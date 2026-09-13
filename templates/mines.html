@@ -126,6 +126,7 @@
         .mines-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr); /* 縦幅の均等化 */
             gap: 6px;
             width: 100%;
             aspect-ratio: 1 / 1;
@@ -147,6 +148,10 @@
             cursor: pointer;
             transition: all 0.1s;
             box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            aspect-ratio: 1 / 1; /* マス自体の正方形維持 */
+            margin: 0;
+            padding: 0;
+            line-height: 1;
         }
 
         .tile:hover:not(.disabled) {
@@ -446,15 +451,24 @@
             };
         }
 
-        // 口座の読み込み
+        // 口座の読み込み（選択状態の保持機能追加）
         async function loadWallets() {
             try {
                 const res = await fetch("/api/wallets", { headers: getHeaders() });
                 if (!res.ok) return;
                 const wallets = await res.json();
+                
+                // 現在の選択値を保存
+                const currentSelected = inputWallet.value;
+                
                 inputWallet.innerHTML = wallets.map(w => 
                     `<option value="${w.wallet_id}">${w.wallet_name} - 残高:${w.balance}G</option>`
                 ).join('');
+                
+                // オプション一覧に保存した値が存在すれば復元する
+                if (currentSelected && wallets.some(w => w.wallet_id === currentSelected)) {
+                    inputWallet.value = currentSelected;
+                }
             } catch (e) {
                 console.error(e);
             }
@@ -520,7 +534,6 @@
             if (tileEl.classList.contains('revealed-gem') || tileEl.classList.contains('revealed-mine')) return;
 
             try {
-                // API仕様に合致させる（game_id と tile_index）
                 const res = await fetch(API_STEP, {
                     method: 'POST',
                     headers: getHeaders(),
@@ -529,13 +542,12 @@
                 const data = await res.json();
                 if (!res.ok) return alert(data.detail || '通信エラー');
 
-                // バックエンドからのレスポンス(is_safe)で判定
                 if (data.is_safe) {
                     // セーフ！
                     tileEl.classList.add('revealed-gem');
                     tileEl.innerHTML = '💎';
                     displayMulti.textContent = `${data.multiplier.toFixed(2)}x`;
-                    displayProfit.textContent = data.current_payout || data.payout; // クリア時は payout に入る
+                    displayProfit.textContent = data.current_payout || data.payout;
                     
                     if (data.is_cleared) {
                         statusText.innerText = `🎉 完璧！全マス制覇！！ +${data.payout} Gold 獲得！！`;
@@ -561,6 +573,7 @@
                     
                     triggerLoseEffects();
                     endGame(data.mines); 
+                    loadWallets();
                 }
             } catch (err) {
                 console.error(err);
@@ -576,7 +589,6 @@
             if (isNaN(bet) || bet <= 0) return alert('賭け金を入力してください');
 
             try {
-                // API仕様に合致させる（wallet_id, amount, mines_count）
                 const res = await fetch(API_START, {
                     method: 'POST',
                     headers: getHeaders(),
@@ -614,7 +626,6 @@
             if (!isPlaying) return;
 
             try {
-                // API仕様に合致させる（game_id）
                 const res = await fetch(API_CASHOUT, {
                     method: 'POST',
                     headers: getHeaders(),
@@ -632,7 +643,6 @@
             }
         }
 
-        // minesArray = 地雷の配置インデックスの配列 [3, 12, 19, ...]
         function endGame(minesArray) {
             isPlaying = false;
             const tiles = grid.querySelectorAll('.tile');
