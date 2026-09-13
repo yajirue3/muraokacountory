@@ -42,11 +42,50 @@
             margin-bottom: 14px; 
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             transition: transform 0.2s, border-color 0.2s;
+            position: relative;
         }
         .game-card:hover {
             border-color: #ffd700;
             transform: translateY(-2px);
         }
+
+        /* 🚨 新要素マインズ専用の激熱ネオンスタイル */
+        .game-card-mines {
+            background: linear-gradient(145deg, #260a2e, #14051a);
+            border: 2px solid #00f3ff;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.35), inset 0 0 15px rgba(255, 0, 127, 0.2);
+            animation: pulse-mines-border 2s infinite alternate;
+        }
+        .game-card-mines:hover {
+            border-color: #ff007f;
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.6);
+        }
+        @keyframes pulse-mines-border {
+            0% { border-color: #00f3ff; box-shadow: 0 0 15px rgba(0, 243, 255, 0.3); }
+            100% { border-color: #ff007f; box-shadow: 0 0 25px rgba(255, 0, 127, 0.5), 0 0 10px rgba(0, 243, 255, 0.3); }
+        }
+
+        .badge-new {
+            position: absolute;
+            top: -10px;
+            right: 12px;
+            background: linear-gradient(135deg, #ff0055, #ff00a0);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #fff;
+            box-shadow: 0 0 10px #ff0055;
+            letter-spacing: 1px;
+            animation: badge-bounce 1s infinite alternate;
+        }
+        @keyframes badge-bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-3px); }
+        }
+
         .game-title { 
             font-weight: bold; 
             color: #ffd700; 
@@ -56,6 +95,10 @@
             align-items: center; 
             gap: 6px; 
             text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+        }
+        .title-mines {
+            color: #00f3ff;
+            text-shadow: 0 0 8px #00f3ff, 0 0 15px #ff007f;
         }
         .game-desc { font-size: 0.8rem; color: #bbb; margin-bottom: 12px; line-height: 1.4; }
         
@@ -87,6 +130,20 @@
             box-shadow: 0 0 18px rgba(255, 87, 51, 0.6);
         }
 
+        .btn-play-mines {
+            background: linear-gradient(135deg, #ff007f 0%, #7928ca 50%, #00f3ff 100%);
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 900;
+            border: 1px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
+            text-shadow: 0 0 6px #000;
+        }
+        .btn-play-mines:hover {
+            filter: brightness(1.25);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.8);
+        }
+
         .btn-back { 
             background: #333; 
             color: #aaa; 
@@ -102,6 +159,14 @@
     <div class="card">
         <div class="header">🎰 王国カジノ（地下娯楽場）</div>
         
+        <!-- 🚨 新要素：マインズ（最上部＆超絶ハイライト） -->
+        <div class="game-card game-card-mines">
+            <div class="badge-new">NEW GAME</div>
+            <div class="game-title title-mines">💣 狂乱マインズ（Mines）</div>
+            <div class="game-desc" style="color: #e0d0f0;">地雷を避けて宝石を掘り当てろ！進めば進むほど配当が爆散跳ね上がる脳汁全開の極限チキンレース！</div>
+            <button class="btn-play btn-play-mines" onclick="location.href='/mines'">⚡ 脳汁ダイブする ⚡</button>
+        </div>
+
         <!-- スロットゲーム -->
         <div class="game-card">
             <div class="game-title">🎰 スロット（Slot）</div>
@@ -109,7 +174,7 @@
             <button class="btn-play" onclick="location.href='/slot'">ゲームをプレイする</button>
         </div>
 
-        <!-- ゲーム一覧 -->
+        <!-- ダイスゲーム -->
         <div class="game-card">
             <div class="game-title">🎲 サイコロ勝負（Dice）</div>
             <div class="game-desc">出目を予想してGoldを賭けるシンプルなダイスゲーム。一攫千金を狙え！</div>
@@ -123,7 +188,7 @@
             <button class="btn-play" onclick="location.href='/tower'">ゲームをプレイする</button>
         </div>
 
-        <!-- カードゲーム（追加） -->
+        <!-- カードバトル -->
         <div class="game-card">
             <div class="game-title">⚔️ カードバトル（Card）</div>
             <div class="game-desc">ドラフトと戦略でライバルと戦う本格対戦カードゲーム。勝利して賞金を掴め！</div>
