@@ -280,102 +280,6 @@ async def cashout_tower(data: TowerCashoutRequest, authorization: str = Header(N
         "new_balance": new_balance
     }
 
-# --- Slot用リクエストモデル ---
-class SlotSpinRequest(BaseModel):
-    wallet_id: str
-    bet_amount: int
-
-# --------------------------------------------------
-# カジノ画面配信ルート：スロット
-# --------------------------------------------------
-@router.get("/slot", response_class=HTMLResponse)
-async def get_slot(request: Request):
-    return templates.TemplateResponse(request=request, name="slot.html")
-
-# --------------------------------------------------
-# カジノAPI：スロットゲーム（配当加算バグ修正版）
-# --------------------------------------------------
-@router.post("/api/slot/spin")
-async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    supabase = await get_supabase()
-
-    if data.bet_amount < 1:
-        raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
-
-    wallet_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-    if not wallet_res.data:
-        raise HTTPException(status_code=400, detail="指定された口座が存在しないか、所有権がありません。")
-
-    wallet = wallet_res.data[0]
-    current_balance = wallet["balance"]
-
-    if current_balance < data.bet_amount:
-        raise HTTPException(status_code=400, detail="口座の残高が不足しています。")
-
-    # 1. 賭け金を即時引き落とし
-    new_balance = current_balance - data.bet_amount
-    
-    # 2. 内部抽選 (配当額 payout は最初から整数 int で計算)
-    rand_val = random.randint(0, 999)
-    
-    if rand_val < 10:    # 確率 1.0%
-        prize = "BIG"
-        payout = int(data.bet_amount * 50)   # 50倍
-        result_symbols = ["7", "7", "7"]
-    elif rand_val < 40:  # 確率 3.0%
-        prize = "REG"
-        payout = int(data.bet_amount * 10)   # 10倍
-        result_symbols = ["BAR", "BAR", "BAR"]
-    elif rand_val < 120: # 確率 8.0%
-        prize = "BELL"
-        payout = int(data.bet_amount * 3)    # 3倍
-        result_symbols = ["BELL", "BELL", "BELL"]
-    elif rand_val < 270: # 確率 15.0%
-        prize = "GRAPE"
-        payout = int(data.bet_amount * 1.5)  # 1.5倍 (切り捨て)
-        result_symbols = ["GRAPE", "GRAPE", "GRAPE"]
-    elif rand_val < 430: # 確率 16.0%
-        prize = "REPLAY"
-        payout = int(data.bet_amount * 1)    # 1倍
-        if random.random() < 0.5:
-            result_symbols = ["REPLAY", "REPLAY", "REPLAY"]
-        else:
-            result_symbols = ["CHERRY", random.choice(["BELL", "GRAPE", "REPLAY"]), random.choice(["BAR", "BELL", "GRAPE"])]
-    else: 
-        prize = "MISS"
-        payout = 0
-        pool = ["7", "BAR", "BELL", "GRAPE", "REPLAY"]
-        result_symbols = [random.choice(pool) for _ in range(3)]
-        
-        # ハズレ補正処理
-        if result_symbols[0] == result_symbols[1] == result_symbols[2]:
-            others = [s for s in pool if s != result_symbols[1]]
-            result_symbols[1] = random.choice(others)
-
-    # 告知（ペカり）フラグ
-    is_pekari = False
-    is_early_pekari = False
-    if prize in ["BIG", "REG"]:
-        is_pekari = True
-        if random.random() < 0.25: 
-            is_early_pekari = True
-
-    # 3. 配当を確実に残高へ加算
-    if payout > 0:
-        new_balance += payout
-        
-    await supabase.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
-
-    return {
-        "prize": prize,
-        "payout": payout,
-        "result_symbols": result_symbols,
-        "is_pekari": is_pekari,
-        "is_early_pekari": is_early_pekari,
-        "new_balance": new_balance
-    }
-    
 # --- Mines用リクエストモデル ---
 class MinesStartRequest(BaseModel):
     wallet_id: str
@@ -400,19 +304,46 @@ async def get_mines(request: Request):
 MINES_SESSIONS = {}
 
 
-# 還元率 96.0% の倍率計算関数
+# --- 🚨 新設：チキン対策・深層ロマン特化コンフィグ 🚨 ---
+def get_mines_config(mines_count: int):
+    """ 地雷数に応じた基礎還元率と最低オープン数の設定 """
+    if mines_count <= 2:
+        return {"base_rtp": 0.85, "min_open": 3}  # チキン: 基礎還元85%・最低3マス縛り
+    elif mines_count <= 4:
+        return {"base_rtp": 0.88, "min_open": 2}  # 標準: 基礎還元88%・最低2マス縛り
+    elif mines_count <= 9:
+        return {"base_rtp": 0.92, "min_open": 2}  # 強気: 基礎還元92%・最低2マス縛り
+    elif mines_count <= 15:
+        return {"base_rtp": 0.96, "min_open": 1}  # 狂気: 高還元96%・1マスOK
+    else:
+        return {"base_rtp": 0.98, "min_open": 1}  # 神頼み: 超高還元98%・1マスOK
+
+
+# --- 📈 進化版：進行度連動型 倍率計算関数 ---
 def get_mines_multiplier(mines_count: int, revealed_count: int) -> float:
     if revealed_count <= 0:
         return 1.0
+        
+    config = get_mines_config(mines_count)
+    max_safe = 25 - mines_count
+    
+    # 進行度（どれくらい深くまで開けたか）に応じて還元率(RTP)が最大+4%まで上昇
+    progress = revealed_count / max_safe
+    current_rtp = config["base_rtp"] + (0.04 * progress)
+    current_rtp = min(0.99, current_rtp)  # 胴元破産防止（上限99%）
+    
+    # 理論勝率の計算
     safe_tiles = 25 - mines_count
     prob = 1.0
     for i in range(revealed_count):
         prob *= (safe_tiles - i) / (25 - i)
-    return round(0.96 / prob, 2)
+        
+    # 現在のRTPを理論確率で割って最終倍率を算出
+    return round(current_rtp / prob, 2)
 
 
 # --------------------------------------------------
-# カジノAPI：マインズゲーム（追加importなし・不正防止仕様）
+# カジノAPI：マインズゲーム（チキン完全封殺・不正防止仕様）
 # --------------------------------------------------
 @router.post("/api/mines/start")
 async def start_mines(data: MinesStartRequest, authorization: str = Header(None)):
@@ -499,81 +430,4 @@ async def step_mines(data: MinesStepRequest, authorization: str = Header(None)):
         revealed_count = len(session["revealed_tiles"])
         max_safe = 25 - session["mines_count"]
 
-        multiplier = get_mines_multiplier(session["mines_count"], revealed_count)
-        current_payout = int(session["bet_amount"] * multiplier)
-
-        # 3. 全安全マス踏破（完全クリア）
-        if revealed_count == max_safe:
-            session["is_active"] = False
-
-            wallet_res = await supabase.table("wallets").select("*").eq("id", session["wallet_db_id"]).execute()
-            wallet = wallet_res.data[0]
-            new_balance = wallet["balance"] + current_payout
-            await supabase.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
-
-            mines = session["mine_positions"]
-            MINES_SESSIONS.pop(data.game_id, None)
-
-            return {
-                "is_safe": True,
-                "tile_index": data.tile_index,
-                "is_cleared": True,
-                "multiplier": multiplier,
-                "payout": current_payout,
-                "new_balance": new_balance,
-                "mines": mines
-            }
-
-        # 4. 途中経過
-        return {
-            "is_safe": True,
-            "tile_index": data.tile_index,
-            "is_cleared": False,
-            "multiplier": multiplier,
-            "current_payout": current_payout,
-            "revealed_count": revealed_count
-        }
-
-    finally:
-        if data.game_id in MINES_SESSIONS:
-            MINES_SESSIONS[data.game_id]["busy"] = False
-
-
-@router.post("/api/mines/cashout")
-async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    supabase = await get_supabase()
-
-    session = MINES_SESSIONS.get(data.game_id)
-    if not session or not session["is_active"]:
-        raise HTTPException(status_code=400, detail="無効または終了したゲームセッションです。")
-    if session["user_id"] != str(user.id):
-        raise HTTPException(status_code=403, detail="不正な操作です。")
-
-    if session["busy"]:
-        raise HTTPException(status_code=429, detail="処理中です。")
-
-    revealed_count = len(session["revealed_tiles"])
-    if revealed_count < 1:
-        raise HTTPException(status_code=400, detail="1マスも開けていないため引き出せません。")
-
-    session["is_active"] = False
-    session["busy"] = True
-
-    multiplier = get_mines_multiplier(session["mines_count"], revealed_count)
-    payout = int(session["bet_amount"] * multiplier)
-
-    wallet_res = await supabase.table("wallets").select("*").eq("id", session["wallet_db_id"]).execute()
-    wallet = wallet_res.data[0]
-    new_balance = wallet["balance"] + payout
-    await supabase.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
-
-    mines = session["mine_positions"]
-    MINES_SESSIONS.pop(data.game_id, None)
-
-    return {
-        "payout": payout,
-        "multiplier": multiplier,
-        "new_balance": new_balance,
-        "mines": mines
-    }
+        multiplier = get_mines_multiplier(session["
