@@ -430,4 +430,87 @@ async def step_mines(data: MinesStepRequest, authorization: str = Header(None)):
         revealed_count = len(session["revealed_tiles"])
         max_safe = 25 - session["mines_count"]
 
-        multiplier = get_mines_multiplier(session["
+        multiplier = get_mines_multiplier(session["mines_count"], revealed_count)
+        current_payout = int(session["bet_amount"] * multiplier)
+
+        # 3. 全安全マス踏破（完全クリア）
+        if revealed_count == max_safe:
+            session["is_active"] = False
+
+            wallet_res = await supabase.table("wallets").select("*").eq("id", session["wallet_db_id"]).execute()
+            wallet = wallet_res.data[0]
+            new_balance = wallet["balance"] + current_payout
+            await supabase.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
+
+            mines = session["mine_positions"]
+            MINES_SESSIONS.pop(data.game_id, None)
+
+            return {
+                "is_safe": True,
+                "tile_index": data.tile_index,
+                "is_cleared": True,
+                "multiplier": multiplier,
+                "payout": current_payout,
+                "new_balance": new_balance,
+                "mines": mines
+            }
+
+        # 4. 途中経過
+        return {
+            "is_safe": True,
+            "tile_index": data.tile_index,
+            "is_cleared": False,
+            "multiplier": multiplier,
+            "current_payout": current_payout,
+            "revealed_count": revealed_count
+        }
+
+    finally:
+        if data.game_id in MINES_SESSIONS:
+            MINES_SESSIONS[data.game_id]["busy"] = False
+
+
+@router.post("/api/mines/cashout")
+async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    session = MINES_SESSIONS.get(data.game_id)
+    if not session or not session["is_active"]:
+        raise HTTPException(status_code=400, detail="無効または終了したゲームセッションです。")
+    if session["user_id"] != str(user.id):
+        raise HTTPException(status_code=403, detail="不正な操作です。")
+
+    if session["busy"]:
+        raise HTTPException(status_code=429, detail="処理中です。")
+
+    # --- 🚨 新設：最低オープン数のルールチェック 🚨 ---
+    revealed_count = len(session["revealed_tiles"])
+    config = get_mines_config(session["mines_count"])
+    
+    if revealed_count < config["min_open"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"【チキン防止】現在の設定では、最低 {config['min_open']} マス開けるまで利確できません！"
+        )
+
+    session["is_active"] = False
+    session["busy"] = True
+
+    multiplier = get_mines_multiplier(session["mines_count"], revealed_count)
+    payout = int(session["bet_amount"] * multiplier)
+
+    wallet_res = await supabase.table("wallets").select("*").eq("id", session["wallet_db_id"]).execute()
+    wallet = wallet_res.data[0]
+    new_balance = wallet["balance"] + payout
+    await supabase.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
+
+    mines = session["mine_positions"]
+    MINES_SESSIONS.pop(data.game_id, None)
+
+    return {
+        "payout": payout,
+        "multiplier": multiplier,
+        "new_balance": new_balance,
+        "mines": mines
+    }
