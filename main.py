@@ -202,9 +202,9 @@ def get_loan(request: Request):
 def get_mines(request: Request):
     return templates.TemplateResponse(request=request, name="mines.html")
 
-@app.get("/mines", response_class=HTMLResponse)
-def get_mines(request: Request):
-    return templates.TemplateResponse(request=request, name="mines.html")
+@app.get("/derby", response_class=HTMLResponse)
+def get_derby(request: Request):
+    return templates.TemplateResponse(request=request, name="derby.html")
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
