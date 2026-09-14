@@ -348,130 +348,76 @@ async def get_transfer_logs(authorization: str = Header(None)):
     
     return {"logs": res.data, "my_wallets": my_wallet_ids}
 
-# ==========================================
-# 8. 市場・オークション関連 API (Market APIs)
-# ==========================================
+# --------------------------------------------------
+# 自由市場（Market）API
+# --------------------------------------------------
 
-@app.get("/api/market/listings", response_model=List[dict])
-def get_market_listings(db: Session = Depends(get_db)):
-    listings = db.query(MarketListing).filter(MarketListing.is_active == True).all()
-    results = []
-    for l in listings:
-        seller = db.query(User).filter(User.id == l.seller_id).first()
-        results.append({
-            "id": l.id,
-            "seller_id": l.seller_id,
-            "seller_username": seller.username if seller else "不明",
-            "item_name": l.item_name,
-            "description": l.description,
-            "price": l.price,
-            "listing_type": l.listing_type,
-            "end_time": l.end_time.isoformat() if l.end_time else None,
-            "created_at": l.created_at.isoformat() if l.created_at else None
-        })
-    return results
+@app.get("/api/market/listings")
+async def get_market_listings(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await client.table("market_listings").select("*").eq("is_active", True).order("created_at", desc=True).execute()
+    return res.data
 
 @app.post("/api/market/sell")
-def create_market_listing(
-    request: MarketSellRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    seller_wallet = db.query(Wallet).filter(Wallet.wallet_id == request.seller_wallet_id, Wallet.user_id == current_user.id).first()
-    if not seller_wallet:
+async def create_market_listing(data: dict, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    seller_wallet_id = data.get("seller_wallet_id")
+    item_name = data.get("item_name")
+    description = data.get("description", "")
+    price = data.get("price", 0)
+    listing_type = data.get("listing_type", "FIXED")
+    duration_hours = data.get("duration_hours", 0)
+
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="価格は1以上で設定してください。")
+
+    w_res = await client.table("wallets").select("*").eq("wallet_id", seller_wallet_id).eq("user_id", user.id).execute()
+    if not w_res.data:
         raise HTTPException(status_code=400, detail="無効な出品用口座です。")
 
-    if request.listing_type == "AUCTION":
-        if not request.duration_hours or request.duration_hours <= 0:
+    end_time = None
+    if listing_type == "AUCTION":
+        if duration_hours <= 0:
             raise HTTPException(status_code=400, detail="オークション期間を正しく設定してください。")
-        end_time = datetime.datetime.utcnow() + datetime.timedelta(hours=request.duration_hours)
-    else:
-        end_time = None
+        end_time = (datetime.now(timezone.utc) + timedelta(hours=duration_hours)).isoformat()
 
-    listing = MarketListing(
-        seller_id=current_user.id,
-        seller_wallet_id=seller_wallet.wallet_id,
-        item_name=request.item_name,
-        description=request.description,
-        price=request.price,
-        listing_type=request.listing_type,
-        end_time=end_time,
-        is_active=True
-    )
-    db.add(listing)
-    db.commit()
-    db.refresh(listing)
+    await client.table("market_listings").insert({
+        "seller_id": user.id,
+        "seller_wallet_id": seller_wallet_id,
+        "item_name": item_name,
+        "description": description,
+        "price": price,
+        "listing_type": listing_type,
+        "end_time": end_time,
+        "is_active": True
+    }).execute()
 
-    return {"message": "出品が完了しました。", "listing_id": listing.id}
+    return {"message": "出品が完了しました。"}
 
 @app.post("/api/market/buy")
-def buy_market_item(
-    request: MarketBuyRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    listing = db.query(MarketListing).filter(MarketListing.id == request.listing_id, MarketListing.is_active == True).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="指定された出品商品は存在しないか、既に終了しています。")
+async def buy_market_item(data: dict, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    listing_id = data.get("listing_id")
+    buyer_wallet_id = data.get("buyer_wallet_id")
+    bid_amount = data.get("bid_amount", 0)
 
-    if listing.seller_id == current_user.id:
-        raise HTTPException(status_code=400, detail="自分の出品した商品は購入できません。")
+    try:
+        res = await client.rpc("execute_market_buy", {
+            "p_listing_id": listing_id,
+            "p_buyer_user_id": str(user.id),
+            "p_buyer_wallet_id": str(buyer_wallet_id),
+            "p_bid_amount": bid_amount
+        }).execute()
+        return {"message": res.data.get("message", "処理が完了しました。")}
+    except Exception as e:
+        err_msg = getattr(e, "message", str(e))
+        raise HTTPException(status_code=400, detail=f"購入・入札エラー: {err_msg}")
 
-    buyer_wallet = db.query(Wallet).filter(Wallet.wallet_id == request.buyer_wallet_id, Wallet.user_id == current_user.id).first()
-    if not buyer_wallet:
-        raise HTTPException(status_code=400, detail="無効な支払用口座です。")
-
-    seller_wallet = db.query(Wallet).filter(Wallet.wallet_id == listing.seller_wallet_id).first()
-    if not seller_wallet:
-        raise HTTPException(status_code=400, detail="出品者の受取口座が存在しません。")
-
-    if listing.listing_type == "FIXED":
-        if buyer_wallet.balance < listing.price:
-            raise HTTPException(status_code=400, detail="残高が不足しています。")
-
-        buyer_wallet.balance -= listing.price
-        seller_wallet.balance += listing.price
-        listing.is_active = False
-
-        tx_buyer = Transaction(wallet_id=buyer_wallet.wallet_id, amount=-listing.price, tx_type="PURCHASE", note=f"商品購入: {listing.item_name}")
-        tx_seller = Transaction(wallet_id=seller_wallet.wallet_id, amount=listing.price, tx_type="SALE", note=f"商品売却: {listing.item_name}")
-        db.add_all([tx_buyer, tx_seller])
-        db.commit()
-
-        return {"message": "購入が完了しました。"}
-
-    elif listing.listing_type == "AUCTION":
-        if datetime.datetime.utcnow() > listing.end_time:
-            raise HTTPException(status_code=400, detail="このオークションは既に終了しています。")
-
-        min_bid = listing.current_bid if listing.current_bid > 0 else listing.price
-        if request.bid_amount <= min_bid:
-            raise HTTPException(status_code=400, detail=f"入札額は現在の価格 ({min_bid} G) より高く設定してください。")
-
-        if buyer_wallet.balance < request.bid_amount:
-            raise HTTPException(status_code=400, detail="入札用の残高が不足しています。")
-
-        # 前回の最高入札者に返金
-        if listing.highest_bidder_id and listing.highest_bidder_wallet_id:
-            prev_wallet = db.query(Wallet).filter(Wallet.wallet_id == listing.highest_bidder_wallet_id).first()
-            if prev_wallet:
-                prev_wallet.balance += listing.current_bid
-                tx_refund = Transaction(wallet_id=prev_wallet.wallet_id, amount=listing.current_bid, tx_type="AUCTION_REFUND", note=f"オークション上書き返金: {listing.item_name}")
-                db.add(tx_refund)
-
-        # 新しい入札者の資金をロック（引き落とし）
-        buyer_wallet.balance -= request.bid_amount
-        listing.current_bid = request.bid_amount
-        listing.highest_bidder_id = current_user.id
-        listing.highest_bidder_wallet_id = buyer_wallet.wallet_id
-
-        tx_bid = Transaction(wallet_id=buyer_wallet.wallet_id, amount=-request.bid_amount, tx_type="AUCTION_BID", note=f"オークション入札: {listing.item_name}")
-        db.add(tx_bid)
-        db.commit()
-
-        return {"message": "入札が完了しました。"}
-
-    raise HTTPException(status_code=400, detail="不正な出品タイプです。")
 
 # --------------------------------------------------
 # 掲示板API（高機能版・ゼロトラスト対応）
@@ -703,7 +649,6 @@ async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
 # 融資・借金（P2Pレンディング）システム API
 # --------------------------------------------------
 
-# 1. 募集中の融資枠一覧を取得
 @app.get("/api/loans/offers")
 async def get_loan_offers(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -711,7 +656,6 @@ async def get_loan_offers(authorization: str = Header(None)):
     res = await client.table("loan_offers").select("*").eq("status", "OPEN").gt("max_amount", 0).order("interest_rate").execute()
     return res.data
 
-# 2. 新規の融資枠を出品（デポジット）
 @app.post("/api/loans/offers")
 async def create_loan_offer(data: LoanOfferCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -737,7 +681,6 @@ async def create_loan_offer(data: LoanOfferCreate, authorization: str = Header(N
     
     return {"message": f"金利 {data.interest_rate}%、融資枠 {data.max_amount}G を市場に出品しました！"}
 
-# 3. 融資枠からお金を借りる（DB行ロック RPC を使用）
 @app.post("/api/loans/borrow")
 async def borrow_loan(data: LoanBorrow, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -757,7 +700,6 @@ async def borrow_loan(data: LoanBorrow, authorization: str = Header(None)):
         err_msg = getattr(e, "message", str(e))
         raise HTTPException(status_code=400, detail=f"借入エラー: {err_msg}")
 
-# 4. 自分の借入状況（負債）を取得
 @app.get("/api/loans/my-debts")
 async def get_my_debts(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -765,16 +707,13 @@ async def get_my_debts(authorization: str = Header(None)):
     res = await client.table("active_loans").select("*, loan_offers(interest_rate)").eq("borrower_user_id", user.id).in_("status", ["ACTIVE", "PAID"]).order("created_at", desc=True).execute()
     return res.data
 
-# 5. 自分の貸付状況（債権）を取得
 @app.get("/api/loans/my-receivables")
 async def get_my_receivables(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
-    # 自身が出品したオファーに紐づく全ての貸し出し（債権）を取得
     res = await client.table("active_loans").select("*, loan_offers!inner(*)").eq("loan_offers.lender_user_id", user.id).order("created_at", desc=True).execute()
     return res.data
 
-# 6. 借金の手動返済（DB行ロック RPC を使用）
 @app.post("/api/loans/repay")
 async def repay_loan(data: LoanRepay, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -792,7 +731,6 @@ async def repay_loan(data: LoanRepay, authorization: str = Header(None)):
     except Exception as e:
         err_msg = getattr(e, "message", str(e))
         raise HTTPException(status_code=400, detail=f"返済エラー: {err_msg}")
-
 
 # --------------------------------------------------
 # カジノモジュールの登録
