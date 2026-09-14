@@ -775,7 +775,7 @@ def calculate_wealth_tax(balance: int) -> int:
 # --------------------------------------------------
 # 資産税徴収 API（毎朝9時 / UTC 0:00 にcron等から呼出）
 # --------------------------------------------------
-@router.post("/api/admin/collect-tax")
+@app.post("/api/admin/collect-tax")
 async def collect_wealth_tax(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
