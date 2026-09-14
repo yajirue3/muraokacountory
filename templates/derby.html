@@ -6,23 +6,25 @@
     <title>村岡王国 - 帝立グランプリ</title>
     <style>
         :root {
-            --bg-dark: #090a0d;
-            --card-bg: #14161d;
+            --bg-dark: #0a0b10;
+            --card-bg: rgba(22, 25, 37, 0.8);
             --border: #2a2e39;
-            --gold: #f59e0b;
-            --gold-glow: rgba(245, 158, 11, 0.25);
+            --gold: #fbbf24;
+            --gold-dark: #b45309;
+            --gold-glow: rgba(251, 191, 36, 0.3);
             --danger: #ef4444;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
             --green: #10b981;
+            --glass-border: rgba(255, 255, 255, 0.05);
         }
 
         body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-            background-color: var(--bg-dark);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: radial-gradient(circle at top, #1a1c29 0%, var(--bg-dark) 100%);
             color: var(--text-main);
             margin: 0;
-            padding: 16px 8px;
+            padding: 20px 10px;
             display: flex;
             justify-content: center;
             min-height: 100vh;
@@ -31,213 +33,243 @@
 
         .wrapper {
             width: 100%;
-            max-width: 960px;
+            max-width: 1000px;
             display: grid;
             grid-template-columns: 1fr;
-            gap: 16px;
+            gap: 24px;
         }
         @media (min-width: 840px) {
-            .wrapper { grid-template-columns: 1.15fr 0.85fr; }
+            .wrapper { grid-template-columns: 1.2fr 0.8fr; }
         }
 
         .card {
             background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
             position: relative;
         }
 
         .header-title {
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: var(--gold);
+            font-size: 1.4rem;
+            font-weight: 900;
+            background: linear-gradient(to right, var(--gold), #fef08a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            text-shadow: 0 0 12px var(--gold-glow);
+            margin-bottom: 16px;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 10px var(--gold-glow);
         }
 
         .jumbotron {
             background: #000;
-            border: 2px solid #374151;
-            border-radius: 10px;
-            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 14px;
-            font-family: monospace;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
         }
-        .live-status { color: var(--gold); font-size: 0.95rem; font-weight: bold; }
-        .clock-display { color: #38bdf8; font-size: 1.1rem; font-weight: bold; }
+        .live-status { color: var(--gold); font-size: 1rem; font-weight: bold; letter-spacing: 1px;}
+        .clock-display { color: #38bdf8; font-size: 1.2rem; font-weight: bold; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);}
 
         .turf {
-            background: radial-gradient(circle at 50% 50%, #154522 0%, #0b2612 100%);
-            border: 3px solid #3f6212;
+            background: linear-gradient(180deg, #154522 0%, #0d2e15 100%);
+            border: 4px solid #2e4a1a;
             border-radius: 12px;
-            padding: 8px 36px 8px 8px;
+            padding: 12px 40px 12px 10px;
             position: relative;
             overflow: hidden;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            box-shadow: inset 0 10px 30px rgba(0,0,0,0.9), 0 5px 15px rgba(0,0,0,0.5);
         }
         .finish-post {
             position: absolute;
-            right: 36px;
+            right: 40px;
             top: 0;
             bottom: 0;
-            width: 4px;
-            background: repeating-linear-gradient(0deg, #fff, #fff 8px, #dc2626 8px, #dc2626 16px);
+            width: 5px;
+            background: repeating-linear-gradient(0deg, #ffffff, #ffffff 10px, #dc2626 10px, #dc2626 20px);
             z-index: 10;
-            box-shadow: 0 0 8px rgba(255,255,255,0.4);
+            box-shadow: -2px 0 10px rgba(255,255,255,0.3);
         }
         .lane {
             position: relative;
-            height: 38px;
+            height: 44px;
             display: flex;
             align-items: center;
-            border-bottom: 1px dashed rgba(255,255,255,0.15);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .lane:last-child { border-bottom: none; }
         
         .horse-badge {
-            width: 22px;
-            height: 22px;
-            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             font-weight: 900;
             color: #fff;
-            margin-right: 6px;
+            margin-right: 8px;
             z-index: 5;
             flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         .horse-name-tag {
             position: absolute;
-            left: 32px;
-            font-size: 0.7rem;
-            color: rgba(255,255,255,0.5);
+            left: 38px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.4);
             pointer-events: none;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
         .runner {
             position: absolute;
-            left: 28px;
-            font-size: 1.3rem;
+            left: 32px;
+            font-size: 1.5rem;
             will-change: transform;
             z-index: 8;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.6));
+            transition: transform 0.1s linear;
         }
 
         .bet-types {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
         }
         .type-btn {
-            background: #1f2430;
+            flex: 1;
+            background: rgba(31, 36, 48, 0.6);
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 8px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 10px;
             font-weight: bold;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             cursor: pointer;
+            transition: all 0.3s ease;
         }
         .type-btn.active {
-            background: var(--gold-glow);
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(180, 83, 9, 0.15));
             color: var(--gold);
             border-color: var(--gold);
+            box-shadow: 0 0 15px var(--gold-glow);
         }
 
         .horse-select-list {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            margin-bottom: 14px;
+            gap: 8px;
+            margin-bottom: 20px;
         }
         .horse-card {
-            background: #1a1e29;
+            background: rgba(26, 30, 41, 0.8);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 10px;
+            padding: 10px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             cursor: pointer;
             transition: all 0.2s ease;
         }
-        .horse-card:hover { border-color: #4b5563; }
-        .horse-card.selected-1 { border-color: var(--gold); background: rgba(245, 158, 11, 0.15); }
-        .horse-card.selected-2 { border-color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
-        .horse-info { display: flex; align-items: center; gap: 8px; }
-
+        .horse-card:hover { border-color: #64748b; transform: translateY(-1px); }
+        .horse-card.selected-1 { border-color: var(--gold); background: rgba(251, 191, 36, 0.1); box-shadow: inset 0 0 10px var(--gold-glow); }
+        .horse-card.selected-2 { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.2); }
+        
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
         input, select {
             width: 100%;
-            padding: 10px 12px;
-            border-radius: 8px;
+            padding: 12px 16px;
+            border-radius: 10px;
             border: 1px solid var(--border);
-            background: #0d0f14;
+            background: rgba(13, 15, 20, 0.9);
             color: #fff;
             box-sizing: border-box;
-            margin-bottom: 10px;
-            font-size: 0.9rem;
+            font-size: 1rem;
+            transition: border-color 0.2s;
         }
-        input:focus, select:focus { outline: none; border-color: var(--gold); }
+        input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 8px var(--gold-glow); }
 
         .btn-bet {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             border: none;
-            border-radius: 8px;
-            font-weight: 800;
-            font-size: 1rem;
+            border-radius: 12px;
+            font-weight: 900;
+            font-size: 1.1rem;
             cursor: pointer;
-            background: linear-gradient(135deg, var(--gold), #d97706);
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
             color: #000;
-            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
             transition: all 0.2s;
         }
-        .btn-bet:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); }
+        .btn-bet:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(251, 191, 36, 0.5); }
+        .btn-bet:active:not(:disabled) { transform: translateY(1px); }
+        .btn-bet:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); background: #333; color: #888; box-shadow: none; }
 
         .btn-admin-instant {
-            background: linear-gradient(135deg, var(--danger), #991b1b);
+            background: linear-gradient(135deg, var(--danger), #7f1d1d);
             color: #fff;
             border: none;
             width: 100%;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 10px;
             font-weight: bold;
-            margin-top: 10px;
+            margin-top: 16px;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            transition: 0.2s;
         }
+        .btn-admin-instant:hover { filter: brightness(1.2); }
 
         .my-ticket-panel {
-            margin-top: 14px;
-            background: #0d0f14;
+            margin-top: 20px;
+            background: rgba(13, 15, 20, 0.6);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 0.75rem;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 0.85rem;
         }
+        .ticket-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .ticket-item:last-child { border-bottom: none; }
+        
         .btn-back {
-            background: #27272a;
-            color: #a1a1aa;
-            border: none;
+            background: rgba(39, 39, 42, 0.8);
+            color: #d4d4d8;
+            border: 1px solid #3f3f46;
             width: 100%;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 10px;
             font-weight: bold;
-            margin-top: 10px;
+            margin-top: 16px;
             cursor: pointer;
+            transition: 0.2s;
         }
+        .btn-back:hover { background: #3f3f46; color: #fff; }
     </style>
 </head>
 <body>
@@ -253,6 +285,7 @@
 
         <div class="turf" id="turf-track">
             <div class="finish-post"></div>
+            <!-- 馬データはJavaScriptで動的に名前をセット -->
             <div class="lane"><div class="horse-badge" style="background:#ef4444;">1</div><span class="horse-name-tag" id="label-1"></span><div class="runner" id="r-1">🐎</div></div>
             <div class="lane"><div class="horse-badge" style="background:#1f2937;">2</div><span class="horse-name-tag" id="label-2"></span><div class="runner" id="r-2">🐎</div></div>
             <div class="lane"><div class="horse-badge" style="background:#b91c1c;">3</div><span class="horse-name-tag" id="label-3"></span><div class="runner" id="r-3">🐎</div></div>
@@ -262,32 +295,35 @@
         </div>
 
         <div class="my-ticket-panel" id="ticket-box">
-            <div style="font-weight: bold; color: var(--gold); margin-bottom: 4px;">🎟️ あなたの購入済み馬券</div>
-            <div id="my-tickets-list">まだ馬券を持っていません。</div>
+            <div style="font-weight: 800; color: var(--gold); margin-bottom: 12px; letter-spacing: 0.5px;">🎟️ 所持馬券</div>
+            <div id="my-tickets-list" style="color: var(--text-muted);">まだ馬券を持っていません。</div>
         </div>
     </div>
 
     <div class="card">
-        <div class="header-title">🎫 馬券投票シート</div>
+        <div class="header-title" style="font-size: 1.2rem; color: #fff; background: none; text-shadow: none;">🎫 投票シート</div>
 
         <div class="bet-types">
-            <button class="type-btn active" id="btn-type-win" onclick="switchBetType('WIN')">単勝 (1着当て)</button>
-            <button class="type-btn" id="btn-type-quinella" onclick="switchBetType('QUINELLA')">馬連 (1-2着ペア)</button>
+            <button class="type-btn active" id="btn-type-win" onclick="switchBetType('WIN')">単勝 (1着)</button>
+            <button class="type-btn" id="btn-type-quinella" onclick="switchBetType('QUINELLA')">馬連 (1-2着)</button>
         </div>
 
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;" id="selection-guide">出走馬を1頭選択してください</div>
+        <div style="font-size: 0.8rem; color: var(--gold); margin-bottom: 10px; font-weight: bold;" id="selection-guide">出走馬を1頭選択してください</div>
         <div class="horse-select-list" id="horse-list"></div>
 
-        <label style="font-size: 0.75rem; color: var(--text-muted);">賭け金 (Gold)</label>
-        <input type="number" id="bet-amount" min="1" step="1" placeholder="例: 1000">
+        <div class="form-group">
+            <label>賭け金 (最大: 50,000 G)</label>
+            <input type="number" id="bet-amount" min="1" max="50000" step="100" placeholder="例: 1000">
+        </div>
 
-        <label style="font-size: 0.75rem; color: var(--text-muted);">投票する口座</label>
-        <select id="wallet-select"></select>
+        <div class="form-group">
+            <label>投票する口座</label>
+            <select id="wallet-select"></select>
+        </div>
 
         <button class="btn-bet" id="btn-submit-bet" onclick="executeBet()">馬券を購入する</button>
         
-        <!-- 国王専用 即時発走トリガー（初期非表示） -->
-        <button class="btn-admin-instant" id="btn-admin-instant" style="display: none;" onclick="executeAdminInstantRace()">👑 国王専用：5秒後に強制発走させる</button>
+        <button class="btn-admin-instant" id="btn-admin-instant" style="display: none;" onclick="executeAdminInstantRace()">👑 国王専用：5秒後に強制発走</button>
         
         <button class="btn-back" onclick="location.href='/casino'">カジノフロアへ戻る</button>
     </div>
@@ -300,7 +336,7 @@
     let currentRace = null;
     let betType = "WIN";
     let selectedHorse1 = 1;
-    let selectedHorse2 = 2;
+    let selectedHorse2 = null;
     let serverTimeOffset = 0;
     let isSettling = false;
     let isFetchingTrajectory = false;
@@ -318,9 +354,7 @@
             const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const prof = await res.json();
-                if (prof.role === "king") {
-                    document.getElementById("btn-admin-instant").style.display = "block";
-                }
+                if (prof.role === "king") document.getElementById("btn-admin-instant").style.display = "block";
             }
         } catch(e) {}
     }
@@ -330,7 +364,7 @@
             const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const wallets = await res.json();
-                document.getElementById("wallet-select").innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance} G)</option>`).join('');
+                document.getElementById("wallet-select").innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()} G)</option>`).join('');
             }
         } catch(e) {}
     }
@@ -354,6 +388,7 @@
         document.getElementById('btn-type-win').classList.toggle('active', type === 'WIN');
         document.getElementById('btn-type-quinella').classList.toggle('active', type === 'QUINELLA');
         document.getElementById('selection-guide').innerText = (type === 'WIN') ? "出走馬を1頭選択してください" : "1着・2着に入る2頭を選択してください";
+        if(type === 'WIN') selectedHorse2 = null;
         renderHorseList();
     }
 
@@ -369,12 +404,12 @@
 
             return `
             <div class="horse-card ${selClass}" onclick="handleSelectHorse(${h})">
-                <div class="horse-info">
+                <div style="display:flex; align-items:center;">
                     <div class="horse-badge" style="background:${horse.color};">${h}</div>
-                    <span style="font-size:0.85rem; font-weight:bold;">${horse.name}</span>
+                    <span style="font-size:0.95rem; font-weight:700;">${horse.name}</span>
                 </div>
-                <div style="font-weight:bold; color:var(--gold); font-size:0.85rem;">
-                    ${betType === 'WIN' ? `x${currentRace.win_odds[h] || 6.0}` : ''}
+                <div style="font-weight:900; color:var(--gold); font-size:1rem;">
+                    ${betType === 'WIN' ? `x${(currentRace.win_odds[h] || 6.0).toFixed(1)}` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -385,11 +420,8 @@
             selectedHorse1 = h;
         } else {
             if (selectedHorse1 === h) return;
-            if (selectedHorse2 === h) {
-                selectedHorse2 = null;
-            } else {
-                selectedHorse2 = h;
-            }
+            if (selectedHorse2 === h) selectedHorse2 = null;
+            else selectedHorse2 = h;
         }
         renderHorseList();
     }
@@ -401,15 +433,15 @@
             return;
         }
         c.innerHTML = currentRace.my_bets.map(b => {
-            if (b.bet_type === 'WIN') {
-                return `<div>[単勝] <b>${b.horse_id}号馬</b> : ${b.amount}G</div>`;
-            } else {
-                return `<div>[馬連] <b>${b.horse_id} - ${b.second_horse_id}</b> : ${b.amount}G</div>`;
-            }
+            const typeStr = b.bet_type === 'WIN' ? `<span style="color:var(--gold)">[単勝]</span>` : `<span style="color:#38bdf8">[馬連]</span>`;
+            const horseStr = b.bet_type === 'WIN' ? `${b.horse_id}号馬` : `${b.horse_id} - ${b.second_horse_id}`;
+            return `<div class="ticket-item">
+                        <div>${typeStr} <b>${horseStr}</b></div>
+                        <div style="font-weight:bold;">${b.amount.toLocaleString()} G</div>
+                    </div>`;
         }).join('');
     }
 
-    // 毎フレーム描画ループ
     function renderLoop() {
         if (currentRace) {
             const accurateNow = Date.now() + serverTimeOffset;
@@ -421,41 +453,38 @@
             const btnBet = document.getElementById("btn-submit-bet");
 
             if (diff > 0) {
-                // 待機中
                 const m = Math.floor(diff / 60);
                 const s = Math.floor(diff % 60);
                 clock.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
                 if (diff < 15) {
-                    ticker.innerText = "⚠️ ゲート入り完了・投票締切！";
-                    ticker.style.color = "var(--danger)";
+                    ticker.innerHTML = "⚠️ ゲート入り完了 <span style='color:var(--danger);'>投票締切</span>";
                     btnBet.disabled = true;
+                    btnBet.innerText = "投票受付終了";
                 } else {
-                    ticker.innerText = "📡 パドック周回中（投票受付中）";
-                    ticker.style.color = "var(--gold)";
+                    ticker.innerText = "📡 パドック周回中";
                     btnBet.disabled = false;
+                    btnBet.innerText = "馬券を購入する";
                 }
                 for (let h = 1; h <= 6; h++) {
                     document.getElementById(`r-${h}`).style.transform = `translateX(0px)`;
                 }
             } else if (diff <= 0 && diff >= -20) {
-                // レース実況中
                 btnBet.disabled = true;
+                btnBet.innerText = "レース中";
 
-                // 発走と同時に軌道データ（秘匿データ）を未取得なら即時取得
                 if (!currentRace.trajectory && !isFetchingTrajectory) {
                     isFetchingTrajectory = true;
                     refreshRace().finally(() => { isFetchingTrajectory = false; });
                 }
 
                 const elapsed = Math.abs(diff);
-                ticker.innerText = `🏁 第4コーナー激走中！ [${elapsed.toFixed(1)}s]`;
+                ticker.innerText = `🏁 激走中！ [${elapsed.toFixed(1)}s]`;
                 ticker.style.color = "#38bdf8";
                 clock.innerText = "LIVE";
 
                 if (currentRace.trajectory) {
                     const turfEl = document.getElementById("turf-track");
-                    const maxRunWidth = turfEl.clientWidth - 68;
-
+                    const maxRunWidth = turfEl.clientWidth - 74; 
                     const prevSec = Math.floor(elapsed);
                     const nextSec = Math.min(20, prevSec + 1);
                     const ratio = elapsed - prevSec;
@@ -469,8 +498,7 @@
                     }
                 }
             } else {
-                // 確定・精算中
-                ticker.innerText = "🏆 ゴールイン！ 審議・配当集計中...";
+                ticker.innerText = "🏆 審議・配当集計中...";
                 ticker.style.color = "var(--green)";
                 clock.innerText = "FIN";
 
@@ -495,13 +523,16 @@
         const amt = parseInt(document.getElementById("bet-amount").value, 10);
         const wId = document.getElementById("wallet-select").value;
 
-        if (isNaN(amt) || amt <= 0 || !wId) return alert("正しい賭け金と口座を選択してください。");
+        // UI側での上限バリデーション追加
+        if (isNaN(amt) || amt < 1 || amt > 50000) return alert("賭け金は1〜50,000Gの範囲で指定してください。");
+        if (!wId) return alert("口座を選択してください。");
         if (betType === 'QUINELLA' && (!selectedHorse1 || !selectedHorse2 || selectedHorse1 === selectedHorse2)) {
             return alert("馬連は異なる2頭を選択してください。");
         }
 
         const btn = document.getElementById("btn-submit-bet");
         btn.disabled = true;
+        btn.innerText = "処理中...";
 
         try {
             const res = await fetch("/api/derby/bet", {
@@ -524,11 +555,14 @@
                 await refreshRace();
             }
         } catch(e) { alert("通信エラー"); }
-        finally { btn.disabled = false; }
+        finally { 
+            btn.disabled = false;
+            btn.innerText = "馬券を購入する";
+        }
     }
 
     async function executeAdminInstantRace() {
-        if (!confirm("現在のレースを5秒後に強制発走させますか？（新規投票は直ちに締め切られます）")) return;
+        if (!confirm("強制発走させますか？（投票は締め切られます）")) return;
         try {
             const res = await fetch("/api/admin/derby/instant-race", {
                 method: "POST",
