@@ -742,69 +742,41 @@ from fastapi import Header, HTTPException
 from db import get_supabase
 from casino import get_user_from_token
 
-
 def calculate_wealth_tax(balance: int) -> int:
     """
-    【マイルド版 累進資産税計算】
-    超過累進方式（各階層の超過分のみに税率適用）
-    
-    ・10万以下: 0%（一般層は完全無税）
-    ・10万〜100万: 0.1%（1日あたり最大 900 Gold）
-    ・100万〜1000万: 0.3%（1日あたり最大 27,000 Gold）
-    ・1000万超: 1.0%（数十億プレイヤーから毎日確実に回収）
+    【火金・完全一律 0.5%版】
+    ・10万以下: 0%（初心者保護のため無税）
+    ・10万超: 所持金全額に対して一律 0.5%
     """
     if balance <= 100_000:
         return 0
 
-    tax = 0
-    temp_balance = balance
-
-    # 1000万超の超過分: 1.0%
-    if temp_balance > 10_000_000:
-        tax += int((temp_balance - 10_000_000) * 0.01)
-        temp_balance = 10_000_000
-
-    # 100万〜1000万の超過分: 0.3%
-    if temp_balance > 1_000_000:
-        tax += int((temp_balance - 1_000_000) * 0.003)
-        temp_balance = 1_000_000
-
-    # 10万〜100万の超過分: 0.1%
-    if temp_balance > 100_000:
-        tax += int((temp_balance - 100_000) * 0.001)
-
-    return tax
+    # 一律0.5% (例: 1000万なら5万G、10億なら500万G)
+    return int(balance * 0.005)
 
 
-# --------------------------------------------------
-# 資産税徴収 API（王が手動実行、またはcron等から呼出）
-# --------------------------------------------------
 @app.post("/api/admin/collect-tax")
 async def collect_wealth_tax(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
 
-    # 1. profiles テーブルから role を取得して権限チェック（"king" のみ許可）
+    # roleカラムで王(king)かチェック
     profile_res = await supabase.table("profiles").select("role").eq("id", user.id).execute()
     if not profile_res.data or profile_res.data[0].get("role") != "king":
         raise HTTPException(status_code=403, detail="管理者（King）権限がありません。")
 
-    # 2. 課税対象（10万Gold超）のウォレットを取得
     wallet_res = await supabase.table("wallets").select("id, wallet_id, balance").gt("balance", 100000).execute()
     wallets = wallet_res.data or []
 
     taxed_results = []
     total_tax_collected = 0
 
-    # 3. 各ウォレットから税金を差し引き
     for w in wallets:
         current_bal = w["balance"]
         tax_amount = calculate_wealth_tax(current_bal)
 
         if tax_amount > 0:
             new_bal = current_bal - tax_amount
-
-            # 口座残高を安全に更新
             await supabase.table("wallets").update({"balance": new_bal}).eq("id", w["id"]).execute()
 
             total_tax_collected += tax_amount
