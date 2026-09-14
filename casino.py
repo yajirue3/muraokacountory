@@ -12,6 +12,25 @@ from db import get_supabase
 # ルーターの定義
 router = APIRouter()
 
+import asyncio
+
+# アプリ起動時に裏で回すバックグラウンドループ
+async def derby_scheduler():
+    while True:
+        try:
+            # 常に「次の枠（00分または30分）」のレースを事前生成しておく
+            await get_or_create_current_race()
+        except Exception as e:
+            print(f"[Derby Scheduler Error] {e}")
+        # 30秒ごとにチェック
+        await asyncio.sleep(30)
+
+# FastAPIの起動イベントでタスクを開始
+@router.on_event("startup")
+async def start_derby_task():
+    asyncio.create_task(derby_scheduler())
+
+
 # テンプレートの設定
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -617,19 +636,29 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "new_balance": new_balance
     }
 
-
 # ==================================================
 # 王国ダービー（競馬）モジュール
 # ==================================================
 from datetime import datetime, timezone, timedelta
+import asyncio
 
 class DerbyBetRequest(BaseModel):
     race_id: int
     wallet_id: str
-    horse_id: int  # 1 〜 6
+    bet_type: str  # "WIN" or "QUINELLA"
+    horse1: int
+    horse2: int = None
     amount: int
 
-# 毎時00分・30分の発走時刻を取得
+HORSE_NAMES = {
+    1: {"name": "ムラオカテイオー", "color": "#ef4444"},   # 1枠: 白/赤
+    2: {"name": "ブラックドレイ",   "color": "#1f2937"},   # 2枠: 黒
+    3: {"name": "シャッキンヌス",   "color": "#dc2626"},   # 3枠: 赤
+    4: {"name": "コッコウサクシュ", "color": "#2563eb"},   # 4枠: 青
+    5: {"name": "ハイエナゴールド", "color": "#eab308"},   # 5枠: 黄
+    6: {"name": "チキンキラー",     "color": "#16a34a"},   # 6枠: 緑
+}
+
 def get_next_race_time() -> datetime:
     now = datetime.now(timezone.utc)
     target_minute = 30 if now.minute < 30 else 0
@@ -638,30 +667,33 @@ def get_next_race_time() -> datetime:
         next_time += timedelta(hours=1)
     return next_time
 
-# サーバー側で完全固定されるミリ秒単位の軌道生成（全20秒）
 def generate_race_trajectory():
     horses = [1, 2, 3, 4, 5, 6]
     random.shuffle(horses)
     winner = horses[0]
+    second = horses[1]
     
     trajectory = {h: [0.0] for h in range(1, 7)}
     positions = {h: 0.0 for h in range(1, 7)}
     
-    # 20ステップ（1ステップ1秒）
     for step in range(1, 21):
         for h in range(1, 7):
             if step == 20:
-                positions[h] = 100.0 if h == winner else round(random.uniform(92.0, 98.5), 2)
+                if h == winner:
+                    positions[h] = 100.0
+                elif h == second:
+                    positions[h] = round(random.uniform(97.0, 98.8), 2)
+                else:
+                    positions[h] = round(random.uniform(91.0, 96.0), 2)
             else:
-                remaining_steps = 20 - step
-                target_dist = 100.0 - positions[h]
-                step_gain = (target_dist / remaining_steps) + random.uniform(-1.5, 2.0)
-                positions[h] = round(min(99.0, max(positions[h] + step_gain, positions[h])), 2)
+                rem = 20 - step
+                dist = 100.0 - positions[h]
+                gain = (dist / rem) + random.uniform(-2.0, 2.2)
+                positions[h] = round(min(98.5, max(positions[h] + gain, positions[h])), 2)
             trajectory[h].append(positions[h])
             
-    return winner, trajectory
+    return winner, second, trajectory
 
-# レースセッションの確保・自動生成
 async def get_or_create_current_race():
     client = await get_supabase()
     target_time = get_next_race_time()
@@ -670,10 +702,11 @@ async def get_or_create_current_race():
     if res.data and len(res.data) > 0:
         return res.data[0]
         
-    winner, trajectory = generate_race_trajectory()
+    winner, second, trajectory = generate_race_trajectory()
     new_race = {
         "start_time": target_time.isoformat(),
         "winner_horse_id": winner,
+        "second_horse_id": second,
         "trajectory": trajectory,
         "status": "OPEN"
     }
@@ -684,27 +717,22 @@ async def get_or_create_current_race():
 async def get_derby_page(request: Request):
     return templates.TemplateResponse(request=request, name="derby.html")
 
-# 現在のレース情報・全オッズの取得
 @router.get("/api/derby/current")
 async def get_derby_current(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     race = await get_or_create_current_race()
     
-    # オッズと賭け状況の算出
-    bets_res = await client.table("derby_bets").select("horse_id, amount").eq("race_id", race["id"]).execute()
+    bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).execute()
     bets = bets_res.data or []
     
-    total_pool = sum(b["amount"] for b in bets)
-    horse_pools = {h: sum(b["amount"] for b in bets if b["horse_id"] == h) for h in range(1, 7)}
-    
-    odds = {}
-    payout_pool = total_pool * 0.85
+    # 単勝オッズ
+    win_bets = [b for b in bets if b["bet_type"] == "WIN"]
+    win_total = sum(b["amount"] for b in win_bets)
+    win_pools = {h: sum(b["amount"] for b in win_bets if b["horse_id"] == h) for h in range(1, 7)}
+    win_odds = {}
     for h in range(1, 7):
-        if horse_pools[h] > 0 and payout_pool > 0:
-            odds[h] = round(payout_pool / horse_pools[h], 2)
-        else:
-            odds[h] = 6.0  # デフォルト基準オッズ
+        win_odds[h] = round((win_total * 0.85) / win_pools[h], 2) if win_pools[h] > 0 else 6.0
 
     my_bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).eq("user_id", user.id).execute()
 
@@ -713,13 +741,11 @@ async def get_derby_current(authorization: str = Header(None)):
         "start_time": race["start_time"],
         "server_time": datetime.now(timezone.utc).isoformat(),
         "trajectory": race["trajectory"],
-        "odds": odds,
-        "horse_pools": horse_pools,
-        "total_pool": total_pool,
+        "win_odds": win_odds,
+        "horses": HORSE_NAMES,
         "my_bets": my_bets_res.data or []
     }
 
-# 馬券購入 (ゼロトラストRPC)
 @router.post("/api/derby/bet")
 async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -729,14 +755,15 @@ async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
             "p_race_id": data.race_id,
             "p_user_id": str(user.id),
             "p_wallet_id": data.wallet_id,
-            "p_horse_id": data.horse_id,
+            "p_bet_type": data.bet_type,
+            "p_horse1": data.horse1,
+            "p_horse2": data.horse2,
             "p_amount": data.amount
         }).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
-# レース終了後の自動精算トリガー (レース終了時にフロントから発火)
 @router.post("/api/derby/settle/{race_id}")
 async def settle_derby(race_id: int):
     client = await get_supabase()
@@ -745,3 +772,16 @@ async def settle_derby(race_id: int):
         return res.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# 常時監視バックグラウンドタスク
+async def derby_scheduler():
+    while True:
+        try:
+            await get_or_create_current_race()
+        except Exception as e:
+            pass
+        await asyncio.sleep(30)
+
+@router.on_event("startup")
+async def start_derby_task():
+    asyncio.create_task(derby_scheduler())
