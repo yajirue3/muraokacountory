@@ -613,6 +613,7 @@ async def king_override_contract(contract_id: int, action: dict, authorization: 
 # --------------------------------------------------
 import time
 from collections import defaultdict
+from pydantic import BaseModel, Field
 
 # --- メモリベースのスパム連打防止機構 ---
 _post_history = defaultdict(list)
@@ -620,52 +621,54 @@ _banned_until = {}
 
 def enforce_rate_limit(user_id: str):
     now = time.time()
-    # 1. バン期間の確認
     if user_id in _banned_until:
         if now < _banned_until[user_id]:
             remain = int(_banned_until[user_id] - now)
-            raise HTTPException(status_code=429, detail=f"連投制限中（ペナルティ）です。残り {remain} 秒")
+            raise HTTPException(status_code=429, detail=f"連投制限中です。残り {remain} 秒お待ちください。")
         else:
             del _banned_until[user_id]
 
     history = _post_history[user_id]
-    # 過去10秒の履歴だけ残す
     history = [t for t in history if now - t <= 10]
     
-    # 2. バースト検知 (10秒間に8回以上で1分間BAN)
     if len(history) >= 8:
         _banned_until[user_id] = now + 60
         raise HTTPException(status_code=429, detail="スパム行為を検知したため、1分間投稿を禁止します。")
     
-    # 3. 最低クールダウン (1秒)
     if history and now - history[-1] < 1.0:
         raise HTTPException(status_code=429, detail="送信が早すぎます。1秒お待ちください。")
     
     history.append(now)
     _post_history[user_id] = history
 
+# --- 厳格なバリデーションモデル ---
 class BoardPostCreate(BaseModel):
     content: str
     user_title: str = "奴隷"
     wallet_id: Optional[str] = None
-    airdrop_amount: int = 0
-    airdrop_total: int = 0
+    # マイナス値による不正引き出しやバグをAPI層で完全ブロック
+    airdrop_amount: int = Field(0, ge=0, description="配布額は0以上")
+    airdrop_total: int = Field(0, ge=0, description="配布枠は0以上")
 
 class AirdropClaim(BaseModel):
     wallet_id: str
 
 class TipRequest(BaseModel):
     wallet_id: str
-    amount: int
+    # チップは必ず1G以上（マイナス値による残高泥棒を防止）
+    amount: int = Field(..., gt=0, description="チップは1G以上必要です")
 
 @app.get("/api/board/posts")
 async def get_board_posts(page: int = 1, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
+    # マイナス・ゼロページへのアクセスを防止
+    if page < 1:
+        page = 1
+        
     client = await get_supabase()
     limit = 20
     offset = (page - 1) * limit
 
-    # ピン留め投稿と通常投稿を分けて取得
     pinned_res = await client.table("board_posts").select("*").eq("is_pinned", True).order("created_at", desc=True).execute()
     normal_res = await client.table("board_posts").select("*").eq("is_pinned", False).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     
@@ -675,7 +678,6 @@ async def get_board_posts(page: int = 1, authorization: str = Header(None)):
     if not post_ids:
         return {"posts": [], "is_king": await is_king(user.id)}
 
-    # リアクションとエアドロップ履歴を一括取得
     react_res = await client.table("board_reactions").select("*").in_("post_id", post_ids).execute()
     claims_res = await client.table("board_airdrop_claims").select("*").in_("post_id", post_ids).eq("user_id", user.id).execute()
 
@@ -700,19 +702,25 @@ async def create_board_post(data: BoardPostCreate, authorization: str = Header(N
     user = await get_user_from_token(authorization)
     enforce_rate_limit(user.id)
     
-    if len(data.content) > 400:
+    # 空白のみの投稿と、文字数超過をブロック
+    clean_content = data.content.strip()
+    if not clean_content:
+        raise HTTPException(status_code=400, detail="本文が入力されていません。")
+    if len(clean_content) > 400:
         raise HTTPException(status_code=400, detail="本文は400文字以内で入力してください。")
 
     client = await get_supabase()
     prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
-    # エアドロップがある場合はウォレットから引き落とし
+    # ばらまき設定の整合性チェック
     if data.airdrop_amount > 0 and data.airdrop_total > 0:
+        if data.airdrop_amount < 100:
+            raise HTTPException(status_code=400, detail="1人あたりのばらまき額は最低100G必要です。")
         if not data.wallet_id:
-            raise HTTPException(status_code=400, detail="お金配りを行う口座を指定してください。")
+            raise HTTPException(status_code=400, detail="ばらまきを行う口座を指定してください。")
+            
         total_cost = data.airdrop_amount * data.airdrop_total
-        
         w_res = await client.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
         if not w_res.data or w_res.data[0]["balance"] < total_cost:
             raise HTTPException(status_code=400, detail="口座の残高が不足しています。")
@@ -723,11 +731,11 @@ async def create_board_post(data: BoardPostCreate, authorization: str = Header(N
         "user_id": user.id,
         "nickname": nickname,
         "user_title": data.user_title,
-        "content": data.content,
+        "content": clean_content,
         "airdrop_amount": data.airdrop_amount,
         "airdrop_total": data.airdrop_total
     }).execute()
-    return {"message": "回覧板に投稿しました。"}
+    return {"message": "回覧板に布告しました。"}
 
 @app.delete("/api/board/posts/{post_id}")
 async def delete_board_post(post_id: int, authorization: str = Header(None)):
@@ -742,7 +750,7 @@ async def delete_board_post(post_id: int, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail="削除権限がありません。")
 
     await client.table("board_posts").delete().eq("id", post_id).execute()
-    return {"message": "投稿を削除しました。"}
+    return {"message": "投稿を消し去りました。"}
 
 @app.post("/api/board/posts/{post_id}/react")
 async def toggle_reaction(post_id: int, type_data: dict, authorization: str = Header(None)):
@@ -757,7 +765,7 @@ async def toggle_reaction(post_id: int, type_data: dict, authorization: str = He
         await client.table("board_reactions").delete().eq("post_id", post_id).eq("user_id", user.id).eq("reaction_type", rtype).execute()
     else:
         await client.table("board_reactions").insert({"post_id": post_id, "user_id": user.id, "reaction_type": rtype}).execute()
-    return {"message": "リアクションを更新しました。"}
+    return {"message": "反応を示しました。"}
 
 @app.post("/api/board/posts/{post_id}/claim")
 async def claim_airdrop(post_id: int, data: AirdropClaim, authorization: str = Header(None)):
@@ -767,7 +775,7 @@ async def claim_airdrop(post_id: int, data: AirdropClaim, authorization: str = H
         res = await client.rpc("claim_board_airdrop", {
             "p_post_id": post_id, "p_user_id": str(user.id), "p_wallet_id": data.wallet_id
         }).execute()
-        return {"message": f"{res.data['amount']}G を受け取りました！"}
+        return {"message": f"{res.data['amount']}G の施しを受け取りました！"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
@@ -780,7 +788,7 @@ async def tip_post(post_id: int, data: TipRequest, authorization: str = Header(N
             "p_post_id": post_id, "p_sender_user_id": str(user.id), 
             "p_sender_wallet_id": data.wallet_id, "p_amount": data.amount
         }).execute()
-        return {"message": f"投稿者に {data.amount}G チップを送りました！"}
+        return {"message": f"投稿者に {data.amount}G を投げました！"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
@@ -788,8 +796,14 @@ async def tip_post(post_id: int, data: TipRequest, authorization: str = Header(N
 async def report_post(post_id: int, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
+    
+    # 複数回通報しても1レコードになるようON CONFLICTを想定（簡易的に存在チェック）
+    exist = await client.table("board_reports").select("*").eq("post_id", post_id).eq("reporter_id", user.id).execute()
+    if exist.data:
+         raise HTTPException(status_code=400, detail="既に通報済みです。")
+         
     await client.table("board_reports").insert({"post_id": post_id, "reporter_id": user.id}).execute()
-    return {"message": "国王へ密告しました。"}
+    return {"message": "国王へ密告しました。対応をお待ちください。"}
 
 @app.get("/api/board/admin/reports")
 async def get_reports_admin(authorization: str = Header(None)):
@@ -807,7 +821,7 @@ async def dismiss_report(report_id: int, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail="権限がありません")
     client = await get_supabase()
     await client.table("board_reports").delete().eq("id", report_id).execute()
-    return {"message": "通報を破棄しました。"}
+    return {"message": "通報をリストから破棄しました。"}
 
 @app.post("/api/board/posts/{post_id}/pin")
 async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
@@ -818,7 +832,8 @@ async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
     post = await client.table("board_posts").select("is_pinned").eq("id", post_id).execute()
     new_status = not post.data[0]["is_pinned"]
     await client.table("board_posts").update({"is_pinned": new_status}).eq("id", post_id).execute()
-    return {"message": "布告(ピン)状態を変更しました。"}
+    return {"message": "布告(ピン)状態を切り替えました。"}
+
 
 # --------------------------------------------------
 # 追加: 融資・借金（P2Pレンディング）システム API
