@@ -7,12 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen pb-8">
-    <!-- ヘッダー（コンパクト化） -->
+    <!-- ヘッダー -->
     <header class="bg-slate-800 border-b border-slate-700 px-4 py-2 sticky top-0 z-50">
         <div class="max-w-md mx-auto flex justify-between items-center">
-            <h1 class="text-base font-bold text-yellow-500 flex items-center gap-1">🏇 国営ダービー</h1>
             <div class="flex items-center space-x-2">
-                <select id="walletSelect" onchange="loadWallets()" class="bg-slate-700 text-xs p-1.5 rounded border border-slate-600 focus:outline-none max-w-[120px] truncate">
+                <!-- カジノへ戻るボタン -->
+                <a href="/casino" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded border border-slate-600 transition">
+                    &larr; カジノ
+                </a>
+                <h1 class="text-base font-bold text-yellow-500 flex items-center gap-1">🏇 ダービー</h1>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <select id="walletSelect" onchange="loadWallets()" class="bg-slate-700 text-xs p-1.5 rounded border border-slate-600 focus:outline-none max-w-[110px] truncate">
                     <option value="">読み込み中...</option>
                 </select>
                 <div class="bg-slate-900 px-2 py-1 rounded border border-slate-700 text-xs">
@@ -23,6 +30,17 @@
     </header>
 
     <main class="max-w-md mx-auto p-3 space-y-4">
+        <!-- 国王専用コマンドパネル (role === 'king' の場合のみ表示) -->
+        <div id="kingAdminPanel" class="hidden bg-yellow-950/40 border border-yellow-600/50 p-3 rounded-xl space-y-2">
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-yellow-400 flex items-center gap-1">👑 国王統制パネル</span>
+                <span class="text-[10px] bg-yellow-600 text-black px-1.5 py-0.5 rounded font-bold">KING ONLY</span>
+            </div>
+            <button id="btnForceStart" onclick="forceStartRace()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-extrabold py-2 rounded text-xs shadow transition active:scale-95">
+                ⚡ 次回レースを即時発走させる（カウントダウンリセット）
+            </button>
+        </div>
+
         <!-- レース状態ステータス -->
         <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center flex justify-between items-center px-4">
             <div>
@@ -81,6 +99,14 @@
                 </div>
             </div>
 
+            <!-- プリセットボタンUI -->
+            <div class="flex gap-1 justify-between">
+                <button type="button" onclick="setBet(1000)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-[10px] py-1 rounded text-slate-300 border border-slate-600">1,000</button>
+                <button type="button" onclick="setBet(5000)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-[10px] py-1 rounded text-slate-300 border border-slate-600">5,000</button>
+                <button type="button" onclick="setBet(10000)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-[10px] py-1 rounded text-slate-300 border border-slate-600">10,000</button>
+                <button type="button" onclick="setMaxBet()" class="flex-1 bg-yellow-700/60 hover:bg-yellow-600/80 text-[10px] py-1 rounded text-yellow-300 border border-yellow-600 font-bold">ALL IN</button>
+            </div>
+
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label id="horse1Label" class="block text-[10px] text-slate-400 mb-0.5">予想馬</label>
@@ -115,7 +141,7 @@
         <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-2">
             <h3 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-1.5 flex items-center gap-1">📊 単勝オッズ</h3>
             <div class="grid grid-cols-2 gap-1.5" id="oddsList">
-                <!-- JavaScriptで動的生成 -->
+                <!-- JS生成 -->
             </div>
         </div>
     </main>
@@ -124,8 +150,50 @@
         let currentRace = null;
         let isSettling = false;
         let lastSettledId = null;
+        let rawBalance = 0;
 
         function getToken() { return localStorage.getItem("access_token"); }
+
+        // 国王権限チェック
+        async function checkKingPermission() {
+            const token = getToken();
+            if (!token) return;
+            try {
+                const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
+                const profile = await res.json();
+                if (profile && profile.role === "king") {
+                    document.getElementById("kingAdminPanel").classList.remove("hidden");
+                }
+            } catch (e) { console.error("国王権限確認エラー:", e); }
+        }
+
+        // 国王専用即時発走（連打ガード付き）
+        async function forceStartRace() {
+            if (!confirm("現在のレースを即時発走させますか？")) return;
+            const btn = document.getElementById("btnForceStart");
+            btn.disabled = true;
+            btn.innerText = "処理中...";
+            
+            const token = getToken();
+            try {
+                const res = await fetch("/api/derby/force-start", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    alert("レースを即時開始しました！");
+                    await refreshRace();
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || "即時開始に失敗しました。");
+                }
+            } catch (e) {
+                alert("通信エラーが発生しました");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "⚡ 次回レースを即時発走させる（カウントダウンリセット）";
+            }
+        }
 
         async function loadWallets() {
             const token = getToken();
@@ -139,9 +207,19 @@
                     select.innerHTML += `<option value="${w.wallet_id}">${w.wallet_name}</option>`;
                 });
                 if(data.length > 0) {
-                    document.getElementById("userBalance").innerText = data[0].balance.toLocaleString();
+                    rawBalance = data[0].balance;
+                    document.getElementById("userBalance").innerText = rawBalance.toLocaleString();
                 }
             } catch(e) { console.error(e); }
+        }
+
+        // 賭け金入力の補助
+        function setBet(val) {
+            document.getElementById("betAmount").value = val;
+        }
+
+        function setMaxBet() {
+            document.getElementById("betAmount").value = rawBalance > 0 ? rawBalance : 0;
         }
 
         function toggleBetInputs() {
@@ -183,20 +261,35 @@
             }
         }
 
+        // 馬券購入（バリデーション＆二重送信ガード実装）
         async function placeBet() {
-            const token = getToken();
+            const btnBet = document.getElementById("btnBet");
             const walletId = document.getElementById("walletSelect").value;
             const betType = document.getElementById("betType").value;
             const horse1 = parseInt(document.getElementById("horse1").value);
             const horse2 = betType === "QUINELLA" ? parseInt(document.getElementById("horse2").value) : null;
             const amount = parseInt(document.getElementById("betAmount").value);
 
+            // 1. バリデーションチェック (SQL・バックエンドエラーを未然防止)
+            if (isNaN(amount) || amount <= 0) {
+                alert("賭け金は1G以上の正の数値を指定してください。");
+                return;
+            }
+            if (amount > rawBalance) {
+                alert("所持金を超えて賭けることはできません。");
+                return;
+            }
             if(betType === "QUINELLA" && horse1 === horse2) {
                 alert("馬連の場合は異なる2頭を選択してください。");
                 return;
             }
 
+            // 2. 二重送信ガード (連打防止)
+            btnBet.disabled = true;
+            btnBet.innerText = "購入処理中...";
+
             try {
+                const token = getToken();
                 const res = await fetch("/api/derby/bet", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -219,9 +312,12 @@
                 const successMsg = typeof data === 'string' ? data : (data.message || "馬券を購入しました！");
                 alert(successMsg);
                 await loadWallets();
-                await refreshRace(); // オッズを即座に最新化
+                await refreshRace();
             } catch(e) {
                 alert(e.message || "エラーが発生しました");
+            } finally {
+                btnBet.disabled = false;
+                btnBet.innerText = "馬券を購入する";
             }
         }
 
@@ -241,8 +337,10 @@
                     countdownElem.innerText = `${m}:${s}`;
                     statusElem.innerText = "投票受付中";
                     statusElem.className = "text-xs font-semibold text-green-400";
-                    btnBet.disabled = false;
-                    btnBet.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded text-xs shadow transition duration-200";
+                    if (!btnBet.disabled && btnBet.innerText !== "購入処理中...") {
+                        btnBet.disabled = false;
+                        btnBet.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded text-xs shadow transition duration-200";
+                    }
                 } else if (diffSec > -20) {
                     countdownElem.innerText = "RACING";
                     statusElem.innerText = "出走中！";
@@ -290,6 +388,7 @@
         }
 
         window.onload = async () => {
+            await checkKingPermission();
             await loadWallets();
             await refreshRace();
             setInterval(refreshRace, 10000);
