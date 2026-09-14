@@ -151,7 +151,7 @@ async def play_dice(data: DicePlayRequest, authorization: str = Header(None)):
 
 
 # --------------------------------------------------
-# カジノAPI：タワーゲーム（イカサマ防止 & RTP 90.0%）
+# カジノAPI：タワーゲーム（公平乱数 & RTP 90.0%）
 # --------------------------------------------------
 @router.post("/api/tower/start")
 async def start_tower(data: TowerStartRequest, authorization: str = Header(None)):
@@ -308,22 +308,21 @@ async def get_mines(request: Request):
 MINES_SESSIONS = {}
 
 
-# --- 🚨 新設：チキン対策・深層ロマン特化コンフィグ 🚨 ---
+# --- 地雷数に応じた基礎還元率と最低オープン数の設定 ---
 def get_mines_config(mines_count: int):
-    """ 地雷数に応じた基礎還元率と最低オープン数の設定 """
     if mines_count <= 2:
-        return {"base_rtp": 0.85, "min_open": 3}  # チキン: 基礎還元85%・最低3マス縛り
+        return {"base_rtp": 0.85, "min_open": 3}
     elif mines_count <= 4:
-        return {"base_rtp": 0.88, "min_open": 2}  # 標準: 基礎還元88%・最低2マス縛り
+        return {"base_rtp": 0.88, "min_open": 2}
     elif mines_count <= 9:
-        return {"base_rtp": 0.92, "min_open": 2}  # 強気: 基礎還元92%・最低2マス縛り
+        return {"base_rtp": 0.92, "min_open": 2}
     elif mines_count <= 15:
-        return {"base_rtp": 0.96, "min_open": 1}  # 狂気: 高還元96%・1マスOK
+        return {"base_rtp": 0.96, "min_open": 1}
     else:
-        return {"base_rtp": 0.98, "min_open": 1}  # 神頼み: 超高還元98%・1マスOK
+        return {"base_rtp": 0.98, "min_open": 1}
 
 
-# --- 📈 進化版：進行度連動型 倍率計算関数 ---
+# --- 進行度連動型 倍率計算関数 ---
 def get_mines_multiplier(mines_count: int, revealed_count: int) -> float:
     if revealed_count <= 0:
         return 1.0
@@ -331,23 +330,20 @@ def get_mines_multiplier(mines_count: int, revealed_count: int) -> float:
     config = get_mines_config(mines_count)
     max_safe = 25 - mines_count
     
-    # 進行度（どれくらい深くまで開けたか）に応じて還元率(RTP)が最大+4%まで上昇
     progress = revealed_count / max_safe
     current_rtp = config["base_rtp"] + (0.04 * progress)
-    current_rtp = min(0.99, current_rtp)  # 胴元破産防止（上限99%）
+    current_rtp = min(0.99, current_rtp)
     
-    # 理論勝率の計算
     safe_tiles = 25 - mines_count
     prob = 1.0
     for i in range(revealed_count):
         prob *= (safe_tiles - i) / (25 - i)
         
-    # 現在のRTPを理論確率で割って最終倍率を算出
     return round(current_rtp / prob, 2)
 
 
 # --------------------------------------------------
-# カジノAPI：マインズゲーム（チキン完全封殺・不正防止仕様）
+# カジノAPI：マインズゲーム
 # --------------------------------------------------
 @router.post("/api/mines/start")
 async def start_mines(data: MinesStartRequest, authorization: str = Header(None)):
@@ -490,14 +486,13 @@ async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(N
     if session["busy"]:
         raise HTTPException(status_code=429, detail="処理中です。")
 
-    # --- 🚨 新設：最低オープン数のルールチェック 🚨 ---
     revealed_count = len(session["revealed_tiles"])
     config = get_mines_config(session["mines_count"])
     
     if revealed_count < config["min_open"]:
         raise HTTPException(
             status_code=400, 
-            detail=f"【チキン防止】現在の設定では、最低 {config['min_open']} マス開けるまで利確できません！"
+            detail=f"現在の設定では、最低 {config['min_open']} マス開けるまで利確できません。"
         )
 
     session["is_active"] = False
@@ -527,12 +522,6 @@ class SlotSpinRequest(BaseModel):
     wallet_id: str
     bet_amount: int
 
-# --- 運営用リクエストモデル ---
-class AdminSessionActionRequest(BaseModel):
-    game_id: str
-    game_type: str  # "TOWER" または "MINES"
-    action: str     # "CANCEL" または "PEEK"
-
 
 # --------------------------------------------------
 # カジノ画面配信ルート：スロット
@@ -541,8 +530,9 @@ class AdminSessionActionRequest(BaseModel):
 async def get_slot(request: Request):
     return templates.TemplateResponse(request=request, name="slot.html")
 
+
 # --------------------------------------------------
-# カジノAPI：スロットゲーム（配当加算バグ修正版）
+# カジノAPI：スロットゲーム（確率調整・合法仕様）
 # --------------------------------------------------
 @router.post("/api/slot/spin")
 async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
@@ -567,7 +557,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     # 1. 賭け金を即時引き落とし
     new_balance = current_balance - data.bet_amount
     
-    # 2. 内部抽選 (配当額 payout は最初から整数 int で計算)
+    # 2. 内部抽選 (設定された還元率・配当テーブルに基づき純粋抽選)
     rand_val = random.randint(0, 999)
     
     if rand_val < 10:    # 確率 1.0%
@@ -584,7 +574,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         result_symbols = ["BELL", "BELL", "BELL"]
     elif rand_val < 270: # 確率 15.0%
         prize = "GRAPE"
-        payout = int(data.bet_amount * 1.5)  # 1.5倍 (切り捨て)
+        payout = int(data.bet_amount * 1.5)  # 1.5倍
         result_symbols = ["GRAPE", "GRAPE", "GRAPE"]
     elif rand_val < 430: # 確率 16.0%
         prize = "REPLAY"
@@ -599,7 +589,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         pool = ["7", "BAR", "BELL", "GRAPE", "REPLAY"]
         result_symbols = [random.choice(pool) for _ in range(3)]
         
-        # ハズレ補正処理
+        # ハズレ補正（偶然揃ってしまった場合の再抽選）
         if result_symbols[0] == result_symbols[1] == result_symbols[2]:
             others = [s for s in pool if s != result_symbols[1]]
             result_symbols[1] = random.choice(others)
@@ -612,7 +602,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         if random.random() < 0.25: 
             is_early_pekari = True
 
-    # 3. 配当を確実に残高へ加算
+    # 3. 配当を残高へ加算
     if payout > 0:
         new_balance += payout
         
@@ -626,33 +616,3 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "is_early_pekari": is_early_pekari,
         "new_balance": new_balance
     }
-
-# --------------------------------------------------
-# 運営API：セッション介入・管理
-# --------------------------------------------------
-@router.post("/api/admin/session")
-async def admin_session_action(data: AdminSessionActionRequest, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    
-    # 【運用時の注意】必要に応じて管理者権限のチェックを追加してください
-    # 例: if user.email != "admin@example.com":
-    #         raise HTTPException(status_code=403, detail="管理者権限がありません")
-
-    if data.game_type == "TOWER":
-        target_sessions = TOWER_SESSIONS
-    elif data.game_type == "MINES":
-        target_sessions = MINES_SESSIONS
-    else:
-        raise HTTPException(status_code=400, detail="無効なゲームタイプです。")
-
-    session = target_sessions.get(data.game_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="指定されたセッションが見つかりません。")
-
-    if data.action == "PEEK":
-        return {"status": "success", "session_data": session}
-    elif data.action == "CANCEL":
-        session["is_active"] = False
-        return {"status": "success", "message": f"{data.game_id} のセッションを強制終了しました。"}
-    else:
-        raise HTTPException(status_code=400, detail="無効なアクションです。")
