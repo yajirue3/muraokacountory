@@ -26,7 +26,6 @@
         .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
         .sub-desc { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: -10px; margin-bottom: 16px; }
 
-        /* ナビゲーションタブ (Grid化して2x2配置) */
         .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 20px; }
         .tab-btn { padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s ease; }
         .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(212, 175, 55, 0.2); }
@@ -35,7 +34,6 @@
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* リストアイテム */
         .list-item { background: #15171a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .list-item:hover { border-color: #4b5563; transform: translateY(-2px); }
         .list-item .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
@@ -64,7 +62,6 @@
         .btn-danger { background: linear-gradient(145deg, var(--danger), #b91c1c); color: #fff; padding: 10px; margin-top: 8px; }
         .btn-back { background: #334155; color: #cbd5e1; margin-top: 14px; box-shadow: none; }
 
-        /* モーダル */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; }
         .modal-content { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 340px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.7); animation: scaleUp 0.2s ease-out; }
         @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -81,10 +78,10 @@
         <div class="sub-desc">毎朝9時に未返済者から強制没収が執行されます</div>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('borrow')">🛒 市場 (借りる)</button>
-            <button class="tab-btn" onclick="switchTab('debts')">💸 負債 (借りた金)</button>
-            <button class="tab-btn" onclick="switchTab('lend')">💰 出品 (貸す)</button>
-            <button class="tab-btn" onclick="switchTab('receivables')">📜 債権 (貸した金)</button>
+            <button class="tab-btn active" onclick="switchTab('borrow', event)">🛒 市場 (借りる)</button>
+            <button class="tab-btn" onclick="switchTab('debts', event)">💸 負債 (借りた金)</button>
+            <button class="tab-btn" onclick="switchTab('lend', event)">💰 出品 (貸す)</button>
+            <button class="tab-btn" onclick="switchTab('receivables', event)">📜 債権 (貸した金)</button>
         </div>
 
         <!-- タブ1: 借りる -->
@@ -188,11 +185,11 @@
         loadMyReceivables();
     }
 
-    function switchTab(tabId) {
+    function switchTab(tabId, evt) {
         if (isProcessing) return;
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        event.target.classList.add('active');
+        if (evt && evt.target) evt.target.classList.add('active');
         document.getElementById(`tab-${tabId}`).classList.add('active');
     }
 
@@ -264,7 +261,7 @@
                         let html = `
                         <div class="list-item" style="${isPaid ? 'opacity: 0.6;' : ''}">
                             <div class="title-row"><span class="title">📜 借入 #${d.id}</span> ${badge}</div>
-                            <div class="row"><span>借入元本</span> <span>${d.principal} G (金利 ${d.loan_offers.interest_rate}%)</span></div>
+                            <div class="row"><span>借入元本</span> <span>${d.principal} G (金利 ${d.loan_offers ? d.loan_offers.interest_rate : 0}%)</span></div>
                             <div class="row"><span>返済総額</span> <span>${d.total_due} G</span></div>
                             <div class="row"><span>返済済み</span> <span>${d.repaid_amount} G</span></div>`;
                             
