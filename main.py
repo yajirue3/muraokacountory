@@ -752,6 +752,50 @@ class LoanRepay(BaseModel):
     loan_id: int
     repay_amount: int = Field(..., gt=0, description="返済額は1以上")
 
+
+# レビュー評価の投稿
+@app.post("/api/contracts/{contract_id}/review")
+async def review_contract(contract_id: int, data: ReviewCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
+    contract = c_res.data[0]
+
+    is_creator = contract["creator_user_id"] == user.id
+    is_acceptor = contract["acceptor_user_id"] == user.id
+    if not (is_creator or is_acceptor):
+        raise HTTPException(status_code=403, detail="当事者のみ評価可能です。")
+
+    target_user_id = contract["acceptor_user_id"] if is_creator else contract["creator_user_id"]
+
+    await client.table("contract_reviews").insert({
+        "contract_id": contract_id,
+        "reviewer_user_id": user.id,
+        "target_user_id": target_user_id,
+        "rating": data.rating,
+        "comment": data.comment
+    }).execute()
+    return {"message": "評価を投稿しました！"}
+
+# 国王専用：強制介入
+@app.post("/api/admin/contracts/{contract_id}/override")
+async def admin_override_contract(contract_id: int, action: dict, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_contract_king_override", {
+            "p_contract_id": contract_id,
+            "p_mode": action.get("mode")
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+
 # --------------------------------------------------
 # 融資・借金（P2Pレンディング）システム API
 # --------------------------------------------------
