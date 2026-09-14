@@ -736,8 +736,12 @@ app.include_router(factory_router)
 app.include_router(card_router)
 
 # ==================================================
-# 資産保有税（所得税・保管料）処理モジュール
+# 資産保有税（所得税・保管料）処理モジュール (main.py用)
 # ==================================================
+from fastapi import Header, HTTPException
+from db import get_supabase
+from casino import get_user_from_token
+
 
 def calculate_wealth_tax(balance: int) -> int:
     """
@@ -773,16 +777,16 @@ def calculate_wealth_tax(balance: int) -> int:
 
 
 # --------------------------------------------------
-# 資産税徴収 API（毎朝9時 / UTC 0:00 にcron等から呼出）
+# 資産税徴収 API（王が手動実行、またはcron等から呼出）
 # --------------------------------------------------
 @app.post("/api/admin/collect-tax")
 async def collect_wealth_tax(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
 
-    # 1. profiles テーブルから is_king を取得して権限チェック
-    profile_res = await supabase.table("profiles").select("is_king").eq("id", user.id).execute()
-    if not profile_res.data or not profile_res.data[0].get("is_king"):
+    # 1. profiles テーブルから role を取得して権限チェック（"king" のみ許可）
+    profile_res = await supabase.table("profiles").select("role").eq("id", user.id).execute()
+    if not profile_res.data or profile_res.data[0].get("role") != "king":
         raise HTTPException(status_code=403, detail="管理者（King）権限がありません。")
 
     # 2. 課税対象（10万Gold超）のウォレットを取得
