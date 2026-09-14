@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pathlib import Path
 import random
 import uuid
+import datetime
 
 # db.py の get_supabase をインポート
 from db import get_supabase
