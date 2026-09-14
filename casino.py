@@ -667,10 +667,6 @@ def get_next_race_time():
     return next_time
 
 def generate_race_trajectory():
-    """
-    20ステップ（20秒想定）のレース座標を生成。
-    1着、2着を決定し、最終的に1着は100.0に到達する。
-    """
     horses = [1, 2, 3, 4, 5, 6]
     random.shuffle(horses)
     winner, second = horses[0], horses[1]
@@ -697,9 +693,6 @@ def generate_race_trajectory():
     return winner, second, trajectory
 
 async def get_or_create_current_race():
-    """
-    現在開かれている（OPEN）直近のレースを取得するか、無ければ生成する。
-    """
     client = await get_supabase()
     target_time = get_next_race_time()
     
@@ -718,9 +711,6 @@ async def get_or_create_current_race():
     insert_res = await client.table("derby_races").insert(new_race).execute()
     return insert_res.data[0]
 
-# --------------------------------------------------
-# ダービーAPI：レース状態とオッズ取得
-# --------------------------------------------------
 @router.get("/api/derby/current")
 async def get_derby_current(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -732,22 +722,16 @@ async def get_derby_current(authorization: str = Header(None)):
     start_utc = datetime.fromisoformat(st.replace("Z", "+00:00")) if isinstance(st, str) else st
 
     is_racing_or_done = (now_utc >= start_utc)
-    
-    # レース開始前は座標（結果）データをフロントエンドに送らない（チート対策）
     exposed_trajectory = race["trajectory"] if is_racing_or_done else None
 
-    # プール金とオッズの計算（還元率85%設定）
     bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).execute()
     bets = bets_res.data or []
     
     win_bets = [b for b in bets if b["bet_type"] == "WIN"]
     win_total = sum(b["amount"] for b in win_bets)
     win_pools = {h: sum(b["amount"] for b in win_bets if b["horse_id"] == h) for h in range(1, 7)}
-    
-    # 賭け金が0の馬のデフォルトオッズは6.0倍
     win_odds = {h: round((win_total * 0.85) / win_pools[h], 2) if win_pools[h] > 0 else 6.0 for h in range(1, 7)}
 
-    # ユーザー自身のベット履歴
     my_bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).eq("user_id", user.id).execute()
 
     return {
@@ -761,9 +745,6 @@ async def get_derby_current(authorization: str = Header(None)):
         "my_bets": my_bets_res.data or []
     }
 
-# --------------------------------------------------
-# ダービーAPI：馬券購入
-# --------------------------------------------------
 @router.post("/api/derby/bet")
 async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
     if data.amount < 1 or data.amount > 50000:
@@ -773,9 +754,51 @@ async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
     client = await get_supabase()
     
     try:
-        # トランザクション処理や残高確認はSupabase側のRPC関数で安全に実行する想定
         res = await client.rpc("execute_derby_bet", {
             "p_race_id": data.race_id,
             "p_user_id": str(user.id),
             "p_wallet_id": data.wallet_id,
-         
+            "p_bet_type": data.bet_type,
+            "p_horse1": data.horse1,
+            "p_horse2": data.horse2,
+            "p_amount": data.amount
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@router.post("/api/admin/derby/instant-race")
+async def admin_instant_race(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    race = await get_or_create_current_race()
+    
+    try:
+        res = await client.rpc("admin_force_start_derby", {
+            "p_race_id": race["id"],
+            "p_admin_id": str(user.id)
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="権限がないか、エラーが発生しました。")
+
+@router.post("/api/derby/settle/{race_id}")
+async def settle_derby(race_id: int):
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_derby_settle", {"p_race_id": race_id}).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+async def derby_scheduler():
+    while True:
+        try:
+            await get_or_create_current_race()
+        except Exception as e:
+            print(f"[Derby Scheduler Log] {e}")
+        await asyncio.sleep(30)
+
+@router.on_event("startup")
+async def start_derby_task():
+    asyncio.create_task(derby_scheduler())
