@@ -92,6 +92,8 @@ async def play_dice(data: DicePlayRequest, authorization: str = Header(None)):
     # 1. バリデーションチェック
     if data.amount <= 0:
         raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
+    if data.amount > 50000:
+        raise HTTPException(status_code=400, detail="1度に賭けれるのは5万までです。")
     if data.target < 100 or data.target > 9500:
         raise HTTPException(status_code=400, detail="ターゲット値が不正です。")
     if data.mode not in ["UNDER", "OVER"]:
@@ -158,6 +160,8 @@ async def start_tower(data: TowerStartRequest, authorization: str = Header(None)
 
     if data.amount <= 0:
         raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
+    if data.amount > 50000:
+        raise HTTPException(status_code=400, detail="1度に賭けれるのは5万までです。")
 
     wallet_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
     if not wallet_res.data:
@@ -352,6 +356,8 @@ async def start_mines(data: MinesStartRequest, authorization: str = Header(None)
 
     if data.amount <= 0:
         raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
+    if data.amount > 50000:
+        raise HTTPException(status_code=400, detail="1度に賭けれるのは5万までです。")
     if data.mines_count < 1 or data.mines_count > 24:
         raise HTTPException(status_code=400, detail="地雷の数は1〜24個の間で指定してください。")
 
@@ -521,6 +527,13 @@ class SlotSpinRequest(BaseModel):
     wallet_id: str
     bet_amount: int
 
+# --- 運営用リクエストモデル ---
+class AdminSessionActionRequest(BaseModel):
+    game_id: str
+    game_type: str  # "TOWER" または "MINES"
+    action: str     # "CANCEL" または "PEEK"
+
+
 # --------------------------------------------------
 # カジノ画面配信ルート：スロット
 # --------------------------------------------------
@@ -538,6 +551,8 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
 
     if data.bet_amount < 1:
         raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
+    if data.bet_amount > 50000:
+        raise HTTPException(status_code=400, detail="1度に賭けれるのは5万までです。")
 
     wallet_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
     if not wallet_res.data:
@@ -611,4 +626,33 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "is_early_pekari": is_early_pekari,
         "new_balance": new_balance
     }
+
+# --------------------------------------------------
+# 運営API：セッション介入・管理
+# --------------------------------------------------
+@router.post("/api/admin/session")
+async def admin_session_action(data: AdminSessionActionRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
     
+    # 【運用時の注意】必要に応じて管理者権限のチェックを追加してください
+    # 例: if user.email != "admin@example.com":
+    #         raise HTTPException(status_code=403, detail="管理者権限がありません")
+
+    if data.game_type == "TOWER":
+        target_sessions = TOWER_SESSIONS
+    elif data.game_type == "MINES":
+        target_sessions = MINES_SESSIONS
+    else:
+        raise HTTPException(status_code=400, detail="無効なゲームタイプです。")
+
+    session = target_sessions.get(data.game_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="指定されたセッションが見つかりません。")
+
+    if data.action == "PEEK":
+        return {"status": "success", "session_data": session}
+    elif data.action == "CANCEL":
+        session["is_active"] = False
+        return {"status": "success", "message": f"{data.game_id} のセッションを強制終了しました。"}
+    else:
+        raise HTTPException(status_code=400, detail="無効なアクションです。")
