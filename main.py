@@ -609,28 +609,216 @@ async def king_override_contract(contract_id: int, action: dict, authorization: 
     raise HTTPException(status_code=400, detail="無効な裁定モードです。")
 
 # --------------------------------------------------
-# 掲示板API
+# 掲示板API（高機能版・ゼロトラスト対応）
 # --------------------------------------------------
-@app.get("/api/reports")
-async def get_reports():
-    client = await get_supabase()
-    res = await client.table("reports").select("id, nickname, content, created_at").order("id", desc=True).limit(10).execute()
-    return res.data
+import time
+from collections import defaultdict
 
-@app.post("/api/reports")
-async def create_report(data: ReportCreate, authorization: str = Header(None)):
+# --- メモリベースのスパム連打防止機構 ---
+_post_history = defaultdict(list)
+_banned_until = {}
+
+def enforce_rate_limit(user_id: str):
+    now = time.time()
+    # 1. バン期間の確認
+    if user_id in _banned_until:
+        if now < _banned_until[user_id]:
+            remain = int(_banned_until[user_id] - now)
+            raise HTTPException(status_code=429, detail=f"連投制限中（ペナルティ）です。残り {remain} 秒")
+        else:
+            del _banned_until[user_id]
+
+    history = _post_history[user_id]
+    # 過去10秒の履歴だけ残す
+    history = [t for t in history if now - t <= 10]
+    
+    # 2. バースト検知 (10秒間に8回以上で1分間BAN)
+    if len(history) >= 8:
+        _banned_until[user_id] = now + 60
+        raise HTTPException(status_code=429, detail="スパム行為を検知したため、1分間投稿を禁止します。")
+    
+    # 3. 最低クールダウン (1秒)
+    if history and now - history[-1] < 1.0:
+        raise HTTPException(status_code=429, detail="送信が早すぎます。1秒お待ちください。")
+    
+    history.append(now)
+    _post_history[user_id] = history
+
+class BoardPostCreate(BaseModel):
+    content: str
+    user_title: str = "奴隷"
+    wallet_id: Optional[str] = None
+    airdrop_amount: int = 0
+    airdrop_total: int = 0
+
+class AirdropClaim(BaseModel):
+    wallet_id: str
+
+class TipRequest(BaseModel):
+    wallet_id: str
+    amount: int
+
+@app.get("/api/board/posts")
+async def get_board_posts(page: int = 1, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
-    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = prof_res.data[0]["nickname"] if prof_res.data else "名無しの労働奴隷"
+    limit = 20
+    offset = (page - 1) * limit
 
-    await client.table("reports").insert({
+    # ピン留め投稿と通常投稿を分けて取得
+    pinned_res = await client.table("board_posts").select("*").eq("is_pinned", True).order("created_at", desc=True).execute()
+    normal_res = await client.table("board_posts").select("*").eq("is_pinned", False).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+    
+    posts = (pinned_res.data or []) + (normal_res.data or [])
+    post_ids = [p["id"] for p in posts]
+
+    if not post_ids:
+        return {"posts": [], "is_king": await is_king(user.id)}
+
+    # リアクションとエアドロップ履歴を一括取得
+    react_res = await client.table("board_reactions").select("*").in_("post_id", post_ids).execute()
+    claims_res = await client.table("board_airdrop_claims").select("*").in_("post_id", post_ids).eq("user_id", user.id).execute()
+
+    reacts = react_res.data or []
+    claimed_set = {c["post_id"] for c in (claims_res.data or [])}
+
+    for p in posts:
+        p_reacts = [r for r in reacts if r["post_id"] == p["id"]]
+        p["reactions"] = {
+            "👍": len([r for r in p_reacts if r["reaction_type"] == "👍"]),
+            "⛏️": len([r for r in p_reacts if r["reaction_type"] == "⛏️"]),
+            "👑": len([r for r in p_reacts if r["reaction_type"] == "👑"]),
+            "my_reacts": [r["reaction_type"] for r in p_reacts if r["user_id"] == user.id]
+        }
+        p["is_mine"] = (p["user_id"] == user.id)
+        p["my_claim"] = (p["id"] in claimed_set)
+
+    return {"posts": posts, "is_king": await is_king(user.id)}
+
+@app.post("/api/board/posts")
+async def create_board_post(data: BoardPostCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    enforce_rate_limit(user.id)
+    
+    if len(data.content) > 400:
+        raise HTTPException(status_code=400, detail="本文は400文字以内で入力してください。")
+
+    client = await get_supabase()
+    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
+    nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
+
+    # エアドロップがある場合はウォレットから引き落とし
+    if data.airdrop_amount > 0 and data.airdrop_total > 0:
+        if not data.wallet_id:
+            raise HTTPException(status_code=400, detail="お金配りを行う口座を指定してください。")
+        total_cost = data.airdrop_amount * data.airdrop_total
+        
+        w_res = await client.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+        if not w_res.data or w_res.data[0]["balance"] < total_cost:
+            raise HTTPException(status_code=400, detail="口座の残高が不足しています。")
+            
+        await client.table("wallets").update({"balance": w_res.data[0]["balance"] - total_cost}).eq("id", w_res.data[0]["id"]).execute()
+
+    await client.table("board_posts").insert({
         "user_id": user.id,
         "nickname": nickname,
-        "content": data.content
+        "user_title": data.user_title,
+        "content": data.content,
+        "airdrop_amount": data.airdrop_amount,
+        "airdrop_total": data.airdrop_total
     }).execute()
+    return {"message": "回覧板に投稿しました。"}
 
-    return {"message": "労働報告を提出しました"}
+@app.delete("/api/board/posts/{post_id}")
+async def delete_board_post(post_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    post_res = await client.table("board_posts").select("user_id").eq("id", post_id).execute()
+    if not post_res.data:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません。")
+        
+    if post_res.data[0]["user_id"] != user.id and not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="削除権限がありません。")
+
+    await client.table("board_posts").delete().eq("id", post_id).execute()
+    return {"message": "投稿を削除しました。"}
+
+@app.post("/api/board/posts/{post_id}/react")
+async def toggle_reaction(post_id: int, type_data: dict, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    rtype = type_data.get("type")
+    if rtype not in ["👍", "⛏️", "👑"]:
+        raise HTTPException(status_code=400, detail="無効なスタンプです")
+
+    exist = await client.table("board_reactions").select("*").eq("post_id", post_id).eq("user_id", user.id).eq("reaction_type", rtype).execute()
+    if exist.data:
+        await client.table("board_reactions").delete().eq("post_id", post_id).eq("user_id", user.id).eq("reaction_type", rtype).execute()
+    else:
+        await client.table("board_reactions").insert({"post_id": post_id, "user_id": user.id, "reaction_type": rtype}).execute()
+    return {"message": "リアクションを更新しました。"}
+
+@app.post("/api/board/posts/{post_id}/claim")
+async def claim_airdrop(post_id: int, data: AirdropClaim, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("claim_board_airdrop", {
+            "p_post_id": post_id, "p_user_id": str(user.id), "p_wallet_id": data.wallet_id
+        }).execute()
+        return {"message": f"{res.data['amount']}G を受け取りました！"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/board/posts/{post_id}/tip")
+async def tip_post(post_id: int, data: TipRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        await client.rpc("tip_board_post", {
+            "p_post_id": post_id, "p_sender_user_id": str(user.id), 
+            "p_sender_wallet_id": data.wallet_id, "p_amount": data.amount
+        }).execute()
+        return {"message": f"投稿者に {data.amount}G チップを送りました！"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/board/posts/{post_id}/report")
+async def report_post(post_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    await client.table("board_reports").insert({"post_id": post_id, "reporter_id": user.id}).execute()
+    return {"message": "国王へ密告しました。"}
+
+@app.get("/api/board/admin/reports")
+async def get_reports_admin(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    client = await get_supabase()
+    res = await client.table("board_reports").select("id, created_at, board_posts(id, nickname, content)").order("created_at", desc=True).execute()
+    return res.data
+
+@app.delete("/api/board/admin/reports/{report_id}")
+async def dismiss_report(report_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    client = await get_supabase()
+    await client.table("board_reports").delete().eq("id", report_id).execute()
+    return {"message": "通報を破棄しました。"}
+
+@app.post("/api/board/posts/{post_id}/pin")
+async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    client = await get_supabase()
+    post = await client.table("board_posts").select("is_pinned").eq("id", post_id).execute()
+    new_status = not post.data[0]["is_pinned"]
+    await client.table("board_posts").update({"is_pinned": new_status}).eq("id", post_id).execute()
+    return {"message": "布告(ピン)状態を変更しました。"}
 
 # --------------------------------------------------
 # 追加: 融資・借金（P2Pレンディング）システム API
