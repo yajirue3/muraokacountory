@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>村岡王国 - 帝立グランプリ</title>
+    <style>
+        :root {
+            --bg-dark: #090a0d;
+            --card-bg: #14161d;
+            --border: #2a2e39;
+            --gold: #f59e0b;
+            --gold-glow: rgba(245, 158, 11, 0.25);
+            --danger: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --green: #10b981;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px 8px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* レスポンシブコンテナ (PCでは横並び、スマホでは縦積み) */
+        .wrapper {
+            width: 100%;
+            max-width: 960px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        @media (min-width: 840px) {
+            .wrapper { grid-template-columns: 1.15fr 0.85fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--gold);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            text-shadow: 0 0 12px var(--gold-glow);
+        }
+
+        /* 電光掲示板・実況モニター */
+        .jumbotron {
+            background: #000;
+            border: 2px solid #374151;
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            font-family: monospace;
+        }
+        .live-status { color: var(--gold); font-size: 0.95rem; font-weight: bold; }
+        .clock-display { color: #38bdf8; font-size: 1.1rem; font-weight: bold; }
+
+        /* ターフ・トラック */
+        .turf {
+            background: radial-gradient(circle at 50% 50%, #154522 0%, #0b2612 100%);
+            border: 3px solid #3f6212;
+            border-radius: 12px;
+            padding: 8px 36px 8px 8px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+        .finish-post {
+            position: absolute;
+            right: 36px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: repeating-linear-gradient(0deg, #fff, #fff 8px, #dc2626 8px, #dc2626 16px);
+            z-index: 10;
+            box-shadow: 0 0 8px rgba(255,255,255,0.4);
+        }
+        .lane {
+            position: relative;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px dashed rgba(255,255,255,0.15);
+        }
+        .lane:last-child { border-bottom: none; }
+        
+        .horse-badge {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 900;
+            color: #fff;
+            margin-right: 6px;
+            z-index: 5;
+            flex-shrink: 0;
+        }
+        .horse-name-tag {
+            position: absolute;
+            left: 32px;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.5);
+            pointer-events: none;
+        }
+        .runner {
+            position: absolute;
+            left: 28px;
+            font-size: 1.3rem;
+            will-change: transform;
+            z-index: 8;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+        }
+
+        /* 馬券購入パネル */
+        .bet-types {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .type-btn {
+            background: #1f2430;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .type-btn.active {
+            background: var(--gold-glow);
+            color: var(--gold);
+            border-color: var(--gold);
+        }
+
+        /* 出走馬リストグリッド */
+        .horse-select-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .horse-card {
+            background: #1a1e29;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .horse-card:hover { border-color: #4b5563; }
+        .horse-card.selected-1 { border-color: var(--gold); background: rgba(245, 158, 11, 0.15); }
+        .horse-card.selected-2 { border-color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+        .horse-info { display: flex; align-items: center; gap: 8px; }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #0d0f14;
+            color: #fff;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--gold); }
+
+        .btn-bet {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 1rem;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--gold), #d97706);
+            color: #000;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+            transition: all 0.2s;
+        }
+        .btn-bet:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); }
+
+        .my-ticket-panel {
+            margin-top: 14px;
+            background: #0d0f14;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.75rem;
+        }
+        .btn-back {
+            background: #27272a;
+            color: #a1a1aa;
+            border: none;
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <!-- 左側：コース・実況画面 -->
+    <div class="card">
+        <div class="header-title">🏇 帝立グランプリ (毎時00分・30分)</div>
+
+        <div class="jumbotron">
+            <span id="live-ticker" class="live-status">📡 発走前：パドック周回中</span>
+            <span id="timer-display" class="clock-display">--:--</span>
+        </div>
+
+        <div class="turf" id="turf-track">
+            <div class="finish-post"></div>
+            <!-- 1〜6枠 -->
+            <div class="lane"><div class="horse-badge" style="background:#ef4444;">1</div><span class="horse-name-tag" id="label-1"></span><div class="runner" id="r-1">🐎</div></div>
+            <div class="lane"><div class="horse-badge" style="background:#1f2937;">2</div><span class="horse-name-tag" id="label-2"></span><div class="runner" id="r-2">🐎</div></div>
+            <div class="lane"><div class="horse-badge" style="background:#b91c1c;">3</div><span class="horse-name-tag" id="label-3"></span><div class="runner" id="r-3">🐎</div></div>
+            <div class="lane"><div class="horse-badge" style="background:#2563eb;">4</div><span class="horse-name-tag" id="label-4"></span><div class="runner" id="r-4">🐎</div></div>
+            <div class="lane"><div class="horse-badge" style="background:#eab308; color:#000;">5</div><span class="horse-name-tag" id="label-5"></span><div class="runner" id="r-5">🐎</div></div>
+            <div class="lane"><div class="horse-badge" style="background:#16a34a;">6</div><span class="horse-name-tag" id="label-6"></span><div class="runner" id="r-6">🐎</div></div>
+        </div>
+
+        <div class="my-ticket-panel" id="ticket-box">
+            <div style="font-weight: bold; color: var(--gold); margin-bottom: 4px;">🎟️ あなたの購入済み馬券</div>
+            <div id="my-tickets-list">まだ馬券を持っていません。</div>
+        </div>
+    </div>
+
+    <!-- 右側：投票シート -->
+    <div class="card">
+        <div class="header-title">🎫 馬券投票シート</div>
+
+        <div class="bet-types">
+            <button class="type-btn active" id="btn-type-win" onclick="switchBetType('WIN')">単勝 (1着当て)</button>
+            <button class="type-btn" id="btn-type-quinella" onclick="switchBetType('QUINELLA')">馬連 (1-2着ペア)</button>
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;" id="selection-guide">出走馬を1頭選択してください</div>
+        <div class="horse-select-list" id="horse-list"></div>
+
+        <label style="font-size: 0.75rem; color: var(--text-muted);">賭け金 (Gold)</label>
+        <input type="number" id="bet-amount" min="1" step="1" placeholder="例: 1000">
+
+        <label style="font-size: 0.75rem; color: var(--text-muted);">投票する口座</label>
+        <select id="wallet-select"></select>
+
+        <button class="btn-bet" id="btn-submit-bet" onclick="executeBet()">馬券を購入する</button>
+        <button class="btn-back" onclick="location.href='/casino'">カジノフロアへ戻る</button>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let currentRace = null;
+    let betType = "WIN"; // 'WIN' or 'QUINELLA'
+    let selectedHorse1 = 1;
+    let selectedHorse2 = 2;
+    let serverTimeOffset = 0;
+    let isSettling = false;
+    let lastSettledId = null;
+
+    async function init() {
+        await loadWallets();
+        await refreshRace();
+        requestAnimationFrame(renderLoop);
+    }
+
+    async function loadWallets() {
+        try {
+            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const wallets = await res.json();
+                document.getElementById("wallet-select").innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance} G)</option>`).join('');
+            }
+        } catch(e) {}
+    }
+
+    async function refreshRace() {
+        try {
+            const t0 = Date.now();
+            const res = await fetch("/api/derby/current", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                currentRace = await res.json();
+                const latency = (Date.now() - t0) / 2;
+                serverTimeOffset = (new Date(currentRace.server_time).getTime() + latency) - Date.now();
+                renderHorseList();
+                renderTickets();
+            }
+        } catch(e) {}
+    }
+
+    function switchBetType(type) {
+        betType = type;
+        document.getElementById('btn-type-win').classList.toggle('active', type === 'WIN');
+        document.getElementById('btn-type-quinella').classList.toggle('active', type === 'QUINELLA');
+        document.getElementById('selection-guide').innerText = (type === 'WIN') ? "出走馬を1頭選択してください" : "1着・2着に入る2頭を選択してください";
+        renderHorseList();
+    }
+
+    function renderHorseList() {
+        if (!currentRace || !currentRace.horses) return;
+        const c = document.getElementById("horse-list");
+        c.innerHTML = [1,2,3,4,5,6].map(h => {
+            const horse = currentRace.horses[h];
+            document.getElementById(`label-${h}`).innerText = horse.name;
+            const isSel1 = (selectedHorse1 === h);
+            const isSel2 = (betType === 'QUINELLA' && selectedHorse2 === h);
+            const selClass = isSel1 ? 'selected-1' : (isSel2 ? 'selected-2' : '');
+
+            return `
+            <div class="horse-card ${selClass}" onclick="handleSelectHorse(${h})">
+                <div class="horse-info">
+                    <div class="horse-badge" style="background:${horse.color};">${h}</div>
+                    <span style="font-size:0.85rem; font-weight:bold;">${horse.name}</span>
+                </div>
+                <div style="font-weight:bold; color:var(--gold); font-size:0.85rem;">
+                    ${betType === 'WIN' ? `x${currentRace.win_odds[h] || 6.0}` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function handleSelectHorse(h) {
+        if (betType === 'WIN') {
+            selectedHorse1 = h;
+        } else {
+            if (selectedHorse1 === h) return;
+            if (selectedHorse2 === h) {
+                selectedHorse2 = null;
+            } else {
+                selectedHorse2 = h;
+            }
+        }
+        renderHorseList();
+    }
+
+    function renderTickets() {
+        const c = document.getElementById("my-tickets-list");
+        if (!currentRace.my_bets || currentRace.my_bets.length === 0) {
+            c.innerText = "まだ馬券を持っていません。";
+            return;
+        }
+        c.innerHTML = currentRace.my_bets.map(b => {
+            if (b.bet_type === 'WIN') {
+                return `<div>[単勝] <b>${b.horse_id}号馬</b> : ${b.amount}G</div>`;
+            } else {
+                return `<div>[馬連] <b>${b.horse_id} - ${b.second_horse_id}</b> : ${b.amount}G</div>`;
+            }
+        }).join('');
+    }
+
+    // 毎フレーム完全同期ループ
+    function renderLoop() {
+        if (currentRace) {
+            const accurateNow = Date.now() + serverTimeOffset;
+            const start = new Date(currentRace.start_time).getTime();
+            const diff = (start - accurateNow) / 1000;
+
+            const ticker = document.getElementById("live-ticker");
+            const clock = document.getElementById("timer-display");
+            const btnBet = document.getElementById("btn-submit-bet");
+
+            if (diff > 0) {
+                // 待機中
+                const m = Math.floor(diff / 60);
+                const s = Math.floor(diff % 60);
+                clock.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                if (diff < 15) {
+                    ticker.innerText = "⚠️ ゲート入り完了・投票締切！";
+                    ticker.style.color = "var(--danger)";
+                    btnBet.disabled = true;
+                } else {
+                    ticker.innerText = "📡 パドック周回中（投票受付中）";
+                    ticker.style.color = "var(--gold)";
+                    btnBet.disabled = false;
+                }
+                for (let h = 1; h <= 6; h++) {
+                    document.getElementById(`r-${h}`).style.transform = `translateX(0px)`;
+                }
+            } else if (diff <= 0 && diff >= -20) {
+                // レース実況中
+                btnBet.disabled = true;
+                const elapsed = Math.abs(diff);
+                ticker.innerText = `🏁 第4コーナー激走中！ [${elapsed.toFixed(1)}s]`;
+                ticker.style.color = "#38bdf8";
+                clock.innerText = "LIVE";
+
+                const turfEl = document.getElementById("turf-track");
+                const maxRunWidth = turfEl.clientWidth - 68;
+
+                const prevSec = Math.floor(elapsed);
+                const nextSec = Math.min(20, prevSec + 1);
+                const ratio = elapsed - prevSec;
+
+                for (let h = 1; h <= 6; h++) {
+                    const traj = currentRace.trajectory[h] || currentRace.trajectory[String(h)];
+                    const pA = traj ? traj[prevSec] : 0.0;
+                    const pB = traj ? traj[nextSec] : 100.0;
+                    const prog = pA + (pB - pA) * ratio;
+                    document.getElementById(`r-${h}`).style.transform = `translateX(${(prog / 100.0) * maxRunWidth}px)`;
+                }
+            } else {
+                // 確定・精算中
+                ticker.innerText = "🏆 ゴールイン！ 審議・配当集計中...";
+                ticker.style.color = "var(--green)";
+                clock.innerText = "FIN";
+
+                if (!isSettling && lastSettledId !== currentRace.race_id) {
+                    isSettling = true;
+                    lastSettledId = currentRace.race_id;
+                    fetch(`/api/derby/settle/${currentRace.race_id}`, { method: "POST" })
+                        .finally(() => {
+                            setTimeout(async () => {
+                                await loadWallets();
+                                await refreshRace();
+                                isSettling = false;
+                            }, 5000);
+                        });
+                }
+            }
+        }
+        requestAnimationFrame(renderLoop);
+    }
+
+    async function executeBet() {
+        const amt = parseInt(document.getElementById("bet-amount").value, 10);
+        const wId = document.getElementById("wallet-select").value;
+
+        if (isNaN(amt) || amt <= 0 || !wId) return alert("正しい賭け金と口座を選択してください。");
+        if (betType === 'QUINELLA' && (!selectedHorse1 || !selectedHorse2 || selectedHorse1 === selectedHorse2)) {
+            return alert("馬連は異なる2頭を選択してください。");
+        }
+
+        const btn = document.getElementById("btn-submit-bet");
+        btn.disabled = true;
+
+        try {
+            const res = await fetch("/api/derby/bet", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({
+                    race_id: currentRace.race_id,
+                    wallet_id: wId,
+                    bet_type: betType,
+                    horse1: selectedHorse1,
+                    horse2: selectedHorse2,
+                    amount: amt
+                })
+            });
+            const data = await res.json();
+            alert(data.message || data.detail);
+            if (res.ok) {
+                document.getElementById("bet-amount").value = "";
+                await loadWallets();
+                await refreshRace();
+            }
+        } catch(e) { alert("通信エラー"); }
+        finally { btn.disabled = false; }
+    }
+
+    init();
+</script>
+</body>
+</html>
