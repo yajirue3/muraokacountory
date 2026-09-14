@@ -3,578 +3,300 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - 帝立グランプリ</title>
-    <style>
-        :root {
-            --bg-dark: #0a0b10;
-            --card-bg: rgba(22, 25, 37, 0.8);
-            --border: #2a2e39;
-            --gold: #fbbf24;
-            --gold-dark: #b45309;
-            --gold-glow: rgba(251, 191, 36, 0.3);
-            --danger: #ef4444;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --green: #10b981;
-            --glass-border: rgba(255, 255, 255, 0.05);
-        }
-
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background: radial-gradient(circle at top, #1a1c29 0%, var(--bg-dark) 100%);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px 10px;
-            display: flex;
-            justify-content: center;
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
-
-        .wrapper {
-            width: 100%;
-            max-width: 1000px;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 24px;
-        }
-        @media (min-width: 840px) {
-            .wrapper { grid-template-columns: 1.2fr 0.8fr; }
-        }
-
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
-            position: relative;
-        }
-
-        .header-title {
-            font-size: 1.4rem;
-            font-weight: 900;
-            background: linear-gradient(to right, var(--gold), #fef08a);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-            margin-bottom: 16px;
-            letter-spacing: 2px;
-            text-shadow: 0 2px 10px var(--gold-glow);
-        }
-
-        .jumbotron {
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            font-family: 'Courier New', monospace;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
-        }
-        .live-status { color: var(--gold); font-size: 1rem; font-weight: bold; letter-spacing: 1px;}
-        .clock-display { color: #38bdf8; font-size: 1.2rem; font-weight: bold; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);}
-
-        .turf {
-            background: linear-gradient(180deg, #154522 0%, #0d2e15 100%);
-            border: 4px solid #2e4a1a;
-            border-radius: 12px;
-            padding: 12px 40px 12px 10px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: inset 0 10px 30px rgba(0,0,0,0.9), 0 5px 15px rgba(0,0,0,0.5);
-        }
-        .finish-post {
-            position: absolute;
-            right: 40px;
-            top: 0;
-            bottom: 0;
-            width: 5px;
-            background: repeating-linear-gradient(0deg, #ffffff, #ffffff 10px, #dc2626 10px, #dc2626 20px);
-            z-index: 10;
-            box-shadow: -2px 0 10px rgba(255,255,255,0.3);
-        }
-        .lane {
-            position: relative;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .lane:last-child { border-bottom: none; }
-        
-        .horse-badge {
-            width: 24px;
-            height: 24px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.85rem;
-            font-weight: 900;
-            color: #fff;
-            margin-right: 8px;
-            z-index: 5;
-            flex-shrink: 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        .horse-name-tag {
-            position: absolute;
-            left: 38px;
-            font-size: 0.75rem;
-            color: rgba(255,255,255,0.4);
-            pointer-events: none;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-        .runner {
-            position: absolute;
-            left: 32px;
-            font-size: 1.5rem;
-            will-change: transform;
-            z-index: 8;
-            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.6));
-            transition: transform 0.1s linear;
-        }
-
-        .bet-types {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-        .type-btn {
-            flex: 1;
-            background: rgba(31, 36, 48, 0.6);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 10px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .type-btn.active {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(180, 83, 9, 0.15));
-            color: var(--gold);
-            border-color: var(--gold);
-            box-shadow: 0 0 15px var(--gold-glow);
-        }
-
-        .horse-select-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 20px;
-        }
-        .horse-card {
-            background: rgba(26, 30, 41, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 10px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .horse-card:hover { border-color: #64748b; transform: translateY(-1px); }
-        .horse-card.selected-1 { border-color: var(--gold); background: rgba(251, 191, 36, 0.1); box-shadow: inset 0 0 10px var(--gold-glow); }
-        .horse-card.selected-2 { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.2); }
-        
-        .form-group { margin-bottom: 16px; }
-        .form-group label {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-        input, select {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            background: rgba(13, 15, 20, 0.9);
-            color: #fff;
-            box-sizing: border-box;
-            font-size: 1rem;
-            transition: border-color 0.2s;
-        }
-        input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 8px var(--gold-glow); }
-
-        .btn-bet {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 900;
-            font-size: 1.1rem;
-            cursor: pointer;
-            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-            color: #000;
-            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s;
-        }
-        .btn-bet:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(251, 191, 36, 0.5); }
-        .btn-bet:active:not(:disabled) { transform: translateY(1px); }
-        .btn-bet:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); background: #333; color: #888; box-shadow: none; }
-
-        .btn-admin-instant {
-            background: linear-gradient(135deg, var(--danger), #7f1d1d);
-            color: #fff;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            font-weight: bold;
-            margin-top: 16px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-            transition: 0.2s;
-        }
-        .btn-admin-instant:hover { filter: brightness(1.2); }
-
-        .my-ticket-panel {
-            margin-top: 20px;
-            background: rgba(13, 15, 20, 0.6);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            font-size: 0.85rem;
-        }
-        .ticket-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .ticket-item:last-child { border-bottom: none; }
-        
-        .btn-back {
-            background: rgba(39, 39, 42, 0.8);
-            color: #d4d4d8;
-            border: 1px solid #3f3f46;
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            font-weight: bold;
-            margin-top: 16px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-back:hover { background: #3f3f46; color: #fff; }
-    </style>
+    <title>国営ダービー - 王国カジノ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-slate-900 text-white min-h-screen pb-12">
+    <!-- ヘッダー -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-yellow-500">🏇 国営ダービー</h1>
+            <div class="flex items-center space-x-4">
+                <select id="walletSelect" onchange="loadWallets()" class="bg-slate-700 text-sm p-2 rounded border border-slate-600 focus:outline-none">
+                    <option value="">口座読み込み中...</option>
+                </select>
+                <div class="bg-slate-900 px-3 py-1 rounded border border-slate-700 text-sm">
+                    残高: <span id="userBalance" class="text-yellow-400 font-bold">---</span> G
+                </div>
+            </div>
+        </div>
+    </header>
 
-<div class="wrapper">
-    <div class="card">
-        <div class="header-title">🏇 帝立グランプリ</div>
-
-        <div class="jumbotron">
-            <span id="live-ticker" class="live-status">📡 パドック周回中</span>
-            <span id="timer-display" class="clock-display">--:--</span>
+    <main class="max-w-4xl mx-auto p-4 space-y-6">
+        <!-- レース状態ステータス -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+            <div id="raceStatus" class="text-sm font-semibold text-slate-400">ステータス確認中...</div>
+            <div id="countdown" class="text-4xl font-extrabold text-yellow-400 my-2">00:00</div>
+            <div id="raceId" class="text-xs text-slate-500">RACE ID: --</div>
         </div>
 
-        <div class="turf" id="turf-track">
-            <div class="finish-post"></div>
-            <!-- 馬データはJavaScriptで動的に名前をセット -->
-            <div class="lane"><div class="horse-badge" style="background:#ef4444;">1</div><span class="horse-name-tag" id="label-1"></span><div class="runner" id="r-1">🐎</div></div>
-            <div class="lane"><div class="horse-badge" style="background:#1f2937;">2</div><span class="horse-name-tag" id="label-2"></span><div class="runner" id="r-2">🐎</div></div>
-            <div class="lane"><div class="horse-badge" style="background:#b91c1c;">3</div><span class="horse-name-tag" id="label-3"></span><div class="runner" id="r-3">🐎</div></div>
-            <div class="lane"><div class="horse-badge" style="background:#2563eb;">4</div><span class="horse-name-tag" id="label-4"></span><div class="runner" id="r-4">🐎</div></div>
-            <div class="lane"><div class="horse-badge" style="background:#eab308; color:#000;">5</div><span class="horse-name-tag" id="label-5"></span><div class="runner" id="r-5">🐎</div></div>
-            <div class="lane"><div class="horse-badge" style="background:#16a34a;">6</div><span class="horse-name-tag" id="label-6"></span><div class="runner" id="r-6">🐎</div></div>
+        <!-- コース（出走アニメーション） -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 relative overflow-hidden">
+            <div class="absolute right-12 top-0 bottom-0 w-1 bg-red-500/50 border-r-2 border-dashed border-red-500 z-10 flex items-center justify-center">
+                <span class="text-[10px] text-red-400 -rotate-90 font-bold tracking-widest uppercase">FINISH</span>
+            </div>
+            
+            <div id="track">
+                <!-- 1〜6枠馬のコース -->
+                <script>
+                    const horses = [
+                        { id: 1, name: "ムラオカテイオー", color: "bg-red-600" },
+                        { id: 2, name: "ブラックドレイ", color: "bg-slate-700" },
+                        { id: 3, name: "シャッキンヌス", color: "bg-red-800" },
+                        { id: 4, name: "コッコウサクシュ", color: "bg-blue-600" },
+                        { id: 5, name: "ハイエナゴールド", color: "bg-yellow-500" },
+                        { id: 6, name: "チキンキラー", color: "bg-green-600" },
+                    ];
+                    horses.forEach(h => {
+                        document.write(`
+                            <div class="flex items-center space-x-2 py-1.5 border-b border-slate-700/50 last:border-0">
+                                <span class="w-6 text-center text-xs font-bold text-slate-400">${h.id}</span>
+                                <div class="flex-1 bg-slate-900/80 rounded-full h-8 relative overflow-hidden flex items-center px-1">
+                                    <div id="r-${h.id}" class="absolute left-1 transition-all duration-300 ease-linear flex items-center space-x-1" style="transform: translateX(0px);">
+                                        <div class="w-6 h-6 rounded-full ${h.color} flex items-center justify-center text-xs font-bold shadow-md">🏇</div>
+                                        <span class="text-xs text-slate-300 whitespace-nowrap font-medium">${h.name}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                    });
+                </script>
+            </div>
         </div>
 
-        <div class="my-ticket-panel" id="ticket-box">
-            <div style="font-weight: 800; color: var(--gold); margin-bottom: 12px; letter-spacing: 0.5px;">🎟️ 所持馬券</div>
-            <div id="my-tickets-list" style="color: var(--text-muted);">まだ馬券を持っていません。</div>
+        <!-- 投票フォーム & オッズ表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 投票入力 -->
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
+                <h3 class="font-bold text-lg text-slate-200 border-b border-slate-700 pb-2">🎟️ 馬券購入</h3>
+                
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">券種</label>
+                    <select id="betType" onchange="toggleBetInputs()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                        <option value="WIN">単勝（1着当て）</option>
+                        <option value="QUINELLA">馬連（1・2着ペア・順不同）</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label id="horse1Label" class="block text-xs text-slate-400 mb-1">1着予想馬</label>
+                        <select id="horse1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                            <option value="1">1. ムラオカテイオー</option>
+                            <option value="2">2. ブラックドレイ</option>
+                            <option value="3">3. シャッキンヌス</option>
+                            <option value="4">4. コッコウサクシュ</option>
+                            <option value="5">5. ハイエナゴールド</option>
+                            <option value="6">6. チキンキラー</option>
+                        </select>
+                    </div>
+                    <div id="horse2Container" class="hidden">
+                        <label class="block text-xs text-slate-400 mb-1">2着予想馬</label>
+                        <select id="horse2" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                            <option value="2">2. ブラックドレイ</option>
+                            <option value="1">1. ムラオカテイオー</option>
+                            <option value="3">3. シャッキンヌス</option>
+                            <option value="4">4. コッコウサクシュ</option>
+                            <option value="5">5. ハイエナゴールド</option>
+                            <option value="6">6. チキンキラー</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">賭け金（1〜50,000G）</label>
+                    <input type="number" id="betAmount" value="1000" min="1" max="50000" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm font-bold text-yellow-400">
+                </div>
+
+                <button id="btnBet" onclick="placeBet()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2.5 rounded shadow transition duration-200">
+                    馬券を購入する
+                </button>
+            </div>
+
+            <!-- 単勝オッズ表 -->
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+                <h3 class="font-bold text-lg text-slate-200 border-b border-slate-700 pb-2">📊 単勝オッズ</h3>
+                <div class="space-y-2" id="oddsList">
+                    <!-- JavaScriptで動的生成 -->
+                </div>
+            </div>
         </div>
-    </div>
+    </main>
 
-    <div class="card">
-        <div class="header-title" style="font-size: 1.2rem; color: #fff; background: none; text-shadow: none;">🎫 投票シート</div>
+    <script>
+        let currentRace = null;
+        let isSettling = false;
+        let lastSettledId = null;
 
-        <div class="bet-types">
-            <button class="type-btn active" id="btn-type-win" onclick="switchBetType('WIN')">単勝 (1着)</button>
-            <button class="type-btn" id="btn-type-quinella" onclick="switchBetType('QUINELLA')">馬連 (1-2着)</button>
-        </div>
+        function getToken() { return localStorage.getItem("access_token"); }
 
-        <div style="font-size: 0.8rem; color: var(--gold); margin-bottom: 10px; font-weight: bold;" id="selection-guide">出走馬を1頭選択してください</div>
-        <div class="horse-select-list" id="horse-list"></div>
+        async function loadWallets() {
+            const token = getToken();
+            if(!token) return;
+            try {
+                const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                const select = document.getElementById("walletSelect");
+                select.innerHTML = "";
+                data.forEach(w => {
+                    select.innerHTML += `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance}G)</option>`;
+                });
+                if(data.length > 0) {
+                    document.getElementById("userBalance").innerText = data[0].balance.toLocaleString();
+                }
+            } catch(e) { console.error(e); }
+        }
 
-        <div class="form-group">
-            <label>賭け金 (最大: 50,000 G)</label>
-            <input type="number" id="bet-amount" min="1" max="50000" step="100" placeholder="例: 1000">
-        </div>
-
-        <div class="form-group">
-            <label>投票する口座</label>
-            <select id="wallet-select"></select>
-        </div>
-
-        <button class="btn-bet" id="btn-submit-bet" onclick="executeBet()">馬券を購入する</button>
-        
-        <button class="btn-admin-instant" id="btn-admin-instant" style="display: none;" onclick="executeAdminInstantRace()">👑 国王専用：5秒後に強制発走</button>
-        
-        <button class="btn-back" onclick="location.href='/casino'">カジノフロアへ戻る</button>
-    </div>
-</div>
-
-<script>
-    const token = localStorage.getItem("access_token");
-    if (!token) window.location.href = "/";
-
-    let currentRace = null;
-    let betType = "WIN";
-    let selectedHorse1 = 1;
-    let selectedHorse2 = null;
-    let serverTimeOffset = 0;
-    let isSettling = false;
-    let isFetchingTrajectory = false;
-    let lastSettledId = null;
-
-    async function init() {
-        await checkAdminRole();
-        await loadWallets();
-        await refreshRace();
-        requestAnimationFrame(renderLoop);
-    }
-
-    async function checkAdminRole() {
-        try {
-            const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                const prof = await res.json();
-                if (prof.role === "king") document.getElementById("btn-admin-instant").style.display = "block";
+        function toggleBetInputs() {
+            const type = document.getElementById("betType").value;
+            const h2 = document.getElementById("horse2Container");
+            const h1Label = document.getElementById("horse1Label");
+            if (type === "QUINELLA") {
+                h2.classList.remove("hidden");
+                h1Label.innerText = "選択馬 1";
+            } else {
+                h2.classList.add("hidden");
+                h1Label.innerText = "1着予想馬";
             }
-        } catch(e) {}
-    }
+        }
 
-    async function loadWallets() {
-        try {
-            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                const wallets = await res.json();
-                document.getElementById("wallet-select").innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()} G)</option>`).join('');
-            }
-        } catch(e) {}
-    }
-
-    async function refreshRace() {
-        try {
-            const t0 = Date.now();
-            const res = await fetch("/api/derby/current", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
+        async function refreshRace() {
+            const token = getToken();
+            try {
+                const res = await fetch("/api/derby/current", { headers: { "Authorization": `Bearer ${token}` } });
                 currentRace = await res.json();
-                const latency = (Date.now() - t0) / 2;
-                serverTimeOffset = (new Date(currentRace.server_time).getTime() + latency) - Date.now();
-                renderHorseList();
-                renderTickets();
+                
+                document.getElementById("raceId").innerText = `RACE ID: #${currentRace.race_id}`;
+                updateOddsDisplay(currentRace.win_odds, currentRace.horses);
+            } catch(e) { console.error(e); }
+        }
+
+        function updateOddsDisplay(odds, horses) {
+            const container = document.getElementById("oddsList");
+            container.innerHTML = "";
+            for(let h = 1; h <= 6; h++) {
+                const o = odds ? odds[h] : 6.0;
+                const info = horses[h];
+                container.innerHTML += `
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700/50">
+                        <span class="text-sm font-semibold" style="color:${info.color}">${h}. ${info.name}</span>
+                        <span class="text-sm font-bold text-yellow-400">${o.toFixed(1)}倍</span>
+                    </div>
+                `;
             }
-        } catch(e) {}
-    }
-
-    function switchBetType(type) {
-        betType = type;
-        document.getElementById('btn-type-win').classList.toggle('active', type === 'WIN');
-        document.getElementById('btn-type-quinella').classList.toggle('active', type === 'QUINELLA');
-        document.getElementById('selection-guide').innerText = (type === 'WIN') ? "出走馬を1頭選択してください" : "1着・2着に入る2頭を選択してください";
-        if(type === 'WIN') selectedHorse2 = null;
-        renderHorseList();
-    }
-
-    function renderHorseList() {
-        if (!currentRace || !currentRace.horses) return;
-        const c = document.getElementById("horse-list");
-        c.innerHTML = [1,2,3,4,5,6].map(h => {
-            const horse = currentRace.horses[h];
-            document.getElementById(`label-${h}`).innerText = horse.name;
-            const isSel1 = (selectedHorse1 === h);
-            const isSel2 = (betType === 'QUINELLA' && selectedHorse2 === h);
-            const selClass = isSel1 ? 'selected-1' : (isSel2 ? 'selected-2' : '');
-
-            return `
-            <div class="horse-card ${selClass}" onclick="handleSelectHorse(${h})">
-                <div style="display:flex; align-items:center;">
-                    <div class="horse-badge" style="background:${horse.color};">${h}</div>
-                    <span style="font-size:0.95rem; font-weight:700;">${horse.name}</span>
-                </div>
-                <div style="font-weight:900; color:var(--gold); font-size:1rem;">
-                    ${betType === 'WIN' ? `x${(currentRace.win_odds[h] || 6.0).toFixed(1)}` : ''}
-                </div>
-            </div>`;
-        }).join('');
-    }
-
-    function handleSelectHorse(h) {
-        if (betType === 'WIN') {
-            selectedHorse1 = h;
-        } else {
-            if (selectedHorse1 === h) return;
-            if (selectedHorse2 === h) selectedHorse2 = null;
-            else selectedHorse2 = h;
         }
-        renderHorseList();
-    }
 
-    function renderTickets() {
-        const c = document.getElementById("my-tickets-list");
-        if (!currentRace.my_bets || currentRace.my_bets.length === 0) {
-            c.innerText = "まだ馬券を持っていません。";
-            return;
+        async function placeBet() {
+            const token = getToken();
+            const walletId = document.getElementById("walletSelect").value;
+            const betType = document.getElementById("betType").value;
+            const horse1 = parseInt(document.getElementById("horse1").value);
+            const horse2 = betType === "QUINELLA" ? parseInt(document.getElementById("horse2").value) : null;
+            const amount = parseInt(document.getElementById("betAmount").value);
+
+            if(betType === "QUINELLA" && horse1 === horse2) {
+                alert("馬連の場合は異なる2頭を選択してください。");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/derby/bet", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({
+                        race_id: currentRace.race_id,
+                        wallet_id: walletId,
+                        bet_type: betType,
+                        horse1: horse1,
+                        horse2: horse2,
+                        amount: amount
+                    })
+                });
+                const data = await res.json();
+                if(!res.ok) throw new Error(data.detail || "エラーが発生しました");
+                
+                alert("馬券を購入しました！");
+                await loadWallets();
+            } catch(e) { alert(e.message); }
         }
-        c.innerHTML = currentRace.my_bets.map(b => {
-            const typeStr = b.bet_type === 'WIN' ? `<span style="color:var(--gold)">[単勝]</span>` : `<span style="color:#38bdf8">[馬連]</span>`;
-            const horseStr = b.bet_type === 'WIN' ? `${b.horse_id}号馬` : `${b.horse_id} - ${b.second_horse_id}`;
-            return `<div class="ticket-item">
-                        <div>${typeStr} <b>${horseStr}</b></div>
-                        <div style="font-weight:bold;">${b.amount.toLocaleString()} G</div>
-                    </div>`;
-        }).join('');
-    }
 
-    function renderLoop() {
-        if (currentRace) {
-            const accurateNow = Date.now() + serverTimeOffset;
-            const start = new Date(currentRace.start_time).getTime();
-            const diff = (start - accurateNow) / 1000;
+        // メイン描画ループ（アニメーション & カウントダウン & 自動リフレッシュ）
+        function renderLoop() {
+            if (currentRace) {
+                const now = new Date();
+                const start = new Date(currentRace.start_time);
+                const diffSec = (start - now) / 1000;
 
-            const ticker = document.getElementById("live-ticker");
-            const clock = document.getElementById("timer-display");
-            const btnBet = document.getElementById("btn-submit-bet");
+                const countdownElem = document.getElementById("countdown");
+                const statusElem = document.getElementById("raceStatus");
+                const btnBet = document.getElementById("btnBet");
 
-            if (diff > 0) {
-                const m = Math.floor(diff / 60);
-                const s = Math.floor(diff % 60);
-                clock.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-                if (diff < 15) {
-                    ticker.innerHTML = "⚠️ ゲート入り完了 <span style='color:var(--danger);'>投票締切</span>";
-                    btnBet.disabled = true;
-                    btnBet.innerText = "投票受付終了";
-                } else {
-                    ticker.innerText = "📡 パドック周回中";
+                if (diffSec > 0) {
+                    // 投票受付中
+                    const m = String(Math.floor(diffSec / 60)).padStart(2, '0');
+                    const s = String(Math.floor(diffSec % 60)).padStart(2, '0');
+                    countdownElem.innerText = `${m}:${s}`;
+                    statusElem.innerText = "投票受付中";
+                    statusElem.className = "text-sm font-semibold text-green-400";
                     btnBet.disabled = false;
-                    btnBet.innerText = "馬券を購入する";
-                }
-                for (let h = 1; h <= 6; h++) {
-                    document.getElementById(`r-${h}`).style.transform = `translateX(0px)`;
-                }
-            } else if (diff <= 0 && diff >= -20) {
-                btnBet.disabled = true;
-                btnBet.innerText = "レース中";
+                    btnBet.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2.5 rounded shadow transition duration-200";
+                } else if (diffSec > -20) {
+                    // 発走中（アニメーション再生）
+                    countdownElem.innerText = "RACING";
+                    statusElem.innerText = "出走中！";
+                    statusElem.className = "text-sm font-semibold text-red-500 animate-pulse";
+                    btnBet.disabled = true;
+                    btnBet.className = "w-full bg-slate-700 text-slate-500 font-bold py-2.5 rounded cursor-not-allowed";
 
-                if (!currentRace.trajectory && !isFetchingTrajectory) {
-                    isFetchingTrajectory = true;
-                    refreshRace().finally(() => { isFetchingTrajectory = false; });
-                }
+                    if (currentRace.trajectory) {
+                        const elapsed = Math.abs(diffSec);
+                        const stepIndex = Math.min(20, Math.floor((elapsed / 20) * 20));
+                        const trackWidth = document.getElementById("track").clientWidth - 120;
 
-                const elapsed = Math.abs(diff);
-                ticker.innerText = `🏁 激走中！ [${elapsed.toFixed(1)}s]`;
-                ticker.style.color = "#38bdf8";
-                clock.innerText = "LIVE";
+                        for (let h = 1; h <= 6; h++) {
+                            const posPercent = currentRace.trajectory[h][stepIndex] || 0;
+                            const px = (posPercent / 100) * trackWidth;
+                            const elem = document.getElementById(`r-${h}`);
+                            if(elem) elem.style.transform = `translateX(${px}px)`;
+                        }
+                    }
+                } else {
+                    // 精算完了・結果確定
+                    countdownElem.innerText = "FINISH";
+                    statusElem.innerText = "精算中・次回レース準備中";
+                    statusElem.className = "text-sm font-semibold text-slate-400";
 
-                if (currentRace.trajectory) {
-                    const turfEl = document.getElementById("turf-track");
-                    const maxRunWidth = turfEl.clientWidth - 74; 
-                    const prevSec = Math.floor(elapsed);
-                    const nextSec = Math.min(20, prevSec + 1);
-                    const ratio = elapsed - prevSec;
+                    // レース終了後の自動更新ロジック
+                    if (!isSettling && lastSettledId !== currentRace.race_id) {
+                        isSettling = true;
+                        lastSettledId = currentRace.race_id;
 
-                    for (let h = 1; h <= 6; h++) {
-                        const traj = currentRace.trajectory[h] || currentRace.trajectory[String(h)];
-                        const pA = traj ? traj[prevSec] : 0.0;
-                        const pB = traj ? traj[nextSec] : 100.0;
-                        const prog = pA + (pB - pA) * ratio;
-                        document.getElementById(`r-${h}`).style.transform = `translateX(${(prog / 100.0) * maxRunWidth}px)`;
+                        fetch(`/api/derby/settle/${currentRace.race_id}`, { method: "POST" })
+                            .finally(() => {
+                                setTimeout(async () => {
+                                    await loadWallets();
+                                    await refreshRace();
+                                    isSettling = false;
+                                    // 馬をスタートラインへリセット
+                                    for (let h = 1; h <= 6; h++) {
+                                        const elem = document.getElementById(`r-${h}`);
+                                        if (elem) elem.style.transform = `translateX(0px)`;
+                                    }
+                                }, 5000); // 5秒後に次レース切り替え
+                            });
                     }
                 }
-            } else {
-                ticker.innerText = "🏆 審議・配当集計中...";
-                ticker.style.color = "var(--green)";
-                clock.innerText = "FIN";
-
-                if (!isSettling && lastSettledId !== currentRace.race_id) {
-                    isSettling = true;
-                    lastSettledId = currentRace.race_id;
-                    fetch(`/api/derby/settle/${currentRace.race_id}`, { method: "POST" })
-                        .finally(() => {
-                            setTimeout(async () => {
-                                await loadWallets();
-                                await refreshRace();
-                                isSettling = false;
-                            }, 5000);
-                        });
-                }
             }
-        }
-        requestAnimationFrame(renderLoop);
-    }
-
-    async function executeBet() {
-        const amt = parseInt(document.getElementById("bet-amount").value, 10);
-        const wId = document.getElementById("wallet-select").value;
-
-        // UI側での上限バリデーション追加
-        if (isNaN(amt) || amt < 1 || amt > 50000) return alert("賭け金は1〜50,000Gの範囲で指定してください。");
-        if (!wId) return alert("口座を選択してください。");
-        if (betType === 'QUINELLA' && (!selectedHorse1 || !selectedHorse2 || selectedHorse1 === selectedHorse2)) {
-            return alert("馬連は異なる2頭を選択してください。");
+            requestAnimationFrame(renderLoop);
         }
 
-        const btn = document.getElementById("btn-submit-bet");
-        btn.disabled = true;
-        btn.innerText = "処理中...";
-
-        try {
-            const res = await fetch("/api/derby/bet", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({
-                    race_id: currentRace.race_id,
-                    wallet_id: wId,
-                    bet_type: betType,
-                    horse1: selectedHorse1,
-                    horse2: selectedHorse2,
-                    amount: amt
-                })
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) {
-                document.getElementById("bet-amount").value = "";
-                await loadWallets();
-                await refreshRace();
-            }
-        } catch(e) { alert("通信エラー"); }
-        finally { 
-            btn.disabled = false;
-            btn.innerText = "馬券を購入する";
-        }
-    }
-
-    async function executeAdminInstantRace() {
-        if (!confirm("強制発走させますか？（投票は締め切られます）")) return;
-        try {
-            const res = await fetch("/api/admin/derby/instant-race", {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) await refreshRace();
-        } catch(e) { alert("通信エラー"); }
-    }
-
-    init();
-</script>
+        // 初期化
+        window.onload = async () => {
+            await loadWallets();
+            await refreshRace();
+            setInterval(refreshRace, 10000); // 10秒ごとにサーバー同期
+            requestAnimationFrame(renderLoop);
+        };
+    </script>
 </body>
 </html>
