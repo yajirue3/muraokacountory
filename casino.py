@@ -637,7 +637,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     }
 
 # ==================================================
-# 王国ダービー（競馬）モジュール：完全ゼロトラスト仕様
+# 王国ダービー（競馬）モジュール：完全防御＆安全タスク版
 # ==================================================
 from datetime import datetime, timezone, timedelta
 import asyncio
@@ -721,11 +721,9 @@ async def get_derby_current(authorization: str = Header(None)):
     now_utc = datetime.now(timezone.utc)
     start_utc = datetime.fromisoformat(race["start_time"].replace("Z", "+00:00"))
 
-    # 【重要】発走前は軌道データを絶対にレスポンスに含めない（完全秘匿）
     is_racing_or_done = (now_utc >= start_utc)
     exposed_trajectory = race["trajectory"] if is_racing_or_done else None
 
-    # オッズ計算用データ取得
     bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).execute()
     bets = bets_res.data or []
     
@@ -749,7 +747,6 @@ async def get_derby_current(authorization: str = Header(None)):
 
 @router.post("/api/derby/bet")
 async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
-    # 【重要】サーバーサイドでのバリデーション
     if data.amount < 1 or data.amount > 50000:
         raise HTTPException(status_code=400, detail="賭け金は1〜50,000Goldの範囲で指定してください。")
         
@@ -793,3 +790,16 @@ async def settle_derby(race_id: int):
         return res.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# 常時監視バックグラウンドタスク（例外ハンドリング追加）
+async def derby_scheduler():
+    while True:
+        try:
+            await get_or_create_current_race()
+        except Exception as e:
+            print(f"[Derby Scheduler Log] {e}")
+        await asyncio.sleep(30)
+
+@router.on_event("startup")
+async def start_derby_task():
+    asyncio.create_task(derby_scheduler())
