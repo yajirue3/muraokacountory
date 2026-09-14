@@ -636,17 +636,16 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "is_early_pekari": is_early_pekari,
         "new_balance": new_balance
     }
-
 # ==================================================
-# 王国ダービー（競馬）モジュール：完全防御＆安全タスク版
+# 王国ダービー（競馬）モジュール
 # ==================================================
 
 class DerbyBetRequest(BaseModel):
     race_id: int
     wallet_id: str
-    bet_type: str  # "WIN" or "QUINELLA"
+    bet_type: str
     horse1: int
-    horse2: int = 0  # 422エラーを防ぐためint型に完全固定
+    horse2: int = 0
     amount: int
 
 HORSE_NAMES = {
@@ -715,7 +714,8 @@ async def get_derby_current(authorization: str = Header(None)):
     race = await get_or_create_current_race()
     
     now_utc = datetime.now(timezone.utc)
-    start_utc = datetime.fromisoformat(race["start_time"].replace("Z", "+00:00"))
+    st = race["start_time"]
+    start_utc = datetime.fromisoformat(st.replace("Z", "+00:00")) if isinstance(st, str) else st
 
     is_racing_or_done = (now_utc >= start_utc)
     exposed_trajectory = race["trajectory"] if is_racing_or_done else None
@@ -787,7 +787,7 @@ async def settle_derby(race_id: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
-# 常時監視バックグラウンドタスク（例外ハンドリング追加）
+# バックグラウンドタスク
 async def derby_scheduler():
     while True:
         try:
