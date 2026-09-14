@@ -639,18 +639,13 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
 # ==================================================
 # 王国ダービー（競馬）モジュール：完全防御＆安全タスク版
 # ==================================================
-from datetime import datetime, timezone, timedelta
-import asyncio
-import random
-from fastapi import APIRouter, HTTPException, Header, Request
-from pydantic import BaseModel
 
 class DerbyBetRequest(BaseModel):
     race_id: int
     wallet_id: str
     bet_type: str  # "WIN" or "QUINELLA"
     horse1: int
-    horse2: int = None
+    horse2: int = 0  # 422エラーを防ぐためint型に完全固定
     amount: int
 
 HORSE_NAMES = {
@@ -662,7 +657,7 @@ HORSE_NAMES = {
     6: {"name": "チキンキラー",     "color": "#16a34a"},
 }
 
-def get_next_race_time() -> datetime:
+def get_next_race_time():
     now = datetime.now(timezone.utc)
     target_minute = 30 if now.minute < 30 else 0
     next_time = now.replace(minute=target_minute, second=0, microsecond=0)
