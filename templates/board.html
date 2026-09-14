@@ -5,130 +5,357 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 王国回覧板</title>
     <style>
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            display: flex;
-            justify-content: center;
-            padding: 20px 0;
-            margin: 0;
-        }
-        .container { width: 360px; }
-        .card {
-            background: #2a2a2a;
-            border: 2px solid #555;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-        .header {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #d4af37;
-            text-align: center;
-            border-bottom: 1px solid #444;
-            padding-bottom: 8px;
-            margin-bottom: 16px;
-        }
-        textarea {
-            width: 100%;
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background: #333;
-            color: #fff;
-            box-sizing: border-box;
-            font-size: 0.85rem;
-            margin-bottom: 10px;
-            resize: vertical;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            background: #d4af37;
-            color: #1a1a1a;
-            font-size: 0.85rem;
-        }
-        button:hover { background: #f1c40f; }
-        .btn-back { background: #444; color: #ccc; margin-top: 16px; }
-        .btn-back:hover { background: #555; }
-        .report-item {
-            background: #202020;
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 3px solid #d4af37;
-            margin-bottom: 10px;
-            font-size: 0.85rem;
-            word-break: break-all;
-        }
-        .report-user {
-            color: #d4af37;
-            font-weight: bold;
-            font-size: 0.8rem;
-            margin-bottom: 4px;
-        }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 0; margin: 0; }
+        .container { width: 100%; max-width: 450px; padding: 0 10px; box-sizing: border-box; }
+        .card { background: #1e1e1e; border: 1px solid #333; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .header { font-size: 1.2rem; font-weight: bold; color: #d4af37; text-align: center; border-bottom: 1px solid #333; padding-bottom: 12px; margin-bottom: 16px; }
+        
+        /* 投稿フォーム */
+        textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff; box-sizing: border-box; font-size: 0.9rem; resize: vertical; white-space: pre-wrap; }
+        textarea:focus { outline: none; border-color: #d4af37; }
+        .char-counter { text-align: right; font-size: 0.75rem; color: #888; margin-top: 4px; }
+        .airdrop-box { background: #222; border: 1px dashed #d35400; padding: 10px; border-radius: 6px; margin-top: 8px; display: none; }
+        .airdrop-box input, .airdrop-box select { width: 100%; padding: 6px; margin-top: 4px; margin-bottom: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+        button.btn-primary { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #d4af37; color: #1a1a1a; font-size: 0.9rem; margin-top: 10px; }
+        button.btn-primary:hover { background: #f1c40f; }
+        button.btn-primary:disabled { background: #555; color: #888; cursor: not-allowed; }
+        button.btn-toggle { background: #333; color: #ccc; border: 1px solid #555; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-top: 8px; }
+
+        /* 投稿一覧 */
+        .post-card { background: #252525; border: 1px solid #3a3a3a; border-radius: 10px; padding: 12px; margin-bottom: 12px; position: relative; }
+        .post-pinned { border-color: #d4af37; border-left: 4px solid #d4af37; background: #2a281e; }
+        .post-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+        .post-user { font-weight: bold; color: #d4af37; font-size: 0.9rem; cursor: pointer; }
+        .post-badge { background: #8b0000; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+        .post-meta { font-size: 0.7rem; color: #888; }
+        .post-content { font-size: 0.9rem; line-height: 1.5; color: #ddd; white-space: pre-wrap; word-break: break-all; margin-bottom: 12px; }
+        
+        /* リアクション＆アクション */
+        .post-actions { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid #333; padding-top: 10px; }
+        .react-btn { background: #333; border: 1px solid #444; border-radius: 20px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; color: #ccc; display: flex; align-items: center; gap: 4px; }
+        .react-btn.active { background: #d4af37; color: #000; border-color: #d4af37; }
+        .action-btn { background: transparent; border: none; color: #888; font-size: 0.8rem; cursor: pointer; padding: 4px; }
+        .action-btn:hover { color: #d4af37; }
+        
+        /* エアドロップカード */
+        .airdrop-card { background: linear-gradient(135deg, #2c3e50, #c0392b); border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 10px; border: 1px solid #e74c3c; }
+        .airdrop-title { color: #fff; font-weight: bold; font-size: 0.85rem; margin-bottom: 6px; }
+        .btn-airdrop { background: #f1c40f; color: #000; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+        .btn-airdrop:disabled { background: #7f8c8d; cursor: not-allowed; }
+
+        /* ページネーション & UI */
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+        .btn-nav { background: #444; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+        .top-nav { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        
+        /* 国王専用パネル（最小化可能） */
+        #admin-panel { position: fixed; bottom: 20px; right: 20px; background: #111; border: 1px solid #d4af37; padding: 12px; border-radius: 8px; width: 280px; box-shadow: 0 4px 20px rgba(0,0,0,0.8); z-index: 1000; display: none; }
+        #admin-panel.minimized .admin-content { display: none; }
+        .admin-header { display: flex; justify-content: space-between; color: #d4af37; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+        .report-item { background: #222; padding: 8px; border-left: 2px solid #c0392b; margin-top: 8px; font-size: 0.75rem; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card">
-        <div class="header">📜 王国回覧板（労働報告）</div>
-        <textarea id="report-content" rows="3" placeholder="労働成果や国王への忠誠を書き込め..."></textarea>
-        <button onclick="sendReport()">報告を提出する</button>
-
-        <div style="margin-top: 20px;" id="reports-list"></div>
-        <button class="btn-back" onclick="location.href='/dashboard'">◀ 国民証に戻る</button>
+    <div class="top-nav">
+        <button class="btn-nav" onclick="location.href='/dashboard'">◀ 戻る</button>
+        <button class="btn-nav" style="background: #27ae60;" onclick="loadPosts(currentPage)">🔄 更新</button>
     </div>
+
+    <div class="card">
+        <div class="header">📜 王国回覧板</div>
+        <textarea id="post-content" rows="3" maxlength="400" placeholder="労働成果、雑談、王への忠誠を書き込め... (>>番号 で返信)"></textarea>
+        <div class="char-counter"><span id="char-count">0</span> / 400</div>
+
+        <button class="btn-toggle" onclick="toggleAirdropUI()">💸 お金をばらまく（施し）</button>
+        <div id="airdrop-ui" class="airdrop-box">
+            <div style="font-size:0.75rem; color:#aaa;">先着順で所持金を配布します（投稿時に即時引落）</div>
+            <select id="wallet-select"><option value="">口座読込中...</option></select>
+            <input type="number" id="airdrop-amount" placeholder="1人あたりの配布額 (G)" min="100">
+            <input type="number" id="airdrop-total" placeholder="先着人数 (人)" min="1" max="50">
+        </div>
+
+        <button id="btn-submit" class="btn-primary" onclick="submitPost()">布告を提出する</button>
+    </div>
+
+    <div id="posts-container">
+        <!-- 投稿がここに描画される -->
+    </div>
+
+    <div class="pagination">
+        <button id="btn-prev" class="btn-nav" onclick="changePage(-1)">◀ 前へ</button>
+        <span id="page-display" style="font-weight: bold; color: #d4af37;">Page 1</span>
+        <button id="btn-next" class="btn-nav" onclick="changePage(1)">次へ ▶</button>
+    </div>
+</div>
+
+<!-- 国王用 通報パネル -->
+<div id="admin-panel">
+    <div class="admin-header" onclick="toggleAdminPanel()">
+        <span>🚨 密告リスト (国王専用)</span>
+        <span id="admin-toggle-icon">▼</span>
+    </div>
+    <div class="admin-content" id="admin-reports-list"></div>
 </div>
 
 <script>
     const token = localStorage.getItem("access_token");
-    if (!token) {
-        window.location.href = "/";
-    } else {
-        loadReports();
-    }
+    if (!token) window.location.href = "/";
 
-    async function loadReports() {
-        const res = await fetch("/api/reports");
-        if (res.ok) {
-            const reports = await res.json();
-            document.getElementById("reports-list").innerHTML = reports.map(r => `
-                <div class="report-item">
-                    <div class="report-user">⛏️ ${escapeHtml(r.nickname)}</div>
-                    <div>${escapeHtml(r.content)}</div>
-                </div>
-            `).join('');
-        }
-    }
+    let currentPage = 1;
+    let isKing = false;
+    let userTitle = "奴隷";
+    let myWallets = [];
 
-    async function sendReport() {
-        const content = document.getElementById("report-content").value;
-        if (!content) return alert("内容を入力してください");
+    // URLからページ番号取得
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('page')) currentPage = parseInt(params.get('page')) || 1;
 
-        const res = await fetch("/api/reports", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({ content })
+    document.addEventListener("DOMContentLoaded", async () => {
+        await fetchWallets();
+        loadPosts(currentPage);
+        
+        document.getElementById("post-content").addEventListener("input", function() {
+            document.getElementById("char-count").innerText = this.value.length;
         });
+    });
+
+    // ランクとウォレット情報の取得
+    async function fetchWallets() {
+        const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
         if (res.ok) {
-            document.getElementById("report-content").value = "";
-            loadReports();
+            myWallets = await res.json();
+            const select = document.getElementById("wallet-select");
+            select.innerHTML = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残高:${w.balance}G)</option>`).join('');
+            
+            const total = myWallets.reduce((s, w) => s + w.balance, 0);
+            if (total > 10000) userTitle = "貴族";
+            else if (total > 1500) userTitle = "金持ち";
+            else if (total > 1000) userTitle = "平民";
+            else if (total > 500) userTitle = "商人に雇われた奴隷";
+            else userTitle = "鉱山労働奴隷";
         }
     }
 
-    function escapeHtml(str) {
-        return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+    function toggleAirdropUI() {
+        const ui = document.getElementById("airdrop-ui");
+        ui.style.display = ui.style.display === "block" ? "none" : "block";
     }
+
+    // 投稿処理（クールダウン付き）
+    async function submitPost() {
+        const content = document.getElementById("post-content").value.trim();
+        if (!content) return alert("内容を入力してください");
+        
+        const btn = document.getElementById("btn-submit");
+        btn.disabled = true;
+        btn.innerText = "送信中...";
+
+        const payload = {
+            content: content,
+            user_title: userTitle,
+            wallet_id: document.getElementById("wallet-select").value || null,
+            airdrop_amount: parseInt(document.getElementById("airdrop-amount").value) || 0,
+            airdrop_total: parseInt(document.getElementById("airdrop-total").value) || 0
+        };
+
+        try {
+            const res = await fetch("/api/board/posts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById("post-content").value = "";
+                document.getElementById("char-count").innerText = "0";
+                document.getElementById("airdrop-amount").value = "";
+                document.getElementById("airdrop-total").value = "";
+                loadPosts(1);
+            } else {
+                alert(data.detail || "エラーが発生しました");
+            }
+        } finally {
+            // 最低1秒のフロントエンド・クールダウン
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "布告を提出する";
+            }, 1000);
+        }
+    }
+
+    // 投稿一覧の描画
+    async function loadPosts(page) {
+        const res = await fetch(`/api/board/posts?page=${page}`, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        isKing = data.is_king;
+        
+        currentPage = page;
+        window.history.pushState({}, '', `?page=${page}`);
+        document.getElementById("page-display").innerText = `Page ${page}`;
+        document.getElementById("btn-prev").disabled = (page === 1);
+        document.getElementById("btn-next").disabled = (data.posts.length < 20);
+
+        if (isKing) {
+            document.getElementById("admin-panel").style.display = "block";
+            loadAdminReports();
+        }
+
+        const container = document.getElementById("posts-container");
+        container.innerHTML = data.posts.map(p => {
+            const d = new Date(p.created_at);
+            const timeStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            
+            // アンカー（>>番号）をリンク化する簡易処理
+            let safeContent = escapeHtml(p.content).replace(/&gt;&gt;(\d+)/g, '<span style="color:#3498db; cursor:pointer;" onclick="replyTo($1)">>>$1</span>');
+
+            let airdropHtml = '';
+            if (p.airdrop_total > 0) {
+                const remain = p.airdrop_total - p.airdrop_claimed;
+                const isClaimed = p.my_claim;
+                const isOwner = p.is_mine;
+                let btnHtml = '';
+                
+                if (remain <= 0) btnHtml = `<button class="btn-airdrop" disabled>配布終了</button>`;
+                else if (isOwner) btnHtml = `<button class="btn-airdrop" disabled>自分の配布です</button>`;
+                else if (isClaimed) btnHtml = `<button class="btn-airdrop" disabled>受取済み</button>`;
+                else btnHtml = `<button class="btn-airdrop" onclick="claimAirdrop(${p.id})">🧧 ${p.airdrop_amount}G 受け取る</button>`;
+
+                airdropHtml = `
+                    <div class="airdrop-card">
+                        <div class="airdrop-title">💰 施し：${p.airdrop_amount}G × ${remain}人枠</div>
+                        ${btnHtml}
+                    </div>`;
+            }
+
+            const pinHtml = p.is_pinned ? '📌 ' : '';
+            const cardClass = p.is_pinned ? 'post-card post-pinned' : 'post-card';
+            
+            return `
+                <div class="${cardClass}" id="post-${p.id}">
+                    <div class="post-header">
+                        <div>
+                            <span class="post-user" onclick="replyTo(${p.id})">${pinHtml}⛏️ ${escapeHtml(p.nickname)}</span>
+                            <span class="post-badge">${escapeHtml(p.user_title)}</span>
+                        </div>
+                        <div class="post-meta">ID:${p.id} - ${timeStr}</div>
+                    </div>
+                    
+                    ${airdropHtml}
+                    <div class="post-content">${safeContent}</div>
+                    
+                    <div class="post-actions">
+                        <button class="react-btn ${p.reactions.my_reacts.includes('👍')?'active':''}" onclick="reactPost(${p.id}, '👍')">👍 ${p.reactions['👍']}</button>
+                        <button class="react-btn ${p.reactions.my_reacts.includes('⛏️')?'active':''}" onclick="reactPost(${p.id}, '⛏️')">⛏️ ${p.reactions['⛏️']}</button>
+                        <button class="react-btn ${p.reactions.my_reacts.includes('👑')?'active':''}" onclick="reactPost(${p.id}, '👑')">👑 ${p.reactions['👑']}</button>
+                        
+                        <div style="flex-grow: 1;"></div>
+                        ${!p.is_mine ? `<button class="action-btn" onclick="tipPost(${p.id})">💰 100G投げる</button>` : ''}
+                        ${!p.is_mine ? `<button class="action-btn" onclick="reportPost(${p.id})">🚨 密告</button>` : ''}
+                        ${(p.is_mine || isKing) ? `<button class="action-btn" onclick="deletePost(${p.id})" style="color:#e74c3c;">🗑 削除</button>` : ''}
+                        ${isKing ? `<button class="action-btn" onclick="pinPost(${p.id})" style="color:#f1c40f;">📌 ピン</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function changePage(delta) {
+        loadPosts(currentPage + delta);
+    }
+
+    function replyTo(id) {
+        const ta = document.getElementById("post-content");
+        ta.value = `>>${id}\n` + ta.value;
+        ta.focus();
+    }
+
+    async function reactPost(id, type) {
+        await fetch(`/api/board/posts/${id}/react`, {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ type })
+        });
+        loadPosts(currentPage); // 簡易的に全体リロード
+    }
+
+    async function claimAirdrop(id) {
+        if (!myWallets.length) return alert("受取口座がありません");
+        const res = await fetch(`/api/board/posts/${id}/claim`, {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ wallet_id: myWallets[0].wallet_id }) // 代表口座を指定
+        });
+        const data = await res.json();
+        alert(res.ok ? data.message : "エラー: " + data.detail);
+        if (res.ok) loadPosts(currentPage);
+    }
+
+    async function tipPost(id) {
+        if (!confirm("代表口座から 100G をチップとして投げますか？")) return;
+        if (!myWallets.length) return alert("口座がありません");
+        
+        const res = await fetch(`/api/board/posts/${id}/tip`, {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ wallet_id: myWallets[0].wallet_id, amount: 100 })
+        });
+        const data = await res.json();
+        alert(res.ok ? data.message : "エラー: " + data.detail);
+        if (res.ok) fetchWallets();
+    }
+
+    async function deletePost(id) {
+        if (!confirm("本当に削除しますか？")) return;
+        const res = await fetch(`/api/board/posts/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+        if (res.ok) loadPosts(currentPage);
+    }
+
+    async function reportPost(id) {
+        if (!confirm("国王へ不適切発言として密告しますか？")) return;
+        const res = await fetch(`/api/board/posts/${id}/report`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+        alert(res.ok ? "密告しました。" : "エラーが発生しました");
+    }
+
+    async function pinPost(id) {
+        await fetch(`/api/board/posts/${id}/pin`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+        loadPosts(1);
+    }
+
+    /* 国王パネル用 */
+    function toggleAdminPanel() {
+        const panel = document.getElementById("admin-panel");
+        panel.classList.toggle("minimized");
+        document.getElementById("admin-toggle-icon").innerText = panel.classList.contains("minimized") ? "▲" : "▼";
+    }
+
+    async function loadAdminReports() {
+        const res = await fetch("/api/board/admin/reports", { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        const reports = await res.json();
+        const list = document.getElementById("admin-reports-list");
+        
+        if (reports.length === 0) {
+            list.innerHTML = "<div style='font-size:0.75rem; color:#888; padding:8px;'>現在通報はありません</div>";
+            return;
+        }
+
+        list.innerHTML = reports.map(r => `
+            <div class="report-item">
+                <div style="margin-bottom:4px; color:#aaa;">ID:${r.board_posts.id} (${escapeHtml(r.board_posts.nickname)})</div>
+                <div style="margin-bottom:6px;">${escapeHtml(r.board_posts.content.substring(0,30))}...</div>
+                <button class="btn-toggle" onclick="dismissReport(${r.id})" style="padding:2px 8px;">✅ 破棄</button>
+                <button class="btn-toggle" onclick="deletePost(${r.board_posts.id})" style="padding:2px 8px; border-color:#e74c3c; color:#e74c3c;">🗑 削除</button>
+            </div>
+        `).join('');
+    }
+
+    async function dismissReport(id) {
+        await fetch(`/api/board/admin/reports/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+        loadAdminReports();
+    }
+
+    function escapeHtml(str) { return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; }
 </script>
 
 </body>
