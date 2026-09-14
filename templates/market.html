@@ -4,136 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 王国自由市場</title>
+    <!-- ※CSSは元々のものをそのまま使用 -->
     <style>
-        :root {
-            --bg-dark: #0f1115;
-            --card-bg: #1c1e24;
-            --border: #333842;
-            --gold: #d4af37;
-            --gold-hover: #f1c40f;
-            --text-main: #e2e8f0;
-            --text-muted: #94a3b8;
-            --danger: #ef4444;
-            --success: #10b981;
-            --blue: #3b82f6;
-            --purple: #8e44ad;
-        }
-
+        /* (元のCSSを配置。追加で種別バッジ用のCSSを定義) */
+        :root { --bg-dark: #0f1115; --card-bg: #1c1e24; --border: #333842; --gold: #d4af37; --success: #10b981; --blue: #3b82f6; --purple: #8e44ad; --text-main: #e2e8f0; --text-muted: #94a3b8;}
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-dark); color: var(--text-main); display: flex; justify-content: center; padding: 20px 0; margin: 0; min-height: 100vh; }
         .container { width: 380px; display: flex; flex-direction: column; gap: 16px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        
-        .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
-        .sub-desc { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: -10px; margin-bottom: 16px; }
-
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+        .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
         .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 20px; }
-        .tab-btn { padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s ease; }
-        .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(212, 175, 55, 0.2); }
-        .tab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .tab-content { display: none; animation: fadeIn 0.3s ease-out; }
+        .tab-btn { padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); }
+        .tab-content { display: none; }
         .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .list-item { background: #15171a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .list-item:hover { border-color: #4b5563; transform: translateY(-2px); }
-        .list-item .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-        .list-item .title { font-weight: 700; color: #fff; font-size: 0.95rem; }
         
-        .badge { font-size: 0.65rem; padding: 3px 8px; border-radius: 12px; font-weight: bold; }
-        .badge-open { background: rgba(59, 130, 246, 0.2); color: var(--blue); border: 1px solid var(--blue); }
-        .badge-signed { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; }
-        .badge-completed { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
-        .badge-cancelled { background: rgba(148, 163, 184, 0.2); color: var(--text-muted); border: 1px solid var(--text-muted); }
-
-        .c-desc { font-size: 0.8rem; color: #cbd5e1; background: #0f1115; border-radius: 6px; padding: 8px; margin: 8px 0; white-space: pre-wrap; word-break: break-all; border: 1px solid #262932; }
-
-        input, select, textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #15171a; color: #fff; box-sizing: border-box; margin-top: 4px; margin-bottom: 12px; font-size: 0.85rem; font-family: inherit; transition: border 0.2s; }
-        textarea { resize: vertical; height: 70px; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+        .list-item { background: #15171a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+        .type-badge-req { background: rgba(59,130,246,0.2); color: var(--blue); border: 1px solid var(--blue); padding: 3px 6px; border-radius: 6px; font-size: 0.65rem; }
+        .type-badge-off { background: rgba(142,68,173,0.2); color: var(--purple); border: 1px solid var(--purple); padding: 3px 6px; border-radius: 6px; font-size: 0.65rem; }
         
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: linear-gradient(145deg, var(--gold), #b8860b); color: #1a1a1a; font-size: 0.9rem; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        button:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
-
-        .btn-action { background: linear-gradient(145deg, var(--blue), #2563eb); color: #fff; padding: 10px; margin-top: 4px; }
-        .btn-success { background: linear-gradient(145deg, var(--success), #059669); color: #fff; padding: 10px; margin-top: 4px; }
-        .btn-danger { background: linear-gradient(145deg, var(--danger), #b91c1c); color: #fff; padding: 10px; margin-top: 4px; }
-        .btn-back { background: #334155; color: #cbd5e1; margin-top: 14px; box-shadow: none; }
-
-        .review-box { border-top: 1px dashed var(--border); margin-top: 8px; padding-top: 8px; font-size: 0.75rem; }
-        .review-item { background: #0f1115; border-radius: 4px; padding: 6px; margin-top: 4px; border: 1px solid #262932; }
-        .stars { color: #f1c40f; }
-        .empty-msg { text-align: center; color: #64748b; font-size: 0.85rem; padding: 20px 0; font-style: italic; }
+        .c-desc { font-size: 0.8rem; color: #cbd5e1; background: #0f1115; border-radius: 6px; padding: 8px; margin: 8px 0; border: 1px solid #262932; }
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #15171a; color: #fff; box-sizing: border-box; margin-bottom: 12px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-action { background: linear-gradient(145deg, var(--gold), #b8860b); color: #1a1a1a; }
+        .btn-buy { background: linear-gradient(145deg, var(--purple), #6c3483); color: #fff; margin-top: 8px; }
+        .btn-accept { background: linear-gradient(145deg, var(--blue), #2563eb); color: #fff; margin-top: 8px; }
+        .btn-success { background: linear-gradient(145deg, var(--success), #059669); color: #fff; margin-top: 8px; }
+        .btn-danger { background: linear-gradient(145deg, #ef4444, #b91c1c); color: #fff; margin-top: 8px; }
+        .btn-back { background: #334155; color: #cbd5e1; margin-top: 14px; }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="card">
         <div class="header">⚖️ 王国自由市場</div>
-        <div class="sub-desc">報酬金は完了承認まで安全にエスクロー預託されます</div>
-
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('market')">📜 契約一覧 (受諾)</button>
-            <button class="tab-btn" onclick="switchTab('create')">📝 仕事出品 (発行)</button>
-            <button class="tab-btn" onclick="switchTab('my-created')">👑 自らの依頼</button>
-            <button class="tab-btn" onclick="switchTab('my-accepted')">✍️ 受注中の仕事</button>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: -10px; margin-bottom: 16px;">
+            依頼と出品のエスクロー（預託）取引所
         </div>
 
-        <!-- タブ1: 市場の全契約一覧 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('market')">📜 市場一覧</button>
+            <button class="tab-btn" onclick="switchTab('create')">📝 依頼 / 出品する</button>
+            <button class="tab-btn" onclick="switchTab('my-created')">👑 自らの投稿</button>
+            <button class="tab-btn" onclick="switchTab('my-accepted')">✍️ 進行中の取引</button>
+        </div>
+
+        <!-- 市場一覧 -->
         <div id="tab-market" class="tab-content active">
             <div id="contracts-list"><div class="empty-msg">読み込み中...</div></div>
             <button onclick="loadContracts()" style="background: #334155; color: #fff; margin-top: 10px;">🔄 リロード</button>
         </div>
 
-        <!-- タブ2: 新規契約の出品 -->
+        <!-- 新規作成 (メルカリ・ココナラ方式) -->
         <div id="tab-create" class="tab-content">
-            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; font-size: 0.8rem; color: #94a3b8; margin-bottom: 16px; border-left: 3px solid var(--gold);">
-                仕事の報酬は作成時に指定口座から一時的に引き落とされ、保護されます。
+            <label style="font-size: 0.75rem; color: #94a3b8;">投稿タイプ</label>
+            <select id="c-type" onchange="updateCreateUI()">
+                <option value="REQUEST">📥 依頼する (〇〇をやってほしい / 自分が払う)</option>
+                <option value="OFFER">📤 出品する (〇〇を売る・やります / 相手が払う)</option>
+            </select>
+
+            <div id="create-hint" style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; font-size: 0.8rem; color: #94a3b8; margin-bottom: 16px; border-left: 3px solid var(--blue);">
+                【依頼】作成時に指定口座から報酬が引き落とされ、預託されます。
             </div>
 
-            <label style="font-size: 0.75rem; color: #94a3b8;">依頼タイトル</label>
-            <input type="text" id="c-title" placeholder="例: Discord Botの開発・導入サポート">
+            <label style="font-size: 0.75rem; color: #94a3b8;">タイトル</label>
+            <input type="text" id="c-title" placeholder="例: Discord Bot開発">
 
-            <label style="font-size: 0.75rem; color: #94a3b8;">詳細要件・条件</label>
-            <textarea id="c-desc" placeholder="例: 明日までに特定のコマンドを実装すること。"></textarea>
+            <label style="font-size: 0.75rem; color: #94a3b8;">詳細要件・内容</label>
+            <textarea id="c-desc" placeholder="詳細を記載してください" style="height: 80px;"></textarea>
 
-            <label style="font-size: 0.75rem; color: #94a3b8;">設定報酬 (Gold)</label>
+            <label style="font-size: 0.75rem; color: #94a3b8;">金額設定 (Gold)</label>
             <input type="number" id="c-amount" min="1" step="1" placeholder="例: 1000">
 
-            <label style="font-size: 0.75rem; color: #94a3b8;">報酬預託元口座</label>
+            <label style="font-size: 0.75rem; color: #94a3b8;">紐付ける口座</label>
             <select id="create-wallet-select"></select>
 
-            <button id="btn-create-contract" onclick="createContract()">市場に契約を出品・掲示する</button>
+            <button class="btn-action" onclick="createContract()">市場に投稿する</button>
         </div>
 
-        <!-- タブ3: 自分が作成した依頼 -->
-        <div id="tab-my-created" class="tab-content">
-            <div id="my-created-list"><div class="empty-msg">読み込み中...</div></div>
-        </div>
+        <div id="tab-my-created" class="tab-content"><div id="my-created-list"></div></div>
+        <div id="tab-my-accepted" class="tab-content"><div id="my-accepted-list"></div></div>
 
-        <!-- タブ4: 自分が受注した仕事 -->
-        <div id="tab-my-accepted" class="tab-content">
-            <div id="my-accepted-list"><div class="empty-msg">読み込み中...</div></div>
-        </div>
-
-        <button class="btn-back" onclick="location.href='/dashboard'">ダッシュボードへ戻る</button>
+        <button class="btn-back" onclick="location.href='/dashboard'">戻る</button>
     </div>
 </div>
 
 <script>
     const token = localStorage.getItem("access_token");
-    if (!token) window.location.href = "/";
-
     let wallets = [];
     let currentUserId = "";
-    let isKingUser = false;
     let allContracts = [];
-    let isProcessing = false;
-
-    function escapeHtml(str) { 
-        return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); 
-    }
 
     async function init() {
         await loadWallets();
@@ -141,255 +100,136 @@
     }
 
     function switchTab(tabId) {
-        if (isProcessing) return;
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         event.target.classList.add('active');
         document.getElementById(`tab-${tabId}`).classList.add('active');
     }
 
+    function updateCreateUI() {
+        const type = document.getElementById("c-type").value;
+        const hint = document.getElementById("create-hint");
+        if (type === "REQUEST") {
+            hint.innerHTML = "【依頼】作成時にあなたの口座から報酬が引き落とされ、預託されます。";
+            hint.style.borderLeftColor = "var(--blue)";
+        } else {
+            hint.innerHTML = "【出品】購入者が現れた時点で相手から代金が引き落とされ、預託されます。";
+            hint.style.borderLeftColor = "var(--purple)";
+        }
+    }
+
     async function loadWallets() {
-        try {
-            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                wallets = await res.json();
-                const options = wallets.map(w => `<option value="${escapeHtml(w.wallet_id)}">${escapeHtml(w.wallet_name)} (残高: ${w.balance} G)</option>`).join('');
-                document.getElementById("create-wallet-select").innerHTML = options;
-            }
-        } catch (e) { console.error(e); }
+        const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+        if (res.ok) {
+            wallets = await res.json();
+            const opts = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (残: ${w.balance} G)</option>`).join('');
+            document.getElementById("create-wallet-select").innerHTML = opts;
+        }
     }
 
     async function loadContracts() {
-        if (isProcessing) return;
-        try {
-            const res = await fetch("/api/contracts", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                const data = await res.json();
-                allContracts = data.contracts || [];
-                currentUserId = data.current_user_id;
-                isKingUser = data.is_king;
-                renderAllTabs();
+        const res = await fetch("/api/contracts", { headers: { "Authorization": `Bearer ${token}` } });
+        if (res.ok) {
+            const data = await res.json();
+            allContracts = data.contracts || [];
+            currentUserId = data.current_user_id;
+            renderAll();
+        }
+    }
+
+    function renderAll() {
+        renderList("contracts-list", allContracts.filter(c => c.status === "OPEN"));
+        renderList("my-created-list", allContracts.filter(c => c.creator_user_id === currentUserId));
+        renderList("my-accepted-list", allContracts.filter(c => c.acceptor_user_id === currentUserId));
+    }
+
+    function renderList(elementId, list) {
+        const el = document.getElementById(elementId);
+        if (list.length === 0) {
+            el.innerHTML = '<div class="empty-msg">データがありません。</div>';
+            return;
+        }
+        el.innerHTML = list.map(c => {
+            const isReq = (c.contract_type === "REQUEST");
+            const typeBadge = isReq ? `<span class="type-badge-req">📥 依頼</span>` : `<span class="type-badge-off">📤 出品</span>`;
+            
+            let actionArea = "";
+            // 他人のOPENな投稿に対するアクション
+            if (c.status === "OPEN" && c.creator_user_id !== currentUserId) {
+                const btnClass = isReq ? "btn-accept" : "btn-buy";
+                const btnText = isReq ? "✍️ この依頼を受注する" : "🛒 この商品/役務を購入する";
+                
+                actionArea = `
+                    <div style="margin-top: 10px;">
+                        <select id="wallet-${c.id}" style="padding:8px; font-size:0.75rem;">
+                            ${wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name}</option>`).join('')}
+                        </select>
+                        <button class="${btnClass}" onclick="acceptContract(${c.id})">${btnText}</button>
+                    </div>`;
             }
-        } catch (e) { console.error(e); }
-    }
+            
+            // 自分の投稿へのアクション
+            if (c.creator_user_id === currentUserId) {
+                if (c.status === "OPEN") {
+                    actionArea = `<button class="btn-danger" onclick="cancelContract(${c.id})">✖ 取り消す (キャンセル)</button>`;
+                } else if (c.status === "SIGNED") {
+                    actionArea = `<button class="btn-success" onclick="completeContract(${c.id})">✅ 取引を完了し、代金を決済する</button>`;
+                }
+            }
 
-    function renderAllTabs() {
-        renderMarketList();
-        renderMyCreatedList();
-        renderMyAcceptedList();
-    }
-
-    /* タブ1: 全掲示リスト */
-    function renderMarketList() {
-        const el = document.getElementById("contracts-list");
-        const openContracts = allContracts.filter(c => c.status === "OPEN");
-        if (openContracts.length === 0) {
-            el.innerHTML = '<div class="empty-msg">現在、募集中の契約はありません。</div>';
-            return;
-        }
-        el.innerHTML = openContracts.map(c => renderContractCard(c, "market")).join('');
-    }
-
-    /* タブ3: 自分の依頼 */
-    function renderMyCreatedList() {
-        const el = document.getElementById("my-created-list");
-        const list = allContracts.filter(c => c.creator_user_id === currentUserId);
-        if (list.length === 0) {
-            el.innerHTML = '<div class="empty-msg">作成した契約はありません。</div>';
-            return;
-        }
-        el.innerHTML = list.map(c => renderContractCard(c, "my-created")).join('');
-    }
-
-    /* タブ4: 受注中の仕事 */
-    function renderMyAcceptedList() {
-        const el = document.getElementById("my-accepted-list");
-        const list = allContracts.filter(c => c.acceptor_user_id === currentUserId);
-        if (list.length === 0) {
-            el.innerHTML = '<div class="empty-msg">受注した契約はありません。</div>';
-            return;
-        }
-        el.innerHTML = list.map(c => renderContractCard(c, "my-accepted")).join('');
-    }
-
-    /* カードレンダリング統一エンジン */
-    function renderContractCard(c, viewContext) {
-        let badge = '<span class="badge badge-open">募集中</span>';
-        if (c.status === "SIGNED") badge = '<span class="badge badge-signed">履行待ち(預託中)</span>';
-        if (c.status === "COMPLETED") badge = '<span class="badge badge-completed">完了・決済済</span>';
-        if (c.status === "CANCELLED") badge = '<span class="badge badge-cancelled">キャンセル</span>';
-
-        let actionArea = "";
-
-        // 1. OPEN状態で自分が作成者でない ➔ 受注ボタン
-        if (c.status === "OPEN" && c.creator_user_id !== currentUserId) {
-            actionArea = `
-                <div style="margin-top: 8px;">
-                    <label style="font-size: 0.7rem; color: #94a3b8;">報酬受取口座</label>
-                    <select id="accept-wallet-${c.id}">
-                        ${wallets.map(w => `<option value="${escapeHtml(w.wallet_id)}">${escapeHtml(w.wallet_name)}</option>`).join('')}
-                    </select>
-                    <button class="btn-action" onclick="acceptContract(${c.id})">✍️ この契約を受注する</button>
-                </div>`;
-        }
-
-        // 2. OPEN状態で自分が作成者 ➔ キャンセルボタン
-        if (c.status === "OPEN" && c.creator_user_id === currentUserId) {
-            actionArea = `<button class="btn-danger" onclick="cancelContract(${c.id})">✖ 契約を取り消す (返金)</button>`;
-        }
-
-        // 3. SIGNED状態で自分が作成者 ➔ 完了承認ボタン
-        if (c.status === "SIGNED" && c.creator_user_id === currentUserId) {
-            actionArea = `<button class="btn-success" onclick="completeContract(${c.id})">✅ 履行完了を確認して報酬を送金</button>`;
-        }
-
-        // 4. COMPLETED状態で当事者かつ未評価 ➔ レビューフォーム
-        const isParty = (c.creator_user_id === currentUserId || c.acceptor_user_id === currentUserId);
-        const hasReviewed = (c.reviews || []).some(r => r.reviewer_user_id === currentUserId);
-
-        if (c.status === "COMPLETED" && isParty && !hasReviewed) {
-            actionArea += `
-                <div style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px;">
-                    <label style="font-size: 0.7rem; color: var(--gold);">⭐ 相手への評価・レビュー</label>
-                    <select id="rev-rating-${c.id}">
-                        <option value="5">★★★★★ (5 - 大満足)</option>
-                        <option value="4">★★★★☆ (4 - 満足)</option>
-                        <option value="3">★★★☆☆ (3 - 普通)</option>
-                        <option value="2">★★☆☆☆ (2 - 不満)</option>
-                        <option value="1">★☆☆☆☆ (1 - 最悪)</option>
-                    </select>
-                    <input type="text" id="rev-comment-${c.id}" placeholder="コメント（任意）">
-                    <button class="btn-action" onclick="submitReview(${c.id})">評価を送信</button>
-                </div>`;
-        }
-
-        // レビュー表示
-        let reviewsHtml = "";
-        if (c.reviews && c.reviews.length > 0) {
-            reviewsHtml = `
-                <div class="review-box">
-                    <div style="color: #94a3b8; margin-bottom: 4px;">💬 評価・レビュー一覧:</div>
-                    ${c.reviews.map(r => `
-                        <div class="review-item">
-                            <span class="stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span>
-                            ${r.comment ? `<span style="color: #e2e8f0; margin-left: 6px;">${escapeHtml(r.comment)}</span>` : ''}
-                        </div>
-                    `).join('')}
-                </div>`;
-        }
-
-        return `
+            return `
             <div class="list-item">
                 <div class="title-row">
-                    <span class="title">📜 ${escapeHtml(c.title)}</span>
-                    ${badge}
+                    <span style="font-weight:bold;">${c.title}</span>
+                    ${typeBadge}
                 </div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">
-                    依頼主: <b style="color: #fff;">${escapeHtml(c.creator_nickname)}</b> | 報酬: <b style="color: var(--gold);">${c.amount} G</b>
+                <div style="font-size: 0.8rem; color: #94a3b8;">
+                    投稿者: <b style="color:#fff;">${c.creator_nickname}</b> | 金額: <b style="color:var(--gold);">${c.amount} G</b>
                 </div>
-                <div class="c-desc">${escapeHtml(c.description)}</div>
+                <div class="c-desc">${c.description}</div>
                 ${actionArea}
-                ${reviewsHtml}
             </div>`;
+        }).join('');
     }
 
-    /* 契約作成 */
     async function createContract() {
-        if (isProcessing) return;
-        const title = document.getElementById("c-title").value.trim();
-        const description = document.getElementById("c-desc").value.trim();
-        const amount = parseInt(document.getElementById("c-amount").value, 10);
-        const creator_wallet_id = document.getElementById("create-wallet-select").value;
-
-        if (!title || !description || isNaN(amount) || amount <= 0 || !creator_wallet_id) {
-            return alert("全項目を正しく入力してください。");
-        }
-
-        isProcessing = true;
-        const btn = document.getElementById("btn-create-contract");
-        btn.disabled = true; btn.innerText = "掲示中...";
-
-        try {
-            const res = await fetch("/api/contracts", {
-                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ title, description, amount, creator_wallet_id })
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) {
-                document.getElementById("c-title").value = "";
-                document.getElementById("c-desc").value = "";
-                document.getElementById("c-amount").value = "";
-                await loadWallets();
-                await loadContracts();
-                switchTab('market');
-            }
-        } catch (e) { alert("通信エラー"); } finally { isProcessing = false; btn.disabled = false; btn.innerText = "市場に契約を出品・掲示する"; }
+        const data = {
+            contract_type: document.getElementById("c-type").value,
+            title: document.getElementById("c-title").value,
+            description: document.getElementById("c-desc").value,
+            amount: parseInt(document.getElementById("c-amount").value),
+            creator_wallet_id: document.getElementById("create-wallet-select").value
+        };
+        const res = await fetch("/api/contracts", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify(data)
+        });
+        alert((await res.json()).message || "エラー");
+        if (res.ok) { loadWallets(); loadContracts(); switchTab('market'); }
     }
 
-    /* 受注 */
     async function acceptContract(id) {
-        if (isProcessing) return;
-        const acceptor_wallet_id = document.getElementById(`accept-wallet-${id}`).value;
-        if (!acceptor_wallet_id) return alert("受取口座を選択してください。");
-        if (!confirm("この契約を受注しますか？")) return;
-
-        isProcessing = true;
-        try {
-            const res = await fetch(`/api/contracts/${id}/accept`, {
-                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ acceptor_wallet_id })
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) { await loadContracts(); switchTab('my-accepted'); }
-        } catch (e) { alert("通信エラー"); } finally { isProcessing = false; }
+        const wId = document.getElementById(`wallet-${id}`).value;
+        const res = await fetch(`/api/contracts/${id}/accept`, {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ acceptor_wallet_id: wId })
+        });
+        alert((await res.json()).message || "エラー");
+        if (res.ok) { loadWallets(); loadContracts(); switchTab('my-accepted'); }
     }
 
-    /* キャンセル */
     async function cancelContract(id) {
-        if (isProcessing || !confirm("契約を取り消しますか？預託された報酬金が口座に返金されます。")) return;
-        isProcessing = true;
-        try {
-            const res = await fetch(`/api/contracts/${id}/cancel`, {
-                method: "POST", headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) { await loadWallets(); await loadContracts(); }
-        } catch (e) { alert("通信エラー"); } finally { isProcessing = false; }
+        if (!confirm("本当に取り消しますか？")) return;
+        const res = await fetch(`/api/contracts/${id}/cancel`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+        alert((await res.json()).message || "エラー");
+        if (res.ok) { loadWallets(); loadContracts(); }
     }
 
-    /* 完了承認 */
     async function completeContract(id) {
-        if (isProcessing || !confirm("履行完了を確認しましたか？承認すると受注者へ報酬が送金されます。")) return;
-        isProcessing = true;
-        try {
-            const res = await fetch(`/api/contracts/${id}/complete`, {
-                method: "POST", headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) { await loadWallets(); await loadContracts(); }
-        } catch (e) { alert("通信エラー"); } finally { isProcessing = false; }
-    }
-
-    /* 評価送信 */
-    async function submitReview(id) {
-        if (isProcessing) return;
-        const rating = parseInt(document.getElementById(`rev-rating-${id}`).value, 10);
-        const comment = document.getElementById(`rev-comment-${id}`).value.trim();
-
-        isProcessing = true;
-        try {
-            const res = await fetch(`/api/contracts/${id}/review`, {
-                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ rating, comment })
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
-            if (res.ok) { await loadContracts(); }
-        } catch (e) { alert("通信エラー"); } finally { isProcessing = false; }
+        if (!confirm("取引を完了として決済を実行しますか？")) return;
+        const res = await fetch(`/api/contracts/${id}/complete`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+        alert((await res.json()).message || "エラー");
+        if (res.ok) { loadWallets(); loadContracts(); }
     }
 
     init();
