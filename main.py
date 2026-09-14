@@ -734,3 +734,61 @@ app.include_router(inventory_router)
 app.include_router(policy_router)
 app.include_router(factory_router)
 app.include_router(card_router)
+
+# --------------------------------------------------
+# 資産税（保管手数料）の徴収関数・API
+# --------------------------------------------------
+def calculate_wealth_tax(balance: int) -> int:
+    """累進課税で税額を計算"""
+    if balance <= 100_000:
+        return 0
+
+    tax = 0
+    # 1000万超の部分: 10%
+    if balance > 10_000_000:
+        tax += int((balance - 10_000_000) * 0.10)
+        balance = 10_000_000
+
+    # 100万〜1000万の部分: 3%
+    if balance > 1_000_000:
+        tax += int((balance - 1_000_000) * 0.03)
+        balance = 1_000_000
+
+    # 10万〜100万の部分: 1%
+    if balance > 100_000:
+        tax += int((balance - 100_000) * 0.01)
+
+    return tax
+
+
+@router.post("/api/admin/collect-tax")
+async def collect_wealth_tax(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    # 必要に応じて管理者権限チェックを追加
+    # if user.email != "admin@example.com":
+    #     raise HTTPException(status_code=403, detail="管理者権限がありません")
+
+    supabase = await get_supabase()
+
+    # 残高が10万超のウォレットのみ取得
+    res = await supabase.table("wallets").select("id, wallet_id, balance").gt("balance", 100000).execute()
+    wallets = res.data or []
+
+    taxed_wallets = []
+    for w in wallets:
+        tax = calculate_wealth_tax(w["balance"])
+        if tax > 0:
+            new_bal = w["balance"] - tax
+            await supabase.table("wallets").update({"balance": new_bal}).eq("id", w["id"]).execute()
+            taxed_wallets.append({
+                "wallet_id": w["wallet_id"],
+                "old_balance": w["balance"],
+                "tax_amount": tax,
+                "new_balance": new_bal
+            })
+
+    return {
+        "status": "success",
+        "processed_count": len(taxed_wallets),
+        "details": taxed_wallets
+    }
