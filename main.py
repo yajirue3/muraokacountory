@@ -348,75 +348,6 @@ async def get_transfer_logs(authorization: str = Header(None)):
     
     return {"logs": res.data, "my_wallets": my_wallet_ids}
 
-# --------------------------------------------------
-# 自由市場（Market）API
-# --------------------------------------------------
-
-@app.get("/api/market/listings")
-async def get_market_listings(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    res = await client.table("market_listings").select("*").eq("is_active", True).order("created_at", desc=True).execute()
-    return res.data
-
-@app.post("/api/market/sell")
-async def create_market_listing(data: dict, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    seller_wallet_id = data.get("seller_wallet_id")
-    item_name = data.get("item_name")
-    description = data.get("description", "")
-    price = data.get("price", 0)
-    listing_type = data.get("listing_type", "FIXED")
-    duration_hours = data.get("duration_hours", 0)
-
-    if price <= 0:
-        raise HTTPException(status_code=400, detail="価格は1以上で設定してください。")
-
-    w_res = await client.table("wallets").select("*").eq("wallet_id", seller_wallet_id).eq("user_id", user.id).execute()
-    if not w_res.data:
-        raise HTTPException(status_code=400, detail="無効な出品用口座です。")
-
-    end_time = None
-    if listing_type == "AUCTION":
-        if duration_hours <= 0:
-            raise HTTPException(status_code=400, detail="オークション期間を正しく設定してください。")
-        end_time = (datetime.now(timezone.utc) + timedelta(hours=duration_hours)).isoformat()
-
-    await client.table("market_listings").insert({
-        "seller_id": user.id,
-        "seller_wallet_id": seller_wallet_id,
-        "item_name": item_name,
-        "description": description,
-        "price": price,
-        "listing_type": listing_type,
-        "end_time": end_time,
-        "is_active": True
-    }).execute()
-
-    return {"message": "出品が完了しました。"}
-
-@app.post("/api/market/buy")
-async def buy_market_item(data: dict, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    listing_id = data.get("listing_id")
-    buyer_wallet_id = data.get("buyer_wallet_id")
-    bid_amount = data.get("bid_amount", 0)
-
-    try:
-        res = await client.rpc("execute_market_buy", {
-            "p_listing_id": listing_id,
-            "p_buyer_user_id": str(user.id),
-            "p_buyer_wallet_id": str(buyer_wallet_id),
-            "p_bid_amount": bid_amount
-        }).execute()
-        return {"message": res.data.get("message", "処理が完了しました。")}
-    except Exception as e:
-        err_msg = getattr(e, "message", str(e))
-        raise HTTPException(status_code=400, detail=f"購入・入札エラー: {err_msg}")
 
 
 # --------------------------------------------------
@@ -645,92 +576,6 @@ async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
     await client.table("board_posts").update({"is_pinned": new_status}).eq("id", post_id).execute()
     return {"message": "布告(ピン)状態を切り替えました。"}
 
-# --------------------------------------------------
-# 融資・借金（P2Pレンディング）システム API
-# --------------------------------------------------
-
-@app.get("/api/loans/offers")
-async def get_loan_offers(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    res = await client.table("loan_offers").select("*").eq("status", "OPEN").gt("max_amount", 0).order("interest_rate").execute()
-    return res.data
-
-@app.post("/api/loans/offers")
-async def create_loan_offer(data: LoanOfferCreate, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    w_res = await client.table("wallets").select("*").eq("wallet_id", data.lender_wallet_id).eq("user_id", user.id).execute()
-    if not w_res.data:
-        raise HTTPException(status_code=400, detail="指定された口座が存在しないか所有権がありません。")
-    
-    wallet = w_res.data[0]
-    if wallet["balance"] < data.max_amount:
-        raise HTTPException(status_code=400, detail="融資枠を作成するための口座残高が不足しています。")
-        
-    await client.table("wallets").update({"balance": wallet["balance"] - data.max_amount}).eq("id", wallet["id"]).execute()
-    
-    await client.table("loan_offers").insert({
-        "lender_user_id": user.id,
-        "lender_wallet_id": data.lender_wallet_id,
-        "max_amount": data.max_amount,
-        "interest_rate": data.interest_rate,
-        "status": "OPEN"
-    }).execute()
-    
-    return {"message": f"金利 {data.interest_rate}%、融資枠 {data.max_amount}G を市場に出品しました！"}
-
-@app.post("/api/loans/borrow")
-async def borrow_loan(data: LoanBorrow, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    try:
-        res = await client.rpc("execute_loan_borrow", {
-            "p_offer_id": data.offer_id,
-            "p_borrower_user_id": str(user.id),
-            "p_borrower_wallet_id": str(data.borrower_wallet_id),
-            "p_borrow_amount": data.borrow_amount
-        }).execute()
-        
-        result = res.data
-        return {"message": f"{result['principal']}Gの借入に成功しました。金利を含めた返済義務は {result['total_due']}G です。"}
-    except Exception as e:
-        err_msg = getattr(e, "message", str(e))
-        raise HTTPException(status_code=400, detail=f"借入エラー: {err_msg}")
-
-@app.get("/api/loans/my-debts")
-async def get_my_debts(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    res = await client.table("active_loans").select("*, loan_offers(interest_rate)").eq("borrower_user_id", user.id).in_("status", ["ACTIVE", "PAID"]).order("created_at", desc=True).execute()
-    return res.data
-
-@app.get("/api/loans/my-receivables")
-async def get_my_receivables(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    res = await client.table("active_loans").select("*, loan_offers!inner(*)").eq("loan_offers.lender_user_id", user.id).order("created_at", desc=True).execute()
-    return res.data
-
-@app.post("/api/loans/repay")
-async def repay_loan(data: LoanRepay, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    try:
-        res = await client.rpc("execute_loan_repay", {
-            "p_loan_id": data.loan_id,
-            "p_borrower_user_id": str(user.id),
-            "p_repay_amount": data.repay_amount
-        }).execute()
-        
-        result = res.data
-        return {"message": f"{result['repaid']}G を返済しました！ 現在の状態: {result['status']}"}
-    except Exception as e:
-        err_msg = getattr(e, "message", str(e))
-        raise HTTPException(status_code=400, detail=f"返済エラー: {err_msg}")
 
 # --------------------------------------------------
 # カジノモジュールの登録
@@ -799,3 +644,205 @@ async def collect_wealth_tax(authorization: str = Header(None)):
         "total_tax_collected": total_tax_collected,
         "details": taxed_results
     }
+
+# ==================================================
+# 自由市場（Contracts）モデル定義
+# ==================================================
+class ContractCreate(BaseModel):
+    title: str
+    description: str
+    amount: int = Field(..., gt=0, description="金額は1以上")
+    creator_wallet_id: str
+    contract_type: str = Field("REQUEST", pattern="^(REQUEST|OFFER)$")
+
+class ContractAccept(BaseModel):
+    acceptor_wallet_id: str
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: str = ""
+
+# --------------------------------------------------
+# 自由市場（Contracts）API
+# --------------------------------------------------
+
+@app.get("/api/contracts")
+async def get_contracts(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await client.table("contracts").select("*").order("created_at", desc=True).execute()
+    return {
+        "contracts": res.data or [],
+        "current_user_id": user.id,
+        "is_king": await is_king(user.id)
+    }
+
+@app.post("/api/contracts")
+async def create_contract(data: ContractCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_contract_create", {
+            "p_user_id": str(user.id),
+            "p_wallet_id": data.creator_wallet_id,
+            "p_title": data.title.strip(),
+            "p_description": data.description.strip(),
+            "p_amount": data.amount,
+            "p_contract_type": data.contract_type
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/contracts/{contract_id}/accept")
+async def accept_contract(contract_id: int, data: ContractAccept, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_contract_accept", {
+            "p_contract_id": contract_id,
+            "p_user_id": str(user.id),
+            "p_wallet_id": data.acceptor_wallet_id
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/contracts/{contract_id}/complete")
+async def complete_contract(contract_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_contract_complete", {
+            "p_contract_id": contract_id,
+            "p_user_id": str(user.id)
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/contracts/{contract_id}/cancel")
+async def cancel_contract(contract_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_contract_cancel", {
+            "p_contract_id": contract_id,
+            "p_user_id": str(user.id)
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+
+# ==================================================
+# 融資・借金（P2Pレンディング）モデル定義
+# ==================================================
+class LoanOfferCreate(BaseModel):
+    lender_wallet_id: str
+    max_amount: int = Field(..., gt=0, description="出品額は1以上")
+    interest_rate: int = Field(..., ge=0, description="金利は0以上")
+
+class LoanBorrow(BaseModel):
+    offer_id: int
+    borrow_amount: int = Field(..., gt=0, description="借入額は1以上")
+    borrower_wallet_id: str
+
+class LoanRepay(BaseModel):
+    loan_id: int
+    repay_amount: int = Field(..., gt=0, description="返済額は1以上")
+
+# --------------------------------------------------
+# 融資・借金（P2Pレンディング）システム API
+# --------------------------------------------------
+
+@app.get("/api/loans/offers")
+async def get_loan_offers(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await client.table("loan_offers").select("*").eq("status", "OPEN").gt("max_amount", 0).order("interest_rate").execute()
+    return res.data
+
+@app.post("/api/loans/offers")
+async def create_loan_offer(data: LoanOfferCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_loan_offer_create", {
+            "p_user_id": str(user.id),
+            "p_wallet_id": data.lender_wallet_id,
+            "p_max_amount": data.max_amount,
+            "p_interest_rate": data.interest_rate
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/loans/borrow")
+async def borrow_loan(data: LoanBorrow, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_loan_borrow", {
+            "p_offer_id": data.offer_id,
+            "p_borrower_user_id": str(user.id),
+            "p_borrower_wallet_id": str(data.borrower_wallet_id),
+            "p_borrow_amount": data.borrow_amount
+        }).execute()
+        result = res.data
+        return {"message": f"{result['principal']}Gの借入に成功しました。返済義務は {result['total_due']}G です。"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.get("/api/loans/my-debts")
+async def get_my_debts(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await client.table("active_loans").select("*, loan_offers(interest_rate)").eq("borrower_user_id", user.id).in_("status", ["ACTIVE", "PAID"]).order("created_at", desc=True).execute()
+    return res.data
+
+@app.get("/api/loans/my-receivables")
+async def get_my_receivables(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await client.table("active_loans").select("*, loan_offers!inner(*)").eq("loan_offers.lender_user_id", user.id).order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/api/loans/repay")
+async def repay_loan(data: LoanRepay, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_loan_repay", {
+            "p_loan_id": data.loan_id,
+            "p_borrower_user_id": str(user.id),
+            "p_repay_amount": data.repay_amount
+        }).execute()
+        return {"message": f"{res.data['repaid']}G を返済しました！"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# 7. 管理者専用：全滞納ローンの一覧取得
+@app.get("/api/admin/loans")
+async def get_all_loans_admin(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    client = await get_supabase()
+    res = await client.table("active_loans").select("*, profiles:borrower_user_id(nickname)").eq("status", "ACTIVE").order("created_at", desc=True).execute()
+    return res.data
+
+# 8. 管理者専用：強制取り立て執行
+@app.post("/api/admin/loans/{loan_id}/force-repay")
+async def admin_force_repay_loan(loan_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="権限がありません")
+    client = await get_supabase()
+    try:
+        res = await client.rpc("execute_admin_force_repay", {"p_loan_id": loan_id}).execute()
+        rec = res.data.get("recovered", 0)
+        rem = res.data.get("remaining_debt", 0)
+        return {"message": f"強制取り立てを実行し {rec}G を回収しました。残債: {rem}G"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
