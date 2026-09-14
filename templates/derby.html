@@ -6,42 +6,41 @@
     <title>国営ダービー - 王国カジノ</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen pb-12">
-    <!-- ヘッダー -->
-    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50">
-        <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold text-yellow-500">🏇 国営ダービー</h1>
-            <div class="flex items-center space-x-4">
-                <select id="walletSelect" onchange="loadWallets()" class="bg-slate-700 text-sm p-2 rounded border border-slate-600 focus:outline-none">
-                    <option value="">口座読み込み中...</option>
+<body class="bg-slate-900 text-white min-h-screen pb-8">
+    <!-- ヘッダー（コンパクト化） -->
+    <header class="bg-slate-800 border-b border-slate-700 px-4 py-2 sticky top-0 z-50">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <h1 class="text-base font-bold text-yellow-500 flex items-center gap-1">🏇 国営ダービー</h1>
+            <div class="flex items-center space-x-2">
+                <select id="walletSelect" onchange="loadWallets()" class="bg-slate-700 text-xs p-1.5 rounded border border-slate-600 focus:outline-none max-w-[120px] truncate">
+                    <option value="">読み込み中...</option>
                 </select>
-                <div class="bg-slate-900 px-3 py-1 rounded border border-slate-700 text-sm">
-                    残高: <span id="userBalance" class="text-yellow-400 font-bold">---</span> G
+                <div class="bg-slate-900 px-2 py-1 rounded border border-slate-700 text-xs">
+                    <span id="userBalance" class="text-yellow-400 font-bold">---</span> G
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto p-4 space-y-6">
+    <main class="max-w-md mx-auto p-3 space-y-4">
         <!-- レース状態ステータス -->
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-            <div id="raceStatus" class="text-sm font-semibold text-slate-400">ステータス確認中...</div>
-            <div id="countdown" class="text-4xl font-extrabold text-yellow-400 my-2">00:00</div>
-            <div id="raceId" class="text-xs text-slate-500">RACE ID: --</div>
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center flex justify-between items-center px-4">
+            <div>
+                <div id="raceId" class="text-[10px] text-slate-500">RACE ID: --</div>
+                <div id="raceStatus" class="text-xs font-semibold text-slate-400">確認中...</div>
+            </div>
+            <div id="countdown" class="text-3xl font-extrabold text-yellow-400 tracking-wider">00:00</div>
         </div>
 
-        <!-- コース（出走アニメーション） -->
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 relative overflow-hidden">
-            <div class="absolute right-12 top-0 bottom-0 w-1 bg-red-500/50 border-r-2 border-dashed border-red-500 z-10 flex items-center justify-center">
-                <span class="text-[10px] text-red-400 -rotate-90 font-bold tracking-widest uppercase">FINISH</span>
-            </div>
+        <!-- コース（スマホ最適化） -->
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 space-y-2 relative overflow-hidden">
+            <div class="absolute right-8 top-0 bottom-0 w-0.5 bg-red-500/50 border-r border-dashed border-red-500 z-10"></div>
             
-            <div id="track">
-                <!-- 1〜6枠馬のコース -->
+            <div id="track" class="space-y-1">
                 <script>
                     const horses = [
                         { id: 1, name: "ムラオカテイオー", color: "bg-red-600" },
-                        { id: 2, name: "ブラックドレイ", color: "bg-slate-700" },
+                        { id: 2, name: "ブラックドレイ", color: "bg-slate-600" },
                         { id: 3, name: "シャッキンヌス", color: "bg-red-800" },
                         { id: 4, name: "コッコウサクシュ", color: "bg-blue-600" },
                         { id: 5, name: "ハイエナゴールド", color: "bg-yellow-500" },
@@ -49,12 +48,12 @@
                     ];
                     horses.forEach(h => {
                         document.write(`
-                            <div class="flex items-center space-x-2 py-1.5 border-b border-slate-700/50 last:border-0">
-                                <span class="w-6 text-center text-xs font-bold text-slate-400">${h.id}</span>
-                                <div class="flex-1 bg-slate-900/80 rounded-full h-8 relative overflow-hidden flex items-center px-1">
+                            <div class="flex items-center space-x-1.5 py-0.5">
+                                <span class="w-4 text-center text-[10px] font-bold text-slate-400">${h.id}</span>
+                                <div class="flex-1 bg-slate-900 rounded-full h-6 relative overflow-hidden flex items-center px-1">
                                     <div id="r-${h.id}" class="absolute left-1 transition-all duration-300 ease-linear flex items-center space-x-1" style="transform: translateX(0px);">
-                                        <div class="w-6 h-6 rounded-full ${h.color} flex items-center justify-center text-xs font-bold shadow-md">🏇</div>
-                                        <span class="text-xs text-slate-300 whitespace-nowrap font-medium">${h.name}</span>
+                                        <div class="w-4 h-4 rounded-full ${h.color} flex items-center justify-center text-[10px]">🏇</div>
+                                        <span class="text-[10px] text-slate-300 truncate max-w-[80px]">${h.name}</span>
                                     </div>
                                 </div>
                             </div>
@@ -64,61 +63,59 @@
             </div>
         </div>
 
-        <!-- 投票フォーム & オッズ表 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- 投票入力 -->
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
-                <h3 class="font-bold text-lg text-slate-200 border-b border-slate-700 pb-2">🎟️ 馬券購入</h3>
-                
+        <!-- 投票フォーム -->
+        <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-3">
+            <h3 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-1.5 flex items-center gap-1">🎟️ 馬券購入</h3>
+            
+            <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">券種</label>
-                    <select id="betType" onchange="toggleBetInputs()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
-                        <option value="WIN">単勝（1着当て）</option>
-                        <option value="QUINELLA">馬連（1・2着ペア・順不同）</option>
+                    <label class="block text-[10px] text-slate-400 mb-0.5">券種</label>
+                    <select id="betType" onchange="toggleBetInputs()" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs">
+                        <option value="WIN">単勝（1着）</option>
+                        <option value="QUINELLA">馬連（1・2着）</option>
                     </select>
                 </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label id="horse1Label" class="block text-xs text-slate-400 mb-1">1着予想馬</label>
-                        <select id="horse1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
-                            <option value="1">1. ムラオカテイオー</option>
-                            <option value="2">2. ブラックドレイ</option>
-                            <option value="3">3. シャッキンヌス</option>
-                            <option value="4">4. コッコウサクシュ</option>
-                            <option value="5">5. ハイエナゴールド</option>
-                            <option value="6">6. チキンキラー</option>
-                        </select>
-                    </div>
-                    <div id="horse2Container" class="hidden">
-                        <label class="block text-xs text-slate-400 mb-1">2着予想馬</label>
-                        <select id="horse2" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
-                            <option value="2">2. ブラックドレイ</option>
-                            <option value="1">1. ムラオカテイオー</option>
-                            <option value="3">3. シャッキンヌス</option>
-                            <option value="4">4. コッコウサクシュ</option>
-                            <option value="5">5. ハイエナゴールド</option>
-                            <option value="6">6. チキンキラー</option>
-                        </select>
-                    </div>
-                </div>
-
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">賭け金（1〜50,000G）</label>
-                    <input type="number" id="betAmount" value="1000" min="1" max="50000" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm font-bold text-yellow-400">
+                    <label class="block text-[10px] text-slate-400 mb-0.5">賭け金 (G)</label>
+                    <input type="number" id="betAmount" value="1000" min="1" max="50000" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-yellow-400">
                 </div>
-
-                <button id="btnBet" onclick="placeBet()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2.5 rounded shadow transition duration-200">
-                    馬券を購入する
-                </button>
             </div>
 
-            <!-- 単勝オッズ表 -->
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
-                <h3 class="font-bold text-lg text-slate-200 border-b border-slate-700 pb-2">📊 単勝オッズ</h3>
-                <div class="space-y-2" id="oddsList">
-                    <!-- JavaScriptで動的生成 -->
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label id="horse1Label" class="block text-[10px] text-slate-400 mb-0.5">予想馬</label>
+                    <select id="horse1" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs">
+                        <option value="1">1. ムラオカテイオー</option>
+                        <option value="2">2. ブラックドレイ</option>
+                        <option value="3">3. シャッキンヌス</option>
+                        <option value="4">4. コッコウサクシュ</option>
+                        <option value="5">5. ハイエナゴールド</option>
+                        <option value="6">6. チキンキラー</option>
+                    </select>
                 </div>
+                <div id="horse2Container" class="hidden">
+                    <label class="block text-[10px] text-slate-400 mb-0.5">2着予想馬</label>
+                    <select id="horse2" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs">
+                        <option value="2">2. ブラックドレイ</option>
+                        <option value="1">1. ムラオカテイオー</option>
+                        <option value="3">3. シャッキンヌス</option>
+                        <option value="4">4. コッコウサクシュ</option>
+                        <option value="5">5. ハイエナゴールド</option>
+                        <option value="6">6. チキンキラー</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="btnBet" onclick="placeBet()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded text-xs shadow transition duration-200">
+                馬券を購入する
+            </button>
+        </div>
+
+        <!-- 単勝オッズ表 -->
+        <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-2">
+            <h3 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-1.5 flex items-center gap-1">📊 単勝オッズ</h3>
+            <div class="grid grid-cols-2 gap-1.5" id="oddsList">
+                <!-- JavaScriptで動的生成 -->
             </div>
         </div>
     </main>
@@ -139,7 +136,7 @@
                 const select = document.getElementById("walletSelect");
                 select.innerHTML = "";
                 data.forEach(w => {
-                    select.innerHTML += `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance}G)</option>`;
+                    select.innerHTML += `<option value="${w.wallet_id}">${w.wallet_name}</option>`;
                 });
                 if(data.length > 0) {
                     document.getElementById("userBalance").innerText = data[0].balance.toLocaleString();
@@ -156,7 +153,7 @@
                 h1Label.innerText = "選択馬 1";
             } else {
                 h2.classList.add("hidden");
-                h1Label.innerText = "1着予想馬";
+                h1Label.innerText = "予想馬";
             }
         }
 
@@ -178,9 +175,9 @@
                 const o = odds ? odds[h] : 6.0;
                 const info = horses[h];
                 container.innerHTML += `
-                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700/50">
-                        <span class="text-sm font-semibold" style="color:${info.color}">${h}. ${info.name}</span>
-                        <span class="text-sm font-bold text-yellow-400">${o.toFixed(1)}倍</span>
+                    <div class="flex justify-between items-center bg-slate-900 p-1.5 rounded border border-slate-700/50">
+                        <span class="text-xs font-semibold truncate" style="color:${info.color}">${h}.${info.name}</span>
+                        <span class="text-xs font-bold text-yellow-400 pl-1">${Number(o).toFixed(1)}倍</span>
                     </div>
                 `;
             }
@@ -213,14 +210,21 @@
                     })
                 });
                 const data = await res.json();
-                if(!res.ok) throw new Error(data.detail || "エラーが発生しました");
                 
-                alert("馬券を購入しました！");
+                if(!res.ok) {
+                    const errorMsg = typeof data.detail === 'string' ? data.detail : (data.detail?.message || data.message || "馬券の購入に失敗しました");
+                    throw new Error(errorMsg);
+                }
+                
+                const successMsg = typeof data === 'string' ? data : (data.message || "馬券を購入しました！");
+                alert(successMsg);
                 await loadWallets();
-            } catch(e) { alert(e.message); }
+                await refreshRace(); // オッズを即座に最新化
+            } catch(e) {
+                alert(e.message || "エラーが発生しました");
+            }
         }
 
-        // メイン描画ループ（アニメーション & カウントダウン & 自動リフレッシュ）
         function renderLoop() {
             if (currentRace) {
                 const now = new Date();
@@ -232,26 +236,24 @@
                 const btnBet = document.getElementById("btnBet");
 
                 if (diffSec > 0) {
-                    // 投票受付中
                     const m = String(Math.floor(diffSec / 60)).padStart(2, '0');
                     const s = String(Math.floor(diffSec % 60)).padStart(2, '0');
                     countdownElem.innerText = `${m}:${s}`;
                     statusElem.innerText = "投票受付中";
-                    statusElem.className = "text-sm font-semibold text-green-400";
+                    statusElem.className = "text-xs font-semibold text-green-400";
                     btnBet.disabled = false;
-                    btnBet.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2.5 rounded shadow transition duration-200";
+                    btnBet.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded text-xs shadow transition duration-200";
                 } else if (diffSec > -20) {
-                    // 発走中（アニメーション再生）
                     countdownElem.innerText = "RACING";
                     statusElem.innerText = "出走中！";
-                    statusElem.className = "text-sm font-semibold text-red-500 animate-pulse";
+                    statusElem.className = "text-xs font-semibold text-red-500 animate-pulse";
                     btnBet.disabled = true;
-                    btnBet.className = "w-full bg-slate-700 text-slate-500 font-bold py-2.5 rounded cursor-not-allowed";
+                    btnBet.className = "w-full bg-slate-700 text-slate-500 font-bold py-2 rounded text-xs cursor-not-allowed";
 
                     if (currentRace.trajectory) {
                         const elapsed = Math.abs(diffSec);
                         const stepIndex = Math.min(20, Math.floor((elapsed / 20) * 20));
-                        const trackWidth = document.getElementById("track").clientWidth - 120;
+                        const trackWidth = document.getElementById("track").clientWidth - 100;
 
                         for (let h = 1; h <= 6; h++) {
                             const posPercent = currentRace.trajectory[h][stepIndex] || 0;
@@ -261,12 +263,10 @@
                         }
                     }
                 } else {
-                    // 精算完了・結果確定
                     countdownElem.innerText = "FINISH";
-                    statusElem.innerText = "精算中・次回レース準備中";
-                    statusElem.className = "text-sm font-semibold text-slate-400";
+                    statusElem.innerText = "精算中・準備中";
+                    statusElem.className = "text-xs font-semibold text-slate-400";
 
-                    // レース終了後の自動更新ロジック
                     if (!isSettling && lastSettledId !== currentRace.race_id) {
                         isSettling = true;
                         lastSettledId = currentRace.race_id;
@@ -277,12 +277,11 @@
                                     await loadWallets();
                                     await refreshRace();
                                     isSettling = false;
-                                    // 馬をスタートラインへリセット
                                     for (let h = 1; h <= 6; h++) {
                                         const elem = document.getElementById(`r-${h}`);
                                         if (elem) elem.style.transform = `translateX(0px)`;
                                     }
-                                }, 5000); // 5秒後に次レース切り替え
+                                }, 5000);
                             });
                     }
                 }
@@ -290,11 +289,10 @@
             requestAnimationFrame(renderLoop);
         }
 
-        // 初期化
         window.onload = async () => {
             await loadWallets();
             await refreshRace();
-            setInterval(refreshRace, 10000); // 10秒ごとにサーバー同期
+            setInterval(refreshRace, 10000);
             requestAnimationFrame(renderLoop);
         };
     </script>
