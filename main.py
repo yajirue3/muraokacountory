@@ -736,59 +736,42 @@ app.include_router(factory_router)
 app.include_router(card_router)
 
 # --------------------------------------------------
-# 資産税（保管手数料）の徴収関数・API
+# 資産税徴収 API（毎朝9時 / UTC 0時にcronから呼び出し）
 # --------------------------------------------------
-def calculate_wealth_tax(balance: int) -> int:
-    """累進課税で税額を計算"""
-    if balance <= 100_000:
-        return 0
-
-    tax = 0
-    # 1000万超の部分: 10%
-    if balance > 10_000_000:
-        tax += int((balance - 10_000_000) * 0.10)
-        balance = 10_000_000
-
-    # 100万〜1000万の部分: 3%
-    if balance > 1_000_000:
-        tax += int((balance - 1_000_000) * 0.03)
-        balance = 1_000_000
-
-    # 10万〜100万の部分: 1%
-    if balance > 100_000:
-        tax += int((balance - 100_000) * 0.01)
-
-    return tax
-
-
 @router.post("/api/admin/collect-tax")
 async def collect_wealth_tax(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
-    # 必要に応じて管理者権限チェックを追加
-    # if user.email != "admin@example.com":
-    #     raise HTTPException(status_code=403, detail="管理者権限がありません")
-
     supabase = await get_supabase()
 
-    # 残高が10万超のウォレットのみ取得
+    # is_king (管理者) チェック
+    # ※ Supabaseの users テーブル等からフラグを取得して判定
+    user_res = await supabase.table("users").select("is_king").eq("id", user.id).execute()
+    if not user_res.data or not user_res.data[0].get("is_king"):
+        raise HTTPException(status_code=403, detail="管理者（King）権限がありません。")
+
+    # 課税対象（10万Gold超）のウォレットをすべて取得
     res = await supabase.table("wallets").select("id, wallet_id, balance").gt("balance", 100000).execute()
     wallets = res.data or []
 
-    taxed_wallets = []
+    taxed_results = []
     for w in wallets:
-        tax = calculate_wealth_tax(w["balance"])
-        if tax > 0:
-            new_bal = w["balance"] - tax
+        current_bal = w["balance"]
+        tax_amount = calculate_wealth_tax(current_bal)
+
+        if tax_amount > 0:
+            new_bal = current_bal - tax_amount
+            # 残高の更新
             await supabase.table("wallets").update({"balance": new_bal}).eq("id", w["id"]).execute()
-            taxed_wallets.append({
+            
+            taxed_results.append({
                 "wallet_id": w["wallet_id"],
-                "old_balance": w["balance"],
-                "tax_amount": tax,
-                "new_balance": new_bal
+                "before": current_bal,
+                "tax": tax_amount,
+                "after": new_bal
             })
 
     return {
         "status": "success",
-        "processed_count": len(taxed_wallets),
-        "details": taxed_wallets
+        "processed_count": len(taxed_results),
+        "details": taxed_results
     }
