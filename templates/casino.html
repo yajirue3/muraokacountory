@@ -49,35 +49,35 @@
             transform: translateY(-2px);
         }
 
-        /* 🚨 新要素マインズ専用の激熱ネオンスタイル */
-        .game-card-mines {
-            background: linear-gradient(145deg, #260a2e, #14051a);
-            border: 2px solid #00f3ff;
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.35), inset 0 0 15px rgba(255, 0, 127, 0.2);
-            animation: pulse-mines-border 2s infinite alternate;
+        /* 🏇 ピックアップ：国営ダービー専用ネオンゴールドスタイル */
+        .game-card-derby {
+            background: linear-gradient(145deg, #2d1e05, #140d02);
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4), inset 0 0 15px rgba(255, 140, 0, 0.3);
+            animation: pulse-derby-border 2s infinite alternate;
         }
-        .game-card-mines:hover {
-            border-color: #ff007f;
+        .game-card-derby:hover {
+            border-color: #ff9900;
             transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 0 30px rgba(255, 0, 127, 0.6);
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
         }
-        @keyframes pulse-mines-border {
-            0% { border-color: #00f3ff; box-shadow: 0 0 15px rgba(0, 243, 255, 0.3); }
-            100% { border-color: #ff007f; box-shadow: 0 0 25px rgba(255, 0, 127, 0.5), 0 0 10px rgba(0, 243, 255, 0.3); }
+        @keyframes pulse-derby-border {
+            0% { border-color: #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
+            100% { border-color: #ff9900; box-shadow: 0 0 25px rgba(255, 153, 0, 0.6), 0 0 10px rgba(255, 215, 0, 0.3); }
         }
 
-        .badge-new {
+        .badge-pickup {
             position: absolute;
             top: -10px;
             right: 12px;
-            background: linear-gradient(135deg, #ff0055, #ff00a0);
+            background: linear-gradient(135deg, #ff8800, #ff2200);
             color: #fff;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 900;
             padding: 2px 8px;
             border-radius: 10px;
             border: 1px solid #fff;
-            box-shadow: 0 0 10px #ff0055;
+            box-shadow: 0 0 10px #ff5500;
             letter-spacing: 1px;
             animation: badge-bounce 1s infinite alternate;
         }
@@ -96,9 +96,9 @@
             gap: 6px; 
             text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
         }
-        .title-mines {
-            color: #00f3ff;
-            text-shadow: 0 0 8px #00f3ff, 0 0 15px #ff007f;
+        .title-derby {
+            color: #ffd700;
+            text-shadow: 0 0 8px #ffd700, 0 0 15px #ff8800;
         }
         .game-desc { font-size: 0.8rem; color: #bbb; margin-bottom: 12px; line-height: 1.4; }
         
@@ -130,18 +130,18 @@
             box-shadow: 0 0 18px rgba(255, 87, 51, 0.6);
         }
 
-        .btn-play-mines {
-            background: linear-gradient(135deg, #ff007f 0%, #7928ca 50%, #00f3ff 100%);
+        .btn-play-derby {
+            background: linear-gradient(135deg, #ff9900 0%, #d4af37 50%, #ff3300 100%);
             color: #fff;
             font-size: 0.95rem;
             font-weight: 900;
-            border: 1px solid #fff;
-            box-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
+            border: 1px solid #ffe680;
+            box-shadow: 0 0 15px rgba(255, 170, 0, 0.6);
             text-shadow: 0 0 6px #000;
         }
-        .btn-play-mines:hover {
+        .btn-play-derby:hover {
             filter: brightness(1.25);
-            box-shadow: 0 0 25px rgba(0, 243, 255, 0.8);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
         }
 
         .btn-back { 
@@ -159,12 +159,21 @@
     <div class="card">
         <div class="header">🎰 王国カジノ（地下娯楽場）</div>
         
-        <!-- 🚨 新要素：マインズ（最上部＆超絶ハイライト） -->
-        <div class="game-card game-card-mines">
-            <div class="badge-new">NEW GAME</div>
-            <div class="game-title title-mines">💣 狂乱マインズ（Mines）</div>
-            <div class="game-desc" style="color: #e0d0f0;">地雷を避けて宝石を掘り当てろ！進めば進むほど配当が爆散跳ね上がる脳汁全開の極限チキンレース！</div>
-            <button class="btn-play btn-play-mines" onclick="location.href='/mines'">⚡ 脳汁ダイブする ⚡</button>
+        <!-- 🏇 ピックアップ：国営ダービー（デモ先行公開枠） -->
+        <div class="game-card game-card-derby">
+            <div class="badge-pickup">先行BETA / DEMO</div>
+            <div class="game-title title-derby">🏇 国営ダービー（Derby）</div>
+            <div class="game-desc" style="color: #ffebaa;">
+                【※現在デモ稼働中】毎時00分・30分に発走！王国屈指の名馬たちが火花を散らす競馬シミュレーション。栄冠と配当を掴み取れ！
+            </div>
+            <button class="btn-play btn-play-derby" onclick="location.href='/derby'">🏁 レース会場へ行く（BETA）</button>
+        </div>
+
+        <!-- 💣 マインズ（通常枠へ移行） -->
+        <div class="game-card">
+            <div class="game-title">💣 狂乱マインズ（Mines）</div>
+            <div class="game-desc">地雷を避けて宝石を掘り当てろ！進めば進むほど配当が爆散跳ね上がる極限チキンレース！</div>
+            <button class="btn-play" onclick="location.href='/mines'">ゲームをプレイする</button>
         </div>
 
         <!-- スロットゲーム -->
