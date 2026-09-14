@@ -1,4 +1,4 @@
-す<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -115,15 +115,15 @@
         </div>
     </div>
 
-    <!-- お知らせカード追加（所得税について） -->
+    <!-- お知らせカード追加（所得税についてのお詫びと修正） -->
     <div class="card" style="border-color: #d35400;">
-        <div class="header" style="color: #e67e22; border-bottom: 1px solid #d35400;">📢 お知らせ：所得税の導入</div>
+        <div class="header" style="color: #e67e22; border-bottom: 1px solid #d35400;">📢 お知らせ：所得税の緩和について</div>
         <div style="font-size: 0.85rem; color: #ccc; line-height: 1.5;">
-            過度なインフレを防止するため、毎朝9時に所持金に応じた「所得税」が自動徴収されるようになりました。<br><br>
+            【お詫びと仕様変更】事前の税率設定が過酷すぎたことをお詫び申し上げます。<br>
+            お詫びとして、後日順次<b>1,000G</b>を配布させていただきます。<br><br>
+            インフレ防止策として、新ルールでは<b>毎週 火曜・金曜の朝9時</b>に所持金に応じた「所得税」が自動徴収されるよう緩和されました。<br><br>
             ・10万G以下：<b>無税</b><br>
-            ・10万G超〜100万G：<b>0.1%</b><br>
-            ・100万G超〜1000万G：<b>0.3%</b><br>
-            ・1000万G超：<b>1.0%</b><br>
+            ・10万G超：<b>所持金の 0.5% を一律徴収</b><br>
         </div>
         <div style="margin-top: 12px; padding: 10px; background: #222; border: 1px solid #444; border-radius: 6px; font-size: 0.85rem; text-align: center;">
             💰 <b>あなたの次回徴収予定額</b><br>
@@ -169,23 +169,10 @@
         return "王族";
     }
 
-    // 資産税の計算ロジック（バックエンドと同じ累進課税）
+    // 資産税の計算ロジック（火金・完全一律0.5%）
     function calculateWealthTax(balance) {
         if (balance <= 100000) return 0;
-        let tax = 0;
-        let temp = balance;
-        if (temp > 10000000) {
-            tax += Math.floor((temp - 10000000) * 0.01);
-            temp = 10000000;
-        }
-        if (temp > 1000000) {
-            tax += Math.floor((temp - 1000000) * 0.003);
-            temp = 1000000;
-        }
-        if (temp > 100000) {
-            tax += Math.floor((temp - 100000) * 0.001);
-        }
-        return tax;
+        return Math.floor(balance * 0.005);
     }
 
     async function loadProfile() {
