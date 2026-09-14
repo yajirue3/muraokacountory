@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
