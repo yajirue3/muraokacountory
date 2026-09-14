@@ -637,7 +637,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     }
 
 # ==================================================
-# 王国ダービー（競馬）モジュール
+# 王国ダービー（競馬）モジュール：ゼロトラスト＆国王即時発走対応
 # ==================================================
 from datetime import datetime, timezone, timedelta
 import asyncio
@@ -651,12 +651,12 @@ class DerbyBetRequest(BaseModel):
     amount: int
 
 HORSE_NAMES = {
-    1: {"name": "ムラオカテイオー", "color": "#ef4444"},   # 1枠: 白/赤
-    2: {"name": "ブラックドレイ",   "color": "#1f2937"},   # 2枠: 黒
-    3: {"name": "シャッキンヌス",   "color": "#dc2626"},   # 3枠: 赤
-    4: {"name": "コッコウサクシュ", "color": "#2563eb"},   # 4枠: 青
-    5: {"name": "ハイエナゴールド", "color": "#eab308"},   # 5枠: 黄
-    6: {"name": "チキンキラー",     "color": "#16a34a"},   # 6枠: 緑
+    1: {"name": "ムラオカテイオー", "color": "#ef4444"},
+    2: {"name": "ブラックドレイ",   "color": "#1f2937"},
+    3: {"name": "シャッキンヌス",   "color": "#dc2626"},
+    4: {"name": "コッコウサクシュ", "color": "#2563eb"},
+    5: {"name": "ハイエナゴールド", "color": "#eab308"},
+    6: {"name": "チキンキラー",     "color": "#16a34a"},
 }
 
 def get_next_race_time() -> datetime:
@@ -698,7 +698,8 @@ async def get_or_create_current_race():
     client = await get_supabase()
     target_time = get_next_race_time()
     
-    res = await client.table("derby_races").select("*").eq("start_time", target_time.isoformat()).execute()
+    # 未終了の直近OPENレースを取得
+    res = await client.table("derby_races").select("*").eq("status", "OPEN").order("start_time", desc=False).limit(1).execute()
     if res.data and len(res.data) > 0:
         return res.data[0]
         
@@ -717,16 +718,24 @@ async def get_or_create_current_race():
 async def get_derby_page(request: Request):
     return templates.TemplateResponse(request=request, name="derby.html")
 
+# ゼロトラスト情報取得API（発走前は軌道データを徹底秘匿）
 @router.get("/api/derby/current")
 async def get_derby_current(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     race = await get_or_create_current_race()
     
+    now_utc = datetime.now(timezone.utc)
+    start_utc = datetime.fromisoformat(race["start_time"].replace("Z", "+00:00"))
+
+    # 発走前はカンニング防止のため軌道データを絶対に返さない
+    is_racing_or_done = (now_utc >= start_utc)
+    exposed_trajectory = race["trajectory"] if is_racing_or_done else None
+
+    # オッズ計算
     bets_res = await client.table("derby_bets").select("*").eq("race_id", race["id"]).execute()
     bets = bets_res.data or []
     
-    # 単勝オッズ
     win_bets = [b for b in bets if b["bet_type"] == "WIN"]
     win_total = sum(b["amount"] for b in win_bets)
     win_pools = {h: sum(b["amount"] for b in win_bets if b["horse_id"] == h) for h in range(1, 7)}
@@ -739,13 +748,31 @@ async def get_derby_current(authorization: str = Header(None)):
     return {
         "race_id": race["id"],
         "start_time": race["start_time"],
-        "server_time": datetime.now(timezone.utc).isoformat(),
-        "trajectory": race["trajectory"],
+        "server_time": now_utc.isoformat(),
+        "is_started": is_racing_or_done,
+        "trajectory": exposed_trajectory,  # 発走前は null
         "win_odds": win_odds,
         "horses": HORSE_NAMES,
         "my_bets": my_bets_res.data or []
     }
 
+# 国王専用：即時発走トリガー
+@router.post("/api/admin/derby/instant-race")
+async def admin_instant_race(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    race = await get_or_create_current_race()
+    
+    try:
+        res = await client.rpc("admin_force_start_derby", {
+            "p_race_id": race["id"],
+            "p_admin_id": str(user.id)
+        }).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# 馬券購入 (ゼロトラストRPC)
 @router.post("/api/derby/bet")
 async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -764,6 +791,7 @@ async def bet_derby(data: DerbyBetRequest, authorization: str = Header(None)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
+# 自動精算トリガー
 @router.post("/api/derby/settle/{race_id}")
 async def settle_derby(race_id: int):
     client = await get_supabase()
@@ -778,7 +806,7 @@ async def derby_scheduler():
     while True:
         try:
             await get_or_create_current_race()
-        except Exception as e:
+        except Exception:
             pass
         await asyncio.sleep(30)
 
