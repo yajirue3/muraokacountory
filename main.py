@@ -348,265 +348,130 @@ async def get_transfer_logs(authorization: str = Header(None)):
     
     return {"logs": res.data, "my_wallets": my_wallet_ids}
 
-# --------------------------------------------------
-# 自由市場（Contracts）API
-# --------------------------------------------------
+# ==========================================
+# 8. 市場・オークション関連 API (Market APIs)
+# ==========================================
 
-# 1. 全契約一覧取得
-@app.get("/api/contracts")
-async def get_contracts(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    res = await client.table("contracts").select("*").order("created_at", desc=True).execute()
-    contracts = res.data or []
-    
-    contract_ids = [c["id"] for c in contracts]
-    reviews_map = {}
-    if contract_ids:
-        try:
-            rev_res = await client.table("contract_reviews").select("*").in_("contract_id", contract_ids).execute()
-            for r in (rev_res.data or []):
-                cid = r["contract_id"]
-                if cid not in reviews_map:
-                    reviews_map[cid] = []
-                reviews_map[cid].append(r)
-        except Exception:
-            pass
+@app.get("/api/market/listings", response_model=List[dict])
+def get_market_listings(db: Session = Depends(get_db)):
+    listings = db.query(MarketListing).filter(MarketListing.is_active == True).all()
+    results = []
+    for l in listings:
+        seller = db.query(User).filter(User.id == l.seller_id).first()
+        results.append({
+            "id": l.id,
+            "seller_id": l.seller_id,
+            "seller_username": seller.username if seller else "不明",
+            "item_name": l.item_name,
+            "description": l.description,
+            "price": l.price,
+            "listing_type": l.listing_type,
+            "end_time": l.end_time.isoformat() if l.end_time else None,
+            "created_at": l.created_at.isoformat() if l.created_at else None
+        })
+    return results
 
-    for c in contracts:
-        c["reviews"] = reviews_map.get(c["id"], [])
+@app.post("/api/market/sell")
+def create_market_listing(
+    request: MarketSellRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    seller_wallet = db.query(Wallet).filter(Wallet.wallet_id == request.seller_wallet_id, Wallet.user_id == current_user.id).first()
+    if not seller_wallet:
+        raise HTTPException(status_code=400, detail="無効な出品用口座です。")
 
-    return {
-        "contracts": contracts,
-        "current_user_id": user.id,
-        "is_king": await is_king(user.id)
-    }
+    if request.listing_type == "AUCTION":
+        if not request.duration_hours or request.duration_hours <= 0:
+            raise HTTPException(status_code=400, detail="オークション期間を正しく設定してください。")
+        end_time = datetime.datetime.utcnow() + datetime.timedelta(hours=request.duration_hours)
+    else:
+        end_time = None
 
-# 2. マイ契約一覧取得（自分が依頼主または受注者の契約）
-@app.get("/api/my-contracts")
-async def get_my_contracts(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    uid = user.id
-    client = await get_supabase()
-    res = await client.table("contracts").select("*")\
-        .or_(f"creator_user_id.eq.{uid},acceptor_user_id.eq.{uid}")\
-        .order("created_at", desc=True).execute()
-    
-    contracts = res.data or []
-    contract_ids = [c["id"] for c in contracts]
-    reviews_map = {}
-    if contract_ids:
-        try:
-            rev_res = await client.table("contract_reviews").select("*").in_("contract_id", contract_ids).execute()
-            for r in (rev_res.data or []):
-                cid = r["contract_id"]
-                if cid not in reviews_map:
-                    reviews_map[cid] = []
-                reviews_map[cid].append(r)
-        except Exception:
-            pass
+    listing = MarketListing(
+        seller_id=current_user.id,
+        seller_wallet_id=seller_wallet.wallet_id,
+        item_name=request.item_name,
+        description=request.description,
+        price=request.price,
+        listing_type=request.listing_type,
+        end_time=end_time,
+        is_active=True
+    )
+    db.add(listing)
+    db.commit()
+    db.refresh(listing)
 
-    for c in contracts:
-        c["reviews"] = reviews_map.get(c["id"], [])
+    return {"message": "出品が完了しました。", "listing_id": listing.id}
 
-    return contracts
+@app.post("/api/market/buy")
+def buy_market_item(
+    request: MarketBuyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    listing = db.query(MarketListing).filter(MarketListing.id == request.listing_id, MarketListing.is_active == True).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="指定された出品商品は存在しないか、既に終了しています。")
 
-# 3. 契約書新規作成
-@app.post("/api/contracts")
-async def create_contract(data: ContractCreate, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = prof_res.data[0]["nickname"] if prof_res.data else "名無しの労働奴隷"
+    if listing.seller_id == current_user.id:
+        raise HTTPException(status_code=400, detail="自分の出品した商品は購入できません。")
 
-    wallet_res = await client.table("wallets").select("*").eq("wallet_id", data.creator_wallet_id).eq("user_id", user.id).execute()
-    if not wallet_res.data:
-        raise HTTPException(status_code=400, detail="指定された支払口座が存在しないか、所有権がありません。")
+    buyer_wallet = db.query(Wallet).filter(Wallet.wallet_id == request.buyer_wallet_id, Wallet.user_id == current_user.id).first()
+    if not buyer_wallet:
+        raise HTTPException(status_code=400, detail="無効な支払用口座です。")
 
-    wallet = wallet_res.data[0]
-    if wallet["balance"] < data.amount:
-        raise HTTPException(status_code=400, detail="口座の残高が不足しています。")
+    seller_wallet = db.query(Wallet).filter(Wallet.wallet_id == listing.seller_wallet_id).first()
+    if not seller_wallet:
+        raise HTTPException(status_code=400, detail="出品者の受取口座が存在しません。")
 
-    # 作成時点で金額をエスクロー引き落とし
-    new_balance = wallet["balance"] - data.amount
-    await client.table("wallets").update({"balance": new_balance}).eq("id", wallet["id"]).execute()
+    if listing.listing_type == "FIXED":
+        if buyer_wallet.balance < listing.price:
+            raise HTTPException(status_code=400, detail="残高が不足しています。")
 
-    await client.table("contracts").insert({
-        "title": data.title,
-        "description": data.description,
-        "amount": data.amount,
-        "creator_user_id": user.id,
-        "creator_nickname": nickname,
-        "creator_wallet_id": data.creator_wallet_id,
-        "status": "OPEN"
-    }).execute()
+        buyer_wallet.balance -= listing.price
+        seller_wallet.balance += listing.price
+        listing.is_active = False
 
-    return {"message": "自由市場に契約書を発行し、報酬を仮預かり（エスクロー）しました！"}
+        tx_buyer = Transaction(wallet_id=buyer_wallet.wallet_id, amount=-listing.price, tx_type="PURCHASE", note=f"商品購入: {listing.item_name}")
+        tx_seller = Transaction(wallet_id=seller_wallet.wallet_id, amount=listing.price, tx_type="SALE", note=f"商品売却: {listing.item_name}")
+        db.add_all([tx_buyer, tx_seller])
+        db.commit()
 
-# 4. 契約受注
-@app.post("/api/contracts/{contract_id}/accept")
-async def accept_contract(contract_id: int, data: ContractAccept, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
-    if not c_res.data:
-        raise HTTPException(status_code=404, detail="契約書が見つかりません。")
-    contract = c_res.data[0]
+        return {"message": "購入が完了しました。"}
 
-    if contract["status"] != "OPEN":
-        raise HTTPException(status_code=400, detail="この契約はすでに募集中ではありません。")
+    elif listing.listing_type == "AUCTION":
+        if datetime.datetime.utcnow() > listing.end_time:
+            raise HTTPException(status_code=400, detail="このオークションは既に終了しています。")
 
-    if contract["creator_user_id"] == user.id:
-        raise HTTPException(status_code=400, detail="自分が発行した契約を受注することはできません。")
+        min_bid = listing.current_bid if listing.current_bid > 0 else listing.price
+        if request.bid_amount <= min_bid:
+            raise HTTPException(status_code=400, detail=f"入札額は現在の価格 ({min_bid} G) より高く設定してください。")
 
-    w_res = await client.table("wallets").select("*").eq("wallet_id", data.acceptor_wallet_id).eq("user_id", user.id).execute()
-    if not w_res.data:
-        raise HTTPException(status_code=400, detail="指定された受取口座が存在しないか、所有権がありません。")
+        if buyer_wallet.balance < request.bid_amount:
+            raise HTTPException(status_code=400, detail="入札用の残高が不足しています。")
 
-    await client.table("contracts").update({
-        "acceptor_user_id": user.id,
-        "acceptor_wallet_id": data.acceptor_wallet_id,
-        "status": "SIGNED"
-    }).eq("id", contract_id).execute()
+        # 前回の最高入札者に返金
+        if listing.highest_bidder_id and listing.highest_bidder_wallet_id:
+            prev_wallet = db.query(Wallet).filter(Wallet.wallet_id == listing.highest_bidder_wallet_id).first()
+            if prev_wallet:
+                prev_wallet.balance += listing.current_bid
+                tx_refund = Transaction(wallet_id=prev_wallet.wallet_id, amount=listing.current_bid, tx_type="AUCTION_REFUND", note=f"オークション上書き返金: {listing.item_name}")
+                db.add(tx_refund)
 
-    return {"message": "契約を受注しました！履行完了をお待ちください。"}
+        # 新しい入札者の資金をロック（引き落とし）
+        buyer_wallet.balance -= request.bid_amount
+        listing.current_bid = request.bid_amount
+        listing.highest_bidder_id = current_user.id
+        listing.highest_bidder_wallet_id = buyer_wallet.wallet_id
 
-# 5. 契約キャンセル（募集中の取り消し＆返金）
-@app.post("/api/contracts/{contract_id}/cancel")
-async def cancel_contract(contract_id: int, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
-    if not c_res.data:
-        raise HTTPException(status_code=404, detail="契約書が見つかりません。")
-    contract = c_res.data[0]
+        tx_bid = Transaction(wallet_id=buyer_wallet.wallet_id, amount=-request.bid_amount, tx_type="AUCTION_BID", note=f"オークション入札: {listing.item_name}")
+        db.add(tx_bid)
+        db.commit()
 
-    if contract["creator_user_id"] != user.id:
-        raise HTTPException(status_code=403, detail="自分の作成した契約のみ取り消し可能です。")
-    
-    if contract["status"] != "OPEN":
-        raise HTTPException(status_code=400, detail="受注前の募集（OPEN）状態でのみ取り消しが可能です。")
+        return {"message": "入札が完了しました。"}
 
-    cr_w_res = await client.table("wallets").select("*").eq("wallet_id", contract["creator_wallet_id"]).execute()
-    if cr_w_res.data:
-        cw = cr_w_res.data[0]
-        await client.table("wallets").update({"balance": cw["balance"] + contract["amount"]}).eq("id", cw["id"]).execute()
-
-    await client.table("contracts").update({"status": "CANCELLED"}).eq("id", contract_id).execute()
-
-    return {"message": "契約を取り消し、仮預かり金を返金しました。"}
-
-# 6. 契約完了承認＆報酬入金
-@app.post("/api/contracts/{contract_id}/complete")
-async def complete_contract(contract_id: int, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    client = await get_supabase()
-    
-    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
-    if not c_res.data:
-        raise HTTPException(status_code=404, detail="契約書が見つかりません。")
-    contract = c_res.data[0]
-
-    if contract["status"] != "SIGNED":
-        raise HTTPException(status_code=400, detail="この契約は署名・履行待ち状態ではありません。")
-
-    if contract["creator_user_id"] != user.id:
-        raise HTTPException(status_code=403, detail="契約の完了承認は依頼主のみが行えます。")
-
-    acceptor_w_res = await client.table("wallets").select("*").eq("wallet_id", contract["acceptor_wallet_id"]).execute()
-    if not acceptor_w_res.data:
-        raise HTTPException(status_code=400, detail="受注者の受取口座が見つかりません。")
-    
-    acceptor_wallet = acceptor_w_res.data[0]
-    new_acceptor_balance = acceptor_wallet["balance"] + contract["amount"]
-    await client.table("wallets").update({"balance": new_acceptor_balance}).eq("id", acceptor_wallet["id"]).execute()
-
-    await client.table("contracts").update({"status": "COMPLETED"}).eq("id", contract_id).execute()
-
-    try:
-        await client.table("transfer_logs").insert({
-            "sender_wallet_id": contract["creator_wallet_id"],
-            "receiver_wallet_id": contract["acceptor_wallet_id"],
-            "amount": contract["amount"]
-        }).execute()
-    except Exception:
-        pass
-
-    return {"message": "履行完了を承認しました！エスクローから報酬が受注者へ送金されました。"}
-
-# 7. レビュー評価の投稿
-@app.post("/api/contracts/{contract_id}/review")
-async def review_contract(contract_id: int, data: ReviewCreate, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-
-    if data.rating < 1 or data.rating > 5:
-        raise HTTPException(status_code=400, detail="評価は1〜5の星で指定してください。")
-
-    client = await get_supabase()
-    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
-    if not c_res.data:
-        raise HTTPException(status_code=404, detail="契約が見つかりません。")
-    contract = c_res.data[0]
-
-    if contract["status"] != "COMPLETED":
-        raise HTTPException(status_code=400, detail="完了した契約のみ評価できます。")
-
-    is_creator = contract["creator_user_id"] == user.id
-    is_acceptor = contract["acceptor_user_id"] == user.id
-    if not (is_creator or is_acceptor):
-        raise HTTPException(status_code=403, detail="この契約の当事者のみ評価可能です。")
-
-    target_user_id = contract["acceptor_user_id"] if is_creator else contract["creator_user_id"]
-
-    try:
-        await client.table("contract_reviews").insert({
-            "contract_id": contract_id,
-            "reviewer_user_id": user.id,
-            "target_user_id": target_user_id,
-            "rating": data.rating,
-            "comment": data.comment
-        }).execute()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"評価登録エラー: {str(e)}")
-
-    return {"message": "評価を投稿しました！"}
-
-# 8. 国王専用介入コマンド
-@app.post("/api/contracts/{contract_id}/king-override")
-async def king_override_contract(contract_id: int, action: dict, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    if not await is_king(user.id):
-        raise HTTPException(status_code=403, detail="権限がありません（国王専用コマンド）")
-
-    client = await get_supabase()
-    c_res = await client.table("contracts").select("*").eq("id", contract_id).execute()
-    if not c_res.data:
-        raise HTTPException(status_code=404, detail="契約書が見つかりません。")
-    contract = c_res.data[0]
-
-    mode = action.get("mode")
-
-    if mode == "force_complete":
-        if contract.get("acceptor_wallet_id"):
-            acc_w_res = await client.table("wallets").select("*").eq("wallet_id", contract["acceptor_wallet_id"]).execute()
-            if acc_w_res.data:
-                aw = acc_w_res.data[0]
-                await client.table("wallets").update({"balance": aw["balance"] + contract["amount"]}).eq("id", aw["id"]).execute()
-        await client.table("contracts").update({"status": "COMPLETED"}).eq("id", contract_id).execute()
-        return {"message": "【国王裁定】強制的に契約を完了させ、受注者へ報酬を送金しました。"}
-
-    elif mode == "force_cancel":
-        cr_w_res = await client.table("wallets").select("*").eq("wallet_id", contract["creator_wallet_id"]).execute()
-        if cr_w_res.data:
-            cw = cr_w_res.data[0]
-            await client.table("wallets").update({"balance": cw["balance"] + contract["amount"]}).eq("id", cw["id"]).execute()
-        await client.table("contracts").update({"status": "CANCELLED"}).eq("id", contract_id).execute()
-        return {"message": "【国王裁定】強制的に契約を破棄し、エスクロー資金を依頼主に返金しました。"}
-
-    raise HTTPException(status_code=400, detail="無効な裁定モードです。")
+    raise HTTPException(status_code=400, detail="不正な出品タイプです。")
 
 # --------------------------------------------------
 # 掲示板API（高機能版・ゼロトラスト対応）
@@ -834,9 +699,8 @@ async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
     await client.table("board_posts").update({"is_pinned": new_status}).eq("id", post_id).execute()
     return {"message": "布告(ピン)状態を切り替えました。"}
 
-
 # --------------------------------------------------
-# 追加: 融資・借金（P2Pレンディング）システム API
+# 融資・借金（P2Pレンディング）システム API
 # --------------------------------------------------
 
 # 1. 募集中の融資枠一覧を取得
@@ -928,6 +792,7 @@ async def repay_loan(data: LoanRepay, authorization: str = Header(None)):
     except Exception as e:
         err_msg = getattr(e, "message", str(e))
         raise HTTPException(status_code=400, detail=f"返済エラー: {err_msg}")
+
 
 # --------------------------------------------------
 # カジノモジュールの登録
