@@ -464,5 +464,88 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 </script>
 
+
+<!-- ================= 閲覧専用 ポリシー確認機能（完全版） ================= -->
+<style>
+    /* ポリシー閲覧ボタン専用のスタイル */
+    .btn-policy-view {
+        background: #34495e !important;
+        color: #ecf0f1 !important;
+        grid-column: span 2;
+        margin-top: 4px;
+        border: 1px solid #5d6d7e !important;
+    }
+    .btn-policy-view:hover {
+        background: #2c3e50 !important;
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // nav-grid の末尾にボタンを安全に追加
+    const navGrid = document.querySelector(".nav-grid");
+    if (navGrid && !document.getElementById("btn-policy-trigger")) {
+        const viewPolicyBtn = document.createElement("button");
+        viewPolicyBtn.id = "btn-policy-trigger";
+        viewPolicyBtn.type = "button";
+        viewPolicyBtn.className = "btn-policy-view";
+        viewPolicyBtn.innerHTML = "📜 利用規約・ポリシーを確認";
+        viewPolicyBtn.onclick = openPolicyViewer;
+        navGrid.appendChild(viewPolicyBtn);
+    }
+});
+
+let isPolicyFetching = false; // 二重リクエスト防止フラグ
+
+// 閲覧専用モーダルを開く
+async function openPolicyViewer() {
+    if (isPolicyFetching) return;
+    
+    const modal = document.getElementById("policy-view-modal");
+    const contentBox = document.getElementById("policy-view-content");
+
+    try {
+        isPolicyFetching = true;
+        contentBox.innerText = "規約を読み込んでいます...";
+        modal.style.display = "flex";
+
+        const res = await fetch("/api/policy/latest");
+        if (res.ok) {
+            const data = await res.json();
+            contentBox.innerText = data.content || "規約本文がありません。";
+        } else {
+            contentBox.innerText = "規約の読み込みに失敗しました。（エラーコード: " + res.status + "）";
+        }
+    } catch (e) {
+        console.error("規約取得エラー:", e);
+        contentBox.innerText = "通信エラーが発生しました。ネットワーク状況を確認してください。";
+    } finally {
+        isPolicyFetching = false;
+    }
+}
+
+// モーダルを閉じる
+function closePolicyViewer() {
+    document.getElementById("policy-view-modal").style.display = "none";
+}
+</script>
+
+<!-- 閲覧専用モーダル（モーダル外枠クリックでも閉じられる仕様） -->
+<div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
+    <div style="background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #fff; font-family: sans-serif;" onclick="event.stopPropagation();">
+        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
+        
+        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word;">
+            読み込み中...
+        </div>
+
+        <button type="button" onclick="closePolicyViewer()" style="width: 100%; padding: 10px; background: #555; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+            閉じる
+        </button>
+    </div>
+</div>
+<!-- ================================================================= -->
+
+
 </body>
 </html>
