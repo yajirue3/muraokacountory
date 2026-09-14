@@ -736,33 +736,75 @@ app.include_router(factory_router)
 app.include_router(card_router)
 
 # --------------------------------------------------
-# 資産税徴収 API（毎朝9時 / UTC 0時にcronから呼び出し）
+# ==================================================
+# 資産保有税（所得税・保管料）処理モジュール
+# ==================================================
+
+def calculate_wealth_tax(balance: int) -> int:
+    """
+    【マイルド版 累進資産税計算】
+    超過累進方式（各階層の超過分のみに税率適用）
+    
+    ・10万以下: 0%（一般層は完全無税）
+    ・10万〜100万: 0.1%（1日あたり最大 900 Gold）
+    ・100万〜1000万: 0.3%（1日あたり最大 27,000 Gold）
+    ・1000万超: 1.0%（数十億プレイヤーから毎日確実に回収）
+    """
+    if balance <= 100_000:
+        return 0
+
+    tax = 0
+    temp_balance = balance
+
+    # 1000万超の超過分: 1.0%
+    if temp_balance > 10_000_000:
+        tax += int((temp_balance - 10_000_000) * 0.01)
+        temp_balance = 10_000_000
+
+    # 100万〜1000万の超過分: 0.3%
+    if temp_balance > 1_000_000:
+        tax += int((temp_balance - 1_000_000) * 0.003)
+        temp_balance = 1_000_000
+
+    # 10万〜100万の超過分: 0.1%
+    if temp_balance > 100_000:
+        tax += int((temp_balance - 100_000) * 0.001)
+
+    return tax
+
+
+# --------------------------------------------------
+# 資産税徴収 API（毎朝9時 / UTC 0:00 にcron等から呼出）
 # --------------------------------------------------
 @router.post("/api/admin/collect-tax")
 async def collect_wealth_tax(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
 
-    # is_king (管理者) チェック
-    # ※ Supabaseの users テーブル等からフラグを取得して判定
-    user_res = await supabase.table("users").select("is_king").eq("id", user.id).execute()
-    if not user_res.data or not user_res.data[0].get("is_king"):
+    # 1. profiles テーブルから is_king を取得して権限チェック
+    profile_res = await supabase.table("profiles").select("is_king").eq("id", user.id).execute()
+    if not profile_res.data or not profile_res.data[0].get("is_king"):
         raise HTTPException(status_code=403, detail="管理者（King）権限がありません。")
 
-    # 課税対象（10万Gold超）のウォレットをすべて取得
-    res = await supabase.table("wallets").select("id, wallet_id, balance").gt("balance", 100000).execute()
-    wallets = res.data or []
+    # 2. 課税対象（10万Gold超）のウォレットを取得
+    wallet_res = await supabase.table("wallets").select("id, wallet_id, balance").gt("balance", 100000).execute()
+    wallets = wallet_res.data or []
 
     taxed_results = []
+    total_tax_collected = 0
+
+    # 3. 各ウォレットから税金を差し引き
     for w in wallets:
         current_bal = w["balance"]
         tax_amount = calculate_wealth_tax(current_bal)
 
         if tax_amount > 0:
             new_bal = current_bal - tax_amount
-            # 残高の更新
+
+            # 口座残高を安全に更新
             await supabase.table("wallets").update({"balance": new_bal}).eq("id", w["id"]).execute()
-            
+
+            total_tax_collected += tax_amount
             taxed_results.append({
                 "wallet_id": w["wallet_id"],
                 "before": current_bal,
@@ -772,6 +814,7 @@ async def collect_wealth_tax(authorization: str = Header(None)):
 
     return {
         "status": "success",
-        "processed_count": len(taxed_results),
+        "processed_wallets": len(taxed_results),
+        "total_tax_collected": total_tax_collected,
         "details": taxed_results
     }
