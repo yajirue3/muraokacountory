@@ -536,6 +536,12 @@ async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(N
         "mines": mines
     }
 
+# # --- Slot用リクエストモデル ---
+class SlotSpinRequest(BaseModel):
+    wallet_id: str
+    amount: int  # ← bet_amount から他のゲームと同じ amount に統一
+
+
 # --------------------------------------------------
 # カジノAPI：スロットゲーム（確率調整・合法仕様）
 # --------------------------------------------------
@@ -544,9 +550,9 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
 
-    if data.bet_amount < 1:
+    if data.amount < 1:
         raise HTTPException(status_code=400, detail="賭け金は1Gold以上を指定してください。")
-    if data.bet_amount > 50000:
+    if data.amount > 50000:
         raise HTTPException(status_code=400, detail="1度に賭けれるのは5万までです。")
 
     wallet_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
@@ -556,34 +562,34 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     wallet = wallet_res.data[0]
     current_balance = wallet["balance"]
 
-    if current_balance < data.bet_amount:
+    if current_balance < data.amount:
         raise HTTPException(status_code=400, detail="口座の残高が不足しています。")
 
     # 1. 賭け金を即時引き落とし
-    new_balance = current_balance - data.bet_amount
+    new_balance = current_balance - data.amount
     
     # 2. 内部抽選 (還元率96%、黄金バランスの高ボラティリティ仕様)
     rand_val = random.randint(0, 999)
     
     if rand_val < 2:      # 確率 0.2% (2/1000)
         prize = "BIG"
-        payout = int(data.bet_amount * 200)  # 200倍 (RTP 40%)
+        payout = int(data.amount * 200)  # 200倍 (RTP 40%)
         result_symbols = ["7", "7", "7"]
     elif rand_val < 6:    # 確率 0.4% (4/1000) - 累積6
         prize = "REG"
-        payout = int(data.bet_amount * 50)   # 50倍 (RTP 20%)
+        payout = int(data.amount * 50)   # 50倍 (RTP 20%)
         result_symbols = ["BAR", "BAR", "BAR"]
     elif rand_val < 16:   # 確率 1.0% (10/1000) - 累積16
         prize = "BELL"
-        payout = int(data.bet_amount * 10)   # 10倍 (RTP 10%)
+        payout = int(data.amount * 10)   # 10倍 (RTP 10%)
         result_symbols = ["BELL", "BELL", "BELL"]
     elif rand_val < 66:   # 確率 5.0% (50/1000) - 累積66
         prize = "GRAPE"
-        payout = int(data.bet_amount * 3)    # 3倍 (RTP 15%)
+        payout = int(data.amount * 3)    # 3倍 (RTP 15%)
         result_symbols = ["GRAPE", "GRAPE", "GRAPE"]
     elif rand_val < 176:  # 確率 11.0% (110/1000) - 累積176
         prize = "REPLAY"
-        payout = int(data.bet_amount * 1)    # 1倍 (RTP 11%)
+        payout = int(data.amount * 1)    # 1倍 (RTP 11%)
         if random.random() < 0.5:
             result_symbols = ["REPLAY", "REPLAY", "REPLAY"]
         else:
@@ -622,6 +628,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "is_early_pekari": is_early_pekari,
         "new_balance": new_balance
     }
+
 
 # ==================================================
 # 王国ダービー（競馬）モジュール
