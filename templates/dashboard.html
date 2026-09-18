@@ -3,150 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - 国民証</title>
+    <title>村岡王国 - ダッシュボード</title>
     <style>
-        body { font-family: sans-serif; background-color: #1a1a1a; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 0; margin: 0; }
-        .container { width: 360px; display: flex; flex-direction: column; gap: 16px; }
-        .card { background: #2a2a2a; border: 2px solid #555; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-        .header { font-size: 1.1rem; font-weight: bold; color: #d4af37; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 12px; }
-        .icon-box { font-size: 3rem; text-align: center; margin: 8px 0; }
-        .info-group { margin: 12px 0; font-size: 0.85rem; }
-        .label { color: #888; font-size: 0.75rem; }
-        .value { font-weight: bold; margin-bottom: 6px; word-break: break-all; }
-        .badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
-        input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #333; color: #fff; box-sizing: border-box; margin-top: 4px; margin-bottom: 10px; font-size: 0.85rem; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #121212; 
+            color: #e0e0e0; 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px 10px; 
+            margin: 0; 
+            min-height: 100vh;
+        }
+        .container { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
         
-        button { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; background: #d4af37; color: #1a1a1a; font-size: 0.85rem; margin-top: 6px; }
-        button:hover { background: #f1c40f; }
+        /* 汎用カード */
+        .card { 
+            background: #1e1e1e; 
+            border: 1px solid #333; 
+            border-radius: 12px; 
+            padding: 16px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        }
+        
+        .header { 
+            font-size: 1.05rem; 
+            font-weight: bold; 
+            color: #d4af37; 
+            border-bottom: 1px solid #333; 
+            padding-bottom: 8px; 
+            margin-bottom: 12px; 
+        }
+
+        /* リアルな国民証（IDカード）のスタイル */
+        .id-card-wrapper {
+            background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%);
+            border-radius: 12px;
+            padding: 16px;
+            color: #1a1a1a;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.5);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #fff;
+            margin-bottom: 4px;
+        }
+        .id-card-wrapper::after {
+            content: "MURAOKA";
+            position: absolute;
+            font-size: 4.5rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.25);
+            transform: rotate(-25deg);
+            top: 30px; right: -20px;
+            pointer-events: none;
+            letter-spacing: 5px;
+        }
+        .id-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 2;
+        }
+        .id-country { font-weight: 900; font-size: 1.1rem; color: #2c3e50; letter-spacing: 1px; }
+        .id-title { font-size: 0.75rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
+        .id-body {
+            display: flex;
+            gap: 12px;
+            position: relative;
+            z-index: 2;
+        }
+        .id-photo {
+            width: 70px;
+            height: 90px;
+            background: #fff;
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            color: #95a5a6;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+        }
+        .id-details { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .id-row { display: flex; flex-direction: column; }
+        .id-label { font-size: 0.65rem; color: #7f8c8d; font-weight: bold; }
+        .id-value { font-size: 0.95rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
+        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
+        .id-footer { margin-top: 12px; font-size: 0.6rem; color: #7f8c8d; text-align: center; position: relative; z-index: 2; border-top: 1px solid #bdc3c7; padding-top: 6px; }
+
+        /* フォーム系 */
+        .label { color: #888; font-size: 0.75rem; margin-top: 8px; }
+        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; box-sizing: border-box; margin-top: 4px; margin-bottom: 8px; font-size: 0.85rem; }
+        
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; font-size: 0.9rem; transition: filter 0.2s, transform 0.1s; }
+        button:hover { filter: brightness(1.1); }
+        button:active { transform: scale(0.98); }
+
+        .btn-primary { background: #d4af37; color: #1a1a1a; margin-top: 8px; }
+        .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); margin-top: 6px; }
 
         /* ナビゲーション用のグリッドレイアウト */
-        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .nav-grid button { margin-top: 0; padding: 12px 6px; font-size: 0.8rem; line-height: 1.2; }
+        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .nav-grid button { margin-top: 0; padding: 14px 6px; font-size: 0.8rem; line-height: 1.3; }
 
-        .btn-tax { background: linear-gradient(180deg, #f39c12 0%, #d35400 100%); color: #fff; margin-top: 6px; }
-        .btn-tax:hover { background: linear-gradient(180deg, #f1c40f 0%, #e67e22 100%); }
-
-        .btn-bank { background: #27ae60; color: #fff; }
-        .btn-bank:hover { background: #2ecc71; }
-        .btn-inventory { background: #d35400; color: #fff; }
-        .btn-inventory:hover { background: #e67e22; }
-        .btn-board { background: #2980b9; color: #fff; }
-        .btn-board:hover { background: #3498db; }
-        .btn-market { background: #8e44ad; color: #fff; }
-        .btn-market:hover { background: #9b59b6; }
-        .btn-casino { background: #c0392b; color: #fff; grid-column: span 2; }
-        .btn-casino:hover { background: #e74c3c; }
+        .btn-games { background: linear-gradient(135deg, #8f7a66 0%, #6e5c4a 100%); grid-column: span 2; border: 1px solid #bbada0; font-size: 0.9rem;}
+        .btn-bank { background: #27ae60; }
+        .btn-inventory { background: #d35400; }
+        .btn-board { background: #2980b9; }
+        .btn-market { background: #8e44ad; }
+        .btn-casino { background: #c0392b; grid-column: span 2; }
 
         /* 国王専用ボタン */
-        .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; border: 1px solid #ffd700; margin-top: 4px; display: none; }
-        .btn-admin:hover { background: linear-gradient(180deg, #ffd700 0%, #a68a28 100%); }
+        .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; border: 1px solid #ffd700; display: none; }
+        .btn-policy-view { background: #34495e; color: #ecf0f1; grid-column: span 2; border: 1px solid #5d6d7e; }
+        .btn-logout { background: #333; color: #aaa; border: 1px solid #444; }
 
-        /* 路地裏イベント用スタイル（メニュー一覧からは完全に独立） */
-        .alley-card {
-            background: #191b1f;
-            border: 1px dashed #4a5568;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 8px;
-            text-align: center;
-        }
-        .btn-alley {
-            background: #2d3748;
-            color: #a0aec0;
-            border: 1px solid #4a5568;
-            padding: 8px;
-            font-size: 0.8rem;
-        }
-        .btn-alley:hover {
-            background: #3a4a5e;
-            color: #e2e8f0;
-        }
+        /* 次回納税額用カード */
+        .tax-display-card { text-align: center; background: #1a1510; border: 1px solid #f39c12; }
+        .tax-display-amount { color: #e74c3c; font-size: 1.6rem; font-weight: 900; margin: 8px 0; font-variant-numeric: tabular-nums; }
+        .tax-display-note { font-size: 0.7rem; color: #a0a0a0; }
 
-        .btn-logout { background: #444; color: #ccc; }
-        .btn-logout:hover { background: #555; }
-        .secret-tag { color: #e74c3c; font-size: 0.7rem; }
+        /* 路地裏イベント用スタイル */
+        .alley-card { background: #191b1f; border: 1px dashed #4a5568; border-radius: 8px; padding: 12px; margin-top: 16px; text-align: center; }
+        .btn-alley { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; padding: 10px; font-size: 0.85rem; }
+        
+        .secret-tag { color: #e74c3c; font-size: 0.7rem; margin-left: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card">
-        <div class="header">村岡王国 国民証</div>
-        <div class="icon-box">⛏️</div>
-        
-        <div class="info-group">
-            <div class="label">国民ID (Email)</div>
-            <div class="value" id="user-email">-</div>
-
-            <div class="label">登録ニックネーム</div>
-            <div class="value" id="display-nickname">-</div>
-
-            <div class="label">現在の称号</div>
-            <div class="value"><span class="badge" id="user-rank">読み込み中...</span></div>
+    
+    <!-- リアルな国民証エリア -->
+    <div class="id-card-wrapper">
+        <div class="id-header">
+            <div class="id-country">村岡王国</div>
+            <div class="id-title">国民身分証明証</div>
         </div>
+        <div class="id-body">
+            <div class="id-photo">👤</div>
+            <div class="id-details">
+                <div class="id-row">
+                    <span class="id-label">氏名 (NICKNAME)</span>
+                    <span class="id-value" id="display-nickname">-</span>
+                </div>
+                <div class="id-row">
+                    <span class="id-label">国民ID (EMAIL)</span>
+                    <span class="id-value" id="user-email" style="font-size: 0.7rem;">-</span>
+                </div>
+                <div class="id-row">
+                    <span class="id-label">階級 (RANK)</span>
+                    <span class="id-badge" id="user-rank">読込中...</span>
+                </div>
+            </div>
+        </div>
+        <div class="id-footer">
+            ISSUED BY MURAOKA KINGDOM GOVERNMENT
+        </div>
+    </div>
 
+    <!-- シンプル化された次回納税額表示 -->
+    <div class="card tax-display-card">
+        <div class="header" style="color: #f39c12; border-bottom: none; margin-bottom: 0;">💰 次回所得税 徴収予定額</div>
+        <div class="tax-display-amount" id="my-tax-amount">計算中...</div>
+        <div class="tax-display-note">※毎週 火曜・金曜 9:00に自動徴収（10万G超のみ 0.5%）[span_0](start_span)[span_0](end_span)</div>
+    </div>
+
+    <!-- 登録情報と納税操作 -->
+    <div class="card">
+        <div class="header">基本設定 / 納税口座</div>
+        
         <div class="label">納税報酬の受取口座</div>
         <select id="tax-wallet-select">
             <option value="">口座を読み込み中...</option>
         </select>
+        <button class="btn-tax" onclick="payTax()">💰 本日の納税を行う（+100G）[span_1](start_span)[span_1](end_span)</button>
+        
+        <div style="border-top: 1px solid #333; margin: 16px 0;"></div>
 
-        <button class="btn-tax" onclick="payTax()">💰 本日の納税を行う（+100G）</button>
-
-        <!-- メニューボタン（2列グリッド化） -->
-        <div class="nav-grid">
-            <button class="btn-bank" onclick="location.href='/wallet'">🏦 王国中央銀行</button>
-            <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品（バッグ）</button>
-            <button class="btn-board" onclick="location.href='/board'">📜 王国回覧板</button>
-            <button class="btn-market" onclick="location.href='/market'">⚖️ 王国自由市場</button>
-            <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ（一攫千金）</button>
-            
-            <!-- 国王専用ボタン（初期状態は非表示） -->
-            <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）</button>
-            <button id="btn-admin-casino" class="btn-admin" onclick="location.href='/admin/casino'">🎰 カジノ調整（国王専用）</button>
-            <button id="btn-admin-tax" class="btn-admin" onclick="collectAllTax()">👑 全国民から所得税を即時徴収（国王専用）</button>
-        </div>
-
-        <!-- 一覧から外した路地裏イベント（独立エリア） -->
-        <div class="alley-card">
-            <div style="font-size: 0.75rem; color: #718096; margin-bottom: 6px;">
-                👀 視線を感じる... 街の裏路地で怪しげな男がこちらの様子を伺っている。
-            </div>
-            <button class="btn-alley" onclick="openAlleyModal()">🕵️ 男に近づいて話しかける</button>
-        </div>
-    </div>
-
-    <!-- お知らせカード追加（所得税についてのお詫びと修正） -->
-    <div class="card" style="border-color: #d35400;">
-        <div class="header" style="color: #e67e22; border-bottom: 1px solid #d35400;">📢 お知らせ：所得税の緩和について</div>
-        <div style="font-size: 0.85rem; color: #ccc; line-height: 1.5;">
-            【お詫びと仕様変更】事前の税率設定が過酷すぎたことをお詫び申し上げます。<br>
-            お詫びとして、後日順次<b>1,000G</b>を配布させていただきます。<br><br>
-            インフレ防止策として、新ルールでは<b>毎週 火曜・金曜の朝9時</b>に所持金に応じた「所得税」が自動徴収されるよう緩和されました。<br><br>
-            ・10万G以下：<b>無税</b><br>
-            ・10万G超：<b>所持金の 0.5% を一律徴収</b><br>
-        </div>
-        <div style="margin-top: 12px; padding: 10px; background: #222; border: 1px solid #444; border-radius: 6px; font-size: 0.85rem; text-align: center;">
-            💰 <b>あなたの次回徴収予定額</b><br>
-            <span id="my-tax-amount" style="color: #e74c3c; font-size: 1.2rem; font-weight: bold; display: inline-block; margin-top: 4px;">計算中...</span>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="header">国民登録情報の変更</div>
         <div class="label">表のニックネーム (全体公開)</div>
         <input type="text" id="nickname" placeholder="例: 鉱山ハナコ">
 
         <div class="label">本名 <span class="secret-tag">※国王のみ知る(完全非公開)</span></div>
         <input type="text" id="real-name" placeholder="例: 村岡 太郎">
-
-        <button onclick="saveProfile()">情報を保存する</button>
+        <button class="btn-primary" onclick="saveProfile()">情報を保存する</button>
     </div>
 
-    <button class="btn-logout" onclick="logout()">王国を離脱（ログアウト）</button>
+    <!-- メニューナビゲーション -->
+    <div class="nav-grid">
+        <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場 (2048など)</button>
+        <button class="btn-bank" onclick="location.href='/wallet'">🏦 王国中央銀行[span_2](start_span)[span_2](end_span)</button>
+        <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品（バッグ）[span_3](start_span)[span_3](end_span)</button>
+        <button class="btn-board" onclick="location.href='/board'">📜 王国回覧板[span_4](start_span)[span_4](end_span)</button>
+        <button class="btn-market" onclick="location.href='/market'">⚖️ 王国自由市場[span_5](start_span)[span_5](end_span)</button>
+        <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ（一攫千金）[span_6](start_span)[span_6](end_span)</button>
+        
+        <!-- 国王専用ボタン -->
+        <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）[span_7](start_span)[span_7](end_span)</button>
+        <button id="btn-admin-casino" class="btn-admin" onclick="location.href='/admin/casino'">🎰 カジノ調整（国王専用）[span_8](start_span)[span_8](end_span)</button>
+        <button id="btn-admin-tax" class="btn-admin" onclick="collectAllTax()">👑 全国民から所得税を即時徴収[span_9](start_span)[span_9](end_span)</button>
+        
+        <!-- 規約確認ボタン -->
+        <button class="btn-policy-view" onclick="openPolicyViewer()">📜 利用規約・ポリシーを確認[span_10](start_span)[span_10](end_span)</button>
+    </div>
+
+    <!-- ログアウト -->
+    <button class="btn-logout" onclick="logout()">王国を離脱（ログアウト）[span_11](start_span)[span_11](end_span)</button>
+
+    <!-- 路地裏イベント -->
+    <div class="alley-card">
+        <div style="font-size: 0.75rem; color: #718096; margin-bottom: 8px;">
+            👀 視線を感じる... 街の裏路地で怪しげな男がこちらの様子を伺っている。[span_12](start_span)[span_12](end_span)
+        </div>
+        <button class="btn-alley" onclick="openAlleyModal()">🕵️ 男に近づいて話しかける[span_13](start_span)[span_13](end_span)</button>
+    </div>
 </div>
 
 <script>
-    // エスケープ関数を最上部に定義
     function escapeHtml(str) { 
         return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; 
     }
@@ -169,7 +247,6 @@
         return "王族";
     }
 
-    // 資産税の計算ロジック（火金・完全一律0.5%）
     function calculateWealthTax(balance) {
         if (balance <= 100000) return 0;
         return Math.floor(balance * 0.005);
@@ -184,20 +261,15 @@
                 document.getElementById("real-name").value = data.real_name || "";
                 
                 const displayNick = document.getElementById("display-nickname");
-                if (displayNick) {
-                    displayNick.innerText = data.nickname || "（未設定）";
-                }
+                if (displayNick) displayNick.innerText = data.nickname || "（未設定）";
 
-                // 国王権限チェック（is_king または role === 'king' 等の判定）
                 if (data.is_king || data.role === "king") {
                     document.getElementById("btn-admin-items").style.display = "block";
                     document.getElementById("btn-admin-casino").style.display = "block";
                     document.getElementById("btn-admin-tax").style.display = "block";
                 }
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }
 
     async function loadWalletsForTax() {
@@ -205,30 +277,24 @@
             const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const wallets = await res.json();
-                
                 const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
+                
                 document.getElementById("user-rank").innerText = getRankName(totalBalance);
 
-                // 個別の次回徴収額を計算して表示
                 const taxAmount = calculateWealthTax(totalBalance);
                 const taxDisplay = document.getElementById("my-tax-amount");
-                if (taxDisplay) {
-                    taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount} G` : "0 G (無税)";
-                }
+                if (taxDisplay) taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
 
                 const select = document.getElementById("tax-wallet-select");
                 if (wallets.length === 0) {
                     select.innerHTML = '<option value="">口座がありません</option>';
                     return;
                 }
-
                 select.innerHTML = wallets.map(w => 
                     `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (${w.wallet_id}) - 残高:${w.balance}G</option>`
                 ).join('');
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }
 
     async function saveProfile() {
@@ -247,16 +313,12 @@
             } else {
                 alert("エラー: " + (data.detail || "プロフィールの保存に失敗しました"));
             }
-        } catch (e) {
-            console.error(e);
-            alert("通信エラーが発生しました: " + e.message);
-        }
+        } catch (e) { alert("通信エラーが発生しました: " + e.message); }
     }
 
     async function payTax() {
         const wallet_id = document.getElementById("tax-wallet-select").value;
         if (!wallet_id) return alert("受取口座を選択してください");
-
         try {
             const res = await fetch("/api/pay-tax", {
                 method: "POST",
@@ -266,9 +328,7 @@
             const data = await res.json();
             alert(res.ok ? data.message : "エラー: " + data.detail);
             if (res.ok) loadWalletsForTax();
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }
 
     async function collectAllTax() {
@@ -281,14 +341,11 @@
             const data = await res.json();
             if (res.ok) {
                 alert(`徴収完了！\n対象: ${data.processed_wallets || data.processed_count}件\n総徴収額: ${data.total_tax_collected || 0} G`);
-                loadWalletsForTax(); // 自分の残高も再読み込み
+                loadWalletsForTax();
             } else {
                 alert("エラー: " + (data.detail || "徴収に失敗しました"));
             }
-        } catch (e) {
-            console.error(e);
-            alert("通信エラーが発生しました");
-        }
+        } catch (e) { alert("通信エラーが発生しました"); }
     }
 
     function logout() {
@@ -304,11 +361,7 @@
         document.getElementById("alley-choices-loan").style.display = "none";
         document.getElementById("alley-modal").style.display = "flex";
     }
-
-    function closeAlleyModal() {
-        document.getElementById("alley-modal").style.display = "none";
-    }
-
+    function closeAlleyModal() { document.getElementById("alley-modal").style.display = "none"; }
     function chooseWork() {
         document.getElementById("alley-text").innerHTML = 
             "「おい…声がでけぇ、しっ！ 静かにしろ。<br><br>" +
@@ -320,7 +373,6 @@
         document.getElementById("alley-choices-initial").style.display = "none";
         document.getElementById("alley-choices-factory").style.display = "flex";
     }
-
     function chooseLoan() {
         document.getElementById("alley-text").innerHTML = 
             "「……カネ、だと？ ククッ、いい顔つきになってきやがったな。<br><br>" +
@@ -331,76 +383,39 @@
         document.getElementById("alley-choices-initial").style.display = "none";
         document.getElementById("alley-choices-loan").style.display = "flex";
     }
+    function goToFactory() { window.location.href = "/factory"; }
+    function goToLoan() { window.location.href = "/loan"; }
 
-    function goToFactory() {
-        window.location.href = "/factory";
+    let isPolicyFetching = false;
+    async function openPolicyViewer() {
+        if (isPolicyFetching) return;
+        const modal = document.getElementById("policy-view-modal");
+        const contentBox = document.getElementById("policy-view-content");
+        try {
+            isPolicyFetching = true;
+            contentBox.innerText = "規約を読み込んでいます...";
+            modal.style.display = "flex";
+            const res = await fetch("/api/policy/latest");
+            if (res.ok) {
+                const data = await res.json();
+                contentBox.innerText = data.content || "規約本文がありません。";
+            } else {
+                contentBox.innerText = "規約の読み込みに失敗しました。";
+            }
+        } catch (e) {
+            contentBox.innerText = "通信エラーが発生しました。";
+        } finally { isPolicyFetching = false; }
     }
-
-    function goToLoan() {
-        window.location.href = "/loan";
-    }
+    function closePolicyViewer() { document.getElementById("policy-view-modal").style.display = "none"; }
 </script>
 
 <!-- ================= 規約同意モーダル ================= -->
 <div id="terms-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center;">
-    <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff; font-family: sans-serif;">
+    <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff;">
         <h3 style="color: #ffd700; margin-top: 0; text-align: center;">📜 利用規約の同意</h3>
-        <p style="font-size: 0.8rem; color: #ccc; line-height: 1.5;">
-            サービスの安全な運営のため、利用規約への同意が必要です。<br>
-            内容をご確認の上、「同意する」ボタンを押してください。
-        </p>
-        
-        <div id="terms-content-box" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 180px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin-bottom: 15px; white-space: pre-wrap;">
-            規約を読み込んでいます...
-        </div>
-
-        <button id="agree-terms-btn" style="width: 100%; padding: 12px; background: #27ae60; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">
-            規約に同意してプレイを続ける
-        </button>
-    </div>
-</div>
-
-<!-- ================= 路地裏の男会話モーダル（裏イベント） ================= -->
-<div id="alley-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 9998; justify-content: center; align-items: center;">
-    <div style="background: #1c1e22; border: 2px solid #3a4a5e; border-radius: 12px; width: 90%; max-width: 380px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #e2e8f0; font-family: sans-serif;">
-        <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男</h3>
-        
-        <div id="alley-text" style="background: #0f1115; border: 1px solid #2d3748; border-radius: 6px; padding: 12px; font-size: 0.85rem; color: #cbd5e0; line-height: 1.6; margin-bottom: 16px;">
-            「……あ？ なんだお前、俺に何か用か？」
-        </div>
-
-        <!-- 初期選択肢 -->
-        <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
-            <button onclick="chooseWork()" style="background: #2b6cb0; color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                🔨 働きたい（仕事を探す）
-            </button>
-            <button onclick="chooseLoan()" style="background: #8e44ad; color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                💰 金を借りたい（裏金融へ）
-            </button>
-            <button onclick="closeAlleyModal()" style="background: #4a5568; color: #ccc; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                👋 用はない（立ち去る）
-            </button>
-        </div>
-
-        <!-- 工場分岐の選択肢 -->
-        <div id="alley-choices-factory" style="display: none; gap: 10px;">
-            <button onclick="goToFactory()" style="flex: 1; background: #2b6cb0; color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                はい（工場へ行く）
-            </button>
-            <button onclick="openAlleyModal()" style="flex: 1; background: #4a5568; color: #ccc; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                戻る
-            </button>
-        </div>
-
-        <!-- 借金分岐の選択肢 -->
-        <div id="alley-choices-loan" style="display: none; gap: 10px;">
-            <button onclick="goToLoan()" style="flex: 1; background: #8e44ad; color: #fff; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                裏金融へ行く
-            </button>
-            <button onclick="openAlleyModal()" style="flex: 1; background: #4a5568; color: #ccc; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-                戻る
-            </button>
-        </div>
+        <p style="font-size: 0.8rem; color: #ccc; line-height: 1.5;">サービスの安全な運営のため、利用規約への同意が必要です。<br>内容をご確認の上、「同意する」ボタンを押してください。[span_14](start_span)[span_14](end_span)</p>
+        <div id="terms-content-box" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 180px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin-bottom: 15px; white-space: pre-wrap;">規約を読み込んでいます...[span_15](start_span)[span_15](end_span)</div>
+        <button id="agree-terms-btn" style="width: 100%; padding: 12px; background: #27ae60; color: #fff;">規約に同意してプレイを続ける[span_16](start_span)[span_16](end_span)</button>
     </div>
 </div>
 
@@ -410,142 +425,67 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modalEl = document.getElementById("terms-modal");
     const contentBoxEl = document.getElementById("terms-content-box");
     const agreeBtn = document.getElementById("agree-terms-btn");
-
     if (!token || !modalEl || !contentBoxEl || !agreeBtn) return;
-
     try {
-        // 1. 同意ステータスを取得
-        const statusRes = await fetch("/api/policy/status", {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        
+        const statusRes = await fetch("/api/policy/status", { headers: { "Authorization": `Bearer ${token}` } });
         if (!statusRes.ok) return;
         const statusData = await statusRes.json();
-
-        // 2. 未同意（agreed_version < current_version）なら表示
         if (statusData.needs_agreement) {
             const latestRes = await fetch("/api/policy/latest");
             if (!latestRes.ok) return;
-
             const latestData = await latestRes.json();
             contentBoxEl.innerText = latestData.content;
             modalEl.style.display = "flex";
-
-            // 3. 同意ボタンのクリック処理
             agreeBtn.onclick = async () => {
                 agreeBtn.disabled = true;
                 try {
                     const agreeRes = await fetch("/api/policy/agree", {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${token}`
-                        },
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                         body: JSON.stringify({ version: latestData.version })
                     });
-
-                    if (agreeRes.ok) {
-                        modalEl.style.display = "none";
-                    } else {
+                    if (agreeRes.ok) modalEl.style.display = "none";
+                    else {
                         const errData = await agreeRes.json();
-                        alert("エラーが発生しました: " + (errData.detail || "送信失敗"));
+                        alert("エラー: " + (errData.detail || "送信失敗"));
                         agreeBtn.disabled = false;
                     }
-                } catch (err) {
-                    console.error("Agree request error:", err);
-                    alert("通信エラーが発生しました。");
-                    agreeBtn.disabled = false;
-                }
+                } catch (err) { alert("通信エラー"); agreeBtn.disabled = false; }
             };
         }
-    } catch (e) {
-        console.error("規約確認エラー:", e);
-    }
+    } catch (e) { console.error(e); }
 });
 </script>
 
-
-<!-- ================= 閲覧専用 ポリシー確認機能（完全版） ================= -->
-<style>
-    /* ポリシー閲覧ボタン専用のスタイル */
-    .btn-policy-view {
-        background: #34495e !important;
-        color: #ecf0f1 !important;
-        grid-column: span 2;
-        margin-top: 4px;
-        border: 1px solid #5d6d7e !important;
-    }
-    .btn-policy-view:hover {
-        background: #2c3e50 !important;
-    }
-</style>
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    // nav-grid の末尾にボタンを安全に追加
-    const navGrid = document.querySelector(".nav-grid");
-    if (navGrid && !document.getElementById("btn-policy-trigger")) {
-        const viewPolicyBtn = document.createElement("button");
-        viewPolicyBtn.id = "btn-policy-trigger";
-        viewPolicyBtn.type = "button";
-        viewPolicyBtn.className = "btn-policy-view";
-        viewPolicyBtn.innerHTML = "📜 利用規約・ポリシーを確認";
-        viewPolicyBtn.onclick = openPolicyViewer;
-        navGrid.appendChild(viewPolicyBtn);
-    }
-});
-
-let isPolicyFetching = false; // 二重リクエスト防止フラグ
-
-// 閲覧専用モーダルを開く
-async function openPolicyViewer() {
-    if (isPolicyFetching) return;
-    
-    const modal = document.getElementById("policy-view-modal");
-    const contentBox = document.getElementById("policy-view-content");
-
-    try {
-        isPolicyFetching = true;
-        contentBox.innerText = "規約を読み込んでいます...";
-        modal.style.display = "flex";
-
-        const res = await fetch("/api/policy/latest");
-        if (res.ok) {
-            const data = await res.json();
-            contentBox.innerText = data.content || "規約本文がありません。";
-        } else {
-            contentBox.innerText = "規約の読み込みに失敗しました。（エラーコード: " + res.status + "）";
-        }
-    } catch (e) {
-        console.error("規約取得エラー:", e);
-        contentBox.innerText = "通信エラーが発生しました。ネットワーク状況を確認してください。";
-    } finally {
-        isPolicyFetching = false;
-    }
-}
-
-// モーダルを閉じる
-function closePolicyViewer() {
-    document.getElementById("policy-view-modal").style.display = "none";
-}
-</script>
-
-<!-- 閲覧専用モーダル（モーダル外枠クリックでも閉じられる仕様） -->
+<!-- ================= 閲覧専用 ポリシー確認機能 ================= -->
 <div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
-    <div style="background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #fff; font-family: sans-serif;" onclick="event.stopPropagation();">
-        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
-        
-        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word;">
-            読み込み中...
-        </div>
-
-        <button type="button" onclick="closePolicyViewer()" style="width: 100%; padding: 10px; background: #555; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
-            閉じる
-        </button>
+    <div style="background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
+        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px;">📜 利用規約・ポリシー[span_17](start_span)[span_17](end_span)</h3>
+        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word;">読み込み中...</div>
+        <button type="button" onclick="closePolicyViewer()" style="width: 100%; background: #555;">閉じる[span_18](start_span)[span_18](end_span)</button>
     </div>
 </div>
-<!-- ================================================================= -->
 
+<!-- ================= 路地裏の男会話モーダル ================= -->
+<div id="alley-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 9998; justify-content: center; align-items: center;">
+    <div style="background: #1c1e22; border: 2px solid #3a4a5e; border-radius: 12px; width: 90%; max-width: 380px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #e2e8f0;">
+        <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男[span_19](start_span)[span_19](end_span)</h3>
+        <div id="alley-text" style="background: #0f1115; border: 1px solid #2d3748; border-radius: 6px; padding: 12px; font-size: 0.85rem; color: #cbd5e0; line-height: 1.6; margin-bottom: 16px;"></div>
+        <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
+            <button onclick="chooseWork()" style="background: #2b6cb0;">🔨 働きたい（仕事を探す）[span_20](start_span)[span_20](end_span)</button>
+            <button onclick="chooseLoan()" style="background: #8e44ad;">💰 金を借りたい（裏金融へ）[span_21](start_span)[span_21](end_span)</button>
+            <button onclick="closeAlleyModal()" style="background: #4a5568;">👋 用はない（立ち去る）[span_22](start_span)[span_22](end_span)</button>
+        </div>
+        <div id="alley-choices-factory" style="display: none; gap: 10px;">
+            <button onclick="goToFactory()" style="background: #2b6cb0;">はい（工場へ行く）[span_23](start_span)[span_23](end_span)</button>
+            <button onclick="openAlleyModal()" style="background: #4a5568;">戻る[span_24](start_span)[span_24](end_span)</button>
+        </div>
+        <div id="alley-choices-loan" style="display: none; gap: 10px;">
+            <button onclick="goToLoan()" style="background: #8e44ad;">裏金融へ行く[span_25](start_span)[span_25](end_span)</button>
+            <button onclick="openAlleyModal()" style="background: #4a5568;">戻る[span_26](start_span)[span_26](end_span)</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
