@@ -535,22 +535,6 @@ async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(N
         "new_balance": new_balance,
         "mines": mines
     }
-
-
-# --- Slot用リクエストモデル ---
-class SlotSpinRequest(BaseModel):
-    wallet_id: str
-    bet_amount: int
-
-
-# --------------------------------------------------
-# カジノ画面配信ルート：スロット
-# --------------------------------------------------
-@router.get("/slot", response_class=HTMLResponse)
-async def get_slot(request: Request):
-    return templates.TemplateResponse(request=request, name="slot.html")
-
-
 # --------------------------------------------------
 # カジノAPI：スロットゲーム（確率調整・合法仕様）
 # --------------------------------------------------
@@ -577,28 +561,28 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     # 1. 賭け金を即時引き落とし
     new_balance = current_balance - data.bet_amount
     
-    # 2. 内部抽選 (設定された還元率・配当テーブルに基づき純粋抽選)
+    # 2. 内部抽選 (還元率96%、低倍率高確率を高倍率低確率に変更した超高ボラティリティ仕様)
     rand_val = random.randint(0, 999)
     
-    if rand_val < 10:    # 確率 1.0%
+    if rand_val < 5:      # 確率 0.5% (5/1000)
         prize = "BIG"
-        payout = int(data.bet_amount * 50)   # 50倍
+        payout = int(data.bet_amount * 100)  # 100倍 (RTP 50%)
         result_symbols = ["7", "7", "7"]
-    elif rand_val < 40:  # 確率 3.0%
+    elif rand_val < 10:   # 確率 0.5% (5/1000)
         prize = "REG"
-        payout = int(data.bet_amount * 10)   # 10倍
+        payout = int(data.bet_amount * 50)   # 50倍 (RTP 25%)
         result_symbols = ["BAR", "BAR", "BAR"]
-    elif rand_val < 120: # 確率 8.0%
+    elif rand_val < 15:   # 確率 0.5% (5/1000)
         prize = "BELL"
-        payout = int(data.bet_amount * 3)    # 3倍
+        payout = int(data.bet_amount * 20)   # 20倍 (RTP 10%)
         result_symbols = ["BELL", "BELL", "BELL"]
-    elif rand_val < 270: # 確率 15.0%
+    elif rand_val < 21:   # 確率 0.6% (6/1000)
         prize = "GRAPE"
-        payout = int(data.bet_amount * 1.5)  # 1.5倍
+        payout = int(data.bet_amount * 10)   # 10倍 (RTP 6%)
         result_symbols = ["GRAPE", "GRAPE", "GRAPE"]
-    elif rand_val < 430: # 確率 16.0%
+    elif rand_val < 31:   # 確率 1.0% (10/1000)
         prize = "REPLAY"
-        payout = int(data.bet_amount * 1)    # 1倍
+        payout = int(data.bet_amount * 5)    # 5倍 (RTP 5%)
         if random.random() < 0.5:
             result_symbols = ["REPLAY", "REPLAY", "REPLAY"]
         else:
@@ -636,6 +620,7 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
         "is_early_pekari": is_early_pekari,
         "new_balance": new_balance
     }
+
 
 # ==================================================
 # 王国ダービー（競馬）モジュール
