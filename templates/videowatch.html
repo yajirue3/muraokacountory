@@ -2,155 +2,100 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>王国映像広場 - 視聴</title>
+    <title>映像再生</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 0; }
-        .header { background: #1e1e1e; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
-        .btn-back { color: #d4af37; text-decoration: none; font-weight: bold; font-size: 0.9rem; }
-        .main-layout { max-width: 1000px; margin: 20px auto; padding: 0 16px; box-sizing: border-box; }
-        
-        .player-container { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.8); border: 1px solid #333; }
-        .player-container iframe { width: 100%; height: 100%; border: none; }
-        
-        .v-info-card { background: #1e1e1e; border-radius: 12px; padding: 16px; margin-top: 16px; border: 1px solid rgba(255, 255, 255, 0.08); }
-        .v-title { font-size: 1.25rem; font-weight: bold; color: #fff; margin: 0 0 10px 0; }
-        .v-sub { font-size: 0.8rem; color: #aaa; display: flex; gap: 16px; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
-        .v-desc { font-size: 0.85rem; color: #ccc; white-space: pre-wrap; line-height: 1.5; }
-
-        .comments-box { margin-top: 24px; background: #1e1e1e; border-radius: 12px; padding: 16px; border: 1px solid rgba(255, 255, 255, 0.08); }
-        .comment-header { font-size: 1rem; font-weight: bold; color: #d4af37; margin-bottom: 14px; }
-        .comment-form { display: flex; gap: 10px; margin-bottom: 20px; }
-        .comment-input { flex: 1; padding: 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 0.85rem; }
-        .btn-send { padding: 10px 18px; background: #d4af37; color: #1a1a1a; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
-
-        .comment-list { display: flex; flex-direction: column; gap: 12px; }
-        .comment-item { background: #262626; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .comment-user { font-size: 0.75rem; color: #d4af37; font-weight: bold; margin-bottom: 4px; }
-        .comment-content { font-size: 0.85rem; color: #e0e0e0; word-break: break-all; }
-        .btn-del-c { background: transparent; border: none; color: #e74c3c; cursor: pointer; font-size: 0.75rem; }
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; }
+        .header { background: #1e1e1e; padding: 12px 20px; border-bottom: 1px solid #333; }
+        .btn { padding: 6px 12px; background: #2a2a2a; color: #d4af37; text-decoration: none; border-radius: 4px; border: 1px solid #444; }
+        .container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+        .player { background: #000; width: 100%; aspect-ratio: 16/9; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
+        .player iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
+        .info { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
+        .info h1 { margin: 0 0 10px 0; font-size: 1.4rem; color: #fff; }
+        .info .meta { color: #888; font-size: 0.9rem; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px; }
+        .comments { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; }
+        .c-form { display: flex; gap: 10px; margin-bottom: 20px; }
+        .c-form input { flex: 1; padding: 10px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; }
+        .c-form button { padding: 10px 16px; background: #d4af37; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .c-item { background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .c-del { color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 0.8rem; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <a href="/videos" class="btn-back">← 映像広場へ戻る</a>
-    </div>
-
-    <div class="main-layout">
-        <div class="player-container" id="player-box">
-            <div style="color: #aaa; text-align: center; line-height: 300px;">映像を読み込み中...</div>
+    <div class="header"><a href="/videos" class="btn">← 戻る</a></div>
+    <div class="container">
+        <div class="player" id="player">読み込み中...</div>
+        <div class="info">
+            <h1 id="v-title">-</h1>
+            <div class="meta" id="v-meta">-</div>
+            <div id="v-desc" style="white-space: pre-wrap;">-</div>
         </div>
-
-        <div class="v-info-card">
-            <h1 class="v-title" id="v-title">-</h1>
-            <div class="v-sub">
-                <span id="v-author">👤 -</span>
-                <span id="v-views">👀 - 回</span>
-                <span id="v-date">📅 -</span>
+        <div class="comments">
+            <h3 style="margin-top:0; color:#d4af37;">コメント</h3>
+            <div class="c-form">
+                <input type="text" id="c-input" placeholder="感想を入力...">
+                <button onclick="postComment()">送信</button>
             </div>
-            <div class="v-desc" id="v-desc">解説はありません。</div>
-        </div>
-
-        <div class="comments-box">
-            <div class="comment-header">💬 感想一覧 (コメント)</div>
-            <div class="comment-form">
-                <input type="text" id="c-input" class="comment-input" placeholder="感想を入力...">
-                <button class="btn-send" onclick="sendComment()">送信</button>
-            </div>
-            <div class="comment-list" id="c-list"></div>
+            <div id="c-list"></div>
         </div>
     </div>
 
     <script>
         const token = localStorage.getItem("access_token");
-        const urlParams = new URLSearchParams(window.location.search);
-        const videoId = urlParams.get('v');
-
-        if (!token || !videoId) window.location.href = "/videos";
-
-        let currentUserId = "";
+        const videoId = new URLSearchParams(location.search).get('v');
+        if (!token || !videoId) location.href = "/videos";
 
         async function init() {
             try {
                 const res = await fetch(`/api/videos/${videoId}`, { headers: { "Authorization": `Bearer ${token}` } });
-                if (!res.ok) {
-                    alert("この映像は閲覧できません");
-                    window.location.href = "/videos";
-                    return;
-                }
-                const video = await res.json();
+                if (!res.ok) throw new Error();
+                const v = await res.json();
                 
-                document.getElementById("v-title").innerText = video.title;
-                document.getElementById("v-author").innerText = `👤 ${video.author_name}`;
-                document.getElementById("v-views").innerText = `👀 ${video.views || 0} 回`;
-                document.getElementById("v-date").innerText = `📅 ${new Date(video.created_at).toLocaleDateString("ja-JP")}`;
-                document.getElementById("v-desc").innerText = video.description || "解説はありません。";
-
-                document.getElementById("player-box").innerHTML = 
-                    `<iframe src="https://drive.google.com/file/d/${video.drive_file_id}/preview" allow="autoplay"></iframe>`;
-
+                document.getElementById("v-title").innerText = v.title;
+                document.getElementById("v-meta").innerText = `👤 ${v.author_name} | 👀 ${v.views || 0}回`;
+                document.getElementById("v-desc").innerText = v.description || "説明なし";
+                document.getElementById("player").innerHTML = `<iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview"></iframe>`;
+                
                 loadComments();
-            } catch (e) {
-                console.error(e);
+            } catch(e) {
+                alert("再生できません");
+                location.href = "/videos";
             }
         }
 
         async function loadComments() {
             const res = await fetch(`/api/videos/${videoId}/comments`);
-            const comments = await res.json();
-            
-            const listEl = document.getElementById("c-list");
-            if (comments.length === 0) {
-                listEl.innerHTML = `<div style="font-size:0.8rem; color:#888;">コメントはまだありません。</div>`;
-                return;
-            }
-
-            listEl.innerHTML = comments.map(c => `
-                <div class="comment-item">
+            const data = await res.json();
+            document.getElementById("c-list").innerHTML = data.map(c => `
+                <div class="c-item">
                     <div>
-                        <div class="comment-user">${escapeHtml(c.author_name)}</div>
-                        <div class="comment-content">${escapeHtml(c.content)}</div>
+                        <div style="font-size:0.8rem; color:#d4af37; margin-bottom:4px;">${c.author_name}</div>
+                        <div>${c.content}</div>
                     </div>
-                    <button class="btn-del-c" onclick="deleteComment('${c.id}')">削除</button>
+                    <button class="c-del" onclick="delComment('${c.id}')">削除</button>
                 </div>
             `).join('');
         }
 
-        async function sendComment() {
-            const input = document.getElementById("c-input");
-            const content = input.value.trim();
-            if (!content) return;
-
+        async function postComment() {
+            const val = document.getElementById("c-input").value;
+            if(!val.trim()) return;
             const res = await fetch(`/api/videos/${videoId}/comments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ content })
+                body: JSON.stringify({ content: val })
             });
-
             if (res.ok) {
-                input.value = "";
+                document.getElementById("c-input").value = "";
                 loadComments();
-            } else {
-                alert("コメント送信エラー");
             }
         }
 
-        async function deleteComment(cid) {
-            if (!confirm("コメントを削除しますか？")) return;
-            const res = await fetch(`/api/comments/${cid}`, {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-                loadComments();
-            } else {
-                alert("削除権限がありません");
-            }
-        }
-
-        function escapeHtml(str) {
-            return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        async function delComment(id) {
+            if(!confirm("削除しますか？")) return;
+            const res = await fetch(`/api/comments/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) loadComments();
+            else alert("権限がありません");
         }
 
         init();
