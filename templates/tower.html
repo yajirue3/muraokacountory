@@ -120,7 +120,7 @@
             will-change: transform;
         }
 
-        /* 🏰 15段タワー：完全表示用コンパクトレイアウト */
+        /* 🏰 15段タワー */
         .tower-container {
             display: flex;
             flex-direction: column-reverse;
@@ -262,7 +262,7 @@
             font-size: 0.6rem; 
             font-weight: 900;
             color: var(--neon-green); 
-            width: 44px; 
+            width: 50px; 
             text-align: right; 
             text-shadow: 0 0 4px var(--neon-green);
             font-family: 'Black Ops One', monospace;
@@ -402,11 +402,22 @@
         body.hyper-flash-active {
             animation: hyper-body-flash 0.25s linear;
         }
+        body.hyper-flash-extreme {
+            animation: hyper-body-flash-extreme 0.4s linear;
+        }
 
         @keyframes hyper-body-flash {
             0% { background-color: #fff; filter: invert(1) hue-rotate(180deg); }
             50% { background-color: var(--neon-pink); }
             100% { background-color: #000; filter: none; }
+        }
+        
+        @keyframes hyper-body-flash-extreme {
+            0% { background-color: #fff; }
+            20% { background-color: var(--neon-cyan); }
+            40% { background-color: var(--neon-yellow); }
+            60% { background-color: var(--neon-pink); }
+            100% { background-color: #000; }
         }
 
         .win-rainbow-shake {
@@ -424,10 +435,19 @@
         .num-pop {
             animation: hyper-pop-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
         }
+        .num-pop-extreme {
+            animation: hyper-pop-bounce-extreme 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+        }
 
         @keyframes hyper-pop-bounce {
             0% { transform: scale(1); }
             50% { transform: scale(2.0); text-shadow: 0 0 40px #ffffff, 0 0 80px var(--neon-pink), 0 0 100px var(--neon-yellow); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes hyper-pop-bounce-extreme {
+            0% { transform: scale(1); }
+            50% { transform: scale(2.5) rotate(5deg); color: #fff; text-shadow: 0 0 50px #fff, 0 0 100px var(--neon-yellow), 0 0 150px var(--neon-red); }
             100% { transform: scale(1); }
         }
 
@@ -518,11 +538,11 @@
             <button class="btn-back" onclick="location.href='/casino'">◀ カジノ一覧に戻る</button>
             <label class="checkbox-label">
                 <input type="checkbox" id="bgm-toggle">
-                <span>🎵 BGM ON</span>
+                <span>🎵 音声/BGM ON</span>
             </label>
             <label class="checkbox-label">
                 <input type="checkbox" id="disable-shake">
-                <span>🚫 画面演出（揺れ・光）をオフ</span>
+                <span>🚫 画面演出をオフ</span>
             </label>
         </div>
         <audio id="bgm-player" src="/templates/dopa.mp3" loop preload="auto"></audio>
@@ -539,6 +559,47 @@
     let isPlaying = false;
     let activeBetAmount = 0;
 
+    // Web Audio API によるドーパミンSE
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = new AudioContext();
+
+    function playSound(type) {
+        if(!document.getElementById("bgm-toggle").checked) return;
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'SAFE') {
+            // タイル成功音：ピロリン♪
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800 + (currentFloor * 50), now); // 階が上がるごとに音が高くなる
+            osc.frequency.exponentialRampToValueAtTime(1200 + (currentFloor * 50), now + 0.1);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now); osc.stop(now + 0.3);
+        } else if (type === 'TRAP') {
+            // 地雷爆発音：ドカーン
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4);
+        } else if (type === 'CASHOUT') {
+            // 利確音：チャリンチャリン
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.setValueAtTime(600, now + 0.1);
+            osc.frequency.setValueAtTime(800, now + 0.2);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4);
+        }
+    }
+
     initTowerUI();
 
     if (!token) {
@@ -548,10 +609,10 @@
         setupEventListeners();
     }
 
-    // RTP 90.0% 倍率計算関数
+    // RTP 96.0% 倍率計算関数 (2.88倍)
     function getMultiplier(floor) {
         if (floor <= 0) return 1.0;
-        return Math.floor(Math.pow(2.70, floor) * 100) / 100;
+        return Math.floor(Math.pow(2.88, floor) * 100) / 100;
     }
 
     async function loadWallets() {
@@ -575,12 +636,18 @@
         }
     }
 
+    function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
+        if (num >= 1000) return (num / 1000).toFixed(1) + "k";
+        return num;
+    }
+
     function initTowerUI() {
         const container = document.getElementById("tower-container");
         container.innerHTML = "";
 
         for (let f = 1; f <= TOTAL_FLOORS; f++) {
-            const mult = getMultiplier(f).toFixed(2);
+            const mult = formatNumber(getMultiplier(f));
             const row = document.createElement("div");
             row.className = `tower-row ${f === 1 ? 'active' : ''}`;
             row.id = `floor-row-${f}`;
@@ -607,6 +674,7 @@
 
         bgmToggle.addEventListener("change", (e) => {
             if (e.target.checked) {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
                 bgmPlayer.play().catch(err => console.log("再生ブロック解除待ち:", err));
             } else {
                 bgmPlayer.pause();
@@ -645,10 +713,17 @@
             displayBox.classList.add("win-rainbow-noshake");
         } else {
             displayBox.classList.add("win-rainbow-shake");
-            payoutEl.classList.add("num-pop");
             
-            document.body.classList.add("hyper-flash-active");
-            setTimeout(() => document.body.classList.remove("hyper-flash-active"), 250);
+            // 階層が深ければ深いほど演出が過激になる
+            if (currentFloor > 5) {
+                payoutEl.classList.add("num-pop-extreme");
+                document.body.classList.add("hyper-flash-extreme");
+                setTimeout(() => document.body.classList.remove("hyper-flash-extreme"), 400);
+            } else {
+                payoutEl.classList.add("num-pop");
+                document.body.classList.add("hyper-flash-active");
+                setTimeout(() => document.body.classList.remove("hyper-flash-active"), 250);
+            }
         }
     }
 
@@ -730,6 +805,7 @@
             if (data.is_safe) {
                 buttons[tileIndex].innerText = "💎";
                 buttons[tileIndex].classList.add("safe");
+                playSound("SAFE");
 
                 if (data.is_cleared) {
                     isPlaying = false;
@@ -750,6 +826,7 @@
             } else {
                 buttons[tileIndex].innerText = "💣";
                 buttons[tileIndex].classList.add("trap");
+                playSound("TRAP");
                 
                 if (buttons[data.safe_tile]) {
                     buttons[data.safe_tile].innerText = "💎";
@@ -785,6 +862,7 @@
             if (!res.ok) return alert(data.detail || "エラーが発生しました");
 
             isPlaying = false;
+            playSound("CASHOUT");
             const statusEl = document.getElementById("game-status");
             statusEl.innerText = `💰 キャッシュアウト成功！ +${data.payout} Gold 獲得！`;
 
@@ -806,7 +884,7 @@
 
         const mult = isPlaying && currentFloor > 1 ? getMultiplier(currentFloor - 1) : (isPlaying ? 1.0 : 0);
         const payout = Math.floor(activeBetAmount * mult);
-        document.getElementById("stat-multiplier").innerText = mult.toFixed(2) + "x";
+        document.getElementById("stat-multiplier").innerText = formatNumber(mult) + "x";
         document.getElementById("stat-payout").innerText = payout + " G";
 
         for (let f = 1; f <= TOTAL_FLOORS; f++) {
