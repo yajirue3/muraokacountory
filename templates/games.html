@@ -168,4 +168,61 @@
 
         <!-- ダービー（木目調デザインに調整） -->
         <div class="game-card game-card-derby">
-            <div class="badge-pickup">BETA / DEMO</
+            <div class="badge-pickup">BETA / DEMO</div>
+            <div class="game-title title-derby">🏇 国営ダービー（Derby）</div>
+            <div class="game-desc">
+                【※現在デモ稼働中】毎時00分・30分に発走。王国屈指の名馬たちが火花を散らす競馬シミュレーション。
+            </div>
+            <button class="btn-play btn-play-derby" onclick="location.href='/derby'">レース会場へ（BETA）</button>
+        </div>
+
+        <!-- マインズ -->
+        <div class="game-card">
+            <div class="game-title">💣 狂乱マインズ（Mines）</div>
+            <div class="game-desc">地雷を避けて宝石を掘り当てろ！進めば進むほど配当が跳ね上がる極限チキンレース。</div>
+            <button class="btn-play" onclick="location.href='/mines'">プレイする</button>
+        </div>
+
+        <!-- スロット -->
+        <div class="game-card">
+            <div class="game-title">🎰 スロット（Slot）</div>
+            <div class="game-desc">安定性が高いニュータイプな保守的遊技。当たりやすさはピカイチ。</div>
+            <button class="btn-play" onclick="location.href='/slot'">プレイする</button>
+        </div>
+
+        <!-- ダイス -->
+        <div class="game-card">
+            <div class="game-title">🎲 サイコロ勝負（Dice）</div>
+            <div class="game-desc">出目を予想してGoldを賭けるシンプルなダイスゲーム。一攫千金を狙え！</div>
+            <button class="btn-play" onclick="location.href='/dice'">プレイする</button>
+        </div>
+
+        <!-- タワー -->
+        <div class="game-card">
+            <div class="game-title">🏰 タワーゲーム（Tower）</div>
+            <div class="game-desc">罠を避けてタワーを登り詰め、高倍率の配当を獲得せよ！</div>
+            <button class="btn-play" onclick="location.href='/tower'">プレイする</button>
+        </div>
+
+        <!-- カードバトル -->
+        <div class="game-card">
+            <div class="game-title">⚔️ カードバトル（Card）</div>
+            <div class="game-desc">ドラフトと戦略でライバルと戦う対戦カードゲーム。勝利して賞金を掴め！</div>
+            <button class="btn-play" onclick="location.href='/card'">プレイする</button>
+        </div>
+
+        <!-- ダッシュボードへ戻るボタン -->
+        <button class="btn-back" onclick="location.href='/dashboard'">ダッシュボードへ戻る</button>
+    </div>
+</div>
+
+<script>
+    // 未ログイン時は強制送還
+    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+    if (!token) {
+        window.location.href = "/";
+    }
+</script>
+
+</body>
+</html>
