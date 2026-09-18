@@ -536,6 +536,19 @@ async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(N
         "mines": mines
     }
 
+
+# --- Slot用リクエストモデル ---
+class SlotSpinRequest(BaseModel):
+    wallet_id: str
+    amount: int
+
+# --------------------------------------------------
+# カジノ画面配信ルート：スロット
+# --------------------------------------------------
+@router.get("/slot", response_class=HTMLResponse)
+async def get_slot(request: Request):
+    return templates.TemplateResponse(request=request, name="slot.html")
+
 # --------------------------------------------------
 # カジノAPI：スロットゲーム（名機バランス仕様）
 # --------------------------------------------------
