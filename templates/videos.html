@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王国映像記録館 - 一覧</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 0; }
+        .nav-bar { background: #1a1a1a; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d4af37; }
+        .nav-bar h1 { margin: 0; font-size: 1.2rem; color: #d4af37; }
+        .btn { padding: 8px 12px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 4px; border: 1px solid #444; font-size: 0.9rem; cursor: pointer; }
+        .btn:hover { background: #d4af37; color: #121212; }
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .video-card { background: #1e1e1e; border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform 0.2s; border: 1px solid #333; }
+        .video-card:hover { transform: translateY(-4px); border-color: #d4af37; }
+        .thumbnail-placeholder { background: #2a2a2a; height: 160px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #555; position: relative; }
+        .private-badge { position: absolute; top: 8px; right: 8px; background: #c0392b; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
+        .video-info { padding: 12px; }
+        .video-title { margin: 0 0 6px 0; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .video-author { margin: 0; font-size: 0.8rem; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <h1>🎞️ 王国映像記録館</h1>
+        <div>
+            <a href="/manage_videos" class="btn">管理所へ</a>
+            <a href="/dashboard" class="btn">ダッシュボードへ戻る</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="video-grid" id="video-list">
+            <p>読み込み中...</p>
+        </div>
+    </div>
+    <script>
+        const token = localStorage.getItem("access_token");
+        if (!token) window.location.href = "/";
+
+        async function loadVideos() {
+            try {
+                const res = await fetch("/api/videos", { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                const grid = document.getElementById("video-list");
+                grid.innerHTML = "";
+                
+                if(data.videos.length === 0) {
+                    grid.innerHTML = "<p>記録された映像はありません。</p>";
+                    return;
+                }
+
+                data.videos.forEach(v => {
+                    const privateTag = v.is_private ? '<span class="private-badge">非公開</span>' : '';
+                    grid.innerHTML += `
+                        <div class="video-card" onclick="location.href='/watch?v=${v.id}'">
+                            <div class="thumbnail-placeholder">▶️${privateTag}</div>
+                            <div class="video-info">
+                                <h3 class="video-title">${v.title}</h3>
+                                <p class="video-author">記録者: ${v.author_name}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch(e) { console.error(e); }
+        }
+        loadVideos();
+    </script>
+</body>
+</html>
