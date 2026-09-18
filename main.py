@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from factory import router as factory_router
 from card import router as card_router
 from db import get_supabase
-from 2048 import get_supabase
+from game_2048 import get_supabase
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -594,7 +594,7 @@ app.include_router(inventory_router)
 app.include_router(policy_router)
 app.include_router(factory_router)
 app.include_router(card_router)
-app.include_router(2048_router)
+app.include_router(game_2048_router)
 
 # ==================================================
 # 資産保有税（所得税・保管料）処理モジュール (main.py用)
