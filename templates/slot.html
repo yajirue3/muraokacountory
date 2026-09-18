@@ -54,10 +54,6 @@
             position: relative;
         }
 
-        body.jackpot-mode {
-            animation: hyper-jackpot 0.5s infinite alternate ease-in-out;
-        }
-
         /* ==========================================================================
            CABINET (LUXURY NEON CASING)
            ========================================================================== */
@@ -137,23 +133,16 @@
 
         .notice-banner {
             width: 100%;
-            background: rgba(255, 0, 51, 0.15);
-            border: 1px solid var(--alert-red);
+            background: rgba(0, 243, 255, 0.15);
+            border: 1px solid var(--neon-cyan);
             color: #fff;
             font-family: 'M PLUS 1p', sans-serif;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             text-align: center;
             padding: 8px;
             border-radius: 6px;
             margin-bottom: -5px;
-            text-shadow: 0 0 5px var(--alert-red);
-            animation: pulse-notice 2s infinite;
-        }
-        
-        @keyframes pulse-notice {
-            0% { box-shadow: 0 0 5px rgba(255,0,51,0.2); }
-            50% { box-shadow: 0 0 15px rgba(255,0,51,0.6); }
-            100% { box-shadow: 0 0 5px rgba(255,0,51,0.2); }
+            text-shadow: 0 0 5px var(--neon-cyan);
         }
 
         /* ==========================================================================
@@ -169,6 +158,7 @@
             padding: 15px 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(157, 0, 255, 0.4);
             position: relative;
+            transition: all 0.1s;
         }
         
         .inputs-row { display: flex; gap: 15px; }
@@ -211,6 +201,7 @@
             color: #fff; 
             line-height: 1; margin-top: 20px; 
             text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            will-change: transform;
         }
         .meter-val.green { 
             color: var(--gold-base); 
@@ -251,10 +242,7 @@
             font-family: 'Righteous', cursive;
             font-size: clamp(0.9rem, 2.5vw, 1.5rem);
             color: #1a1a1a; line-height: 1.1;
-            box-shadow: 
-                inset 0 10px 20px rgba(0,0,0,0.9), 
-                0 0 0 3px #333,
-                0 10px 15px rgba(0,0,0,0.8);
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.9), 0 0 0 3px #333, 0 10px 15px rgba(0,0,0,0.8);
             position: relative; z-index: 20;
         }
         .gogo-lamp span { font-size: clamp(1.2rem, 3.5vw, 2.2rem); margin-top: -2px; color: #1a1a1a; }
@@ -262,16 +250,13 @@
         .gogo-lamp.peka {
             background: radial-gradient(circle at 40% 40%, #fff 0%, #ff007f 40%, #800040 100%);
             border-color: #ffb3d9;
-            box-shadow: 
-                0 0 50px rgba(255, 0, 127, 1), 
-                0 0 100px rgba(255, 0, 127, 0.6),
-                inset 0 0 30px rgba(255,255,255,0.9);
+            box-shadow: 0 0 50px rgba(255, 0, 127, 1), 0 0 100px rgba(255, 0, 127, 0.6), inset 0 0 30px rgba(255,255,255,0.9);
             animation: hyper-peka-pulse 0.2s infinite alternate;
         }
         .gogo-lamp.peka span { color: #fff; text-shadow: 0 0 15px #fff; }
 
         /* ==========================================================================
-           REELS (HEAVILY DECORATED)
+           REELS
            ========================================================================== */
         .reels-wrapper {
             width: 72%; display: flex; gap: 8px;
@@ -280,10 +265,7 @@
             border-radius: 8px;
             border: 3px solid var(--gold-base);
             position: relative;
-            box-shadow: 
-                0 0 0 2px #000,
-                0 0 20px rgba(255, 215, 0, 0.5),
-                inset 0 20px 20px rgba(0,0,0,0.8);
+            box-shadow: 0 0 0 2px #000, 0 0 20px rgba(255, 215, 0, 0.5), inset 0 20px 20px rgba(0,0,0,0.8);
             z-index: 10;
         }
         
@@ -344,7 +326,7 @@
         .spin-blur { opacity: 0.85; filter: contrast(1.2); } 
 
         /* ==========================================================================
-           CONTROLS (HEAVY TACTILE BUTTONS)
+           CONTROLS
            ========================================================================== */
         .controls-area { display: flex; flex-direction: column; gap: 15px; margin-top: auto; }
         .stop-buttons { display: flex; justify-content: flex-end; width: 100%; gap: 12px; padding-left: 28%; }
@@ -391,26 +373,33 @@
         }
 
         /* ==========================================================================
-           FOOTER
+           FOOTER & SETTINGS
            ========================================================================== */
-        .footer-link { text-align: center; padding-bottom: 5px; }
-        .footer-link a { 
-            color: var(--neon-cyan); text-decoration: none; font-family: 'Righteous', cursive;
-            font-size: 1.2rem; font-weight: 900; letter-spacing: 2px; transition: all 0.2s;
+        .footer-row {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 5px;
         }
-        .footer-link a:hover { color: #fff; text-shadow: 0 0 20px var(--neon-cyan); }
+        .btn-back { 
+            background: #111; color: #888; border: 1px solid #333; font-size: 0.75rem; 
+            padding: 6px 12px; box-shadow: none; width: auto; border-radius: 4px; cursor: pointer; text-decoration: none;
+        }
+        .checkbox-label { 
+            display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: bold; color: #aaa; cursor: pointer; 
+        }
+        .checkbox-label input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--neon-magenta); }
 
         /* ==========================================================================
-           HYPER EFFECTS (DOM MINIMAL)
+           HYPER EFFECTS (DOM MINIMAL & SHAKES)
            ========================================================================== */
-        #flash-bang {
-            position: fixed; top:0; left:0; width:100%; height:100%;
-            background: #fff; opacity: 0; pointer-events: none; z-index: 99999; 
-        }
-        body.mega-flash #flash-bang { animation: hyper-flash 0.5s ease-out forwards; }
+        body.hyper-flash-active { animation: hyper-body-flash 0.25s linear; }
         
+        .win-rainbow-shake {
+            animation: hyper-rainbow-glow 0.15s linear infinite, hyper-shake-anim 0.08s ease-in-out infinite alternate;
+        }
+        .win-rainbow-noshake {
+            animation: hyper-rainbow-glow 0.15s linear infinite;
+        }
         .num-pop { 
-            animation: overdrive-pop 0.2s ease-out; 
+            animation: overdrive-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5) !important; 
             color: #fff !important; 
             text-shadow: 0 0 20px var(--gold-base), 0 0 40px var(--gold-base) !important; 
         }
@@ -418,51 +407,48 @@
         /* ==========================================================================
            OVERDOSE KEYFRAMES
            ========================================================================== */
-        @keyframes hyper-jackpot {
-            0% { background-color: #330000; box-shadow: inset 0 0 100px #ff0000; }
-            50% { background-color: #000033; box-shadow: inset 0 0 100px #0000ff; }
-            100% { background-color: #330033; box-shadow: inset 0 0 100px #ff00ff; }
+        @keyframes shine-gold { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+        @keyframes marquee-rush { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+        @keyframes hyper-peka-pulse { 0% { transform: scale(1.05); text-shadow: 0 0 10px #fff; } 100% { transform: scale(1.12); text-shadow: 0 0 20px #fff, 0 0 40px #ff007f; } }
+        @keyframes reel-hyper-bounce { 0% { transform: translateY(0); } 40% { transform: translateY(20px); } 100% { transform: translateY(0); } }
+        
+        @keyframes hyper-body-flash {
+            0% { background-color: #fff; filter: invert(1) hue-rotate(180deg); }
+            50% { background-color: var(--neon-magenta); }
+            100% { background-color: #000; filter: none; }
         }
-        @keyframes shine-gold { 
-            0% { background-position: 0% center; } 
-            100% { background-position: 200% center; } 
+        @keyframes hyper-rainbow-glow {
+            0% { border-color: #ff0000; box-shadow: 0 0 40px #ff0000, inset 0 0 30px #ff0000; }
+            20% { border-color: #ffff00; box-shadow: 0 0 40px #ffff00, inset 0 0 30px #ffff00; }
+            40% { border-color: #00ff00; box-shadow: 0 0 40px #00ff00, inset 0 0 30px #00ff00; }
+            60% { border-color: #00ffff; box-shadow: 0 0 40px #00ffff, inset 0 0 30px #00ffff; }
+            80% { border-color: #ff00ff; box-shadow: 0 0 40px #ff00ff, inset 0 0 30px #ff00ff; }
+            100% { border-color: #ff0000; box-shadow: 0 0 40px #ff0000, inset 0 0 30px #ff0000; }
         }
-        @keyframes marquee-rush { 
-            0% { background-position: 0% 50%; } 
-            100% { background-position: 300% 50%; } 
-        }
-        @keyframes hyper-peka-pulse { 
-            0% { transform: scale(1.05); text-shadow: 0 0 10px #fff; } 
-            100% { transform: scale(1.12); text-shadow: 0 0 20px #fff, 0 0 40px #ff007f; } 
-        }
-        @keyframes reel-hyper-bounce { 
-            0% { transform: translateY(0); } 
-            40% { transform: translateY(20px); } 
-            100% { transform: translateY(0); } 
-        }
-        @keyframes hyper-flash { 
-            0% { opacity: 0.9; } 
-            100% { opacity: 0; } 
+        @keyframes hyper-shake-anim {
+            0% { transform: scale(1.02) translate(2px, 2px) rotate(0deg); }
+            25% { transform: scale(1.02) translate(-2px, -2px) rotate(-1deg); }
+            50% { transform: scale(1.02) translate(-2px, 2px) rotate(1deg); }
+            75% { transform: scale(1.02) translate(2px, -2px) rotate(-1deg); }
+            100% { transform: scale(1.02) translate(2px, 2px) rotate(1deg); }
         }
         @keyframes overdrive-pop { 
             0% { transform: scale(1); } 
-            50% { transform: scale(1.3); } 
+            50% { transform: scale(1.5); } 
             100% { transform: scale(1); } 
         }
     </style>
 </head>
 <body>
 
-<div id="flash-bang"></div>
-
 <div class="arcade-cabinet" id="cabinet">
     <div class="marquee" id="marquee">INSERT MEDAL</div>
     
     <div class="notice-banner">
-        【運営よりお知らせ】還元率を96%に調整いたしました。また、低倍率高確率な小役を高倍率低確率仕様へと変更するアップデートを実施しました。
+        【お知らせ】還元率96%の黄金バランス（高ボラティリティ）に再調整しました。
     </div>
 
-    <div class="hud-panel">
+    <div class="hud-panel" id="hud-panel">
         <div class="inputs-row">
             <div class="input-group">
                 <label>ACCOUNT</label>
@@ -501,7 +487,19 @@
             <button class="btn-stop" id="btn-stop-2" disabled>3</button>
         </div>
         <button class="btn-start" id="btn-start">LEVER ON</button>
-        <div class="footer-link"><a href="/casino">◀ BACK TO CASINO</a></div>
+        
+        <div class="footer-row">
+            <a href="/casino" class="btn-back">◀ 戻る</a>
+            <label class="checkbox-label">
+                <input type="checkbox" id="bgm-toggle">
+                <span>🎵 BGM ON</span>
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="disable-shake">
+                <span>🚫 演出オフ</span>
+            </label>
+        </div>
+        <audio id="bgm-player" src="/templates/dopa.mp3" loop preload="auto"></audio>
     </div>
 </div>
 
@@ -519,7 +517,6 @@
     };
 
     const getSymbolHtml = (key) => SYMBOLS[key] || SYMBOLS["7"];
-
     const FIXED_STRIP_PATTERN = [
         "7", "CHERRY", "GRAPE", "BELL", "BAR", "REPLAY", 
         "GRAPE", "BAR", "CHERRY", "BELL", "7", "REPLAY",
@@ -608,6 +605,16 @@
             if(w) updateCredit(w.balance);
         });
 
+        const bgmPlayer = document.getElementById("bgm-player");
+        const bgmToggle = document.getElementById("bgm-toggle");
+        bgmToggle.addEventListener("change", (e) => {
+            if (e.target.checked) bgmPlayer.play().catch(() => {});
+            else bgmPlayer.pause();
+        });
+        document.addEventListener("click", () => {
+            if (bgmToggle.checked && bgmPlayer.paused) bgmPlayer.play().catch(() => {});
+        }, { once: true });
+
         window.addEventListener('resize', () => { setupReels(true); });
     }
 
@@ -629,25 +636,32 @@
 
     function fireFeedback(type) {
         const mq = document.getElementById("marquee");
+        const hud = document.getElementById("hud-panel");
+        const disableShake = document.getElementById("disable-shake").checked;
+
         if(type === "PEKA") {
             playSound("PEKA");
-            document.body.classList.remove("mega-flash");
-            void document.body.offsetWidth;
-            document.body.classList.add("mega-flash");
             document.getElementById("gogo-lamp").classList.add("peka");
+            if (!disableShake) {
+                document.body.classList.remove("hyper-flash-active");
+                void document.body.offsetWidth;
+                document.body.classList.add("hyper-flash-active");
+            }
         } else if (type === "BIG") {
-            document.body.classList.add("jackpot-mode");
             mq.innerText = "SUPER JACKPOT";
             mq.classList.add("jackpot");
+            hud.className = disableShake ? "hud-panel win-rainbow-noshake" : "hud-panel win-rainbow-shake";
         } else if (type === "REG") {
             mq.innerText = "REGULAR BONUS";
             mq.classList.add("active");
+            hud.className = disableShake ? "hud-panel win-rainbow-noshake" : "hud-panel win-rainbow-shake";
         }
     }
 
     function resetUI() {
         document.getElementById("gogo-lamp").classList.remove("peka");
-        document.body.classList.remove("jackpot-mode", "mega-flash");
+        document.body.classList.remove("hyper-flash-active");
+        document.getElementById("hud-panel").className = "hud-panel";
         const mq = document.getElementById("marquee");
         mq.innerText = "GOOD LUCK";
         mq.className = "marquee";
@@ -658,7 +672,6 @@
     function setupReels(isInit = false, resSyms = ["7","7","7"]) {
         const windowHeight = winEls[0].offsetHeight;
         symbolHeight = windowHeight / 3;
-        
         document.documentElement.style.setProperty('--sym-h', `${symbolHeight}px`);
         
         for(let i=0; i<3; i++) {
@@ -708,17 +721,13 @@
         const wid = document.getElementById("wallet-select").value;
         const bet = parseInt(document.getElementById("bet-amount").value, 10);
         
-        if(!wid || isNaN(bet) || bet < 1) {
-            alert("口座またはベット額が正しくありません。");
-            return;
-        }
+        if(!wid || isNaN(bet) || bet < 1) return alert("口座またはベット額が正しくありません。");
 
         isSpinning = true;
         stoppedCount = 0;
         serverRes = null;
         resetUI();
         playSound("SPIN");
-        
         document.getElementById("btn-start").disabled = true;
         
         try {
@@ -727,7 +736,6 @@
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ wallet_id: wid, bet_amount: bet })
             });
-            
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || "通信エラー");
             serverRes = data;
@@ -756,7 +764,6 @@
         document.getElementById(`btn-stop-${idx}`).disabled = true;
         rState[idx] = 2; 
         stoppedCount++;
-        
         if (stoppedCount === 3) setTimeout(finishGame, 200);
     }
 
@@ -766,7 +773,6 @@
         document.getElementById("marquee").innerText = "INSERT MEDAL";
         
         if (serverRes.is_pekari && !serverRes.is_early_pekari) fireFeedback("PEKA");
-
         if (serverRes.prize === "BIG") fireFeedback("BIG");
         else if (serverRes.prize === "REG") fireFeedback("REG");
         else if (serverRes.payout > 0) document.getElementById("marquee").innerText = "WINNER";
@@ -774,7 +780,7 @@
         if (serverRes.payout > 0) {
             let cur = 0;
             const tgt = serverRes.payout;
-            const step = Math.ceil(tgt / 40); 
+            const step = Math.ceil(tgt / 30); 
             
             const countTimer = setInterval(() => {
                 cur += step;
@@ -786,9 +792,11 @@
                 }
                 updateWin(cur);
                 const pEl = document.getElementById("payout-display");
-                pEl.classList.remove("num-pop");
-                void pEl.offsetWidth; 
-                pEl.classList.add("num-pop");
+                if(!document.getElementById("disable-shake").checked) {
+                    pEl.classList.remove("num-pop");
+                    void pEl.offsetWidth; 
+                    pEl.classList.add("num-pop");
+                }
                 playSound("COIN");
             }, 16); 
         }
