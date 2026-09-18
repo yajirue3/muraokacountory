@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>映像管理所</title>
+    <style>
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
+        h1 { color: #d4af37; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .btn { padding: 6px 12px; background: #333; color: #fff; border: 1px solid #555; cursor: pointer; border-radius: 4px; text-decoration: none; font-size: 0.85rem;}
+        .btn-danger { background: #c0392b; }
+        .btn-toggle { background: #2980b9; }
+        .list-item { background: #1e1e1e; padding: 15px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #555; display: flex; justify-content: space-between; align-items: center;}
+        .title-area { max-width: 60%; }
+        .title-area h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .actions { display: flex; gap: 8px; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #444; }
+        .tab { padding: 10px 20px; cursor: pointer; color: #888; }
+        .tab.active { color: #d4af37; border-bottom: 2px solid #d4af37; }
+        #king-tab { display: none; } /* 国王のみ表示 */
+    </style>
+</head>
+<body>
+    <a href="/videos" class="btn" style="margin-bottom: 20px; display: inline-block;">← 記録館へ戻る</a>
+    <h1>管理所</h1>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('my')">自分の記録</div>
+        <div class="tab" id="king-tab" onclick="switchTab('king')">👑 国王専用 (全域管理)</div>
+    </div>
+
+    <div id="content-area">読み込み中...</div>
+
+    <script>
+        const token = localStorage.getItem("access_token");
+        if (!token) window.location.href = "/";
+        let allVideos = [];
+        let myUserId = "";
+        let isKing = false;
+        let currentMode = 'my';
+
+        async function init() {
+            const res = await fetch("/api/videos", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            allVideos = data.videos;
+            isKing = data.is_king;
+            myUserId = data.user_id;
+
+            if(isKing) document.getElementById("king-tab").style.display = "block";
+            renderList();
+        }
+
+        function switchTab(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderList();
+        }
+
+        function renderList() {
+            const box = document.getElementById("content-area");
+            let targetVideos = currentMode === 'king' ? allVideos : allVideos.filter(v => v.user_id === myUserId);
+            
+            if(targetVideos.length === 0) {
+                box.innerHTML = "<p>対象の映像がありません。</p>";
+                return;
+            }
+
+            box.innerHTML = targetVideos.map(v => `
+                <div class="list-item" style="border-color: ${v.is_private ? '#c0392b' : '#27ae60'}">
+                    <div class="title-area">
+                        <h3>${v.title} <span style="font-size:0.8rem; color:${v.is_private ? '#c0392b' : '#27ae60'};">[${v.is_private ? '非公開' : '公開中'}]</span></h3>
+                        <div style="font-size:0.8rem; color:#888;">ID: ${v.id} | 投稿者: ${v.author_name}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-toggle" onclick="togglePrivate('${v.id}')">公開/非公開切替</button>
+                        <button class="btn btn-danger" onclick="deleteVideo('${v.id}')">消去</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function togglePrivate(id) {
+            await fetch(`/api/videos/${id}/toggle_private`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` } });
+            init(); // 再読み込み
+        }
+
+        async function deleteVideo(id) {
+            if(!confirm("本当にこの記録を抹消しますか？")) return;
+            await fetch(`/api/videos/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+            init();
+        }
+
+        init();
+    </script>
+</body>
+</html>
