@@ -2,82 +2,55 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 映像広場</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 0; min-height: 100vh; }
-        .header { background: #1e1e1e; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .logo { font-size: 1.2rem; font-weight: bold; color: #d4af37; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .nav-btns { display: flex; gap: 10px; }
-        .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: none; transition: 0.2s; }
-        .btn:hover { background: #3a3a3a; border-color: #d4af37; }
-        .btn-primary { background: #d4af37; color: #1a1a1a; border: none; }
-        .btn-primary:hover { background: #f39c12; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .search-bar { margin-bottom: 24px; display: flex; gap: 10px; }
-        .search-input { flex: 1; padding: 12px; background: #1e1e1e; border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 0.9rem; }
-        .search-input:focus { outline: none; border-color: #d4af37; }
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; }
+        .header { background: #1e1e1e; border-bottom: 1px solid #333; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { color: #d4af37; font-weight: bold; font-size: 1.2rem; text-decoration: none; }
+        .btn { padding: 8px 14px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 0.9rem; }
+        .btn-primary { background: #d4af37; color: #1a1a1a; font-weight: bold; }
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
         .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
-        .video-card { background: #1e1e1e; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
-        .video-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.6); border-color: rgba(212, 175, 55, 0.4); }
-        .thumb-box { width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%); display: flex; justify-content: center; align-items: center; font-size: 2.5rem; color: #d4af37; position: relative; }
-        .badge-private { position: absolute; top: 8px; right: 8px; background: #c0392b; color: white; font-size: 0.65rem; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
-        .video-meta { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-        .video-title { font-size: 0.95rem; font-weight: bold; color: #fff; margin: 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        .video-sub { font-size: 0.75rem; color: #888; display: flex; justify-content: space-between; margin-top: auto; padding-top: 6px; }
+        .card { background: #1e1e1e; border-radius: 8px; border: 1px solid #333; overflow: hidden; cursor: pointer; transition: 0.2s; }
+        .card:hover { border-color: #d4af37; transform: translateY(-3px); }
+        .thumb { background: #000; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; font-size: 2rem; position: relative; }
+        .badge { position: absolute; top: 8px; right: 8px; background: #c0392b; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
+        .info { padding: 12px; }
+        .title { font-weight: bold; margin-bottom: 6px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .meta { font-size: 0.8rem; color: #aaa; display: flex; justify-content: space-between; }
         
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-body { background: #1e1e1e; border: 1px solid #d4af37; border-radius: 12px; padding: 24px; width: 90%; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .form-group { margin-bottom: 14px; }
-        .form-group label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 6px; font-weight: bold; }
-        .form-group input[type="text"], .form-group textarea { width: 100%; padding: 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; box-sizing: border-box; font-size: 0.85rem; }
-        .form-group textarea { resize: vertical; height: 80px; }
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #d4af37; width: 400px; }
+        .modal input, .modal textarea { width: 100%; margin-bottom: 12px; padding: 10px; background: #2a2a2a; border: 1px solid #444; color: #fff; box-sizing: border-box; border-radius: 4px;}
     </style>
 </head>
 <body>
-
     <div class="header">
-        <a href="/dashboard" class="logo">🎬 王国映像広場</a>
-        <div class="nav-btns">
-            <button class="btn btn-primary" onclick="openUploadModal()">＋ 映像を投稿する</button>
-            <a href="/manage_videos" class="btn">🛠 映像管理</a>
-            <a href="/dashboard" class="btn">🏛 ダッシュボード</a>
+        <a href="/dashboard" class="logo">🎬 映像広場</a>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="document.getElementById('modal').style.display='flex'">＋ 投稿</button>
+            <a href="/manage_videos" class="btn">🛠 管理所</a>
+            <a href="/dashboard" class="btn">ダッシュボードへ</a>
         </div>
     </div>
 
     <div class="container">
-        <div class="search-bar">
-            <input type="text" id="search-input" class="search-input" placeholder="タイトルや投稿者名で絞り込み..." oninput="filterVideos()">
-        </div>
-
-        <div class="video-grid" id="video-grid">
-            <div style="color: #888; grid-column: span 3;">映像データを読み込んでいます...</div>
-        </div>
+        <div class="video-grid" id="grid">読み込み中...</div>
     </div>
 
-    <div class="modal" id="upload-modal">
-        <div class="modal-body">
-            <h3 style="color: #d4af37; margin-top: 0;">新規映像投稿</h3>
-            <form id="upload-form" onsubmit="handleUpload(event)">
-                <div class="form-group">
-                    <label>題名 (タイトル)</label>
-                    <input type="text" id="up-title" required placeholder="動画のタイトル">
-                </div>
-                <div class="form-group">
-                    <label>概要 (説明文)</label>
-                    <textarea id="up-desc" placeholder="動画の簡単な解説..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>映像ファイル (MP4等)</label>
-                    <input type="file" id="up-file" accept="video/*" required style="color:#aaa;">
-                </div>
-                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="up-private">
-                    <label for="up-private" style="margin: 0; cursor: pointer;">自分のみ閲覧可能（非公開設定）</label>
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" class="btn btn-primary" id="up-submit-btn" style="flex: 1;">投稿実行</button>
-                    <button type="button" class="btn" onclick="closeUploadModal()">キャンセル</button>
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h3 style="color:#d4af37; margin-top:0;">新規映像の投稿</h3>
+            <form onsubmit="uploadVideo(event)">
+                <input type="text" id="up-title" required placeholder="タイトル">
+                <textarea id="up-desc" placeholder="説明文" rows="3"></textarea>
+                <input type="file" id="up-file" accept="video/*" required>
+                <label style="font-size: 0.9rem; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                    <input type="checkbox" id="up-private" style="width:auto; margin:0;"> 非公開にする
+                </label>
+                <div style="display:flex; gap:10px;">
+                    <button type="submit" class="btn btn-primary" id="btn-up" style="flex:1;">投稿</button>
+                    <button type="button" class="btn" onclick="document.getElementById('modal').style.display='none'">キャンセル</button>
                 </div>
             </form>
         </div>
@@ -85,101 +58,72 @@
 
     <script>
         const token = localStorage.getItem("access_token");
-        if (!token) window.location.href = "/";
-
-        let allVideos = [];
+        if (!token) location.href = "/";
 
         async function loadVideos() {
             try {
                 const res = await fetch("/api/videos", { headers: { "Authorization": `Bearer ${token}` } });
+                if (!res.ok) throw new Error("取得エラー");
                 const data = await res.json();
-                allVideos = data.videos || [];
-                renderVideos(allVideos);
-            } catch (e) {
-                console.error(e);
-                document.getElementById("video-grid").innerHTML = `<div style="color:#e74c3c;">通信エラーが発生しました。</div>`;
-            }
-        }
-
-        function renderVideos(list) {
-            const grid = document.getElementById("video-grid");
-            if (list.length === 0) {
-                grid.innerHTML = `<div style="color:#888; grid-column: 1/-1; text-align:center; padding: 40px;">該当する映像が見つかりません。</div>`;
-                return;
-            }
-            grid.innerHTML = list.map(v => {
-                const dateStr = new Date(v.created_at).toLocaleDateString("ja-JP");
-                return `
-                    <div class="video-card" onclick="location.href='/watch?v=${v.id}'">
-                        <div class="thumb-box">
-                            ▶️
-                            ${v.is_private ? '<span class="badge-private">非公開</span>' : ''}
-                        </div>
-                        <div class="video-meta">
-                            <div class="video-title">${escapeHtml(v.title)}</div>
-                            <div class="video-sub">
-                                <span>👤 ${escapeHtml(v.author_name)}</span>
-                                <span>👀 ${v.views || 0} 回</span>
-                            </div>
-                            <div class="video-sub" style="padding-top:0;">
-                                <span>📅 ${dateStr}</span>
+                const grid = document.getElementById("grid");
+                
+                if(data.videos.length === 0) {
+                    grid.innerHTML = "映像がありません。";
+                    return;
+                }
+                
+                grid.innerHTML = data.videos.map(v => `
+                    <div class="card" onclick="location.href='/watch?v=${v.id}'">
+                        <div class="thumb">▶️ ${v.is_private ? '<span class="badge">非公開</span>' : ''}</div>
+                        <div class="info">
+                            <div class="title">${v.title}</div>
+                            <div class="meta">
+                                <span>👤 ${v.author_name}</span>
+                                <span>👀 ${v.views || 0}回</span>
                             </div>
                         </div>
                     </div>
-                `;
-            }).join('');
+                `).join('');
+            } catch(e) {
+                document.getElementById("grid").innerHTML = "エラーが発生しました。";
+            }
         }
 
-        function filterVideos() {
-            const query = document.getElementById("search-input").value.toLowerCase();
-            const filtered = allVideos.filter(v => 
-                v.title.toLowerCase().includes(query) || v.author_name.toLowerCase().includes(query)
-            );
-            renderVideos(filtered);
-        }
-
-        function openUploadModal() { document.getElementById("upload-modal").style.display = "flex"; }
-        function closeUploadModal() { document.getElementById("upload-modal").style.display = "none"; }
-
-        async function handleUpload(e) {
+        async function uploadVideo(e) {
             e.preventDefault();
-            const btn = document.getElementById("up-submit-btn");
+            const btn = document.getElementById("btn-up");
             btn.disabled = true;
             btn.innerText = "転送中...";
 
-            const formData = new FormData();
-            formData.append("title", document.getElementById("up-title").value);
-            formData.append("description", document.getElementById("up-desc").value);
-            formData.append("is_private", document.getElementById("up-private").checked);
-            formData.append("file", document.getElementById("up-file").files[0]);
+            const fd = new FormData();
+            fd.append("title", document.getElementById("up-title").value);
+            fd.append("description", document.getElementById("up-desc").value);
+            fd.append("is_private", document.getElementById("up-private").checked);
+            fd.append("file", document.getElementById("up-file").files[0]);
 
             try {
                 const res = await fetch("/api/videos/upload", {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${token}` },
-                    body: formData
+                    body: fd
                 });
-                const data = await res.json();
+                
                 if (res.ok) {
-                    alert("映像の投稿が完了しました！");
-                    closeUploadModal();
-                    document.getElementById("upload-form").reset();
+                    alert("投稿完了しました");
+                    document.getElementById("modal").style.display = 'none';
+                    e.target.reset();
                     loadVideos();
                 } else {
-                    alert("エラー: " + (data.detail || "投稿に失敗しました"));
+                    const err = await res.json();
+                    alert("エラー: " + err.detail);
                 }
-            } catch (err) {
+            } catch(e) {
                 alert("通信エラーが発生しました");
             } finally {
                 btn.disabled = false;
-                btn.innerText = "投稿実行";
+                btn.innerText = "投稿";
             }
         }
-
-        function escapeHtml(str) {
-            return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        }
-
         loadVideos();
     </script>
 </body>
