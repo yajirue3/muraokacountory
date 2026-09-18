@@ -3,307 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2048 - Strategic Merge</title>
+    <title>2048 - Classic Modern</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Clear+Sans:wght@400;700&display=swap');
 
         :root {
-            --bg-base: #09090b;
-            --board-bg: #18181b;
-            --cell-bg: rgba(255, 255, 255, 0.04);
-            --text-main: #f4f4f5;
-            --text-muted: #a1a1aa;
-            --gap: 10px;
+            --bg-color: #faf8ef;
+            --text-dark: #776e65;
+            --text-light: #f9f6f2;
+            --board-bg: #bbada0;
+            --cell-bg: rgba(238, 228, 218, 0.35);
+            --gap: 12px;
             --board-padding: 12px;
             --transition-speed: 130ms;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            font-family: 'Inter', -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 16px;
-            overflow: hidden;
-            background: radial-gradient(circle at center, #18181b 0%, #09090b 100%);
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 16px; overflow: hidden;
         }
 
-        .header {
-            width: 100%;
-            max-width: 380px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+        .header-top {
+            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;
         }
 
-        .title-area h1 {
-            font-size: 2.4rem;
-            font-weight: 900;
-            letter-spacing: -1px;
-            color: #fff;
-            line-height: 1;
+        .title { font-size: 3.2rem; font-weight: 700; color: var(--text-dark); line-height: 1; letter-spacing: -1px; }
+        
+        .scores-container { display: flex; gap: 8px; }
+        .score-box { background: var(--board-bg); border-radius: 6px; padding: 6px 16px; text-align: center; min-width: 70px; color: white; }
+        .score-label { font-size: 0.7rem; font-weight: 700; color: #eee4da; text-transform: uppercase; margin-bottom: 2px; }
+        .score-val { font-size: 1.25rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+
+        .controls-row {
+            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; gap: 10px;
         }
 
-        .title-area p {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--text-muted);
-            letter-spacing: 1.5px;
-            margin-top: 4px;
+        .action-btn {
+            background: #8f7a66; color: var(--text-light); border: none; border-radius: 6px;
+            padding: 10px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: background 0.15s; flex: 1; text-align: center; text-decoration: none;
         }
+        .action-btn:active { background: #9f8b77; }
+        .btn-secondary { background: var(--board-bg); }
 
-        .score-box {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 8px 16px;
-            text-align: center;
-            min-width: 90px;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .score-title {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-
-        .score-val {
-            font-size: 1.5rem;
-            font-weight: 900;
-            color: #fff;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* 盤面レイアウト */
         .board-container {
-            position: relative;
-            width: 100%;
-            max-width: 380px;
-            aspect-ratio: 1 / 1;
-            background: var(--board-bg);
-            border-radius: 14px;
-            padding: var(--board-padding);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.05);
+            position: relative; width: 100%; max-width: 400px; aspect-ratio: 1 / 1;
+            background: var(--board-bg); border-radius: 8px; padding: var(--board-padding);
         }
 
-        .grid-bg {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(4, 1fr);
-            gap: var(--gap);
-            width: 100%;
-            height: 100%;
-        }
+        .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--gap); width: 100%; height: 100%; }
+        .grid-cell { background: var(--cell-bg); border-radius: 4px; }
 
-        .grid-cell {
-            background: var(--cell-bg);
-            border-radius: 8px;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
-        }
-
-        /* タイルアニメーション層 */
-        .tile-layer {
-            position: absolute;
-            top: var(--board-padding);
-            left: var(--board-padding);
-            right: var(--board-padding);
-            bottom: var(--board-padding);
-            pointer-events: none;
-        }
-
-        /* 外側のラッパーで移動アニメーションを処理 */
+        .tile-layer { position: absolute; top: var(--board-padding); left: var(--board-padding); right: var(--board-padding); bottom: var(--board-padding); pointer-events: none; }
         .tile-wrapper {
-            position: absolute;
-            width: calc(25% - (var(--gap) * 3 / 4));
-            height: calc(25% - (var(--gap) * 3 / 4));
-            top: 0; left: 0;
-            transition: transform var(--transition-speed) cubic-bezier(0.2, 0.8, 0.2, 1);
-            /* c(列)とr(行)の変数を使って絶対位置を計算 */
-            transform: translate(
-                calc(var(--c) * 100% + var(--c) * var(--gap)), 
-                calc(var(--r) * 100% + var(--r) * var(--gap))
-            );
+            position: absolute; width: calc(25% - (var(--gap) * 3 / 4)); height: calc(25% - (var(--gap) * 3 / 4)); top: 0; left: 0;
+            transition: transform var(--transition-speed) ease-in-out;
+            transform: translate(calc(var(--c) * 100% + var(--c) * var(--gap)), calc(var(--r) * 100% + var(--r) * var(--gap)));
         }
-
-        /* 内側の要素で色・サイズ・ポップアップを処理 */
         .tile-inner {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            font-size: 1.8rem;
-            font-weight: 900;
-            color: #fff;
-            transition: background-color 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 4px;
+            font-size: 2.2rem; font-weight: 700; transition: background-color 0.15s;
         }
 
-        /* 色彩設計（モダン・ルミナス） */
-        .tile-2    { background: rgba(255,255,255,0.08); color: #e4e4e7; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
-        .tile-4    { background: rgba(255,255,255,0.15); color: #fff; box-shadow: none; border: 1px solid rgba(255,255,255,0.1); }
-        .tile-8    { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .tile-16   { background: linear-gradient(135deg, #f97316, #ea580c); }
-        .tile-32   { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .tile-64   { background: linear-gradient(135deg, #ec4899, #be185d); }
-        .tile-128  { background: linear-gradient(135deg, #8b5cf6, #6d28d9); font-size: 1.5rem; box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
-        .tile-256  { background: linear-gradient(135deg, #3b82f6, #2563eb); font-size: 1.5rem; box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-        .tile-512  { background: linear-gradient(135deg, #10b981, #059669); font-size: 1.5rem; box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); }
-        .tile-1024 { background: linear-gradient(135deg, #14b8a6, #0d9488); font-size: 1.25rem; box-shadow: 0 0 30px rgba(20, 184, 166, 0.7); }
-        .tile-2048, .tile-4096 { 
-            background: linear-gradient(135deg, #fbbf24, #f59e0b); 
-            color: #451a03; 
-            font-size: 1.25rem; 
-            box-shadow: 0 0 40px rgba(251, 191, 36, 0.8), inset 0 0 10px rgba(255,255,255,0.6);
-            text-shadow: 0 1px 2px rgba(255,255,255,0.5);
-        }
+        /* Classic Colors */
+        .tile-2    { background: #eee4da; color: #776e65; }
+        .tile-4    { background: #ede0c8; color: #776e65; }
+        .tile-8    { background: #f2b179; color: #f9f6f2; }
+        .tile-16   { background: #f59563; color: #f9f6f2; }
+        .tile-32   { background: #f67c5f; color: #f9f6f2; }
+        .tile-64   { background: #f65e3b; color: #f9f6f2; }
+        .tile-128  { background: #edcf72; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.3) inset; }
+        .tile-256  { background: #edcc61; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.4) inset; }
+        .tile-512  { background: #edc850; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.5) inset; }
+        .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.6) inset; }
+        .tile-2048, .tile-4096 { background: #edc22e; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.7) inset; }
 
-        /* ポップアニメーション */
-        .pop-in { animation: popIn 250ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .pop-merge { animation: popMerge 200ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .pop-in { animation: popIn 200ms ease forwards; }
+        .pop-merge { animation: popMerge 200ms ease forwards; }
+        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        @keyframes popMerge { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-        @keyframes popIn {
-            0% { transform: scale(0); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes popMerge {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); box-shadow: 0 0 30px rgba(255,255,255,0.5); }
-            100% { transform: scale(1); }
-        }
-
-        /* コントロール */
-        .controls {
-            width: 100%;
-            max-width: 380px;
-            margin-top: 20px;
-            display: flex;
-            gap: 12px;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 14px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn:active { transform: scale(0.96); }
-        .btn-restart { background: #fff; color: #09090b; }
-        .btn-back { background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); flex: 0.5; }
-
-        /* リザルトモーダル */
+        /* モーダル汎用 */
         .overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
-            z-index: 999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            display: none; position: fixed; inset: 0; background: rgba(238, 228, 218, 0.75); backdrop-filter: blur(3px);
+            z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
-
         .modal-content {
-            background: #18181b;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            width: 100%;
-            max-width: 340px;
-            padding: 30px 24px;
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
-            transform: translateY(20px);
-            opacity: 0;
-            animation: modalFade 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            background: #faf8ef; border: 2px solid var(--board-bg); border-radius: 8px; width: 100%; max-width: 360px;
+            padding: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15); animation: fadeUp 0.3s ease;
         }
+        @keyframes fadeUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        @keyframes modalFade {
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .elite-tag {
-            display: none;
-            color: #fbbf24;
-            font-size: 0.9rem;
-            font-weight: 900;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-            text-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
-        }
-
-        .modal-score {
-            font-size: 3.5rem;
-            font-weight: 900;
-            color: #fff;
-            line-height: 1;
-            margin: 10px 0 24px;
-            font-variant-numeric: tabular-nums;
-        }
-
+        /* ランキング用UI */
+        .tab-row { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 8px; background: var(--board-bg); color: #fff; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; opacity: 0.6; }
+        .tab-btn.active { opacity: 1; background: #8f7a66; }
+        
         .leaderboard {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 20px;
-            max-height: 200px;
-            overflow-y: auto;
-            text-align: left;
+            background: #fff; border: 1px solid var(--board-bg); border-radius: 6px; padding: 12px; margin-bottom: 15px;
+            max-height: 250px; overflow-y: auto; text-align: left;
         }
-
-        .lb-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 0.85rem;
-            color: #a1a1aa;
-        }
+        .lb-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; font-weight: 700; color: var(--text-dark); }
         .lb-row:last-child { border-bottom: none; }
-        .lb-top { color: #fbbf24; font-weight: 700; }
+        .lb-top { color: #f67c5f; }
+
+        .modal-title { font-size: 1.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="title-area">
-        <h1>2048</h1>
-        <p>STRATEGIC MERGE</p>
+<div class="header-top">
+    <div class="title">2048</div>
+    <div class="scores-container">
+        <div class="score-box">
+            <div class="score-label">SCORE</div>
+            <div class="score-val" id="score-display">0</div>
+        </div>
+        <div class="score-box">
+            <div class="score-label">BEST</div>
+            <div class="score-val" id="best-display">0</div>
+        </div>
     </div>
-    <div class="score-box">
-        <div class="score-title">SCORE</div>
-        <div class="score-val" id="score-display">0</div>
-    </div>
+</div>
+
+<div class="controls-row">
+    <a href="/dashboard" class="action-btn btn-secondary">戻る</a>
+    <button class="action-btn btn-secondary" onclick="openRankingModal()">ランキング</button>
+    <button class="action-btn" onclick="resetGame()">ニューゲーム</button>
 </div>
 
 <div class="board-container" id="touch-area">
     <div class="grid-bg">
-        <!-- 16個の背景マス -->
         <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
         <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
         <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
@@ -312,75 +146,66 @@
     <div class="tile-layer" id="tile-layer"></div>
 </div>
 
-<div class="controls">
-    <button class="btn btn-back" onclick="location.href='/casino'">退出</button>
-    <button class="btn btn-restart" onclick="resetGame()">RESTART</button>
-</div>
-
+<!-- 汎用モーダル (ゲームオーバー ＆ ランキング共通) -->
 <div class="overlay" id="overlay">
     <div class="modal-content">
-        <div class="elite-tag" id="elite-badge">👑 ELITE RANK IN</div>
-        <div style="font-size: 0.75rem; color: #a1a1aa; font-weight: 700; letter-spacing: 1px;">FINAL SCORE</div>
-        <div class="modal-score" id="final-score">0</div>
-        <div class="leaderboard" id="leaderboard">
-            <div style="text-align:center; color:#a1a1aa; font-size:0.75rem; padding: 10px;">記録を同期中...</div>
+        <div class="modal-title" id="modal-main-title">Game Over!</div>
+        
+        <!-- タブ（ランキング表示時のみ） -->
+        <div class="tab-row" id="ranking-tabs">
+            <button class="tab-btn active" id="tab-daily" onclick="switchTab('daily')">Daily Top 10</button>
+            <button class="tab-btn" id="tab-alltime" onclick="switchTab('alltime')">All-Time Top 10</button>
         </div>
-        <button class="btn btn-restart" style="width: 100%; background: #fff; color: #000;" onclick="resetGame()">PLAY AGAIN</button>
+
+        <div class="leaderboard" id="leaderboard">
+            <div style="text-align:center; color:#bbada0; font-size:0.85rem;">データ取得中...</div>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button class="action-btn btn-secondary" id="btn-close-modal" onclick="closeModal()">閉じる</button>
+            <button class="action-btn" id="btn-restart-modal" onclick="resetGame()">再挑戦</button>
+        </div>
     </div>
 </div>
 
 <script>
-    function getAuthToken() {
-        return localStorage.getItem("access_token") || localStorage.getItem("token") || localStorage.getItem("sb-access-token") || "";
-    }
+    function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
     let grid = Array(4).fill(null).map(() => Array(4).fill(null));
-    let tiles = []; // 画面上の全タイル要素の参照
+    let tiles = [];
     let tileIdSeq = 0;
     let score = 0;
+    let bestScore = parseInt(localStorage.getItem("2048_best")) || 0;
     let isGameOver = false;
+
+    let rankingData = { daily: [], alltime: [] };
 
     const layer = document.getElementById("tile-layer");
     const scoreDisplay = document.getElementById("score-display");
+    const bestDisplay = document.getElementById("best-display");
     const overlay = document.getElementById("overlay");
-    const eliteBadge = document.getElementById("elite-badge");
+    const lbEl = document.getElementById("leaderboard");
 
-    // iOS等のスクロールバウンス防止
-    document.addEventListener("touchmove", (e) => {
-        if (e.target.closest('.board-container')) e.preventDefault();
-    }, { passive: false });
+    bestDisplay.innerText = bestScore;
+
+    document.addEventListener("touchmove", (e) => { if (e.target.closest('.board-container')) e.preventDefault(); }, { passive: false });
 
     function createTile(r, c, val) {
         const wrapper = document.createElement("div");
         wrapper.className = "tile-wrapper";
-        
         const inner = document.createElement("div");
         inner.className = `tile-inner tile-${val}`;
         inner.innerText = val;
-        
         wrapper.appendChild(inner);
         layer.appendChild(wrapper);
-
-        const tile = {
-            id: tileIdSeq++,
-            r, c, val,
-            wrapper, inner,
-            isNew: true,
-            isMerged: false,
-            isDeleted: false,
-            mergedFrom: []
-        };
+        const tile = { id: tileIdSeq++, r, c, val, wrapper, inner, isNew: true, isMerged: false, isDeleted: false, mergedFrom: [] };
         tiles.push(tile);
         return tile;
     }
 
     function addRandomTile() {
         const empties = [];
-        for (let r = 0; r < 4; r++) {
-            for (let c = 0; c < 4; c++) {
-                if (!grid[r][c]) empties.push({ r, c });
-            }
-        }
+        for (let r=0; r<4; r++) for (let c=0; c<4; c++) if (!grid[r][c]) empties.push({r, c});
         if (empties.length === 0) return;
         const spot = empties[Math.floor(Math.random() * empties.length)];
         grid[spot.r][spot.c] = createTile(spot.r, spot.c, Math.random() < 0.9 ? 2 : 4);
@@ -388,37 +213,33 @@
 
     function renderDOM() {
         scoreDisplay.innerText = score;
-        let activeTiles = [];
+        if (score > bestScore) {
+            bestScore = score;
+            bestDisplay.innerText = bestScore;
+            localStorage.setItem("2048_best", bestScore);
+        }
 
+        let activeTiles = [];
         tiles.forEach(t => {
-            // CSS変数に座標を渡して滑らかに移動させる
             t.wrapper.style.setProperty('--c', t.c);
             t.wrapper.style.setProperty('--r', t.r);
-
-            if (t.isNew && !t.isMerged) {
-                t.inner.classList.add('pop-in');
-                t.isNew = false;
-            }
-
+            if (t.isNew && !t.isMerged) { t.inner.classList.add('pop-in'); t.isNew = false; }
             if (t.isMerged) {
                 t.wrapper.style.zIndex = 10;
-                t.inner.style.transform = "scale(0)"; // スライド完了まで非表示
+                t.inner.style.transform = "scale(0)";
                 setTimeout(() => {
                     t.inner.className = `tile-inner tile-${t.val > 2048 ? 2048 : t.val} pop-merge`;
                     t.inner.innerText = t.val;
                     t.inner.style.transform = "";
-                }, 130); // 移行速度に合わせる
+                }, 130);
                 t.isMerged = false;
             }
-
             if (t.isDeleted) {
-                t.wrapper.style.zIndex = 1; // 下敷きになる
+                t.wrapper.style.zIndex = 1;
                 setTimeout(() => t.wrapper.remove(), 130);
-            } else {
-                activeTiles.push(t);
-            }
+            } else activeTiles.push(t);
         });
-        tiles = activeTiles; // 削除予定の参照を配列から外す
+        tiles = activeTiles;
     }
 
     function resetGame() {
@@ -427,20 +248,15 @@
         tiles = [];
         score = 0;
         isGameOver = false;
-        overlay.style.display = "none";
-        eliteBadge.style.display = "none";
-        addRandomTile();
-        addRandomTile();
+        closeModal();
+        addRandomTile(); addRandomTile();
         renderDOM();
     }
 
     function operate(dir) {
         if (isGameOver) return;
-
-        let moved = false;
-        let gainedScore = 0;
+        let moved = false, gainedScore = 0;
         const oldPositions = new Map(tiles.map(t => [t.id, {r: t.r, c: t.c}]));
-        
         const newGrid = Array(4).fill(null).map(() => Array(4).fill(null));
 
         for (let i = 0; i < 4; i++) {
@@ -450,7 +266,6 @@
                 let c = (dir === "LEFT" || dir === "RIGHT") ? j : i;
                 if (grid[r][c]) line.push(grid[r][c]);
             }
-
             if (dir === "RIGHT" || dir === "DOWN") line.reverse();
 
             let newLine = [];
@@ -458,17 +273,11 @@
                 if (k < line.length - 1 && line[k].val === line[k+1].val && !line[k].isDeleted && !line[k+1].isDeleted) {
                     let val = line[k].val * 2;
                     gainedScore += val;
-                    
                     let newTile = createTile(0, 0, val);
-                    newTile.isMerged = true;
-                    newTile.mergedFrom = [line[k], line[k+1]];
-                    line[k].isDeleted = true;
-                    line[k+1].isDeleted = true;
-                    newLine.push(newTile);
-                    k++;
-                } else {
-                    newLine.push(line[k]);
-                }
+                    newTile.isMerged = true; newTile.mergedFrom = [line[k], line[k+1]];
+                    line[k].isDeleted = true; line[k+1].isDeleted = true;
+                    newLine.push(newTile); k++;
+                } else newLine.push(line[k]);
             }
 
             while (newLine.length < 4) newLine.push(null);
@@ -478,96 +287,95 @@
                 let r = (dir === "UP" || dir === "DOWN") ? j : i;
                 let c = (dir === "LEFT" || dir === "RIGHT") ? j : i;
                 let t = newLine[j];
-
                 newGrid[r][c] = t;
                 if (t) {
                     t.r = r; t.c = c;
-                    if (t.isMerged) {
-                        t.mergedFrom[0].r = r; t.mergedFrom[0].c = c;
-                        t.mergedFrom[1].r = r; t.mergedFrom[1].c = c;
-                    }
+                    if (t.isMerged) { t.mergedFrom[0].r = r; t.mergedFrom[0].c = c; t.mergedFrom[1].r = r; t.mergedFrom[1].c = c; }
                 }
             }
         }
 
         grid = newGrid;
-
-        tiles.forEach(t => {
-            let old = oldPositions.get(t.id);
-            if (old && (old.r !== t.r || old.c !== t.c)) moved = true;
-        });
+        tiles.forEach(t => { let old = oldPositions.get(t.id); if (old && (old.r !== t.r || old.c !== t.c)) moved = true; });
         if (gainedScore > 0) moved = true;
 
         if (moved) {
             score += gainedScore;
-            addRandomTile();
-            renderDOM();
-            checkGameOver();
+            addRandomTile(); renderDOM(); checkGameOver();
         }
     }
 
     function checkGameOver() {
-        for (let r = 0; r < 4; r++) {
-            for (let c = 0; c < 4; c++) {
-                if (!grid[r][c]) return;
-                if (c < 3 && grid[r][c].val === grid[r][c+1].val) return;
-                if (r < 3 && grid[r][c].val === grid[r+1][c].val) return;
-            }
+        for (let r=0; r<4; r++) for (let c=0; c<4; c++) {
+            if (!grid[r][c]) return;
+            if (c<3 && grid[r][c].val === grid[r][c+1].val) return;
+            if (r<3 && grid[r][c].val === grid[r+1][c].val) return;
         }
         isGameOver = true;
-        setTimeout(handleFinish, 500); // 最後の動きを見せてからリザルトへ
+        setTimeout(handleFinish, 600);
     }
 
     async function handleFinish() {
-        document.getElementById("final-score").innerText = score;
+        document.getElementById("modal-main-title").innerText = "Game Over!";
+        document.getElementById("btn-close-modal").style.display = "none";
+        document.getElementById("btn-restart-modal").style.display = "block";
         overlay.style.display = "flex";
 
         let maxTile = 0;
-        for (let r = 0; r < 4; r++) {
-            for (let c = 0; c < 4; c++) {
-                if (grid[r][c] && grid[r][c].val > maxTile) maxTile = grid[r][c].val;
-            }
-        }
+        for (let r=0; r<4; r++) for (let c=0; c<4; c++) if (grid[r][c] && grid[r][c].val > maxTile) maxTile = grid[r][c].val;
 
         const token = getAuthToken();
-        const lbEl = document.getElementById("leaderboard");
-        
-        if (!token) {
-            lbEl.innerHTML = '<div style="text-align:center; color:#a1a1aa; font-size:0.8rem; padding:10px;">ゲストプレイ</div>';
-            return;
-        }
+        if (!token) { renderRankings([]); return; }
 
         try {
             const res = await fetch("/api/2048/score", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ score: score, max_tile: maxTile })
+                body: JSON.stringify({ score, max_tile: maxTile })
             });
             const data = await res.json();
+            rankingData = { daily: data.daily || [], alltime: data.alltime || [] };
+            switchTab('daily');
+        } catch (e) { lbEl.innerHTML = '<div style="text-align:center; color:#f67c5f; font-size:0.9rem;">通信エラー</div>'; }
+    }
 
-            if (data.my_rank && data.my_rank <= 3) {
-                eliteBadge.style.display = "block";
-            }
+    async function openRankingModal() {
+        document.getElementById("modal-main-title").innerText = "Ranking";
+        document.getElementById("btn-close-modal").style.display = "block";
+        document.getElementById("btn-restart-modal").style.display = isGameOver ? "block" : "none";
+        overlay.style.display = "flex";
 
-            if (data.ranking) {
-                lbEl.innerHTML = "";
-                data.ranking.forEach((entry, idx) => {
-                    const row = document.createElement("div");
-                    row.className = `lb-row ${idx < 3 ? "lb-top" : ""}`;
-                    row.innerHTML = `<span>${idx + 1}. ${escapeHtml(entry.nickname)}</span><span>${entry.score.toLocaleString()}</span>`;
-                    lbEl.appendChild(row);
-                });
-            }
-        } catch (e) {
-            lbEl.innerHTML = '<div style="text-align:center; color:#ef4444; font-size:0.8rem; padding:10px;">通信エラー</div>';
+        try {
+            const res = await fetch("/api/2048/ranking");
+            const data = await res.json();
+            rankingData = { daily: data.daily || [], alltime: data.alltime || [] };
+            switchTab('daily');
+        } catch(e) { lbEl.innerHTML = '<div style="text-align:center; color:#f67c5f; font-size:0.9rem;">通信エラー</div>'; }
+    }
+
+    function switchTab(type) {
+        document.getElementById("tab-daily").className = type === 'daily' ? "tab-btn active" : "tab-btn";
+        document.getElementById("tab-alltime").className = type === 'alltime' ? "tab-btn active" : "tab-btn";
+        renderRankings(rankingData[type]);
+    }
+
+    function renderRankings(list) {
+        lbEl.innerHTML = "";
+        if (list.length === 0) {
+            lbEl.innerHTML = '<div style="text-align:center; color:#bbada0; font-size:0.85rem;">データがありません</div>';
+            return;
         }
+        list.forEach((entry, idx) => {
+            const row = document.createElement("div");
+            row.className = `lb-row ${idx < 3 ? "lb-top" : ""}`;
+            row.innerHTML = `<span>${idx + 1}. ${escapeHtml(entry.nickname)}</span><span>${entry.score.toLocaleString()}</span>`;
+            lbEl.appendChild(row);
+        });
     }
 
-    function escapeHtml(str) {
-        return String(str).replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[t]));
-    }
+    function closeModal() { overlay.style.display = "none"; }
+    function escapeHtml(str) { return String(str).replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[t])); }
 
-    // 操作系イベント
     window.addEventListener("keydown", (e) => {
         if (["ArrowUp", "KeyW"].includes(e.code)) { e.preventDefault(); operate("UP"); }
         if (["ArrowDown", "KeyS"].includes(e.code)) { e.preventDefault(); operate("DOWN"); }
@@ -577,22 +385,12 @@
 
     const touchArea = document.getElementById("touch-area");
     let startX = 0, startY = 0;
-
-    touchArea.addEventListener("touchstart", (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
-
-    touchArea.addEventListener("touchend", (e) => {
+    touchArea.addEventListener("touchstart", e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }, { passive: true });
+    touchArea.addEventListener("touchend", e => {
         if (isGameOver) return;
-        const diffX = e.changedTouches[0].clientX - startX;
-        const diffY = e.changedTouches[0].clientY - startY;
-
-        if (Math.abs(diffX) > Math.abs(diffY)) {
-            if (Math.abs(diffX) > 20) operate(diffX > 0 ? "RIGHT" : "LEFT");
-        } else {
-            if (Math.abs(diffY) > 20) operate(diffY > 0 ? "DOWN" : "UP");
-        }
+        const diffX = e.changedTouches[0].clientX - startX, diffY = e.changedTouches[0].clientY - startY;
+        if (Math.abs(diffX) > Math.abs(diffY)) { if (Math.abs(diffX) > 20) operate(diffX > 0 ? "RIGHT" : "LEFT"); } 
+        else { if (Math.abs(diffY) > 20) operate(diffY > 0 ? "DOWN" : "UP"); }
     }, { passive: true });
 
     resetGame();
