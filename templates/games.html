@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>村岡王国 - 王立無償遊技場</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Clear+Sans:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #faf8ef;
+            --text-main: #776e65;
+            --text-light: #8f7a66;
+            --card-bg: #ffffff;
+            --item-bg: #eee4da;
+            --item-border: #bbada0;
+            --btn-bg: #8f7a66;
+            --btn-hover: #9f8b77;
+            --text-white: #f9f6f2;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body { 
+            font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px 10px; 
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { 
+            width: 100%; 
+            max-width: 420px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+        }
+
+        .main-card { 
+            background: var(--card-bg); 
+            border: 2px solid var(--item-bg); 
+            border-radius: 12px; 
+            padding: 24px 20px; 
+            box-shadow: 0 10px 25px rgba(119, 110, 101, 0.1); 
+        }
+
+        .header { 
+            font-size: 1.4rem; 
+            font-weight: 700; 
+            color: var(--text-main); 
+            text-align: center; 
+            border-bottom: 2px solid var(--item-bg); 
+            padding-bottom: 12px; 
+            margin-bottom: 20px; 
+            letter-spacing: 1px;
+        }
+
+        .game-card { 
+            background: var(--item-bg); 
+            border-radius: 8px; 
+            padding: 16px; 
+            margin-bottom: 16px; 
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .game-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(119, 110, 101, 0.15);
+        }
+
+        /* 🏇 ダービー用（アンティークマホガニー調） */
+        .game-card-derby {
+            background: #e9d5c3;
+            border: 2px solid #d3a479;
+        }
+        .badge-pickup {
+            position: absolute;
+            top: -10px;
+            right: 12px;
+            background: #d29922;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(210, 153, 34, 0.3);
+            letter-spacing: 0.5px;
+        }
+
+        .game-title { 
+            font-weight: 700; 
+            color: var(--text-main); 
+            font-size: 1.1rem; 
+            margin-bottom: 8px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+        }
+        .title-derby {
+            color: #9c6633;
+        }
+
+        .game-desc { 
+            font-size: 0.85rem; 
+            color: var(--text-light); 
+            margin-bottom: 14px; 
+            line-height: 1.5; 
+        }
+        
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            font-size: 0.95rem; 
+            transition: background 0.15s, transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+
+        .btn-play { 
+            background: var(--btn-bg); 
+            color: var(--text-white); 
+        }
+        .btn-play:hover { 
+            background: var(--btn-hover); 
+        }
+
+        .btn-play-derby {
+            background: #c08752;
+            color: #fff;
+        }
+        .btn-play-derby:hover {
+            background: #ab7542;
+        }
+
+        .btn-back { 
+            background: var(--item-bg); 
+            color: var(--text-main); 
+            margin-top: 10px; 
+        }
+        .btn-back:hover { 
+            background: var(--item-border); 
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-card">
+        <div class="header">🏛️ 王立無償遊技場</div>
+        
+        <!-- 新規：2048 -->
+        <div class="game-card" style="background: #eed7a1;">
+            <div class="badge-pickup" style="background: #e3b341;">NEW / 人気</div>
+            <div class="game-title">🧩 2048（Strategic Puzzle）</div>
+            <div class="game-desc" style="color: #8c7335;">
+                運要素ゼロの完全思考型パズル。数字を重ねて限界を目指せ。全プレイヤー共通のランキングで覇を競え！
+            </div>
+            <button class="btn-play" style="background: #c89d38;" onclick="location.href='/2048'">プレイする</button>
+        </div>
+
+        <!-- ダービー（木目調デザインに調整） -->
+        <div class="game-card game-card-derby">
+            <div class="badge-pickup">BETA / DEMO</
