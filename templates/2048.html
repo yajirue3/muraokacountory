@@ -2,84 +2,533 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>THE 2048 - 王国知能遊戯</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Share+Tech+Mono&display=swap');
-
-        :root {
-            --bg-color: #0b0f19;
-            --grid-bg: rgba(20, 25, 40, 0.8);
-            --cell-bg: rgba(255, 255, 255, 0.03);
-            --text-color: #e2e8f0;
-            --gap: 12px;
-            --board-size: calc(100vw - 40px);
-            --max-board: 400px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         body {
-            margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color);
-            font-family: 'Montserrat', sans-serif; display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; overflow: hidden; user-select: none;
-            background: radial-gradient(circle at center, #151a2d 0%, #05070a 100%);
+            background-color: #0d1117;
+            color: #f0f6fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 16px;
+            touch-action: none;
         }
 
-        .header-area {
-            width: 100%; max-width: var(--max-board); display: flex; justify-content: space-between;
-            align-items: center; padding: 30px 20px 20px; box-sizing: border-box;
+        .header {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
         }
-        
-        .title-box h1 { margin: 0; font-size: 2.5rem; font-weight: 900; letter-spacing: 2px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.2); }
-        .title-box p { margin: 4px 0 0; font-size: 0.8rem; color: #64748b; letter-spacing: 1px; }
 
-        .score-container {
-            display: flex; gap: 10px;
+        .title-area h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #58a6ff;
         }
+
+        .title-area p {
+            font-size: 0.75rem;
+            color: #8b949e;
+            letter-spacing: 0.5px;
+        }
+
         .score-box {
-            background: rgba(0, 0, 0, 0.5); border: 1px solid #2d3748; border-radius: 8px;
-            padding: 8px 15px; text-align: center; min-width: 70px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-        }
-        .score-label { font-size: 0.65rem; color: #a0aec0; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; }
-        .score-value { font-family: 'Share Tech Mono', monospace; font-size: 1.2rem; font-weight: 900; color: #fff; }
-
-        /* Board */
-        .board-wrapper {
-            position: relative; width: var(--board-size); height: var(--board-size); max-width: var(--max-board); max-height: var(--max-board);
-            background: var(--grid-bg); border-radius: 12px; padding: var(--gap); box-sizing: border-box;
-            border: 1px solid #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.02);
-            backdrop-filter: blur(10px);
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 8px 16px;
+            text-align: center;
+            min-width: 90px;
         }
 
-        .grid-bg {
-            display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--gap);
-            width: 100%; height: 100%; position: absolute; top: var(--gap); left: var(--gap);
-            width: calc(100% - var(--gap)*2); height: calc(100% - var(--gap)*2);
+        .score-title {
+            font-size: 0.65rem;
+            color: #8b949e;
+            font-weight: 700;
         }
-        .grid-cell { background: var(--cell-bg); border-radius: 8px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); }
 
-        .tile-container { position: absolute; top: var(--gap); left: var(--gap); width: calc(100% - var(--gap)*2); height: calc(100% - var(--gap)*2); pointer-events: none; }
-        
+        .score-val {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 盤面 */
+        .board-container {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            aspect-ratio: 1 / 1;
+            background: #161b22;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .grid-cell {
+            background: #21262d;
+            border-radius: 8px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .tile-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            pointer-events: none;
+        }
+
         .tile {
-            position: absolute; display: flex; justify-content: center; align-items: center;
-            border-radius: 8px; font-weight: 900; font-size: 2rem; color: #fff;
-            transition: transform 0.15s ease-in-out;
+            position: absolute;
+            width: calc((100% - 30px) / 4);
+            height: calc((100% - 30px) / 4);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 800;
+            transition: transform 100ms ease-in-out;
             will-change: transform;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
         }
 
-        /* Tile Stylings */
-        .tile[data-val="2"] { background: #1e293b; color: #cbd5e0; }
-        .tile[data-val="4"] { background: #334155; color: #fff; }
-        .tile[data-val="8"] { background: linear-gradient(135deg, #d97706, #b45309); text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        .tile[data-val="16"] { background: linear-gradient(135deg, #ea580c, #c2410c); }
-        .tile[data-val="32"] { background: linear-gradient(135deg, #e11d48, #be123c); }
-        .tile[data-val="64"] { background: linear-gradient(135deg, #9333ea, #7e22ce); }
-        .tile[data-val="128"] { background: linear-gradient(135deg, #4f46e5, #4338ca); font-size: 1.8rem; box-shadow: 0 0 15px rgba(79, 70, 229, 0.4); }
-        .tile[data-val="256"] { background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 1.8rem; box-shadow: 0 0 20px rgba(2, 132, 199, 0.5); }
-        .tile[data-val="512"] { background: linear-gradient(135deg, #059669, #047857); font-size: 1.8rem; box-shadow: 0 0 25px rgba(5, 150, 105, 0.6); }
-        .tile[data-val="1024"] { background: linear-gradient(135deg, #d946ef, #a21caf); font-size: 1.5rem; box-shadow: 0 0 30px rgba(217, 70, 239, 0.7); }
-        .tile[data-val="2048"], .tile[data-val="4096"] { 
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%); 
-            font-size: 1.5rem; text-shadow: 0 0 10px rgba(255,255,255,0.8); color: #000;
-            box-shadow: 0 0 40px rgba(251, 191, 36, 0.8), inset 0 0 10px rg
+        /* 数値ごとの配色 */
+        .tile-2    { background: #30363d; color: #f0f6fc; }
+        .tile-4    { background: #38434f; color: #f0f6fc; }
+        .tile-8    { background: #d29922; color: #0d1117; }
+        .tile-16   { background: #db6d28; color: #ffffff; }
+        .tile-32   { background: #bd561d; color: #ffffff; }
+        .tile-64   { background: #fa4549; color: #ffffff; }
+        .tile-128  { background: #1f6feb; color: #ffffff; font-size: 1.5rem; }
+        .tile-256  { background: #238636; color: #ffffff; font-size: 1.5rem; }
+        .tile-512  { background: #8957e5; color: #ffffff; font-size: 1.5rem; }
+        .tile-1024 { background: #a371f7; color: #ffffff; font-size: 1.25rem; }
+        .tile-2048 { 
+            background: #e3b341; 
+            color: #0d1117; 
+            font-size: 1.25rem; 
+            box-shadow: 0 0 15px rgba(227, 179, 65, 0.6);
+        }
+
+        .tile-pop {
+            animation: pop 120ms ease-in-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .controls {
+            width: 100%;
+            max-width: 380px;
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .btn:active {
+            opacity: 0.7;
+        }
+
+        .btn-restart {
+            background: #238636;
+            color: #ffffff;
+        }
+
+        .btn-back {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            flex: 0.5;
+        }
+
+        /* リザルト画面 */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(13, 17, 23, 0.9);
+            z-index: 999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 340px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-title {
+            font-size: 1rem;
+            color: #8b949e;
+            font-weight: 700;
+        }
+
+        .modal-score {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #ffffff;
+            margin: 8px 0 16px;
+        }
+
+        .elite-tag {
+            display: none;
+            background: #d29922;
+            color: #0d1117;
+            font-size: 0.85rem;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .leaderboard {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            max-height: 180px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .lb-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #21262d;
+            font-size: 0.8rem;
+            color: #c9d1d9;
+        }
+
+        .lb-row:last-child {
+            border-bottom: none;
+        }
+
+        .lb-top {
+            color: #e3b341;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="title-area">
+        <h1>2048</h1>
+        <p>STRATEGIC PUZZLE</p>
+    </div>
+    <div class="score-box">
+        <div class="score-title">SCORE</div>
+        <div class="score-val" id="score-display">0</div>
+    </div>
+</div>
+
+<div class="board-container" id="touch-area">
+    <!-- 背景マス -->
+    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+    <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+    <!-- タイル描画層 -->
+    <div class="tile-layer" id="tile-layer"></div>
+</div>
+
+<div class="controls">
+    <button class="btn btn-back" onclick="location.href='/casino'">戻る</button>
+    <button class="btn btn-restart" onclick="resetGame()">最初から</button>
+</div>
+
+<!-- ゲームオーバーモーダル -->
+<div class="overlay" id="overlay">
+    <div class="modal-content">
+        <div class="elite-tag" id="elite-badge">👑 TOP 3 RANK IN 👑</div>
+        <div class="modal-title">FINAL SCORE</div>
+        <div class="modal-score" id="final-score">0</div>
+        <div class="leaderboard" id="leaderboard">
+            <div style="text-align:center; color:#8b949e; font-size:0.75rem;">ランキング取得中...</div>
+        </div>
+        <button class="btn btn-restart" style="width: 100%;" onclick="resetGame()">再挑戦</button>
+    </div>
+</div>
+
+<script>
+    // 認証トークンの安全な取得（キー名の揺らぎを吸収）
+    function getAuthToken() {
+        return localStorage.getItem("access_token") || 
+               localStorage.getItem("token") || 
+               localStorage.getItem("sb-access-token") || "";
+    }
+
+    let grid = Array(4).fill(null).map(() => Array(4).fill(0));
+    let score = 0;
+    let isGameOver = false;
+
+    const layer = document.getElementById("tile-layer");
+    const scoreDisplay = document.getElementById("score-display");
+    const overlay = document.getElementById("overlay");
+    const eliteBadge = document.getElementById("elite-badge");
+    const finalScore = document.getElementById("final-score");
+    const leaderboard = document.getElementById("leaderboard");
+
+    // 画面レンダリング（絶対座標パーセント配置）
+    function renderBoard(popTilePos = null) {
+        layer.innerHTML = "";
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                const val = grid[r][c];
+                if (val === 0) continue;
+
+                const tile = document.createElement("div");
+                tile.className = `tile tile-${val > 2048 ? 2048 : val}`;
+                
+                // CSS計算と一致させる配置 (パーセント基準)
+                tile.style.top = `calc(${r} * 25% + 0px)`;
+                tile.style.left = `calc(${c} * 25% + 0px)`;
+                tile.innerText = val;
+
+                if (popTilePos && popTilePos.r === r && popTilePos.c === c) {
+                    tile.classList.add("tile-pop");
+                }
+
+                layer.appendChild(tile);
+            }
+        }
+        scoreDisplay.innerText = score;
+    }
+
+    function addRandomTile() {
+        const empties = [];
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                if (grid[r][c] === 0) empties.push({ r, c });
+            }
+        }
+        if (empties.length === 0) return null;
+        const spot = empties[Math.floor(Math.random() * empties.length)];
+        grid[spot.r][spot.c] = Math.random() < 0.9 ? 2 : 4;
+        return spot;
+    }
+
+    function resetGame() {
+        grid = Array(4).fill(null).map(() => Array(4).fill(0));
+        score = 0;
+        isGameOver = false;
+        overlay.style.display = "none";
+        eliteBadge.style.display = "none";
+        addRandomTile();
+        const latest = addRandomTile();
+        renderBoard(latest);
+    }
+
+    // 盤面移動ロジック
+    function operate(dir) {
+        if (isGameOver) return;
+
+        let moved = false;
+        let gainedScore = 0;
+        let newGrid = Array(4).fill(null).map(() => Array(4).fill(0));
+
+        // ベクトルごとの回転正規化処理
+        function slideRow(row) {
+            let arr = row.filter(v => v !== 0);
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (arr[i] === arr[i + 1]) {
+                    arr[i] *= 2;
+                    gainedScore += arr[i];
+                    arr.splice(i + 1, 1);
+                }
+            }
+            while (arr.length < 4) arr.push(0);
+            return arr;
+        }
+
+        if (dir === "LEFT") {
+            for (let r = 0; r < 4; r++) {
+                newGrid[r] = slideRow(grid[r]);
+            }
+        } else if (dir === "RIGHT") {
+            for (let r = 0; r < 4; r++) {
+                newGrid[r] = slideRow([...grid[r]].reverse()).reverse();
+            }
+        } else if (dir === "UP") {
+            for (let c = 0; c < 4; c++) {
+                let col = [grid[0][c], grid[1][c], grid[2][c], grid[3][c]];
+                let res = slideRow(col);
+                for (let r = 0; r < 4; r++) newGrid[r][c] = res[r];
+            }
+        } else if (dir === "DOWN") {
+            for (let c = 0; c < 4; c++) {
+                let col = [grid[3][c], grid[2][c], grid[1][c], grid[0][c]];
+                let res = slideRow(col).reverse();
+                for (let r = 0; r < 4; r++) newGrid[r][c] = res[r];
+            }
+        }
+
+        // 変化チェック
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                if (grid[r][c] !== newGrid[r][c]) {
+                    moved = true;
+                    break;
+                }
+            }
+        }
+
+        if (moved) {
+            grid = newGrid;
+            score += gainedScore;
+            const newPos = addRandomTile();
+            renderBoard(newPos);
+            checkGameOver();
+        }
+    }
+
+    function checkGameOver() {
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                if (grid[r][c] === 0) return;
+                if (c < 3 && grid[r][c] === grid[r][c + 1]) return;
+                if (r < 3 && grid[r][c] === grid[r + 1][c]) return;
+            }
+        }
+        isGameOver = true;
+        handleFinish();
+    }
+
+    async function handleFinish() {
+        finalScore.innerText = score;
+        overlay.style.display = "flex";
+
+        let maxTile = 0;
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                if (grid[r][c] > maxTile) maxTile = grid[r][c];
+            }
+        }
+
+        const token = getAuthToken();
+        if (!token) {
+            leaderboard.innerHTML = '<div style="text-align:center; color:#8b949e; font-size:0.75rem;">ゲストプレイ中（ログインでランキング反映）</div>';
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/2048/score", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ score: score, max_tile: maxTile })
+            });
+
+            if (!res.ok) throw new Error("Score send failed");
+            const data = await res.json();
+
+            // 3位以内のみ称号表示
+            if (data.my_rank && data.my_rank <= 3) {
+                eliteBadge.style.display = "inline-block";
+            }
+
+            if (data.ranking) {
+                leaderboard.innerHTML = "";
+                data.ranking.forEach((entry, idx) => {
+                    const row = document.createElement("div");
+                    row.className = `lb-row ${idx < 3 ? "lb-top" : ""}`;
+                    row.innerHTML = `<span>${idx + 1}. ${escapeHtml(entry.nickname)}</span><span>${entry.score.toLocaleString()}</span>`;
+                    leaderboard.appendChild(row);
+                });
+            }
+        } catch (e) {
+            console.error(e);
+            leaderboard.innerHTML = '<div style="text-align:center; color:#8b949e; font-size:0.75rem;">ランキングの取得に失敗しました</div>';
+        }
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[t]));
+    }
+
+    // キーボード操作
+    window.addEventListener("keydown", (e) => {
+        if (["ArrowUp", "KeyW"].includes(e.code)) { e.preventDefault(); operate("UP"); }
+        if (["ArrowDown", "KeyS"].includes(e.code)) { e.preventDefault(); operate("DOWN"); }
+        if (["ArrowLeft", "KeyA"].includes(e.code)) { e.preventDefault(); operate("LEFT"); }
+        if (["ArrowRight", "KeyD"].includes(e.code)) { e.preventDefault(); operate("RIGHT"); }
+    }, { passive: false });
+
+    // スワイプ操作
+    let startX = 0;
+    let startY = 0;
+    const touchArea = document.getElementById("touch-area");
+
+    touchArea.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    touchArea.addEventListener("touchend", (e) => {
+        if (isGameOver) return;
+        const diffX = e.changedTouches[0].clientX - startX;
+        const diffY = e.changedTouches[0].clientY - startY;
+
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            if (Math.abs(diffX) > 25) operate(diffX > 0 ? "RIGHT" : "LEFT");
+        } else {
+            if (Math.abs(diffY) > 25) operate(diffY > 0 ? "DOWN" : "UP");
+        }
+    }, { passive: true });
+
+    // 初期化実行
+    resetGame();
+</script>
+</body>
+</html>
