@@ -734,12 +734,20 @@
             const res = await fetch("/api/slot/spin", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                // 💡 Python側の修正に合わせて綺麗に「amount」で送信
-                body: JSON.stringify({ wallet_id: wid, amount: bet }) 
+                // Python側が新旧どちらのコードでも確実に通るように「両方」送信する
+                body: JSON.stringify({ wallet_id: wid, amount: bet, bet_amount: bet }) 
             });
             
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || "通信エラー");
+            
+            // [object Object] を防ぎ、エラーの本当の理由をテキスト化する
+            if (!res.ok) {
+                let errMsg = data.detail || "エラーが発生しました";
+                if (typeof errMsg === 'object') {
+                    errMsg = JSON.stringify(errMsg); // オブジェクトなら文字列に変換
+                }
+                throw new Error(errMsg);
+            }
             
             serverRes = data;
             
