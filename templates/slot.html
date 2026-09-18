@@ -35,12 +35,11 @@
         body { 
             font-family: 'M PLUS 1p', sans-serif; 
             margin: 0; 
-            min-height: 100dvh; /* ツールバーを考慮した最小高 */
+            min-height: 100dvh;
             user-select: none;
             overflow-x: hidden;
-            overflow-y: auto; /* スマホで潰れるのを防ぎスクロールを許容 */
+            overflow-y: auto;
             background-color: var(--vip-bg);
-            /* 高級感とサイバー感を両立したリッチな背景 */
             background-image: 
                 linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
@@ -51,7 +50,7 @@
             color: #fff; 
             display: flex; 
             justify-content: center; 
-            align-items: flex-start; /* 中央固定から上寄せに変更し余裕を持たせる */
+            align-items: flex-start;
             position: relative;
         }
 
@@ -93,7 +92,7 @@
         }
 
         /* ==========================================================================
-           MARQUEE (OVERDRIVE HEADER)
+           MARQUEE & NOTICE
            ========================================================================== */
         .marquee {
             text-align: center;
@@ -134,6 +133,27 @@
             animation: marquee-rush 0.5s infinite linear;
             letter-spacing: 6px;
             transform: scale(1.08);
+        }
+
+        .notice-banner {
+            width: 100%;
+            background: rgba(255, 0, 51, 0.15);
+            border: 1px solid var(--alert-red);
+            color: #fff;
+            font-family: 'M PLUS 1p', sans-serif;
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: -5px;
+            text-shadow: 0 0 5px var(--alert-red);
+            animation: pulse-notice 2s infinite;
+        }
+        
+        @keyframes pulse-notice {
+            0% { box-shadow: 0 0 5px rgba(255,0,51,0.2); }
+            50% { box-shadow: 0 0 15px rgba(255,0,51,0.6); }
+            100% { box-shadow: 0 0 5px rgba(255,0,51,0.2); }
         }
 
         /* ==========================================================================
@@ -205,14 +225,13 @@
             background: radial-gradient(circle at center, #1a0033 0%, #000 100%);
             border: 4px solid #333;
             border-image: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan)) 1;
-            border-radius: 2px; /* border-image使用時はradiusが効きにくいため鋭角でサイバー感を演出 */
+            border-radius: 2px;
             padding: 25px 15px;
             box-shadow: inset 0 0 50px rgba(157, 0, 255, 0.4), 0 10px 20px rgba(0,0,0,0.8);
             position: relative; 
             min-height: 220px;
         }
 
-        /* 筐体の四隅の装飾ビス */
         .stage-area::before, .stage-area::after {
             content: ''; position: absolute; left: 5px; right: 5px; height: 10px;
             background: radial-gradient(circle, var(--gold-light) 20%, transparent 20%) 0 0 / 20px 20px repeat-x;
@@ -240,7 +259,6 @@
         }
         .gogo-lamp span { font-size: clamp(1.2rem, 3.5vw, 2.2rem); margin-top: -2px; color: #1a1a1a; }
         
-        /* HYPER PEKA STATE */
         .gogo-lamp.peka {
             background: radial-gradient(circle at 40% 40%, #fff 0%, #ff007f 40%, #800040 100%);
             border-color: #ffb3d9;
@@ -269,7 +287,6 @@
             z-index: 10;
         }
         
-        /* VIPパネル（リール上部の装飾） */
         .reels-wrapper::before {
             content: "★ HIGH ROLLER ★";
             position: absolute;
@@ -282,7 +299,6 @@
             z-index: 40; white-space: nowrap;
         }
 
-        /* 綺麗な有効ライン（ブレンドモードを廃止し、透明度でクリーンに発光） */
         .reels-wrapper::after {
             content: ""; position: absolute; top: 50%; left: -5%; right: -5%; height: 3px;
             background: rgba(0, 255, 255, 0.8);
@@ -295,7 +311,6 @@
             background: #e8e8e8; 
             border-radius: 4px;
             overflow: hidden; position: relative;
-            /* インセットシャドウを整理し、変な線が出ないように調整 */
             box-shadow: inset 0 25px 25px -15px rgba(0,0,0,0.8), inset 0 -25px 25px -15px rgba(0,0,0,0.8);
             border: 1px solid #000;
         }
@@ -304,7 +319,6 @@
         .reel-strip {
             position: absolute; top: 0; left: 0; width: 100%;
             display: flex; flex-direction: column; 
-            /* ハードウェアアクセラレーションを明示して線のチラつきを防ぐ */
             will-change: transform;
             transform: translateZ(0);
             backface-visibility: hidden;
@@ -327,7 +341,6 @@
             letter-spacing: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
         
-        /* 錯覚を利用した軽量スピンブラー */
         .spin-blur { opacity: 0.85; filter: contrast(1.2); } 
 
         /* ==========================================================================
@@ -393,7 +406,6 @@
         #flash-bang {
             position: fixed; top:0; left:0; width:100%; height:100%;
             background: #fff; opacity: 0; pointer-events: none; z-index: 99999; 
-            /* 不具合の元となるblend-modeを排除しシンプルに */
         }
         body.mega-flash #flash-bang { animation: hyper-flash 0.5s ease-out forwards; }
         
@@ -445,6 +457,10 @@
 
 <div class="arcade-cabinet" id="cabinet">
     <div class="marquee" id="marquee">INSERT MEDAL</div>
+    
+    <div class="notice-banner">
+        【運営よりお知らせ】還元率を96%に調整いたしました。また、低倍率高確率な小役を高倍率低確率仕様へと変更するアップデートを実施しました。
+    </div>
 
     <div class="hud-panel">
         <div class="inputs-row">
