@@ -2,153 +2,83 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - 映像管理所</title>
+    <title>管理所</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px; margin-bottom: 20px; }
-        .title { color: #d4af37; font-size: 1.2rem; font-weight: bold; }
-        .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; cursor: pointer; text-decoration: none; font-size: 0.85rem; font-weight: bold; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; }
-        .tab-btn { padding: 10px 16px; background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; }
-        .tab-btn.active { color: #d4af37; border-color: #d4af37; }
-        
-        .list-container { display: flex; flex-direction: column; gap: 12px; }
-        .item-card { background: #1e1e1e; border-radius: 8px; padding: 14px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; }
-        .item-info { display: flex; flex-direction: column; gap: 4px; }
-        .item-title { font-size: 0.95rem; font-weight: bold; color: #fff; }
-        .item-sub { font-size: 0.75rem; color: #888; }
-        .btn-danger { background: #c0392b; color: white; border: none; }
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
+        .btn { padding: 6px 12px; background: #2a2a2a; color: #fff; text-decoration: none; border-radius: 4px; border: 1px solid #444; font-size: 0.9rem; cursor: pointer; }
+        .tabs { display: flex; gap: 10px; margin: 20px 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .tab { background: none; border: none; color: #888; font-weight: bold; cursor: pointer; }
+        .tab.active { color: #d4af37; border-bottom: 2px solid #d4af37; }
+        .item { background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .title { font-weight: bold; margin-bottom: 4px; }
         .btn-toggle { background: #2980b9; color: white; border: none; }
+        .btn-del { background: #c0392b; color: white; border: none; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <div class="title">⚙️ 映像管理所</div>
-        <a href="/videos" class="btn">← 映像広場へ戻る</a>
-    </div>
+    <a href="/videos" class="btn">← 戻る</a>
+    <h2 style="color: #d4af37;">⚙️ 映像管理</h2>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('my-videos')">自分の映像</button>
-        <button class="tab-btn" onclick="switchTab('my-comments')">寄せられたコメント</button>
-        <button class="tab-btn" id="king-tab" style="display: none; color: #f1c40f;" onclick="switchTab('king-videos')">👑 国王管理（全映像）</button>
+        <button class="tab active" onclick="setMode('my')">自分の映像</button>
+        <button class="tab" id="king-tab" style="display:none; color:#f1c40f;" onclick="setMode('king')">👑 国王管理</button>
     </div>
 
-    <div class="list-container" id="list-box">
-        <div style="color: #888;">読み込み中...</div>
-    </div>
+    <div id="list">読み込み中...</div>
 
     <script>
         const token = localStorage.getItem("access_token");
-        if (!token) window.location.href = "/";
+        if (!token) location.href = "/";
 
-        let allVideos = [];
-        let isKing = false;
-        let myUserId = "";
+        let all = [], uid = "", king = false, mode = 'my';
 
         async function init() {
             const res = await fetch("/api/videos", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
-            allVideos = data.videos || [];
-            isKing = data.is_king;
-            myUserId = data.user_id;
-
-            if (isKing) {
-                document.getElementById("king-tab").style.display = "block";
-            }
-
-            switchTab('my-videos');
+            all = data.videos;
+            uid = data.user_id;
+            king = data.is_king;
+            if (king) document.getElementById("king-tab").style.display = "inline-block";
+            render();
         }
 
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
-
-            if (tab === 'my-videos') renderMyVideos();
-            if (tab === 'my-comments') renderMyComments();
-            if (tab === 'king-videos') renderKingVideos();
+            render();
         }
 
-        function renderMyVideos() {
-            const myVids = allVideos.filter(v => v.user_id === myUserId);
-            const box = document.getElementById("list-box");
-            if (myVids.length === 0) {
-                box.innerHTML = `<div style="color:#888;">投稿した映像はありません。</div>`;
+        function render() {
+            const target = mode === 'king' ? all : all.filter(v => v.user_id === uid);
+            const box = document.getElementById("list");
+            if (target.length === 0) {
+                box.innerHTML = "映像がありません。";
                 return;
             }
-            box.innerHTML = myVids.map(v => `
-                <div class="item-card">
-                    <div class="item-info">
-                        <div class="item-title">${escapeHtml(v.title)} ${v.is_private ? '<span style="color:#e74c3c;">[非公開]</span>' : '<span style="color:#2ecc71;">[公開中]</span>'}</div>
-                        <div class="item-sub">👀 ${v.views || 0} 回再生 | 📅 ${new Date(v.created_at).toLocaleDateString("ja-JP")}</div>
+            box.innerHTML = target.map(v => `
+                <div class="item">
+                    <div>
+                        <div class="title">${v.title} <span style="color:${v.is_private?'#e74c3c':'#2ecc71'}">[${v.is_private?'非公開':'公開'}]</span></div>
+                        <div style="font-size:0.8rem; color:#888;">投稿者: ${v.author_name}</div>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button class="btn btn-toggle" onclick="togglePrivate('${v.id}')">公開切替</button>
-                        <button class="btn btn-danger" onclick="deleteVideo('${v.id}')">削除</button>
+                        <button class="btn btn-toggle" onclick="toggle('${v.id}')">公開切替</button>
+                        <button class="btn btn-del" onclick="del('${v.id}')">削除</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function renderMyComments() {
-            const box = document.getElementById("list-box");
-            box.innerHTML = `<div style="color:#888;">取得中...</div>`;
-            const res = await fetch("/api/admin/my_comments", { headers: { "Authorization": `Bearer ${token}` } });
-            const comments = await res.json();
-
-            if (comments.length === 0) {
-                box.innerHTML = `<div style="color:#888;">あなたの映像に対するコメントはありません。</div>`;
-                return;
-            }
-
-            box.innerHTML = comments.map(c => `
-                <div class="item-card">
-                    <div class="item-info">
-                        <div class="item-title">動画: ${escapeHtml(c.video_title)}</div>
-                        <div style="font-size:0.85rem; color:#ddd; margin:4px 0;">${escapeHtml(c.content)}</div>
-                        <div class="item-sub">投稿者: ${escapeHtml(c.author_name)}</div>
-                    </div>
-                    <button class="btn btn-danger" onclick="deleteComment('${c.id}')">不快なコメントを削除</button>
-                </div>
-            `).join('');
+        async function toggle(id) {
+            await fetch(`/api/videos/${id}/toggle_private`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` } });
+            init();
         }
 
-        function renderKingVideos() {
-            const box = document.getElementById("list-box");
-            box.innerHTML = allVideos.map(v => `
-                <div class="item-card" style="border-color: #f1c40f;">
-                    <div class="item-info">
-                        <div class="item-title">👑 ${escapeHtml(v.title)} (投稿者: ${escapeHtml(v.author_name)})</div>
-                        <div class="item-sub">ID: ${v.id} | Status: ${v.is_private ? '非公開' : '公開'}</div>
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn btn-toggle" onclick="togglePrivate('${v.id}')">強制公開切替</button>
-                        <button class="btn btn-danger" onclick="deleteVideo('${v.id}')">勅令削除</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function togglePrivate(vid) {
-            await fetch(`/api/videos/${vid}/toggle_private`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` } });
-            location.reload();
-        }
-
-        async function deleteVideo(vid) {
-            if (!confirm("本当にこの映像を削除しますか？")) return;
-            await fetch(`/api/videos/${vid}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-            location.reload();
-        }
-
-        async function deleteComment(cid) {
-            if (!confirm("このコメントを削除しますか？")) return;
-            await fetch(`/api/comments/${cid}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-            renderMyComments();
-        }
-
-        function escapeHtml(str) {
-            return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        async function del(id) {
+            if(!confirm("削除しますか？")) return;
+            await fetch(`/api/videos/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+            init();
         }
 
         init();
