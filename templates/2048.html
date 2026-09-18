@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2048</title>
+    <title>2048 - Strategic Merge</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Clear+Sans:wght@400;700&display=swap');
 
@@ -26,33 +26,43 @@
             font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh; padding: 16px; overflow: hidden;
+            transition: background-color 0.3s;
         }
 
         .header-top {
-            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;
+            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;
         }
 
         .title { font-size: 3.2rem; font-weight: 700; color: var(--text-dark); line-height: 1; letter-spacing: -1px; }
         
         .scores-container { display: flex; gap: 8px; }
-        .score-box { background: var(--board-bg); border-radius: 6px; padding: 6px 16px; text-align: center; min-width: 70px; color: white; }
+        .score-box { background: var(--board-bg); border-radius: 6px; padding: 6px 16px; text-align: center; min-width: 70px; color: white; position: relative; }
         .score-label { font-size: 0.7rem; font-weight: 700; color: #eee4da; text-transform: uppercase; margin-bottom: 2px; }
-        .score-val { font-size: 1.25rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .score-val { font-size: 1.25rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; transition: transform 0.1s; }
+        
+        /* スコア加算時のミニポップアップ */
+        .score-addition {
+            position: absolute; top: 10px; right: 10px; font-size: 1.2rem; font-weight: bold; color: rgba(119,110,101,0.9);
+            animation: moveUp 0.6s ease-in forwards; z-index: 100; pointer-events: none;
+        }
+        @keyframes moveUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-40px); } }
 
         .controls-row {
-            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; gap: 10px;
+            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 10px;
         }
 
         .action-btn {
             background: #8f7a66; color: var(--text-light); border: none; border-radius: 6px;
             padding: 10px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: background 0.15s; flex: 1; text-align: center; text-decoration: none;
         }
-        .action-btn:active { background: #9f8b77; }
+        .action-btn:active { background: #9f8b77; transform: scale(0.96); }
         .btn-secondary { background: var(--board-bg); }
+        .sound-btn { flex: 0.4; font-size: 1.1rem; padding: 10px; }
 
         .board-container {
             position: relative; width: 100%; max-width: 400px; aspect-ratio: 1 / 1;
             background: var(--board-bg); border-radius: 8px; padding: var(--board-padding);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
 
         .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--gap); width: 100%; height: 100%; }
@@ -69,36 +79,53 @@
             font-size: 2.2rem; font-weight: 700; transition: background-color 0.15s;
         }
 
-        /* Classic Colors */
+        /* フローティングスコア（合体位置から浮かぶ） */
+        .floating-score {
+            position: absolute; font-size: 1.8rem; font-weight: bold; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            animation: float-score-anim 0.7s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; z-index: 50; width: calc(25% - (var(--gap) * 3 / 4)); text-align: center; pointer-events: none;
+        }
+        @keyframes float-score-anim {
+            0% { opacity: 0; transform: translateY(10px) scale(0.8); }
+            20% { opacity: 1; transform: translateY(-5px) scale(1.1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1); }
+        }
+
+        /* タイルカラーとリッチな発光 */
         .tile-2    { background: #eee4da; color: #776e65; }
         .tile-4    { background: #ede0c8; color: #776e65; }
         .tile-8    { background: #f2b179; color: #f9f6f2; }
         .tile-16   { background: #f59563; color: #f9f6f2; }
         .tile-32   { background: #f67c5f; color: #f9f6f2; }
         .tile-64   { background: #f65e3b; color: #f9f6f2; }
-        .tile-128  { background: #edcf72; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.3) inset; }
-        .tile-256  { background: #edcc61; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.4) inset; }
-        .tile-512  { background: #edc850; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.5) inset; }
-        .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.6) inset; }
-        .tile-2048, .tile-4096 { background: #edc22e; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.7) inset; }
+        .tile-128  { background: #edcf72; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 15px rgba(243, 215, 116, 0.4); }
+        .tile-256  { background: #edcc61; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 20px rgba(243, 215, 116, 0.5); }
+        .tile-512  { background: #edc850; color: #f9f6f2; font-size: 1.8rem; box-shadow: 0 0 25px rgba(243, 215, 116, 0.6); }
+        .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 35px rgba(243, 215, 116, 0.7); }
+        .tile-2048, .tile-4096 { background: #edc22e; color: #f9f6f2; font-size: 1.5rem; box-shadow: 0 0 50px rgba(243, 215, 116, 0.8), inset 0 0 15px rgba(255,255,255,0.4); text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
-        .pop-in { animation: popIn 200ms ease forwards; }
-        .pop-merge { animation: popMerge 200ms ease forwards; }
-        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
-        @keyframes popMerge { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .pop-in { animation: popIn 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .pop-merge { animation: popMerge 250ms cubic-bezier(0.175, 0.885, 0.32, 1.5) forwards; }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0;} 100% { transform: scale(1); opacity: 1;} }
+        @keyframes popMerge { 0% { transform: scale(1); } 50% { transform: scale(1.18); filter: brightness(1.2); } 100% { transform: scale(1); filter: brightness(1); } }
+
+        /* 1024, 2048達成時の全体フラッシュ */
+        body.hyper-flash { animation: hyper-flash-bg 0.4s ease-out; }
+        @keyframes hyper-flash-bg { 0% { background-color: #edc22e; } 100% { background-color: var(--bg-color); } }
+        
+        .board-container.shake { animation: shake-board 0.3s ease-in-out; }
+        @keyframes shake-board { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-3px, 2px); } 50% { transform: translate(3px, -2px); } 75% { transform: translate(-2px, -3px); } }
 
         /* モーダル汎用 */
         .overlay {
-            display: none; position: fixed; inset: 0; background: rgba(238, 228, 218, 0.75); backdrop-filter: blur(3px);
+            display: none; position: fixed; inset: 0; background: rgba(238, 228, 218, 0.85); backdrop-filter: blur(5px);
             z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
         .modal-content {
-            background: #faf8ef; border: 2px solid var(--board-bg); border-radius: 8px; width: 100%; max-width: 360px;
-            padding: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15); animation: fadeUp 0.3s ease;
+            background: #faf8ef; border: 2px solid var(--board-bg); border-radius: 12px; width: 100%; max-width: 360px;
+            padding: 30px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.2); animation: fadeUp 0.3s ease;
         }
         @keyframes fadeUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* ランキング用UI */
         .tab-row { display: flex; gap: 5px; margin-bottom: 15px; }
         .tab-btn { flex: 1; padding: 8px; background: var(--board-bg); color: #fff; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; opacity: 0.6; }
         .tab-btn.active { opacity: 1; background: #8f7a66; }
@@ -111,7 +138,7 @@
         .lb-row:last-child { border-bottom: none; }
         .lb-top { color: #f67c5f; }
 
-        .modal-title { font-size: 1.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
+        .modal-title { font-size: 2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 15px; letter-spacing: -1px; }
     </style>
 </head>
 <body>
@@ -119,7 +146,7 @@
 <div class="header-top">
     <div class="title">2048</div>
     <div class="scores-container">
-        <div class="score-box">
+        <div class="score-box" id="score-box-wrapper">
             <div class="score-label">SCORE</div>
             <div class="score-val" id="score-display">0</div>
         </div>
@@ -131,9 +158,10 @@
 </div>
 
 <div class="controls-row">
-    <a href="/games" class="action-btn btn-secondary">戻る</a>
-    <button class="action-btn btn-secondary" onclick="openRankingModal()">ランキング</button>
-    <button class="action-btn" onclick="resetGame()">ニューゲーム</button>
+    <a href="/games" class="action-btn btn-secondary">退出</a>
+    <button class="action-btn sound-btn" id="sound-toggle" onclick="toggleSound()">🔊</button>
+    <button class="action-btn btn-secondary" onclick="openRankingModal()">順位</button>
+    <button class="action-btn" onclick="resetGame()">再挑戦</button>
 </div>
 
 <div class="board-container" id="touch-area">
@@ -146,24 +174,22 @@
     <div class="tile-layer" id="tile-layer"></div>
 </div>
 
-<!-- 汎用モーダル (ゲームオーバー ＆ ランキング共通) -->
 <div class="overlay" id="overlay">
     <div class="modal-content">
         <div class="modal-title" id="modal-main-title">Game Over!</div>
         
-        <!-- タブ（ランキング表示時のみ） -->
         <div class="tab-row" id="ranking-tabs">
             <button class="tab-btn active" id="tab-daily" onclick="switchTab('daily')">Daily Top 10</button>
             <button class="tab-btn" id="tab-alltime" onclick="switchTab('alltime')">All-Time Top 10</button>
         </div>
 
         <div class="leaderboard" id="leaderboard">
-            <div style="text-align:center; color:#bbada0; font-size:0.85rem;">データ取得中...</div>
+            <div style="text-align:center; color:#bbada0; font-size:0.85rem;">データ同期中...</div>
         </div>
         
         <div style="display: flex; gap: 10px;">
             <button class="action-btn btn-secondary" id="btn-close-modal" onclick="closeModal()">閉じる</button>
-            <button class="action-btn" id="btn-restart-modal" onclick="resetGame()">再挑戦</button>
+            <button class="action-btn" id="btn-restart-modal" onclick="resetGame()">もう一度</button>
         </div>
     </div>
 </div>
@@ -171,13 +197,53 @@
 <script>
     function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
+    // --- Web Audio API (効果音シンセサイザー) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    let soundEnabled = true;
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        document.getElementById("sound-toggle").innerText = soundEnabled ? "🔊" : "🔇";
+        if(soundEnabled && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playTone(freq, type, duration, vol) {
+        if (!soundEnabled) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function playMoveSound() { playTone(150, 'sine', 0.1, 0.05); }
+    
+    function playMergeSound(val, combo) {
+        if (!soundEnabled) return;
+        // 数字が大きいほど、コンボが繋がるほどピッチと和音がリッチになる
+        let index = Math.log2(val) - 1;
+        let baseFreq = 261.6 * Math.pow(1.059463, index * 2 + (combo * 2));
+        
+        playTone(baseFreq, 'sine', 0.3, 0.1);
+        if (val >= 64) playTone(baseFreq * 1.5, 'triangle', 0.4, 0.05); // 5度の和音
+        if (val >= 256) playTone(baseFreq * 2.0, 'sine', 0.5, 0.05); // 1オクターブ上
+    }
+
+    // ---------------------------------------------
+
     let grid = Array(4).fill(null).map(() => Array(4).fill(null));
     let tiles = [];
     let tileIdSeq = 0;
     let score = 0;
     let bestScore = parseInt(localStorage.getItem("2048_best")) || 0;
     let isGameOver = false;
-
     let rankingData = { daily: [], alltime: [] };
 
     const layer = document.getElementById("tile-layer");
@@ -189,6 +255,9 @@
     bestDisplay.innerText = bestScore;
 
     document.addEventListener("touchmove", (e) => { if (e.target.closest('.board-container')) e.preventDefault(); }, { passive: false });
+    
+    // 初回タップでAudioContextのロック解除
+    document.addEventListener("click", () => { if(audioCtx.state === 'suspended') audioCtx.resume(); }, { once: true });
 
     function createTile(r, c, val) {
         const wrapper = document.createElement("div");
@@ -217,6 +286,8 @@
             bestScore = score;
             bestDisplay.innerText = bestScore;
             localStorage.setItem("2048_best", bestScore);
+            scoreDisplay.style.transform = "scale(1.2)";
+            setTimeout(() => scoreDisplay.style.transform = "scale(1)", 150);
         }
 
         let activeTiles = [];
@@ -228,7 +299,7 @@
                 t.wrapper.style.zIndex = 10;
                 t.inner.style.transform = "scale(0)";
                 setTimeout(() => {
-                    t.inner.className = `tile-inner tile-${t.val > 2048 ? 2048 : t.val} pop-merge`;
+                    t.inner.className = `tile-inner tile-${t.val > 4096 ? 4096 : t.val} pop-merge`;
                     t.inner.innerText = t.val;
                     t.inner.style.transform = "";
                 }, 130);
@@ -253,9 +324,31 @@
         renderDOM();
     }
 
+    function showScorePopup(val, r, c) {
+        // 合体した場所からスコアが飛び出す演出
+        const pop = document.createElement("div");
+        pop.className = "floating-score";
+        pop.innerText = "+" + val;
+        pop.style.top = `calc(${r} * 25% + var(--gap))`;
+        pop.style.left = `calc(${c} * 25% + var(--gap))`;
+        layer.appendChild(pop);
+        
+        // ヘッダーのスコア欄にも小さいポップアップ
+        const headPop = document.createElement("div");
+        headPop.className = "score-addition";
+        headPop.innerText = "+" + val;
+        document.getElementById("score-box-wrapper").appendChild(headPop);
+
+        setTimeout(() => { pop.remove(); headPop.remove(); }, 700);
+    }
+
     function operate(dir) {
         if (isGameOver) return;
         let moved = false, gainedScore = 0;
+        let combo = 0;
+        let maxMergedVal = 0;
+        let lastMergePos = null;
+
         const oldPositions = new Map(tiles.map(t => [t.id, {r: t.r, c: t.c}]));
         const newGrid = Array(4).fill(null).map(() => Array(4).fill(null));
 
@@ -273,6 +366,9 @@
                 if (k < line.length - 1 && line[k].val === line[k+1].val && !line[k].isDeleted && !line[k+1].isDeleted) {
                     let val = line[k].val * 2;
                     gainedScore += val;
+                    combo++;
+                    if (val > maxMergedVal) maxMergedVal = val;
+                    
                     let newTile = createTile(0, 0, val);
                     newTile.isMerged = true; newTile.mergedFrom = [line[k], line[k+1]];
                     line[k].isDeleted = true; line[k+1].isDeleted = true;
@@ -290,14 +386,39 @@
                 newGrid[r][c] = t;
                 if (t) {
                     t.r = r; t.c = c;
-                    if (t.isMerged) { t.mergedFrom[0].r = r; t.mergedFrom[0].c = c; t.mergedFrom[1].r = r; t.mergedFrom[1].c = c; }
+                    if (t.isMerged) { 
+                        t.mergedFrom[0].r = r; t.mergedFrom[0].c = c; 
+                        t.mergedFrom[1].r = r; t.mergedFrom[1].c = c; 
+                        lastMergePos = {r, c};
+                    }
                 }
             }
         }
 
         grid = newGrid;
         tiles.forEach(t => { let old = oldPositions.get(t.id); if (old && (old.r !== t.r || old.c !== t.c)) moved = true; });
-        if (gainedScore > 0) moved = true;
+        
+        if (gainedScore > 0) {
+            moved = true;
+            playMergeSound(maxMergedVal, combo);
+            showScorePopup(gainedScore, lastMergePos.r, lastMergePos.c);
+            
+            // 爽快感演出（高レベルタイル合成時）
+            if (maxMergedVal >= 512) {
+                const board = document.getElementById("touch-area");
+                board.classList.remove("shake");
+                void board.offsetWidth;
+                board.classList.add("shake");
+                
+                if (maxMergedVal >= 1024) {
+                    document.body.classList.remove("hyper-flash");
+                    void document.body.offsetWidth;
+                    document.body.classList.add("hyper-flash");
+                }
+            }
+        } else if (moved) {
+            playMoveSound();
+        }
 
         if (moved) {
             score += gainedScore;
@@ -312,10 +433,16 @@
             if (r<3 && grid[r][c].val === grid[r+1][c].val) return;
         }
         isGameOver = true;
-        setTimeout(handleFinish, 600);
+        setTimeout(handleFinish, 700);
     }
 
     async function handleFinish() {
+        if(soundEnabled) {
+            // ゲームオーバー時のディスコードな和音
+            playTone(150, 'sawtooth', 0.5, 0.1);
+            playTone(140, 'sawtooth', 0.5, 0.1);
+        }
+
         document.getElementById("modal-main-title").innerText = "Game Over!";
         document.getElementById("btn-close-modal").style.display = "none";
         document.getElementById("btn-restart-modal").style.display = "block";
