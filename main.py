@@ -211,7 +211,7 @@ def get_derby(request: Request):
 def get_2048(request: Request):
     return templates.TemplateResponse(request=request, name="2048.html")
 
-@app.get("/games" response_class=HTMLResponse)
+@app.get("/games", response_class=HTMLResponse)
 def get_games(request: Request):
     return templates.TemplateResponse(request=request, name="games.html")
 
