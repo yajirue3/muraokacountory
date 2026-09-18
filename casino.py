@@ -69,7 +69,7 @@ TOWER_SESSIONS = {}
 def get_tower_multiplier(floor: int) -> float:
     if floor <= 0:
         return 1.0
-    return round((2.70) ** floor, 2)
+    return round((2.88) ** floor, 2)
 
 
 # --- 共通関数：トークン検証 ---
