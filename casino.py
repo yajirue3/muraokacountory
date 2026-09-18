@@ -536,14 +536,8 @@ async def cashout_mines(data: MinesCashoutRequest, authorization: str = Header(N
         "mines": mines
     }
 
-# # --- Slot用リクエストモデル ---
-class SlotSpinRequest(BaseModel):
-    wallet_id: str
-    amount: int  # ← bet_amount から他のゲームと同じ amount に統一
-
-
 # --------------------------------------------------
-# カジノAPI：スロットゲーム（確率調整・合法仕様）
+# カジノAPI：スロットゲーム（名機バランス仕様）
 # --------------------------------------------------
 @router.post("/api/slot/spin")
 async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
@@ -568,34 +562,34 @@ async def spin_slot(data: SlotSpinRequest, authorization: str = Header(None)):
     # 1. 賭け金を即時引き落とし
     new_balance = current_balance - data.amount
     
-    # 2. 内部抽選 (還元率96%、黄金バランスの高ボラティリティ仕様)
-    rand_val = random.randint(0, 999)
+    # 2. 内部抽選 (10,000分母で緻密に確率をコントロール)
+    rand_val = random.randint(0, 9999)
     
-    if rand_val < 2:      # 確率 0.2% (2/1000)
+    if rand_val < 25:      # 確率 0.25% (1/400)
         prize = "BIG"
-        payout = int(data.amount * 200)  # 200倍 (RTP 40%)
+        payout = int(data.amount * 100)  # 100倍 (RTP 25%)
         result_symbols = ["7", "7", "7"]
-    elif rand_val < 6:    # 確率 0.4% (4/1000) - 累積6
+    elif rand_val < 75:    # 確率 0.50% (1/200) - 累積75
         prize = "REG"
-        payout = int(data.amount * 50)   # 50倍 (RTP 20%)
+        payout = int(data.amount * 50)   # 50倍 (RTP 25%)
         result_symbols = ["BAR", "BAR", "BAR"]
-    elif rand_val < 16:   # 確率 1.0% (10/1000) - 累積16
+    elif rand_val < 225:   # 確率 1.50% (1/66) - 累積225
         prize = "BELL"
-        payout = int(data.amount * 10)   # 10倍 (RTP 10%)
+        payout = int(data.amount * 10)   # 10倍 (RTP 15%)
         result_symbols = ["BELL", "BELL", "BELL"]
-    elif rand_val < 66:   # 確率 5.0% (50/1000) - 累積66
+    elif rand_val < 825:   # 確率 6.00% (1/16.6) - 累積825
         prize = "GRAPE"
-        payout = int(data.amount * 3)    # 3倍 (RTP 15%)
+        payout = int(data.amount * 3)    # 3倍 (RTP 18%)
         result_symbols = ["GRAPE", "GRAPE", "GRAPE"]
-    elif rand_val < 176:  # 確率 11.0% (110/1000) - 累積176
+    elif rand_val < 2125:  # 確率 13.00% (1/7.6) - 累積2125
         prize = "REPLAY"
-        payout = int(data.amount * 1)    # 1倍 (RTP 11%)
+        payout = int(data.amount * 1)    # 1倍 (RTP 13%)
         if random.random() < 0.5:
             result_symbols = ["REPLAY", "REPLAY", "REPLAY"]
         else:
             result_symbols = ["CHERRY", random.choice(["BELL", "GRAPE", "REPLAY"]), random.choice(["BAR", "BELL", "GRAPE"])]
     else: 
-        # ハズレ (確率 82.4%)
+        # ハズレ (確率 78.75%)
         prize = "MISS"
         payout = 0
         pool = ["7", "BAR", "BELL", "GRAPE", "REPLAY"]
