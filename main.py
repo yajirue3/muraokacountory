@@ -216,6 +216,20 @@ def get_2048(request: Request):
 def get_games(request: Request):
     return templates.TemplateResponse(request=request, name="games.html")
 
+@app.get("/videos", response_class=HTMLResponse)
+def get_videos(request: Request):
+    return templates.TemplateResponse(request=request, name="videos.html")
+
+@app.get("/videowatch", response_class=HTMLResponse)
+def get_videowatch(request: Request):
+    return templates.TemplateResponse(request=request, name="videowatch.html")
+
+
+@app.get("/videomanage", response_class=HTMLResponse)
+def get_videomanage(request: Request):
+    return templates.TemplateResponse(request=request, name="videomanage.html")
+
+
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
