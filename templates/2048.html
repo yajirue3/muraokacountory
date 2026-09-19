@@ -192,63 +192,76 @@
 <script>
     function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
-    // --- 音響設定（アンビエントBGM自動生成 & 効果音） ---
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
     let soundEnabled = true;
     
-    // BGM（ドローン）用ノード管理
-    let droneOscs = [];
-    let droneGains = [];
+    let bgmSource, bgmFilter, bgmLFO, bgmMasterGain;
     let isBgmPlaying = false;
 
+    // --- アルファ波誘導（ブラウンノイズ生成と呼吸フィルター） ---
     function playBGM() {
         if (isBgmPlaying || !soundEnabled) return;
         isBgmPlaying = true;
-        // 思考を邪魔しない低域中心の和音 (C2, G2, C3)
-        const baseFreqs = [65.41, 98.00, 130.81]; 
         
-        baseFreqs.forEach((freq, i) => {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            
-            // うねり（揺らぎ）を生むLFO
-            const lfo = audioCtx.createOscillator();
-            lfo.type = 'sine';
-            lfo.frequency.value = 0.05 + (i * 0.02);
-            const lfoGain = audioCtx.createGain();
-            lfoGain.gain.value = 0.015;
-            lfo.connect(lfoGain);
-            lfoGain.connect(gain.gain);
-            
-            // 2秒かけてフェードイン
-            gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 2);
-            
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(); 
-            lfo.start();
-            
-            droneOscs.push({osc, lfo});
-            droneGains.push(gain);
-        });
+        // 5秒分のノイズバッファを作成
+        const bufferSize = audioCtx.sampleRate * 5;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        
+        // ホワイトノイズを積分してブラウンノイズ（波や風の自然音）を近似生成
+        let lastOut = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            let white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.5; 
+        }
+
+        bgmSource = audioCtx.createBufferSource();
+        bgmSource.buffer = noiseBuffer;
+        bgmSource.loop = true;
+
+        // 電子音感を消すためのローパス（低音通過）フィルター
+        bgmFilter = audioCtx.createBiquadFilter();
+        bgmFilter.type = 'lowpass';
+        bgmFilter.frequency.value = 180; // 基本の深い風の音
+
+        // 呼吸の周期（アルファ波誘導）のゆったりとした波の揺らぎ
+        bgmLFO = audioCtx.createOscillator();
+        bgmLFO.type = 'sine';
+        bgmLFO.frequency.value = 0.08; // 約12秒で1サイクルのゆっくりとした変化
+        
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 100; // フィルターの開閉幅
+        
+        bgmLFO.connect(lfoGain);
+        lfoGain.connect(bgmFilter.frequency);
+
+        bgmMasterGain = audioCtx.createGain();
+        bgmMasterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        bgmMasterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 3); // 3秒かけてフェードイン
+
+        bgmSource.connect(bgmFilter);
+        bgmFilter.connect(bgmMasterGain);
+        bgmMasterGain.connect(audioCtx.destination);
+
+        bgmSource.start();
+        bgmLFO.start();
     }
 
     function stopBGM() {
         if (!isBgmPlaying) return;
         isBgmPlaying = false;
-        droneGains.forEach(gain => {
-            gain.gain.cancelScheduledValues(audioCtx.currentTime);
-            // 3秒かけてフェードアウト
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
-        });
+        
+        if (bgmMasterGain) {
+            bgmMasterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+            bgmMasterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
+        }
+        
         setTimeout(() => {
-            droneOscs.forEach(nodes => { nodes.osc.stop(); nodes.lfo.stop(); });
-            droneOscs = [];
-            droneGains = [];
+            if (bgmSource) bgmSource.stop();
+            if (bgmLFO) bgmLFO.stop();
         }, 3000);
     }
 
@@ -263,7 +276,7 @@
         }
     }
 
-    // アコースティックなマリンバ風打点音（triangle波 + 急速減衰）
+    // --- 効果音：アコースティックなマリンバ風打点音 ---
     function playMarimbaTone(freq, duration, maxVol) {
         if (!soundEnabled) return;
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -285,13 +298,12 @@
     
     function playMergeSound(val, combo) {
         if (!soundEnabled) return;
-        // 低〜中音域の落ち着いた音階
         const scale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.2, 587.3, 659.2, 783.9];
         let index = Math.min(Math.floor(Math.log2(val)) - 1, scale.length - 1);
         let freq = scale[Math.max(0, index)];
         
         playMarimbaTone(freq, 0.15, 0.2);
-        if (val >= 64) playMarimbaTone(freq * 1.5, 0.2, 0.1); // 和音も丸い音で追加
+        if (val >= 64) playMarimbaTone(freq * 1.5, 0.2, 0.1);
     }
 
     // ---------------------------------------------
