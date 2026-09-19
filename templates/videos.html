@@ -14,12 +14,14 @@
         
         /* ボトムナビゲーション (YouTube風) */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
-        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
-        .nav-item .label { font-size: 10px; font-weight: 500; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; height: 100%; cursor: pointer; border: none; background: transparent; padding: 0; margin: 0; }
+        .nav-item .icon-wrap { height: 24px; display: flex; align-items: center; justify-content: center; }
+        .nav-item .icon { font-size: 20px; line-height: 1; }
+        .nav-item .icon-plus { font-size: 24px; line-height: 1; font-weight: 300; }
+        .nav-item .label { font-size: 10px; font-weight: 500; margin-top: 2px; line-height: 1; }
         .nav-item:hover { background: #f2f2f2; }
 
-        /* グリッドレイアウト (サムネサイズ縮小) */
+        /* グリッドレイアウト */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 30px 16px; padding: 24px; max-width: 1600px; margin: 0 auto; }
         .card { text-decoration: none; color: inherit; display: block; }
         .thumb-wrap { width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 12px; overflow: hidden; background: #f2f2f2; }
@@ -70,27 +72,31 @@
     <nav class="bottom-nav">
         <!-- 1. 動画一覧 (/videos に行くため何も起こらない) -->
         <a href="javascript:void(0)" class="nav-item">
-            <span class="icon">🎬</span>
+            <div class="icon-wrap"><span class="icon">🎬</span></div>
             <span class="label">動画一覧</span>
         </a>
+        
         <!-- 2. 自分のチャンネル -->
-        <a href="/channel" id="my-channel-link" class="nav-item">
-            <span class="icon">👤</span>
+        <a href="javascript:void(0)" id="my-channel-btn" onclick="goToMyChannel()" class="nav-item">
+            <div class="icon-wrap"><span class="icon">👤</span></div>
             <span class="label">チャンネル</span>
         </a>
+        
         <!-- 3. アップロード (真ん中) -->
         <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
-            <span class="icon" style="font-size: 26px; font-weight: 300;">⊕</span>
+            <div class="icon-wrap"><span class="icon-plus">⊕</span></div>
             <span class="label">アップロード</span>
         </div>
+        
         <!-- 4. 登録チャンネル -->
         <a href="/subscribe" class="nav-item">
-            <span class="icon">🔔</span>
+            <div class="icon-wrap"><span class="icon">🔔</span></div>
             <span class="label">登録チャンネル</span>
         </a>
+        
         <!-- 5. 管理ページ -->
         <a href="/manage_videos" class="nav-item">
-            <span class="icon">📁</span>
+            <div class="icon-wrap"><span class="icon">📁</span></div>
             <span class="label">管理</span>
         </a>
     </nav>
@@ -133,19 +139,29 @@
 
         let currentPage = 1;
         let isFetching = false;
+        let myUserId = null;
 
-        // 自分のプロフィールを取得してチャンネルリンクにIDを付与
-        async function loadMyProfile() {
+        // 自分のチャンネルへ移動する処理
+        async function goToMyChannel() {
+            if (myUserId) {
+                location.href = `/channel?id=${myUserId}`;
+                return;
+            }
             try {
                 const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
                 if (res.ok) {
                     const profile = await res.json();
                     if (profile && profile.id) {
-                        document.getElementById("my-channel-link").href = `/channel?c=${profile.id}`;
+                        myUserId = profile.id;
+                        location.href = `/channel?id=${myUserId}`;
+                    } else {
+                        location.href = "/channel";
                     }
+                } else {
+                    location.href = "/channel";
                 }
             } catch(e) {
-                console.error("プロフィール情報の取得に失敗しました", e);
+                location.href = "/channel";
             }
         }
 
@@ -157,6 +173,10 @@
                 const res = await fetch(`/api/videos?page=${currentPage}`, { headers: { "Authorization": `Bearer ${token}` } });
                 const data = await res.json();
                 
+                if (data.user_id) {
+                    myUserId = data.user_id;
+                }
+
                 const grid = document.getElementById("grid");
                 const btnContainer = document.getElementById("load-more-container");
                 
@@ -247,7 +267,6 @@
             }
         }
 
-        loadMyProfile();
         loadVideos();
     </script>
 </body>
