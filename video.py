@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 import httpx
-from fastapi import APIRouter, HTTPException, Header, Request, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Header, Request, UploadFile, File, Form, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -25,7 +25,7 @@ class CommentCreate(BaseModel):
 
 async def get_gdrive_access_token() -> str:
     if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
-        raise HTTPException(status_code=500, detail="Driveの認証情報が設定されていません")
+        raise HTTPException(status_code=500, detail="認証情報が設定されていません")
     
     url = "https://oauth2.googleapis.com/token"
     data = {
@@ -38,7 +38,7 @@ async def get_gdrive_access_token() -> str:
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.post(url, data=data)
         if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code} {res.text}")
+            raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code}")
         return res.json()["access_token"]
 
 async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) -> str:
@@ -59,7 +59,7 @@ async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) ->
     async with httpx.AsyncClient(timeout=60.0) as client:
         init_res = await client.post(init_url, headers=headers, json=metadata)
         if init_res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"アップロードセッション作成失敗: {init_res.status_code} {init_res.text}")
+            raise HTTPException(status_code=500, detail="アップロードセッション作成失敗")
         
         session_url = init_res.headers.get("Location")
         chunk_size = 8 * 1024 * 1024  
@@ -81,11 +81,11 @@ async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) ->
                     file_id = upload_res.json().get("id")
                     break
                 elif upload_res.status_code != 308:
-                    raise HTTPException(status_code=500, detail=f"ファイル転送エラー: {upload_res.status_code} {upload_res.text}")
+                    raise HTTPException(status_code=500, detail="ファイル転送エラー")
                 start = end + 1
 
     if not file_id:
-        raise HTTPException(status_code=500, detail="ファイルIDの取得に失敗しました")
+        raise HTTPException(status_code=500, detail="ファイルIDの取得失敗")
 
     perm_url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -105,16 +105,20 @@ async def get_watch_page(request: Request):
 async def get_manage_page(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
+# 動画の一括取得を廃止し、24件ずつのページネーション(分割取得)に変更
 @router.get("/api/videos")
-async def get_videos(authorization: str = Header(None)):
+async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     king_status = await is_king(user.id)
     supabase = await get_supabase()
     
+    limit = 24
+    offset = (page - 1) * limit
+    
     if king_status:
-        res = await supabase.table("videos").select("*").order("created_at", desc=True).execute()
+        res = await supabase.table("videos").select("*").order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     else:
-        res = await supabase.table("videos").select("*").or_(f"is_private.eq.false,user_id.eq.{user.id}").order("created_at", desc=True).execute()
+        res = await supabase.table("videos").select("*").or_(f"is_private.eq.false,user_id.eq.{user.id}").order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     
     return {"videos": res.data or [], "is_king": king_status, "user_id": str(user.id)}
 
@@ -131,7 +135,7 @@ async def upload_video(
     supabase = await get_supabase()
 
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = prof_res.data[0]["nickname"] if prof_res.data else "名無し"
+    nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
     # 1. 動画本体のアップロード
     v_suffix = Path(file.filename).suffix or ".mp4"
@@ -151,25 +155,22 @@ async def upload_video(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    # 2. サムネイル画像のアップロード（指定された場合のみ）
+    # 2. サムネイル画像のアップロード（判定を強化）
     thumbnail_drive_id = None
-    if thumbnail and thumbnail.filename:
-        t_suffix = Path(thumbnail.filename).suffix or ".jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
-            t_tmp_path = t_tmp.name
-            
-        try:
-            with open(t_tmp_path, "wb") as t_buffer:
-                while True:
-                    t_chunk = await thumbnail.read(1024 * 1024)
-                    if not t_chunk: break
-                    t_buffer.write(t_chunk)
-                    
-            t_mime = thumbnail.content_type or "image/jpeg"
-            thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
-        finally:
-            if os.path.exists(t_tmp_path):
-                os.remove(t_tmp_path)
+    if thumbnail is not None and thumbnail.filename:
+        t_content = await thumbnail.read()
+        if len(t_content) > 0:  # 空ファイルでないことを確実にチェック
+            t_suffix = Path(thumbnail.filename).suffix or ".jpg"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
+                t_tmp.write(t_content)
+                t_tmp_path = t_tmp.name
+                
+            try:
+                t_mime = thumbnail.content_type or "image/jpeg"
+                thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
+            finally:
+                if os.path.exists(t_tmp_path):
+                    os.remove(t_tmp_path)
 
     # 3. DBへ記録
     insert_res = await supabase.table("videos").insert({
@@ -183,7 +184,7 @@ async def upload_video(
         "views": 0
     }).execute()
 
-    return {"message": "映像の記録を完了しました", "video": insert_res.data[0]}
+    return {"message": "アップロード完了", "video": insert_res.data[0]}
 
 @router.get("/api/videos/{video_id}")
 async def get_video_detail(video_id: str, authorization: str = Header(None)):
@@ -193,11 +194,11 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
     
     res = await supabase.table("videos").select("*").eq("id", video_id).execute()
     if not res.data:
-        raise HTTPException(status_code=404, detail="指定の映像は見つかりません")
+        raise HTTPException(status_code=404, detail="映像が見つかりません")
     
     video = res.data[0]
     if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
-        raise HTTPException(status_code=403, detail="この映像は非公開です")
+        raise HTTPException(status_code=403, detail="非公開の動画です")
     
     try:
         current_views = video.get("views") or 0
@@ -205,7 +206,6 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
         video["views"] = current_views + 1
     except Exception:
         pass
-
     return video
 
 @router.get("/api/videos/{video_id}/comments")
@@ -222,7 +222,7 @@ async def post_comment(video_id: str, data: CommentCreate, authorization: str = 
 
     supabase = await get_supabase()
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = prof_res.data[0]["nickname"] if prof_res.data else "名無し"
+    nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
     await supabase.table("video_comments").insert({
         "video_id": video_id,
@@ -246,7 +246,7 @@ async def delete_video(video_id: str, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail="権限がありません")
         
     await supabase.table("videos").delete().eq("id", video_id).execute()
-    return {"message": "映像を消去しました"}
+    return {"message": "削除しました"}
 
 @router.patch("/api/videos/{video_id}/toggle_private")
 async def toggle_private(video_id: str, authorization: str = Header(None)):
@@ -263,7 +263,7 @@ async def toggle_private(video_id: str, authorization: str = Header(None)):
         
     new_status = not res.data[0].get("is_private", False)
     await supabase.table("videos").update({"is_private": new_status}).eq("id", video_id).execute()
-    return {"message": "公開設定を変更しました", "is_private": new_status}
+    return {"message": "設定を変更しました", "is_private": new_status}
 
 @router.delete("/api/comments/{comment_id}")
 async def delete_comment(comment_id: str, authorization: str = Header(None)):
@@ -282,4 +282,4 @@ async def delete_comment(comment_id: str, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail="権限がありません")
         
     await supabase.table("video_comments").delete().eq("id", comment_id).execute()
-    return {"message": "コメントを削除しました"}
+    return {"message": "削除しました"}
