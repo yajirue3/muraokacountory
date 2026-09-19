@@ -2,43 +2,123 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>映像再生</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動画再生</title>
     <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; }
-        .header { background: #1e1e1e; padding: 12px 20px; border-bottom: 1px solid #333; }
-        .btn { padding: 6px 12px; background: #2a2a2a; color: #d4af37; text-decoration: none; border-radius: 4px; border: 1px solid #444; }
-        .container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
-        .player { background: #000; width: 100%; aspect-ratio: 16/9; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
-        .player iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
-        .info { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
-        .info h1 { margin: 0 0 10px 0; font-size: 1.4rem; color: #fff; }
-        .info .meta { color: #888; font-size: 0.9rem; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px; }
-        .comments { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #333; }
-        .c-form { display: flex; gap: 10px; margin-bottom: 20px; }
-        .c-form input { flex: 1; padding: 10px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; }
-        .c-form button { padding: 10px 16px; background: #d4af37; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .c-item { background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .c-del { color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 0.8rem; }
+        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
+        
+        /* トップヘッダー */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
+        .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
+        .logo span { color: #cc0000; }
+
+        /* ボトムナビゲーション (YouTube風) */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
+        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
+        .nav-item .label { font-size: 10px; font-weight: 500; }
+        .nav-item:hover { background: #f2f2f2; }
+
+        /* コンテナ */
+        .container { max-width: 1000px; margin: 0 auto; padding: 0; }
+        
+        /* プレイヤー (16:9) */
+        .player-wrapper { width: 100%; background: #000000; position: relative; padding-top: 56.25%; /* 16:9 Aspect Ratio */ }
+        .player-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
+        
+        /* 動画情報 */
+        .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+        .title { font-size: 18px; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; }
+        .meta { font-size: 14px; color: #606060; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .channel-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #cc0000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        .author-name { font-weight: 500; font-size: 15px; }
+        .desc-box { background: #f2f2f2; border-radius: 12px; padding: 12px; font-size: 14px; white-space: pre-wrap; line-height: 1.5; color: #0f0f0f; }
+
+        /* コメント欄 */
+        .comments { padding: 16px; }
+        .comment-count { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
+        .c-form { display: flex; gap: 12px; margin-bottom: 24px; }
+        .c-form input { flex: 1; border: none; border-bottom: 1px solid #737373; padding: 4px 0; font-size: 14px; font-family: inherit; background: transparent; transition: border-bottom-color 0.2s; }
+        .c-form input:focus { outline: none; border-bottom: 2px solid #0f0f0f; }
+        .btn-submit { background: #f2f2f2; color: #0f0f0f; border: none; padding: 8px 16px; border-radius: 18px; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        .btn-submit:hover { background: #e5e5e5; }
+        .btn-submit.active { background: #065fd4; color: #fff; }
+
+        .c-item { display: flex; gap: 12px; margin-bottom: 16px; }
+        .c-avatar { width: 36px; height: 36px; border-radius: 50%; background: #606060; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; }
+        .c-content-wrap { flex: 1; }
+        .c-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .c-author { font-size: 13px; font-weight: 500; }
+        .c-text { font-size: 14px; line-height: 1.4; color: #0f0f0f; }
+        .c-del { color: #606060; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 12px; }
+        .c-del:hover { background: #f2f2f2; }
+
+        @media (min-width: 1000px) {
+            .container { padding: 24px; }
+            .player-wrapper { border-radius: 12px; overflow: hidden; }
+            header { display: none; /* PCではヘッダー不要 */ }
+            .bottom-nav { display: none; /* PCでは下部ナビ不要 */ }
+            body { padding-bottom: 0; }
+        }
     </style>
 </head>
 <body>
-    <div class="header"><a href="/videos" class="btn">← 戻る</a></div>
+    <header>
+        <a href="/videos" class="back-btn">← 戻る</a>
+        <div class="logo"><span>▶</span> Video</div>
+        <div style="width: 60px;"></div> <!-- バランス調整用 -->
+    </header>
+
     <div class="container">
-        <div class="player" id="player">読み込み中...</div>
-        <div class="info">
-            <h1 id="v-title">-</h1>
-            <div class="meta" id="v-meta">-</div>
-            <div id="v-desc" style="white-space: pre-wrap;">-</div>
+        <!-- 動画プレイヤー (即時ストリーミング再生対応) -->
+        <div class="player-wrapper" id="player-container">
+            <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
         </div>
+
+        <div class="info">
+            <h1 class="title" id="v-title">読み込み中...</h1>
+            <div class="meta" id="v-meta">
+                <span id="v-views">0 回視聴</span>
+            </div>
+            
+            <div class="channel-info">
+                <div class="avatar" id="v-avatar">?</div>
+                <div class="author-name" id="v-author">名無し</div>
+            </div>
+
+            <div class="desc-box" id="v-desc"></div>
+        </div>
+
         <div class="comments">
-            <h3 style="margin-top:0; color:#d4af37;">コメント</h3>
+            <div class="comment-count">コメント</div>
             <div class="c-form">
-                <input type="text" id="c-input" placeholder="感想を入力...">
-                <button onclick="postComment()">送信</button>
+                <div class="c-avatar" id="my-avatar">👤</div>
+                <div style="display: flex; flex-direction: column; flex: 1; align-items: flex-end; gap: 8px;">
+                    <input type="text" id="c-input" placeholder="コメントを追加..." oninput="checkInput()">
+                    <button class="btn-submit" id="btn-submit" onclick="postComment()" disabled>コメント</button>
+                </div>
             </div>
             <div id="c-list"></div>
         </div>
     </div>
+
+    <!-- スマホ用下部ナビゲーション -->
+    <nav class="bottom-nav">
+        <a href="/dashboard" class="nav-item">
+            <span class="icon">🏠</span>
+            <span class="label">ホーム</span>
+        </a>
+        <a href="/videos" class="nav-item">
+            <span class="icon">📺</span>
+            <span class="label">動画一覧</span>
+        </a>
+        <a href="/manage_videos" class="nav-item">
+            <span class="icon">📁</span>
+            <span class="label">管理所</span>
+        </a>
+    </nav>
 
     <script>
         const token = localStorage.getItem("access_token");
@@ -52,13 +132,22 @@
                 const v = await res.json();
                 
                 document.getElementById("v-title").innerText = v.title;
-                document.getElementById("v-meta").innerText = `👤 ${v.author_name} | 👀 ${v.views || 0}回`;
-                document.getElementById("v-desc").innerText = v.description || "説明なし";
-                document.getElementById("player").innerHTML = `<iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview"></iframe>`;
+                document.getElementById("v-views").innerText = `${v.views || 0} 回視聴`;
+                document.getElementById("v-author").innerText = v.author_name;
+                document.getElementById("v-avatar").innerText = v.author_name.charAt(0);
+                document.getElementById("v-desc").innerText = v.description || "説明はありません。";
+                
+                // --- Googleの処理完了を待たずに直接ストリーミング再生するHTML5プレイヤー ---
+                document.getElementById("player-container").innerHTML = `
+                    <video controls autoplay playsinline>
+                        <source src="https://drive.google.com/uc?export=download&id=${v.drive_file_id}" type="video/mp4">
+                        お使いのブラウザは動画の再生に対応していません。
+                    </video>
+                `;
                 
                 loadComments();
             } catch(e) {
-                alert("再生できません");
+                alert("再生できません。権限がないか、動画が削除されています。");
                 location.href = "/videos";
             }
         }
@@ -66,20 +155,40 @@
         async function loadComments() {
             const res = await fetch(`/api/videos/${videoId}/comments`);
             const data = await res.json();
+            
             document.getElementById("c-list").innerHTML = data.map(c => `
                 <div class="c-item">
-                    <div>
-                        <div style="font-size:0.8rem; color:#d4af37; margin-bottom:4px;">${c.author_name}</div>
-                        <div>${c.content}</div>
+                    <div class="c-avatar">${c.author_name.charAt(0)}</div>
+                    <div class="c-content-wrap">
+                        <div class="c-header">
+                            <div class="c-author">@${c.author_name}</div>
+                            <button class="c-del" onclick="delComment('${c.id}')">削除</button>
+                        </div>
+                        <div class="c-text">${c.content}</div>
                     </div>
-                    <button class="c-del" onclick="delComment('${c.id}')">削除</button>
                 </div>
             `).join('');
+        }
+
+        function checkInput() {
+            const val = document.getElementById("c-input").value.trim();
+            const btn = document.getElementById("btn-submit");
+            if (val) {
+                btn.disabled = false;
+                btn.classList.add("active");
+            } else {
+                btn.disabled = true;
+                btn.classList.remove("active");
+            }
         }
 
         async function postComment() {
             const val = document.getElementById("c-input").value;
             if(!val.trim()) return;
+            
+            const btn = document.getElementById("btn-submit");
+            btn.disabled = true;
+            
             const res = await fetch(`/api/videos/${videoId}/comments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -87,15 +196,22 @@
             });
             if (res.ok) {
                 document.getElementById("c-input").value = "";
+                checkInput();
                 loadComments();
+            } else {
+                alert("コメントの投稿に失敗しました");
+                btn.disabled = false;
             }
         }
 
         async function delComment(id) {
-            if(!confirm("削除しますか？")) return;
+            if(!confirm("このコメントを削除しますか？")) return;
             const res = await fetch(`/api/comments/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) loadComments();
-            else alert("権限がありません");
+            if (res.ok) {
+                loadComments();
+            } else {
+                alert("削除する権限がありません");
+            }
         }
 
         init();
