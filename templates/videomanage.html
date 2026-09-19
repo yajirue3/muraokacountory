@@ -2,86 +2,297 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>管理所</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>管理所 - 映像広場</title>
     <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
-        .btn { padding: 6px 12px; background: #2a2a2a; color: #fff; text-decoration: none; border-radius: 4px; border: 1px solid #444; font-size: 0.9rem; cursor: pointer; }
-        .tabs { display: flex; gap: 10px; margin: 20px 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .tab { background: none; border: none; color: #888; font-weight: bold; cursor: pointer; }
-        .tab.active { color: #d4af37; border-bottom: 2px solid #d4af37; }
-        .item { background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .title { font-weight: bold; margin-bottom: 4px; }
-        .btn-toggle { background: #2980b9; color: white; border: none; }
-        .btn-del { background: #c0392b; color: white; border: none; }
+        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #f9f9f9; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 80px; }
+        
+        /* ヘッダー */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
+        .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
+        .logo span { color: #cc0000; }
+
+        /* ボトムナビゲーション */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
+        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
+        .nav-item .label { font-size: 10px; font-weight: 500; }
+        .nav-item:hover { background: #f2f2f2; }
+        .nav-item.active { color: #cc0000; }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 0; }
+
+        /* タブ切り替え */
+        .tabs { display: flex; background: #ffffff; border-bottom: 1px solid #e5e5e5; }
+        .tab-btn { flex: 1; padding: 14px 0; text-align: center; font-size: 14px; font-weight: 500; color: #606060; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
+        .tab-btn.active { color: #0f0f0f; border-bottom: 3px solid #0f0f0f; }
+        
+        .tab-content { display: none; padding: 24px 16px; }
+        .tab-content.active { display: block; }
+
+        /* チャンネル設定フォーム */
+        .form-group { background: #fff; padding: 24px; border-radius: 12px; border: 1px solid #e5e5e5; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; color: #606060; margin-bottom: 8px; }
+        .form-group input[type="text"], .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; font-size: 15px; box-sizing: border-box; margin-bottom: 20px; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #0f0f0f; }
+        .current-avatar { width: 80px; height: 80px; border-radius: 50%; background: #e5e5e5; object-fit: cover; margin-bottom: 16px; display: block; border: 1px solid #ddd; }
+        
+        .btn-primary { background: #cc0000; color: #fff; border: none; padding: 12px 24px; border-radius: 24px; font-weight: bold; font-size: 15px; cursor: pointer; width: 100%; transition: 0.2s; }
+        .btn-primary:hover { background: #990000; }
+        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* 動画管理リスト */
+        .video-list { display: flex; flex-direction: column; gap: 16px; }
+        .v-card { display: flex; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; padding: 12px; gap: 16px; align-items: center; }
+        .v-thumb { width: 120px; aspect-ratio: 16/9; background: #e5e5e5; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+        .v-info { flex: 1; min-width: 0; }
+        .v-title { font-size: 15px; font-weight: 500; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .v-meta { font-size: 12px; color: #606060; margin-bottom: 8px; }
+        .v-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        
+        .btn-sm { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 16px; font-size: 12px; cursor: pointer; color: #0f0f0f; }
+        .btn-sm:hover { background: #f2f2f2; }
+        .btn-sm.delete { color: #cc0000; border-color: #cc0000; }
+        .btn-sm.delete:hover { background: #ffebee; }
+
+        .badge-private { background: #000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 6px; }
+
+        @media (max-width: 600px) {
+            .v-card { flex-direction: column; align-items: flex-start; }
+            .v-thumb { width: 100%; }
+        }
     </style>
 </head>
 <body>
-    <a href="/videos" class="btn">← 戻る</a>
-    <h2 style="color: #d4af37;">⚙️ 映像管理</h2>
+    <header>
+        <a href="/videos" class="back-btn">← 戻る</a>
+        <div class="logo"><span>▶</span> 管理所</div>
+        <div style="width: 60px;"></div>
+    </header>
 
-    <div class="tabs">
-        <button class="tab active" onclick="setMode('my')">自分の映像</button>
-        <button class="tab" id="king-tab" style="display:none; color:#f1c40f;" onclick="setMode('king')">👑 国王管理</button>
+    <div class="container">
+        <!-- タブナビゲーション -->
+        <div class="tabs">
+            <div class="tab-btn active" onclick="switchTab('manage')">動画の管理</div>
+            <div class="tab-btn" onclick="switchTab('settings')">チャンネル設定</div>
+        </div>
+
+        <!-- タブ: 動画の管理 -->
+        <div id="tab-manage" class="tab-content active">
+            <div class="video-list" id="my-videos">
+                <p style="text-align: center; color: #606060; padding: 20px;">読み込み中...</p>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn-sm" id="load-more-btn" onclick="loadMyVideos(true)" style="display: none; padding: 10px 20px; font-size: 14px;">さらに読み込む</button>
+            </div>
+        </div>
+
+        <!-- タブ: チャンネル設定 -->
+        <div id="tab-settings" class="tab-content">
+            <form onsubmit="updateProfile(event)" class="form-group">
+                <label>現在のアイコン</label>
+                <img id="avatar-preview" class="current-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E">
+                
+                <label>新しいアイコンをアップロード (任意)</label>
+                <input type="file" id="p-avatar" accept="image/*" style="margin-bottom: 24px; width: 100%;">
+
+                <label>チャンネル名 (ニックネーム) 必須</label>
+                <input type="text" id="p-name" required placeholder="表示名">
+
+                <label>チャンネルの説明 (任意)</label>
+                <textarea id="p-desc" rows="4" placeholder="どんなチャンネルか視聴者に伝えましょう"></textarea>
+
+                <label>外部リンク (SNSやブログのURLなど)</label>
+                <input type="text" id="p-link" placeholder="https://...">
+
+                <button type="submit" class="btn-primary" id="btn-save">設定を保存</button>
+            </form>
+        </div>
     </div>
 
-    <div id="list">読み込み中...</div>
+    <!-- スマホ用下部ナビゲーション -->
+    <nav class="bottom-nav">
+        <a href="/dashboard" class="nav-item">
+            <span class="icon">🏠</span>
+            <span class="label">ホーム</span>
+        </a>
+        <a href="/videos" class="nav-item">
+            <span class="icon">📺</span>
+            <span class="label">動画一覧</span>
+        </a>
+        <a href="/manage_videos" class="nav-item active">
+            <span class="icon">📁</span>
+            <span class="label">管理所</span>
+        </a>
+    </nav>
 
     <script>
         const token = localStorage.getItem("access_token");
         if (!token) location.href = "/";
 
-        let all = [], uid = "", king = false, mode = 'my';
+        let currentPage = 1;
+        let isFetchingVideos = false;
 
-        async function init() {
-            const res = await fetch("/api/videos", { headers: { "Authorization": `Bearer ${token}` } });
-            const data = await res.json();
-            all = data.videos;
-            uid = data.user_id;
-            king = data.is_king;
-            if (king) document.getElementById("king-tab").style.display = "inline-block";
-            render();
+        // タブ切り替えロジック
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.currentTarget.classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
         }
 
-        function setMode(m) {
-            mode = m;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            render();
-        }
-
-        function render() {
-            const target = mode === 'king' ? all : all.filter(v => v.user_id === uid);
-            const box = document.getElementById("list");
-            if (target.length === 0) {
-                box.innerHTML = "映像がありません。";
-                return;
+        // --- チャンネル設定周りの処理 ---
+        async function loadProfile() {
+            try {
+                const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                document.getElementById("p-name").value = data.nickname || "";
+                document.getElementById("p-desc").value = data.channel_desc || "";
+                document.getElementById("p-link").value = data.external_link || "";
+                
+                if(data.avatar_drive_id) {
+                    document.getElementById("avatar-preview").src = `https://drive.google.com/thumbnail?id=${data.avatar_drive_id}&sz=w200`;
+                }
+            } catch (e) {
+                console.error("プロフィール取得失敗");
             }
-            box.innerHTML = target.map(v => `
-                <div class="item">
-                    <div>
-                        <div class="title">${v.title} <span style="color:${v.is_private?'#e74c3c':'#2ecc71'}">[${v.is_private?'非公開':'公開'}]</span></div>
-                        <div style="font-size:0.8rem; color:#888;">投稿者: ${v.author_name}</div>
+        }
+
+        async function updateProfile(e) {
+            e.preventDefault();
+            const btn = document.getElementById("btn-save");
+            btn.disabled = true;
+            btn.innerText = "保存中...";
+
+            const fd = new FormData();
+            fd.append("nickname", document.getElementById("p-name").value);
+            fd.append("channel_desc", document.getElementById("p-desc").value);
+            fd.append("external_link", document.getElementById("p-link").value);
+            
+            const file = document.getElementById("p-avatar").files[0];
+            if (file) fd.append("avatar", file);
+
+            try {
+                const res = await fetch("/api/profile/update", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: fd
+                });
+                if(res.ok) {
+                    alert("チャンネル設定を保存しました");
+                    loadProfile();
+                } else {
+                    alert("エラーが発生しました");
+                }
+            } catch(e) {
+                alert("通信エラー");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "設定を保存";
+                document.getElementById("p-avatar").value = "";
+            }
+        }
+
+        // --- 動画管理周りの処理 ---
+        async function loadMyVideos(loadMore = false) {
+            if (isFetchingVideos) return;
+            isFetchingVideos = true;
+            
+            if (!loadMore) currentPage = 1;
+
+            try {
+                const res = await fetch(`/api/videos?page=${currentPage}`, { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                
+                // 自分自身の動画のみをフィルタリング（管理者の場合は全動画）
+                const myUserId = data.user_id;
+                const isKing = data.is_king;
+                const displayVideos = data.videos.filter(v => isKing || v.user_id === myUserId);
+
+                const container = document.getElementById("my-videos");
+                const btnMore = document.getElementById("load-more-btn");
+
+                if (displayVideos.length === 0 && currentPage === 1) {
+                    container.innerHTML = `<p style="text-align: center; color: #606060; padding: 20px;">投稿した動画がありません。</p>`;
+                    btnMore.style.display = 'none';
+                    return;
+                }
+
+                const html = displayVideos.map(v => {
+                    const thumbUrl = v.thumbnail_drive_id 
+                        ? `https://drive.google.com/thumbnail?id=${v.thumbnail_drive_id}&sz=w400`
+                        : `https://drive.google.com/thumbnail?id=${v.drive_file_id}&sz=w400`;
+
+                    return `
+                    <div class="v-card" id="v-${v.id}">
+                        <img src="${thumbUrl}" class="v-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'16\\' height=\\'9\\' viewBox=\\'0 0 16 9\\'%3E%3Crect fill=\\'%23f2f2f2\\' width=\\'16\\' height=\\'9\\'/%3E%3C/svg%3E';">
+                        <div class="v-info">
+                            <h3 class="v-title">${v.title}</h3>
+                            <div class="v-meta">
+                                ${v.is_private ? '<span class="badge-private">非公開</span>' : ''}
+                                👀 ${v.views || 0} 回視聴 • ${v.created_at ? v.created_at.split('T')[0] : ''}
+                            </div>
+                            <div class="v-actions">
+                                <a href="/watch?v=${v.id}" class="btn-sm" style="text-decoration: none;">視聴</a>
+                                <button class="btn-sm" onclick="togglePrivate('${v.id}')">${v.is_private ? '公開にする' : '非公開にする'}</button>
+                                <button class="btn-sm delete" onclick="deleteVideo('${v.id}')">削除</button>
+                            </div>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn btn-toggle" onclick="toggle('${v.id}')">公開切替</button>
-                        <button class="btn btn-del" onclick="del('${v.id}')">削除</button>
-                    </div>
-                </div>
-            `).join('');
+                `}).join('');
+
+                if (currentPage === 1) {
+                    container.innerHTML = html;
+                } else {
+                    container.insertAdjacentHTML('beforeend', html);
+                }
+
+                if (data.videos.length < 24) {
+                    btnMore.style.display = "none";
+                } else {
+                    btnMore.style.display = "inline-block";
+                    currentPage++;
+                }
+
+            } catch(e) {
+                console.error("動画取得失敗");
+            } finally {
+                isFetchingVideos = false;
+            }
         }
 
-        async function toggle(id) {
-            await fetch(`/api/videos/${id}/toggle_private`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` } });
-            init();
+        async function togglePrivate(id) {
+            const res = await fetch(`/api/videos/${id}/toggle_private`, { 
+                method: "PATCH", 
+                headers: { "Authorization": `Bearer ${token}` } 
+            });
+            if (res.ok) {
+                loadMyVideos();
+            } else {
+                alert("変更に失敗しました");
+            }
         }
 
-        async function del(id) {
-            if(!confirm("削除しますか？")) return;
-            await fetch(`/api/videos/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-            init();
+        async function deleteVideo(id) {
+            if (!confirm("本当にこの動画を削除しますか？\nこの操作は取り消せません。")) return;
+            
+            const res = await fetch(`/api/videos/${id}`, { 
+                method: "DELETE", 
+                headers: { "Authorization": `Bearer ${token}` } 
+            });
+            
+            if (res.ok) {
+                document.getElementById(`v-${id}`).style.display = 'none';
+            } else {
+                alert("削除に失敗しました。権限がありません。");
+            }
         }
 
-        init();
+        // 初期化実行
+        loadProfile();
+        loadMyVideos();
     </script>
 </body>
 </html>
