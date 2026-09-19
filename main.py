@@ -239,7 +239,7 @@ def get_channel(request: Request):
 
 @app.get("/subscribe", response_class=HTMLResponse)
 def get_subscribe(request: Request):
-    return templates.TemplateResponse(request=request, name="substrate.html")
+    return templates.TemplateResponse(request=request, name="subscribe.html")
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
