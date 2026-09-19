@@ -200,6 +200,7 @@ async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str =
 # --- 【変更】ステップ1: ダイレクトアップロード用の専用URLを取得 ---
 @router.post("/api/videos/get_upload_url")
 async def get_upload_url(
+    request: Request,
     filename: str = Form(...),
     file_size: int = Form(...),
     mime_type: str = Form(...),
@@ -208,12 +209,16 @@ async def get_upload_url(
     user = await get_user_from_token(authorization)
     token = await get_gdrive_access_token()
 
+    origin = request.headers.get("origin") or "https://countory.onrender.com"
+
     init_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json; charset=UTF-8",
         "X-Upload-Content-Type": mime_type,
-        "X-Upload-Content-Length": str(file_size)
+        "X-Upload-Content-Length": str(file_size),
+        "Origin": origin,
+        "Access-Control-Request-Headers": "content-range,content-type"
     }
     metadata = {"name": filename}
     if FOLDER_ID:
@@ -232,7 +237,7 @@ async def get_upload_url(
 async def save_metadata(
     title: str = Form(...),
     description: str = Form(""),
-    is_private: bool = Form(False),
+    is_private: str = Form("false"),
     drive_file_id: str = Form(...),
     mime_type: str = Form(...),
     thumbnail: Optional[UploadFile] = File(None),
@@ -241,22 +246,30 @@ async def save_metadata(
     user = await get_user_from_token(authorization)
     supabase = await get_supabase()
 
+    is_private_bool = str(is_private).lower() in ("true", "1", "t")
+
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
     
     # アップロードされた動画の権限を一般公開(Anyone)に設定
-    token = await get_gdrive_access_token()
-    perm_url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}/permissions"
-    await http_client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
+    try:
+        token = await get_gdrive_access_token()
+        perm_url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}/permissions"
+        await http_client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
+    except Exception as e:
+        print(f"Permission Error: {e}")
 
     # サムネイルは軽いので従来通りサーバー経由
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
-        thumbnail.file.seek(0, os.SEEK_END)
-        t_file_size = thumbnail.file.tell()
-        thumbnail.file.seek(0)
-        t_mime = thumbnail.content_type or "image/jpeg"
-        thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
+        try:
+            thumbnail.file.seek(0, os.SEEK_END)
+            t_file_size = thumbnail.file.tell()
+            thumbnail.file.seek(0)
+            t_mime = thumbnail.content_type or "image/jpeg"
+            thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
+        except Exception as e:
+            print(f"Thumbnail Error: {e}")
 
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
@@ -265,7 +278,7 @@ async def save_metadata(
         "description": description,
         "drive_file_id": drive_file_id,
         "thumbnail_drive_id": thumbnail_drive_id,
-        "is_private": is_private,
+        "is_private": is_private_bool,
         "views": 0,
         "mime_type": mime_type
     }).execute()
