@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional
 import httpx
@@ -19,6 +20,9 @@ CLIENT_ID = os.getenv("GDRIVE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GDRIVE_CLIENT_SECRET")
 REFRESH_TOKEN = os.getenv("GDRIVE_REFRESH_TOKEN")
 FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
+
+# --- 連続再生数稼ぎ防止用のメモリキャッシュ ---
+_view_history = {}
 
 class CommentCreate(BaseModel):
     content: str
@@ -154,7 +158,7 @@ async def upload_video(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    # 2. サムネイルの保存とアップロード（バグ修正済み：チャンク書き込みで確実にディスクに保存）
+    # 2. サムネイルの保存とアップロード
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
         t_suffix = Path(thumbnail.filename).suffix or ".jpg"
@@ -202,12 +206,21 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
     if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
         raise HTTPException(status_code=403, detail="非公開の動画です")
     
-    try:
-        current_views = video.get("views") or 0
-        await supabase.table("videos").update({"views": current_views + 1}).eq("id", video_id).execute()
-        video["views"] = current_views + 1
-    except Exception:
-        pass
+    # --- F5連打の再生数稼ぎ対策 ---
+    now = time.time()
+    view_key = f"{user.id}_{video_id}"
+    last_viewed = _view_history.get(view_key, 0)
+    
+    # 前回アクセスから3600秒（1時間）経過していればカウントアップ
+    if now - last_viewed > 3600:
+        try:
+            current_views = video.get("views") or 0
+            await supabase.table("videos").update({"views": current_views + 1}).eq("id", video_id).execute()
+            video["views"] = current_views + 1
+            _view_history[view_key] = now  # 履歴を更新
+        except Exception:
+            pass
+
     return video
 
 @router.get("/api/videos/{video_id}/comments")
