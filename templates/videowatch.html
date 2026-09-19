@@ -261,11 +261,13 @@
 
                 document.getElementById("v-avatar-container").innerHTML = createAvatarHTML(v.avatar_drive_id, v.author_name, "avatar");
                 
-                // --- 【究極高速化】プレロードとクロスオリジン許可 ---
-                // preload="auto" でブラウザに最速でインデックスを取りに行かせる
+                // --- 【究極高速化】Google Drive 直リンクへの変更 ---
+                // Renderを経由せず、直接Googleのサーバーから動画をダウンロードして再生させる
+                const streamUrl = `https://lh3.googleusercontent.com/d/${v.drive_file_id}`;
+                
                 document.getElementById("player-container").innerHTML = `
-                    <video controls autoplay playsinline preload="auto" crossorigin="anonymous">
-                        <source src="/api/videos/${videoId}/stream">
+                    <video controls autoplay playsinline preload="auto">
+                        <source src="${streamUrl}">
                         お使いのブラウザは動画の再生に対応していません。
                     </video>
                 `;
