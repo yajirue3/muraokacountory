@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>動画再生 - M-Tube</title>
     <style>
-        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 70px; }
         
         header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
         .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
 
-        /* ボトムナビゲーション (統一仕様) */
+        /* ボトムナビゲーション */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; height: 100%; cursor: pointer; border: none; background: transparent; padding: 0; margin: 0; }
         .nav-item .icon-wrap { height: 24px; display: flex; align-items: center; justify-content: center; }
@@ -23,18 +24,28 @@
 
         .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        /* プレイヤー設定 (HTML5 Videoタグ用) */
+        /* プレイヤー設定 */
         .player-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; background: #000000; overflow: hidden; }
         .player-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
         
         .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
         .title { font-size: 18px; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; }
         .meta { font-size: 14px; color: #606060; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .channel-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #cc0000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        
+        .channel-info { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+        .channel-author-wrap { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #cc0000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; object-fit: cover; flex-shrink: 0; }
         .author-name { font-weight: 500; font-size: 15px; }
+
+        /* 登録ボタン */
+        .btn-subscribe { background: #0f0f0f; color: #ffffff; border: none; padding: 0 16px; height: 36px; border-radius: 18px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-subscribe:hover { background: #272727; }
+        .btn-subscribe.subscribed { background: #f2f2f2; color: #0f0f0f; }
+        .btn-subscribe.subscribed:hover { background: #e5e5e5; }
+
         .desc-box { background: #f2f2f2; border-radius: 12px; padding: 12px; font-size: 14px; white-space: pre-wrap; line-height: 1.5; color: #0f0f0f; }
 
+        /* コメント */
         .comments { padding: 16px; }
         .comment-count { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
         .c-form { display: flex; gap: 16px; margin-bottom: 24px; }
@@ -47,7 +58,7 @@
         .btn-submit.active { background: #065fd4; color: #fff; }
 
         .c-item { display: flex; gap: 12px; margin-bottom: 16px; }
-        .c-avatar { width: 36px; height: 36px; border-radius: 50%; background: #606060; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; }
+        .c-avatar { width: 36px; height: 36px; border-radius: 50%; background: #606060; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; object-fit: cover; }
         .c-content-wrap { flex: 1; }
         .c-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
         .c-author { font-size: 13px; font-weight: 500; }
@@ -87,7 +98,7 @@
     </header>
 
     <div class="container">
-        <!-- 最強のストリーミングプレイヤー (自社サーバー経由) -->
+        <!-- ストリーミングプレイヤー -->
         <div class="player-wrapper" id="player-container">
             <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
         </div>
@@ -99,17 +110,24 @@
             </div>
             
             <div class="channel-info">
-                <div class="avatar" id="v-avatar">?</div>
-                <div class="author-name" id="v-author">名無し</div>
+                <a href="#" id="v-author-link" class="channel-author-wrap">
+                    <div id="v-avatar-container">
+                        <div class="avatar" id="v-avatar">?</div>
+                    </div>
+                    <div class="author-name" id="v-author">名無し</div>
+                </a>
+                <button class="btn-subscribe" id="btn-subscribe" onclick="toggleSubscribe()" style="display: none;">チャンネル登録</button>
             </div>
 
             <div class="desc-box" id="v-desc"></div>
         </div>
 
         <div class="comments">
-            <div class="comment-count">コメント</div>
+            <div class="comment-count" id="c-count">コメント</div>
             <div class="c-form">
-                <div class="c-avatar" id="my-avatar">👤</div>
+                <div id="my-avatar-container">
+                    <div class="c-avatar" id="my-avatar">👤</div>
+                </div>
                 <div class="c-input-wrapper">
                     <input type="text" id="c-input" placeholder="コメントを追加..." oninput="checkInput()">
                     <div class="c-actions">
@@ -123,31 +141,22 @@
 
     <!-- スマホ用下部ナビゲーション -->
     <nav class="bottom-nav">
-        <!-- 1. 動画一覧 -->
         <a href="/videos" class="nav-item">
             <div class="icon-wrap"><span class="icon">🎬</span></div>
             <span class="label">動画一覧</span>
         </a>
-        
-        <!-- 2. 自分のチャンネル -->
         <a href="javascript:void(0)" id="my-channel-btn" onclick="goToMyChannel()" class="nav-item">
             <div class="icon-wrap"><span class="icon">👤</span></div>
             <span class="label">チャンネル</span>
         </a>
-        
-        <!-- 3. アップロード (真ん中) -->
         <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
             <div class="icon-wrap"><span class="icon-plus">⊕</span></div>
             <span class="label">アップロード</span>
         </div>
-        
-        <!-- 4. 登録チャンネル -->
         <a href="/subscribe" class="nav-item">
             <div class="icon-wrap"><span class="icon">🔔</span></div>
             <span class="label">登録チャンネル</span>
         </a>
-        
-        <!-- 5. 管理ページ -->
         <a href="/manage_videos" class="nav-item">
             <div class="icon-wrap"><span class="icon">⚙️</span></div>
             <span class="label">管理</span>
@@ -192,8 +201,20 @@
         if (!token || !videoId) location.href = "/videos";
 
         let myUserId = null;
+        let authorUserId = null;
+        let isSubscribed = false;
 
-        // 自分のチャンネルへ移動する処理
+        // アイコン要素生成ヘルパー
+        function createAvatarHTML(avatarDriveId, name, className = 'avatar') {
+            if (avatarDriveId) {
+                const src = `https://drive.google.com/thumbnail?id=${avatarDriveId}&sz=w100`;
+                return `<img src="${src}" class="${className}" alt="${name || ''}">`;
+            } else {
+                const initial = (name && name.length > 0) ? name.charAt(0).toUpperCase() : '?';
+                return `<div class="${className}">${initial}</div>`;
+            }
+        }
+
         async function goToMyChannel() {
             if (myUserId) {
                 location.href = `/channel?id=${myUserId}`;
@@ -219,17 +240,39 @@
 
         async function init() {
             try {
+                // 自分のプロフィール情報・アイコンを取得
+                fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(prof => { 
+                        if (prof) {
+                            myUserId = prof.id;
+                            const myAvatarWrap = document.getElementById("my-avatar-container");
+                            myAvatarWrap.innerHTML = createAvatarHTML(prof.avatar_drive_id || prof.avatar_url, prof.nickname || prof.username, "c-avatar");
+                        }
+                    })
+                    .catch(() => {});
+
+                // 動画詳細取得
                 const res = await fetch(`/api/videos/${videoId}`, { headers: { "Authorization": `Bearer ${token}` } });
                 if (!res.ok) throw new Error();
                 const v = await res.json();
                 
+                authorUserId = v.author_id || v.user_id;
+
                 document.getElementById("v-title").innerText = v.title;
                 document.getElementById("v-views").innerText = `${v.views || 0} 回視聴`;
-                document.getElementById("v-author").innerText = v.author_name;
-                document.getElementById("v-avatar").innerText = v.author_name.charAt(0);
+                document.getElementById("v-author").innerText = v.author_name || "名無し";
                 document.getElementById("v-desc").innerText = v.description || "説明はありません。";
                 
-                // 自社サーバーのストリーミングAPIを経由させることでスマホのブロックを突破
+                if (authorUserId) {
+                    document.getElementById("v-author-link").href = `/channel?id=${authorUserId}`;
+                }
+
+                // アイコンの判定＆表示
+                const avatarDriveId = v.author_avatar_drive_id || v.avatar_drive_id || v.author_avatar;
+                document.getElementById("v-avatar-container").innerHTML = createAvatarHTML(avatarDriveId, v.author_name, "avatar");
+                
+                // 動画プレイヤー
                 document.getElementById("player-container").innerHTML = `
                     <video controls autoplay playsinline>
                         <source src="/api/videos/${videoId}/stream" type="video/mp4">
@@ -237,11 +280,8 @@
                     </video>
                 `;
                 
-                // 自分のIDを事前に取得（ボトムナビ用）
-                fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } })
-                    .then(r => r.json())
-                    .then(prof => { if (prof && prof.id) myUserId = prof.id; })
-                    .catch(() => {});
+                // チャンネル登録ボタンの初期設定
+                checkSubscriptionStatus();
 
                 loadComments();
             } catch(e) {
@@ -250,22 +290,97 @@
             }
         }
 
-        async function loadComments() {
-            const res = await fetch(`/api/videos/${videoId}/comments`);
-            const data = await res.json();
+        // 登録状態の判定
+        async function checkSubscriptionStatus() {
+            if (!authorUserId) return;
+            const subBtn = document.getElementById("btn-subscribe");
             
-            document.getElementById("c-list").innerHTML = data.map(c => `
-                <div class="c-item">
-                    <div class="c-avatar">${c.author_name.charAt(0)}</div>
-                    <div class="c-content-wrap">
-                        <div class="c-header">
-                            <div class="c-author">@${c.author_name}</div>
-                            <button class="c-del" onclick="delComment('${c.id}')">削除</button>
+            // 自分の動画の場合は登録ボタンを表示しない
+            if (myUserId && myUserId === authorUserId) {
+                subBtn.style.display = "none";
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/subscriptions/check?channel_id=${authorUserId}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    isSubscribed = !!data.is_subscribed;
+                }
+            } catch(e) {}
+
+            updateSubscribeButton();
+            subBtn.style.display = "inline-flex";
+        }
+
+        function updateSubscribeButton() {
+            const subBtn = document.getElementById("btn-subscribe");
+            if (isSubscribed) {
+                subBtn.innerText = "登録済み";
+                subBtn.classList.add("subscribed");
+            } else {
+                subBtn.innerText = "チャンネル登録";
+                subBtn.classList.remove("subscribed");
+            }
+        }
+
+        // チャンネル登録 / 解除の実行
+        async function toggleSubscribe() {
+            if (!authorUserId) return;
+            const subBtn = document.getElementById("btn-subscribe");
+            subBtn.disabled = true;
+
+            const method = isSubscribed ? "DELETE" : "POST";
+            try {
+                const res = await fetch(`/api/channels/${authorUserId}/subscribe`, {
+                    method: method,
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    isSubscribed = !isSubscribed;
+                    updateSubscribeButton();
+                } else {
+                    alert("処理に失敗しました。");
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました。");
+            } finally {
+                subBtn.disabled = false;
+            }
+        }
+
+        // コメント一覧読み込み
+        async function loadComments() {
+            try {
+                const res = await fetch(`/api/videos/${videoId}/comments`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                document.getElementById("c-count").innerText = `コメント (${data.length})`;
+                document.getElementById("c-list").innerHTML = data.map(c => {
+                    const avatarHTML = createAvatarHTML(c.author_avatar_drive_id || c.avatar_drive_id, c.author_name, "c-avatar");
+                    const canDelete = (myUserId && (c.author_id === myUserId || c.user_id === myUserId));
+
+                    return `
+                    <div class="c-item">
+                        ${avatarHTML}
+                        <div class="c-content-wrap">
+                            <div class="c-header">
+                                <div class="c-author">${c.author_name || '名無し'}</div>
+                                ${canDelete ? `<button class="c-del" onclick="delComment('${c.id}')">削除</button>` : ''}
+                            </div>
+                            <div class="c-text">${c.content}</div>
                         </div>
-                        <div class="c-text">${c.content}</div>
                     </div>
-                </div>
-            `).join('');
+                `}).join('');
+            } catch(e) {
+                console.error(e);
+            }
         }
 
         function checkInput() {
@@ -287,28 +402,37 @@
             const btn = document.getElementById("btn-submit");
             btn.disabled = true;
             
-            const res = await fetch(`/api/videos/${videoId}/comments`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ content: val })
-            });
-            if (res.ok) {
-                document.getElementById("c-input").value = "";
-                checkInput();
-                loadComments();
-            } else {
-                alert("コメントの投稿に失敗しました");
+            try {
+                const res = await fetch(`/api/videos/${videoId}/comments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ content: val })
+                });
+                if (res.ok) {
+                    document.getElementById("c-input").value = "";
+                    checkInput();
+                    loadComments();
+                } else {
+                    alert("コメントの投稿に失敗しました");
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
                 btn.disabled = false;
             }
         }
 
         async function delComment(id) {
             if(!confirm("このコメントを削除しますか？")) return;
-            const res = await fetch(`/api/comments/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                loadComments();
-            } else {
-                alert("削除する権限がありません");
+            try {
+                const res = await fetch(`/api/comments/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    loadComments();
+                } else {
+                    alert("削除する権限がないか、エラーが発生しました");
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
             }
         }
 
@@ -343,7 +467,7 @@
                     e.target.reset();
                 } else {
                     const err = await res.json();
-                    alert("エラー: " + err.detail);
+                    alert("エラー: " + (err.detail || "アップロード失敗"));
                 }
             } catch(e) {
                 alert("通信エラーが発生しました");
