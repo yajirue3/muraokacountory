@@ -128,6 +128,74 @@ async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(Non
     
     return {"videos": res.data or [], "is_king": king_status, "user_id": str(user.id)}
 
+# --- 登録中チャンネル一覧の取得 ---
+@router.get("/api/subscriptions")
+async def get_my_subscriptions(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    try:
+        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
+        if not sub_res.data:
+            return []
+
+        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
+        if not channel_ids:
+            return []
+
+        prof_res = await supabase.table("profiles").select("id, nickname, avatar_drive_id").in_("id", channel_ids).execute()
+        return prof_res.data or []
+    except Exception as e:
+        print(f"[ERROR] get_my_subscriptions: {e}")
+        return []
+
+# --- 登録チャンネルの新着動画一覧の取得 (※ /api/videos/{video_id} より上に定義する必要あり) ---
+@router.get("/api/videos/subscribed")
+async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    try:
+        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
+        if not sub_res.data:
+            return {"videos": []}
+
+        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
+        if not channel_ids:
+            return {"videos": []}
+
+        limit = 24
+        offset = (page - 1) * limit
+
+        vid_res = await supabase.table("videos") \
+            .select("*") \
+            .in_("user_id", channel_ids) \
+            .eq("is_private", False) \
+            .order("created_at", desc=True) \
+            .range(offset, offset + limit - 1) \
+            .execute()
+
+        videos = vid_res.data or []
+        if not videos:
+            return {"videos": []}
+
+        author_ids = list(set([str(v["user_id"]) for v in videos if v.get("user_id")]))
+        if author_ids:
+            try:
+                prof_res = await supabase.table("profiles").select("id, avatar_drive_id").in_("id", author_ids).execute()
+                prof_map = {str(p["id"]): p.get("avatar_drive_id") for p in (prof_res.data or [])}
+
+                for v in videos:
+                    v["author_avatar_drive_id"] = prof_map.get(str(v.get("user_id")))
+            except Exception as p_err:
+                print(f"[WARNING] プロフィール取得失敗: {p_err}")
+
+        return {"videos": videos}
+
+    except Exception as e:
+        print(f"[ERROR] get_subscribed_videos: {e}")
+        return {"videos": []}
+
 @router.post("/api/videos/upload")
 async def upload_video(
     title: str = Form(...),
@@ -438,72 +506,3 @@ async def toggle_subscribe(channel_id: str, authorization: str = Header(None)):
             "channel_id": channel_id
         }).execute()
         return {"message": "チャンネル登録しました", "is_subscribed": True}
-
-# --- 登録中チャンネル一覧の取得 ---
-@router.get("/api/subscriptions")
-async def get_my_subscriptions(authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    supabase = await get_supabase()
-
-    try:
-        # 自分が登録しているチャンネルのID一覧を取得
-        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
-        if not sub_res.data:
-            return []
-
-        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
-        if not channel_ids:
-            return []
-
-        # プロフィール情報をまとめて取得
-        prof_res = await supabase.table("profiles").select("id, nickname, avatar_drive_id").in_("id", channel_ids).execute()
-        return prof_res.data or []
-    except Exception as e:
-        print(f"Error in get_my_subscriptions: {e}")
-        return []
-
-# --- 登録チャンネルの新着動画一覧の取得 ---
-@router.get("/api/videos/subscribed")
-async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
-    supabase = await get_supabase()
-
-    try:
-        # 1. 自分が登録しているチャンネルのID一覧を取得
-        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
-        if not sub_res.data:
-            return []
-
-        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
-        if not channel_ids:
-            return []
-
-        limit = 24
-        offset = (page - 1) * limit
-
-        # 2. 登録チャンネルが投稿した公開動画を取得 (.in_ に渡す配列を確定させる)
-        vid_res = await supabase.table("videos") \
-            .select("*") \
-            .in_("user_id", channel_ids) \
-            .eq("is_private", False) \
-            .order("created_at", desc=True) \
-            .range(offset, offset + limit - 1) \
-            .execute()
-
-        videos = vid_res.data or []
-        if not videos:
-            return []
-
-        # 3. 動画投稿者のプロフィール（アイコン等）を追加取得して結合
-        author_ids = list(set([str(v["user_id"]) for v in videos if v.get("user_id")]))
-        if author_ids:
-            prof_res = await supabase.table("profiles").select("id, avatar_drive_id").in_("id", author_ids).execute()
-            prof_map = {str(p["id"]): p.get("avatar_drive_id") for p in (prof_res.data or [])}
-
-            for v in videos:
-                v["author_avatar_drive_id"] = prof_map.get(str(v.get("user_id")))
-
-        return videos
-    except Exception as e:
-        print(f"Error in get_subscribed_videos: {e}")
-        raise HTTPException(status_code=500, detail=f"動画一覧の取得に失敗しました: {str(e)}")
