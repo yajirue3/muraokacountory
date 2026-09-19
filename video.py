@@ -108,10 +108,9 @@ async def get_watch_page(request: Request):
 async def get_manage_page(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
-# --- 追加: チャンネル設定画面へのルーティング ---
-@router.get("/channel_settings", response_class=HTMLResponse)
-async def get_channel_settings_page(request: Request):
-    return templates.TemplateResponse(request=request, name="settings.html")
+@router.get("/channel", response_class=HTMLResponse)
+async def get_channel_page(request: Request):
+    return templates.TemplateResponse(request=request, name="channel.html")
 
 @router.get("/api/videos")
 async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
@@ -207,7 +206,6 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
     if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
         raise HTTPException(status_code=403, detail="非公開の動画です")
     
-    # 投稿者のプロフィール情報（アイコン、説明、リンク）も取得して結合
     prof_res = await supabase.table("profiles").select("avatar_drive_id, channel_desc, external_link").eq("id", video["user_id"]).execute()
     if prof_res.data:
         prof = prof_res.data[0]
@@ -341,7 +339,6 @@ async def delete_comment(comment_id: str, authorization: str = Header(None)):
     await supabase.table("video_comments").delete().eq("id", comment_id).execute()
     return {"message": "削除しました"}
 
-# --- 追加: プロフィール管理用API ---
 @router.get("/api/profile/me")
 async def get_my_profile(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -385,3 +382,59 @@ async def update_profile(
 
     await supabase.table("profiles").update(update_data).eq("id", user.id).execute()
     return {"message": "プロフィールを更新しました", "data": update_data}
+
+# --- チャンネル情報の取得 ---
+@router.get("/api/channel/{channel_id}")
+async def get_channel_info(channel_id: str, page: int = Query(1, ge=1)):
+    supabase = await get_supabase()
+    
+    prof_res = await supabase.table("profiles").select("*").eq("id", channel_id).execute()
+    if not prof_res.data:
+        raise HTTPException(status_code=404, detail="チャンネルが見つかりません")
+    profile = prof_res.data[0]
+
+    sub_res = await supabase.table("subscriptions").select("*", count="exact").eq("channel_id", channel_id).execute()
+    sub_count = sub_res.count if sub_res.count else 0
+
+    limit = 24
+    offset = (page - 1) * limit
+    vid_res = await supabase.table("videos").select("*").eq("user_id", channel_id).eq("is_private", False).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+
+    return {
+        "profile": profile,
+        "subscriber_count": sub_count,
+        "videos": vid_res.data or []
+    }
+
+# --- チャンネル登録状態の確認 ---
+@router.get("/api/channel/{channel_id}/status")
+async def check_subscribe_status(channel_id: str, authorization: str = Header(None)):
+    if not authorization:
+        return {"is_subscribed": False}
+    try:
+        user = await get_user_from_token(authorization)
+        supabase = await get_supabase()
+        res = await supabase.table("subscriptions").select("id").eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+        return {"is_subscribed": len(res.data) > 0}
+    except:
+        return {"is_subscribed": False}
+
+# --- チャンネル登録の実行・解除 ---
+@router.post("/api/channel/{channel_id}/subscribe")
+async def toggle_subscribe(channel_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if str(user.id) == channel_id:
+        raise HTTPException(status_code=400, detail="自分自身は登録できません")
+
+    supabase = await get_supabase()
+    res = await supabase.table("subscriptions").select("*").eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+    
+    if res.data:
+        await supabase.table("subscriptions").delete().eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+        return {"message": "登録を解除しました", "is_subscribed": False}
+    else:
+        await supabase.table("subscriptions").insert({
+            "subscriber_id": str(user.id),
+            "channel_id": channel_id
+        }).execute()
+        return {"message": "チャンネル登録しました", "is_subscribed": True}
