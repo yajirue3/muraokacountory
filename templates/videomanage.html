@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>管理所 - 映像広場</title>
+    <title>管理 - M-Tube</title>
     <style>
         body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #f9f9f9; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 80px; }
         
@@ -13,13 +13,14 @@
         .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
 
-        /* ボトムナビゲーション */
+        /* ボトムナビゲーション (統一仕様) */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
-        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
-        .nav-item .label { font-size: 10px; font-weight: 500; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; height: 100%; cursor: pointer; border: none; background: transparent; padding: 0; margin: 0; }
+        .nav-item .icon-wrap { height: 24px; display: flex; align-items: center; justify-content: center; }
+        .nav-item .icon { font-size: 20px; line-height: 1; }
+        .nav-item .icon-plus { font-size: 24px; line-height: 1; font-weight: 300; }
+        .nav-item .label { font-size: 10px; font-weight: 500; margin-top: 2px; line-height: 1; }
         .nav-item:hover { background: #f2f2f2; }
-        .nav-item.active { color: #cc0000; }
 
         .container { max-width: 800px; margin: 0 auto; padding: 0; }
 
@@ -58,6 +59,21 @@
 
         .badge-private { background: #000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 6px; }
 
+        /* モーダル */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 200; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: #ffffff; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal h3 { margin: 0 0 20px 0; font-size: 18px; color: #0f0f0f; }
+        .modal .form-group { padding: 0; border: none; background: transparent; }
+        .modal .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #606060; }
+        .modal input[type="text"], .modal textarea, .modal input[type="file"] { width: 100%; padding: 10px; border: 1px solid #cccccc; border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 14px; margin-bottom: 0; }
+        .modal input[type="text"]:focus, .modal textarea:focus { outline: none; border-color: #0f0f0f; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 20px 0; cursor: pointer; color: #0f0f0f; }
+        .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        .btn { border: none; border-radius: 18px; padding: 0 16px; height: 36px; font-size: 14px; font-weight: 500; cursor: pointer; background: #f2f2f2; color: #0f0f0f; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:hover { background: #e5e5e5; }
+        .btn-primary-modal { background: #cc0000; color: #ffffff; }
+        .btn-primary-modal:hover { background: #990000; }
+
         @media (max-width: 600px) {
             .v-card { flex-direction: column; align-items: flex-start; }
             .v-thumb { width: 100%; }
@@ -66,16 +82,16 @@
 </head>
 <body>
     <header>
-        <a href="/videos" class="back-btn">← 戻る</a>
-        <div class="logo"><span>▶</span> 管理所</div>
+        <a href="javascript:history.back()" class="back-btn">← 戻る</a>
+        <div class="logo"><span>▶</span> M-Tube</div>
         <div style="width: 60px;"></div>
     </header>
 
     <div class="container">
         <!-- タブナビゲーション -->
         <div class="tabs">
-            <div class="tab-btn active" onclick="switchTab('manage')">動画の管理</div>
-            <div class="tab-btn" onclick="switchTab('settings')">チャンネル設定</div>
+            <div class="tab-btn active" onclick="switchTab('manage', event)">動画の管理</div>
+            <div class="tab-btn" onclick="switchTab('settings', event)">チャンネル設定</div>
         </div>
 
         <!-- タブ: 動画の管理 -->
@@ -113,19 +129,68 @@
 
     <!-- スマホ用下部ナビゲーション -->
     <nav class="bottom-nav">
-        <a href="/dashboard" class="nav-item">
-            <span class="icon">🏠</span>
-            <span class="label">ホーム</span>
-        </a>
+        <!-- 1. 動画一覧 -->
         <a href="/videos" class="nav-item">
-            <span class="icon">📺</span>
+            <div class="icon-wrap"><span class="icon">🎬</span></div>
             <span class="label">動画一覧</span>
         </a>
-        <a href="/manage_videos" class="nav-item active">
-            <span class="icon">📁</span>
-            <span class="label">管理所</span>
+        
+        <!-- 2. 自分のチャンネル -->
+        <a href="javascript:void(0)" id="my-channel-btn" onclick="goToMyChannel()" class="nav-item">
+            <div class="icon-wrap"><span class="icon">👤</span></div>
+            <span class="label">チャンネル</span>
+        </a>
+        
+        <!-- 3. アップロード (真ん中) -->
+        <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
+            <div class="icon-wrap"><span class="icon-plus">⊕</span></div>
+            <span class="label">アップロード</span>
+        </div>
+        
+        <!-- 4. 登録チャンネル -->
+        <a href="/subscribe" class="nav-item">
+            <div class="icon-wrap"><span class="icon">🔔</span></div>
+            <span class="label">登録チャンネル</span>
+        </a>
+        
+        <!-- 5. 管理ページ -->
+        <a href="/manage_videos" class="nav-item">
+            <div class="icon-wrap"><span class="icon">⚙️</span></div>
+            <span class="label">管理</span>
         </a>
     </nav>
+
+    <!-- アップロード用モーダル -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h3>動画のアップロード</h3>
+            <form onsubmit="uploadVideo(event)">
+                <div class="form-group">
+                    <label class="modal form-label">タイトル (必須)</label>
+                    <input type="text" id="up-title" required placeholder="タイトルを追加">
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="modal form-label">説明 (任意)</label>
+                    <textarea id="up-desc" placeholder="動画について視聴者に伝える..." rows="3"></textarea>
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="modal form-label">動画ファイル (必須)</label>
+                    <input type="file" id="up-file" accept="video/*" required>
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="modal form-label">サムネイル画像 (任意)</label>
+                    <input type="file" id="up-thumb" accept="image/*">
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="up-private"> 非公開
+                </label>
+                <div class="actions">
+                    <button type="button" class="btn" onclick="document.getElementById('modal').style.display='none'">キャンセル</button>
+                    <button type="submit" class="btn btn-primary-modal" id="btn-up">アップロード</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         const token = localStorage.getItem("access_token");
@@ -133,13 +198,40 @@
 
         let currentPage = 1;
         let isFetchingVideos = false;
+        let myUserId = null;
+
+        // 自分のチャンネルへ移動する処理
+        async function goToMyChannel() {
+            if (myUserId) {
+                location.href = `/channel?id=${myUserId}`;
+                return;
+            }
+            try {
+                const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    const profile = await res.json();
+                    if (profile && profile.id) {
+                        myUserId = profile.id;
+                        location.href = `/channel?id=${myUserId}`;
+                    } else {
+                        location.href = "/channel";
+                    }
+                } else {
+                    location.href = "/channel";
+                }
+            } catch(e) {
+                location.href = "/channel";
+            }
+        }
 
         // タブ切り替えロジック
-        function switchTab(tabId) {
+        function switchTab(tabId, e) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            event.currentTarget.classList.add('active');
+            if (e && e.currentTarget) {
+                e.currentTarget.classList.add('active');
+            }
             document.getElementById(`tab-${tabId}`).classList.add('active');
         }
 
@@ -148,6 +240,8 @@
             try {
                 const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
                 const data = await res.json();
+                if (data && data.id) myUserId = data.id;
+
                 document.getElementById("p-name").value = data.nickname || "";
                 document.getElementById("p-desc").value = data.channel_desc || "";
                 document.getElementById("p-link").value = data.external_link || "";
@@ -207,9 +301,11 @@
                 const data = await res.json();
                 
                 // 自分自身の動画のみをフィルタリング（管理者の場合は全動画）
-                const myUserId = data.user_id;
+                const currentMyId = data.user_id;
+                if (currentMyId) myUserId = currentMyId;
+
                 const isKing = data.is_king;
-                const displayVideos = data.videos.filter(v => isKing || v.user_id === myUserId);
+                const displayVideos = data.videos.filter(v => isKing || v.user_id === currentMyId);
 
                 const container = document.getElementById("my-videos");
                 const btnMore = document.getElementById("load-more-btn");
@@ -287,6 +383,48 @@
                 document.getElementById(`v-${id}`).style.display = 'none';
             } else {
                 alert("削除に失敗しました。権限がありません。");
+            }
+        }
+
+        // アップロード処理
+        async function uploadVideo(e) {
+            e.preventDefault();
+            const btn = document.getElementById("btn-up");
+            btn.disabled = true;
+            btn.innerText = "アップロード中...";
+
+            const fd = new FormData();
+            fd.append("title", document.getElementById("up-title").value);
+            fd.append("description", document.getElementById("up-desc").value);
+            fd.append("is_private", document.getElementById("up-private").checked);
+            fd.append("file", document.getElementById("up-file").files[0]);
+
+            const thumbFile = document.getElementById("up-thumb").files[0];
+            if (thumbFile) {
+                fd.append("thumbnail", thumbFile);
+            }
+
+            try {
+                const res = await fetch("/api/videos/upload", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: fd
+                });
+                
+                if (res.ok) {
+                    alert("アップロードが完了しました");
+                    document.getElementById("modal").style.display = 'none';
+                    e.target.reset();
+                    loadMyVideos();
+                } else {
+                    const err = await res.json();
+                    alert("エラー: " + err.detail);
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "アップロード";
             }
         }
 
