@@ -108,6 +108,11 @@ async def get_watch_page(request: Request):
 async def get_manage_page(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
+# --- 追加: チャンネル設定画面へのルーティング ---
+@router.get("/channel_settings", response_class=HTMLResponse)
+async def get_channel_settings_page(request: Request):
+    return templates.TemplateResponse(request=request, name="settings.html")
+
 @router.get("/api/videos")
 async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -202,6 +207,14 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
     if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
         raise HTTPException(status_code=403, detail="非公開の動画です")
     
+    # 投稿者のプロフィール情報（アイコン、説明、リンク）も取得して結合
+    prof_res = await supabase.table("profiles").select("avatar_drive_id, channel_desc, external_link").eq("id", video["user_id"]).execute()
+    if prof_res.data:
+        prof = prof_res.data[0]
+        video["avatar_drive_id"] = prof.get("avatar_drive_id")
+        video["channel_desc"] = prof.get("channel_desc")
+        video["external_link"] = prof.get("external_link")
+    
     now = time.time()
     view_key = f"{user.id}_{video_id}"
     last_viewed = _view_history.get(view_key, 0)
@@ -217,7 +230,6 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
 
     return video
 
-# --- 最強のスマホ対応：自前ストリーミング中継機能 ---
 @router.get("/api/videos/{video_id}/stream")
 async def stream_video(video_id: str, request: Request):
     supabase = await get_supabase()
@@ -229,7 +241,6 @@ async def stream_video(video_id: str, request: Request):
     token = await get_gdrive_access_token()
     url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media"
     
-    # ブラウザからのRangeヘッダー（シークバー操作）をGoogleにそのままパス
     headers = {"Authorization": f"Bearer {token}"}
     range_header = request.headers.get("Range")
     if range_header:
@@ -239,13 +250,11 @@ async def stream_video(video_id: str, request: Request):
     req = client.build_request("GET", url, headers=headers)
     r = await client.send(req, stream=True)
 
-    # Googleからのレスポンスヘッダーを抽出
     resp_headers = {}
     for k, v in r.headers.items():
         if k.lower() in ["content-type", "content-length", "content-range", "accept-ranges"]:
             resp_headers[k] = v
 
-    # 1MBずつ中継してサーバーメモリのパンクを防止
     async def iter_file():
         try:
             async for chunk in r.aiter_bytes(chunk_size=1024 * 1024):
@@ -331,3 +340,48 @@ async def delete_comment(comment_id: str, authorization: str = Header(None)):
         
     await supabase.table("video_comments").delete().eq("id", comment_id).execute()
     return {"message": "削除しました"}
+
+# --- 追加: プロフィール管理用API ---
+@router.get("/api/profile/me")
+async def get_my_profile(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+    res = await supabase.table("profiles").select("*").eq("id", user.id).execute()
+    return res.data[0] if res.data else {}
+
+@router.post("/api/profile/update")
+async def update_profile(
+    nickname: str = Form(...),
+    channel_desc: str = Form(""),
+    external_link: str = Form(""),
+    avatar: Optional[UploadFile] = File(None),
+    authorization: str = Header(None)
+):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    update_data = {
+        "nickname": nickname,
+        "channel_desc": channel_desc,
+        "external_link": external_link
+    }
+
+    if avatar and avatar.filename:
+        t_suffix = Path(avatar.filename).suffix or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
+            t_tmp_path = t_tmp.name
+        try:
+            with open(t_tmp_path, "wb") as t_buffer:
+                while True:
+                    t_chunk = await avatar.read(1024 * 1024)
+                    if not t_chunk: break
+                    t_buffer.write(t_chunk)
+            t_mime = avatar.content_type or "image/jpeg"
+            avatar_drive_id = await upload_file_to_drive(t_tmp_path, avatar.filename, t_mime)
+            update_data["avatar_drive_id"] = avatar_drive_id
+        finally:
+            if os.path.exists(t_tmp_path):
+                os.remove(t_tmp_path)
+
+    await supabase.table("profiles").update(update_data).eq("id", user.id).execute()
+    return {"message": "プロフィールを更新しました", "data": update_data}
