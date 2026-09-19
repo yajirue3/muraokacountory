@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>動画再生</title>
     <style>
         body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
@@ -23,8 +23,8 @@
         /* コンテナ */
         .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        /* プレイヤー (iframeを16:9で綺麗に埋め込む設定) */
-        .player-wrapper { width: 100%; background: #000000; position: relative; padding-top: 56.25%; }
+        /* プレイヤー (スマホでも崩れない16:9固定設定) */
+        .player-wrapper { position: relative; width: 100%; height: 0; padding-bottom: 56.25%; background: #000000; overflow: hidden; }
         .player-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
         
         /* 動画情報 */
@@ -59,7 +59,6 @@
 
         @media (min-width: 1000px) {
             .container { padding: 24px; }
-            .player-wrapper { border-radius: 12px; overflow: hidden; }
             header { display: none; }
             .bottom-nav { display: none; }
             body { padding-bottom: 0; }
@@ -74,7 +73,7 @@
     </header>
 
     <div class="container">
-        <!-- Google Drive iframe を画面いっぱいに綺麗に表示 -->
+        <!-- 動画プレイヤー領域 -->
         <div class="player-wrapper" id="player-container">
             <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
         </div>
@@ -141,9 +140,9 @@
                 document.getElementById("v-avatar").innerText = v.author_name.charAt(0);
                 document.getElementById("v-desc").innerText = v.description || "説明はありません。";
                 
-                // 再生エラーを防ぐため安定の iframe 方式を採用
+                // allowfullscreen 等の属性を追加してスマホでも正常に描写させる
                 document.getElementById("player-container").innerHTML = `
-                    <iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview"></iframe>
+                    <iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
                 `;
                 
                 loadComments();
