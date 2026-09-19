@@ -54,10 +54,12 @@
         .btn-submit.active { background: #065fd4; color: #fff; }
 
         .c-item { display: flex; gap: 12px; margin-bottom: 16px; }
+        .c-avatar-link { text-decoration: none; }
         .c-avatar { width: 36px; height: 36px; border-radius: 50%; background: #606060; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; object-fit: cover; }
         .c-content-wrap { flex: 1; }
         .c-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-        .c-author { font-size: 13px; font-weight: 500; }
+        .c-author { font-size: 13px; font-weight: 500; color: #0f0f0f; text-decoration: none; }
+        .c-author:hover { text-decoration: underline; }
         .c-text { font-size: 14px; line-height: 1.4; color: #0f0f0f; }
         .c-del { color: #606060; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 12px; }
         .c-del:hover { background: #f2f2f2; }
@@ -340,19 +342,42 @@
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (!res.ok) return;
-                const data = await res.json();
+                const comments = await res.json();
                 
-                document.getElementById("c-count").innerText = `コメント (${data.length})`;
-                document.getElementById("c-list").innerHTML = data.map(c => {
-                    const avatarHTML = createAvatarHTML(c.avatar_drive_id, c.author_name, "c-avatar");
+                document.getElementById("c-count").innerText = `コメント (${comments.length})`;
+
+                // コメント投稿者のプロフィール（アイコン画像など）を一括取得
+                const userIds = [...new Set(comments.map(c => c.user_id).filter(Boolean))];
+                const userProfiles = {};
+
+                await Promise.all(userIds.map(async (uid) => {
+                    try {
+                        const pRes = await fetch(`/api/channel/${uid}`);
+                        if (pRes.ok) {
+                            const pData = await pRes.json();
+                            if (pData && pData.profile) {
+                                userProfiles[uid] = pData.profile;
+                            }
+                        }
+                    } catch(e) {}
+                }));
+
+                document.getElementById("c-list").innerHTML = comments.map(c => {
+                    const prof = userProfiles[c.user_id] || {};
+                    const avatarDriveId = prof.avatar_drive_id || c.avatar_drive_id;
+                    const authorName = prof.nickname || c.author_name || '名無し';
+                    const avatarHTML = createAvatarHTML(avatarDriveId, authorName, "c-avatar");
+                    const channelUrl = `/channel?id=${c.user_id}`;
                     const canDelete = (myUserId && String(c.user_id) === String(myUserId));
 
                     return `
                     <div class="c-item">
-                        ${avatarHTML}
+                        <a href="${channelUrl}" class="c-avatar-link">
+                            ${avatarHTML}
+                        </a>
                         <div class="c-content-wrap">
                             <div class="c-header">
-                                <div class="c-author">${c.author_name || '名無し'}</div>
+                                <a href="${channelUrl}" class="c-author">${authorName}</a>
                                 ${canDelete ? `<button class="c-del" onclick="delComment('${c.id}')">削除</button>` : ''}
                             </div>
                             <div class="c-text">${c.content}</div>
