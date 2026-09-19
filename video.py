@@ -305,28 +305,36 @@ async def stream_video(video_id: str, request: Request):
     if range_header:
         headers["Range"] = range_header
 
-    # ストリーミング再生時は長時間の接続保持となるため、個別のClientを生成
-    client = httpx.AsyncClient()
-    req = client.build_request("GET", url, headers=headers)
-    r = await client.send(req, stream=True)
+    # 【最速化】新規作成せず、プーリングされた共通 http_client を使って接続ラグをゼロにする
+    req = http_client.build_request("GET", url, headers=headers)
+    r = await http_client.send(req, stream=True)
 
-    resp_headers = {}
-    for k, v in r.headers.items():
-        if k.lower() in ["content-length", "content-range", "accept-ranges"]:
-            resp_headers[k] = v
-            
-    # データベースから取得したMIMEタイプを動的に割り当てる
-    resp_headers["Content-Type"] = mime_type
+    resp_headers = {
+        "Content-Type": mime_type,
+        "Accept-Ranges": "bytes"
+    }
+
+    # Google Driveからの部分応答ヘッダをブラウザへ完全に転送する
+    for k in ["content-length", "content-range"]:
+        val = r.headers.get(k)
+        if val:
+            resp_headers[k] = val
 
     async def iter_file():
         try:
-            async for chunk in r.aiter_bytes(chunk_size=1024 * 1024):
+            # チャンクを256KBにして初速（TTFB）を限界まで短縮
+            async for chunk in r.aiter_bytes(chunk_size=256 * 1024):
                 yield chunk
         finally:
             await r.aclose()
-            await client.aclose()
+            # ※共通クライアントなので client.aclose() は呼ばない
 
-    return StreamingResponse(iter_file(), status_code=r.status_code, headers=resp_headers)
+    # Google Driveが 206 (Partial Content) を返した場合は、FastAPIも 206 で返す
+    return StreamingResponse(
+        iter_file(), 
+        status_code=r.status_code, 
+        headers=resp_headers
+    )
 
 @router.get("/api/videos/{video_id}/comments")
 async def get_comments(video_id: str):
