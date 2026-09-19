@@ -308,8 +308,11 @@ async def stream_video(video_id: str, request: Request):
 
     resp_headers = {}
     for k, v in r.headers.items():
-        if k.lower() in ["content-type", "content-length", "content-range", "accept-ranges"]:
+        if k.lower() in ["content-length", "content-range", "accept-ranges"]:
             resp_headers[k] = v
+            
+    # 【重要】ブラウザが動画として認識できるように Content-Type を強制的に上書き
+    resp_headers["Content-Type"] = "video/mp4"
 
     async def iter_file():
         try:
