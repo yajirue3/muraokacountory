@@ -2,55 +2,283 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>村岡王国 - 映像広場</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>映像広場 - 村岡王国</title>
     <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; }
-        .header { background: #1e1e1e; border-bottom: 1px solid #333; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { color: #d4af37; font-weight: bold; font-size: 1.2rem; text-decoration: none; }
-        .btn { padding: 8px 14px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 0.9rem; }
-        .btn-primary { background: #d4af37; color: #1a1a1a; font-weight: bold; }
-        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
-        .card { background: #1e1e1e; border-radius: 8px; border: 1px solid #333; overflow: hidden; cursor: pointer; transition: 0.2s; }
-        .card:hover { border-color: #d4af37; transform: translateY(-3px); }
-        .thumb { background: #000; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; font-size: 2rem; position: relative; }
-        .badge { position: absolute; top: 8px; right: 8px; background: #c0392b; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
-        .info { padding: 12px; }
-        .title { font-weight: bold; margin-bottom: 6px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .meta { font-size: 0.8rem; color: #aaa; display: flex; justify-content: space-between; }
+        :root {
+            --primary: #d4af37;
+            --primary-dark: #b5952f;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #202124;
+            --text-sub: #5f6368;
+            --border: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ヘッダー */
+        .header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .logo {
+            color: var(--text-main);
+            font-weight: 800;
+            font-size: 1.4rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-actions { display: flex; gap: 12px; }
+
+        .btn {
+            padding: 8px 16px;
+            background: var(--bg-color);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn:hover { background: #f1f3f4; }
         
-        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #d4af37; width: 400px; }
-        .modal input, .modal textarea { width: 100%; margin-bottom: 12px; padding: 10px; background: #2a2a2a; border: 1px solid #444; color: #fff; box-sizing: border-box; border-radius: 4px;}
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+
+        /* コンテナ & グリッド */
+        .container {
+            max-width: 1400px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        /* 動画カード */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid var(--border);
+            text-decoration: none;
+            display: block;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+        }
+
+        .thumb-wrapper {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #e8eaed;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .thumb-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover .thumb-img { transform: scale(1.05); }
+
+        .badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(211, 47, 47, 0.9);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            backdrop-filter: blur(4px);
+        }
+
+        .info { padding: 16px; }
+
+        .title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--text-main);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+
+        .meta {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 32px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 { margin: 0 0 20px 0; font-size: 1.4rem; color: var(--text-main); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-sub); }
+        
+        .modal input[type="text"], .modal textarea {
+            width: 100%;
+            padding: 12px;
+            background: #f1f3f4;
+            border: 1px solid transparent;
+            color: var(--text-main);
+            box-sizing: border-box;
+            border-radius: 8px;
+            font-family: inherit;
+            transition: border 0.2s;
+        }
+        .modal input[type="text"]:focus, .modal textarea:focus {
+            outline: none;
+            border: 1px solid var(--primary);
+            background: #fff;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 10px;
+            background: #f1f3f4;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+
+        /* スマホ対応 */
+        @media (max-width: 600px) {
+            .header { padding: 12px; flex-direction: column; gap: 12px; }
+            .header-actions { width: 100%; justify-content: space-between; }
+            .btn { padding: 8px 12px; font-size: 0.85rem; flex: 1; margin: 0 4px; }
+            .container { padding: 0 12px; margin: 16px auto; }
+            .video-grid { grid-template-columns: 1fr; gap: 16px; }
+            .modal-content { padding: 24px; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="/dashboard" class="logo">🎬 映像広場</a>
-        <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" onclick="document.getElementById('modal').style.display='flex'">＋ 投稿</button>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="document.getElementById('modal').style.display='flex'">＋ 新規アップロード</button>
             <a href="/manage_videos" class="btn">🛠 管理所</a>
-            <a href="/dashboard" class="btn">ダッシュボードへ</a>
+            <a href="/dashboard" class="btn">戻る</a>
         </div>
     </div>
 
     <div class="container">
-        <div class="video-grid" id="grid">読み込み中...</div>
+        <div class="video-grid" id="grid">
+            <p style="color: var(--text-sub); text-align: center; grid-column: 1/-1; padding: 40px;">読み込み中...</p>
+        </div>
     </div>
 
     <div class="modal" id="modal">
         <div class="modal-content">
-            <h3 style="color:#d4af37; margin-top:0;">新規映像の投稿</h3>
+            <h3>新しい動画をアップロード</h3>
             <form onsubmit="uploadVideo(event)">
-                <input type="text" id="up-title" required placeholder="タイトル">
-                <textarea id="up-desc" placeholder="説明文" rows="3"></textarea>
-                <input type="file" id="up-file" accept="video/*" required>
-                <label style="font-size: 0.9rem; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                    <input type="checkbox" id="up-private" style="width:auto; margin:0;"> 非公開にする
+                <div class="form-group">
+                    <label class="form-label">タイトル (必須)</label>
+                    <input type="text" id="up-title" required placeholder="分かりやすいタイトルを入力">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">説明文</label>
+                    <textarea id="up-desc" placeholder="動画の概要や詳細を入力..." rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">動画ファイル (必須)</label>
+                    <input type="file" id="up-file" class="file-input" accept="video/*" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">カスタムサムネイル (任意)</label>
+                    <input type="file" id="up-thumb" class="file-input" accept="image/*">
+                    <div style="font-size:0.75rem; color:#888; margin-top:4px;">※未指定の場合は自動で生成されます（反映に数分かかります）</div>
+                </div>
+
+                <label class="checkbox-group">
+                    <input type="checkbox" id="up-private"> 自分だけが閲覧できる非公開設定にする
                 </label>
-                <div style="display:flex; gap:10px;">
-                    <button type="submit" class="btn btn-primary" id="btn-up" style="flex:1;">投稿</button>
-                    <button type="button" class="btn" onclick="document.getElementById('modal').style.display='none'">キャンセル</button>
+
+                <div style="display:flex; gap:12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary" id="btn-up" style="flex:2; padding: 12px;">アップロードを開始</button>
+                    <button type="button" class="btn" style="flex:1;" onclick="document.getElementById('modal').style.display='none'">キャンセル</button>
                 </div>
             </form>
         </div>
@@ -68,24 +296,33 @@
                 const grid = document.getElementById("grid");
                 
                 if(data.videos.length === 0) {
-                    grid.innerHTML = "映像がありません。";
+                    grid.innerHTML = `<p style="color: var(--text-sub); text-align: center; grid-column: 1/-1; padding: 40px;">まだ動画がありません。<br>最初の動画をアップロードしてみましょう！</p>`;
                     return;
                 }
                 
-                grid.innerHTML = data.videos.map(v => `
-                    <div class="card" onclick="location.href='/watch?v=${v.id}'">
-                        <div class="thumb">▶️ ${v.is_private ? '<span class="badge">非公開</span>' : ''}</div>
+                grid.innerHTML = data.videos.map(v => {
+                    // カスタム指定があればそれを、なければDriveの自動生成URLを使用
+                    const thumbUrl = v.thumbnail_drive_id 
+                        ? `https://drive.google.com/uc?id=${v.thumbnail_drive_id}` 
+                        : `https://drive.google.com/thumbnail?id=${v.drive_file_id}&sz=w800`;
+
+                    return `
+                    <a href="/watch?v=${v.id}" class="card">
+                        <div class="thumb-wrapper">
+                            ${v.is_private ? '<span class="badge">非公開</span>' : ''}
+                            <img src="${thumbUrl}" class="thumb-img" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100%25\\' height=\\'100%25\\' viewBox=\\'0 0 16 9\\'%3E%3Crect fill=\\'%23e8eaed\\' width=\\'16\\' height=\\'9\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' font-family=\\'sans-serif\\' font-size=\\'1\\' fill=\\'%239aa0a6\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'%3E%E2%96%B6%EF%B8%8F No Thumbnail%3C/text%3E%3C/svg%3E';">
+                        </div>
                         <div class="info">
                             <div class="title">${v.title}</div>
                             <div class="meta">
                                 <span>👤 ${v.author_name}</span>
-                                <span>👀 ${v.views || 0}回</span>
+                                <span>👀 ${v.views || 0}回視聴</span>
                             </div>
                         </div>
-                    </div>
-                `).join('');
+                    </a>
+                `}).join('');
             } catch(e) {
-                document.getElementById("grid").innerHTML = "エラーが発生しました。";
+                document.getElementById("grid").innerHTML = `<p style="color: red; text-align: center; grid-column: 1/-1;">通信エラーが発生しました。</p>`;
             }
         }
 
@@ -93,13 +330,19 @@
             e.preventDefault();
             const btn = document.getElementById("btn-up");
             btn.disabled = true;
-            btn.innerText = "転送中...";
+            btn.innerText = "転送中... (ブラウザを閉じないでください)";
 
             const fd = new FormData();
             fd.append("title", document.getElementById("up-title").value);
             fd.append("description", document.getElementById("up-desc").value);
             fd.append("is_private", document.getElementById("up-private").checked);
             fd.append("file", document.getElementById("up-file").files[0]);
+
+            // サムネイルファイルが選択されていれば追加
+            const thumbFile = document.getElementById("up-thumb").files[0];
+            if (thumbFile) {
+                fd.append("thumbnail", thumbFile);
+            }
 
             try {
                 const res = await fetch("/api/videos/upload", {
@@ -109,7 +352,7 @@
                 });
                 
                 if (res.ok) {
-                    alert("投稿完了しました");
+                    alert("アップロードが完了しました！");
                     document.getElementById("modal").style.display = 'none';
                     e.target.reset();
                     loadVideos();
@@ -118,12 +361,14 @@
                     alert("エラー: " + err.detail);
                 }
             } catch(e) {
-                alert("通信エラーが発生しました");
+                alert("サーバーとの通信に失敗しました。ファイルサイズが大きすぎる可能性があります。");
             } finally {
                 btn.disabled = false;
-                btn.innerText = "投稿";
+                btn.innerText = "アップロードを開始";
             }
         }
+
+        // 初回読み込み
         loadVideos();
     </script>
 </body>
