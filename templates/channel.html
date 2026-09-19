@@ -347,32 +347,83 @@
             }
         }
 
-        // アップロード処理 (videos.htmlと共通)
+        // --- 改修版: ダイレクトアップロード処理 ---
         async function uploadVideo(e) {
             e.preventDefault();
             const btn = document.getElementById("btn-up");
+            const fileInput = document.getElementById("up-file");
+            const file = fileInput.files[0];
+            
+            if (!file) return alert("ファイルを選択してください");
+
             btn.disabled = true;
-            btn.innerText = "アップロード中...";
-
-            const fd = new FormData();
-            fd.append("title", document.getElementById("up-title").value);
-            fd.append("description", document.getElementById("up-desc").value);
-            fd.append("is_private", document.getElementById("up-private").checked);
-            fd.append("file", document.getElementById("up-file").files[0]);
-
-            const thumbFile = document.getElementById("up-thumb").files[0];
-            if (thumbFile) {
-                fd.append("thumbnail", thumbFile);
-            }
+            btn.innerText = "準備中...";
 
             try {
-                const res = await fetch("/api/videos/upload", {
+                // 1. PythonサーバーからセッションURL（アップロード専用URL）を取得
+                const initFd = new FormData();
+                initFd.append("filename", file.name);
+                initFd.append("file_size", file.size);
+                initFd.append("mime_type", file.type || "video/mp4");
+
+                const initRes = await fetch("/api/videos/get_upload_url", {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${token}` },
-                    body: fd
+                    body: initFd
                 });
                 
-                if (res.ok) {
+                if (!initRes.ok) throw new Error("セッションURLの取得に失敗しました");
+                const { upload_url } = await initRes.json();
+
+                // 2. ブラウザからGoogle Driveへ直接PUT送信（進捗バー付き）
+                btn.innerText = "Googleへ直接送信中... (0%)";
+                
+                const driveFileId = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("PUT", upload_url, true);
+                    xhr.setRequestHeader("Content-Range", `bytes 0-${file.size - 1}/${file.size}`);
+                    
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const percent = Math.round((event.loaded / event.total) * 100);
+                            btn.innerText = `Googleへ直接送信中... (${percent}%)`;
+                        }
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status === 200 || xhr.status === 201) {
+                            const response = JSON.parse(xhr.responseText);
+                            resolve(response.id);
+                        } else {
+                            reject(new Error("Google Driveへの送信に失敗しました"));
+                        }
+                    };
+                    
+                    xhr.onerror = () => reject(new Error("通信エラー"));
+                    xhr.send(file);
+                });
+
+                // 3. Pythonサーバーに完了通知を送り、DB保存とサムネイルアップロードを行う
+                btn.innerText = "データ保存中...";
+                const metaFd = new FormData();
+                metaFd.append("title", document.getElementById("up-title").value);
+                metaFd.append("description", document.getElementById("up-desc").value);
+                metaFd.append("is_private", document.getElementById("up-private").checked);
+                metaFd.append("drive_file_id", driveFileId);
+                metaFd.append("mime_type", file.type || "video/mp4");
+
+                const thumbFile = document.getElementById("up-thumb").files[0];
+                if (thumbFile) {
+                    metaFd.append("thumbnail", thumbFile);
+                }
+
+                const finalRes = await fetch("/api/videos/save_metadata", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: metaFd
+                });
+
+                if (finalRes.ok) {
                     alert("アップロードが完了しました");
                     document.getElementById("modal").style.display = 'none';
                     e.target.reset();
@@ -382,11 +433,11 @@
                         initChannel();
                     }
                 } else {
-                    const err = await res.json();
+                    const err = await finalRes.json();
                     alert("エラー: " + err.detail);
                 }
             } catch(e) {
-                alert("通信エラーが発生しました");
+                alert(e.message || "エラーが発生しました");
             } finally {
                 btn.disabled = false;
                 btn.innerText = "アップロード";
