@@ -49,6 +49,7 @@ async def get_gdrive_access_token() -> str:
         raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code}")
     return res.json()["access_token"]
 
+
 async def upload_file_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
     token = await get_gdrive_access_token()
 
@@ -100,6 +101,7 @@ async def upload_file_to_drive(file_obj, filename: str, mime_type: str, file_siz
         
     return file_id
 
+
 @router.get("/videos", response_class=HTMLResponse)
 async def get_videos_page(request: Request):
     return templates.TemplateResponse(request=request, name="videos.html")
@@ -134,3 +136,356 @@ async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(Non
 
 @router.get("/api/subscriptions")
 async def get_my_subscriptions(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    try:
+        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
+        if not sub_res.data:
+            return []
+
+        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
+        if not channel_ids:
+            return []
+
+        prof_res = await supabase.table("profiles").select("id, nickname, avatar_drive_id").in_("id", channel_ids).execute()
+        return prof_res.data or []
+    except Exception:
+        return []
+
+@router.get("/api/videos/subscribed")
+async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    try:
+        sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", str(user.id)).execute()
+        if not sub_res.data:
+            return {"videos": []}
+
+        channel_ids = [str(s["channel_id"]) for s in sub_res.data if s.get("channel_id")]
+        if not channel_ids:
+            return {"videos": []}
+
+        limit = 24
+        offset = (page - 1) * limit
+
+        vid_res = await supabase.table("videos") \
+            .select("*") \
+            .in_("user_id", channel_ids) \
+            .eq("is_private", False) \
+            .order("created_at", desc=True) \
+            .range(offset, offset + limit - 1) \
+            .execute()
+
+        videos = vid_res.data or []
+        if not videos:
+            return {"videos": []}
+
+        author_ids = list(set([str(v["user_id"]) for v in videos if v.get("user_id")]))
+        if author_ids:
+            try:
+                prof_res = await supabase.table("profiles").select("id, avatar_drive_id").in_("id", author_ids).execute()
+                prof_map = {str(p["id"]): p.get("avatar_drive_id") for p in (prof_res.data or [])}
+
+                for v in videos:
+                    v["author_avatar_drive_id"] = prof_map.get(str(v.get("user_id")))
+            except Exception:
+                pass
+
+        return {"videos": videos}
+
+    except Exception:
+        return {"videos": []}
+
+@router.post("/api/videos/upload")
+async def upload_video(
+    title: str = Form(...),
+    description: str = Form(""),
+    is_private: bool = Form(False),
+    file: UploadFile = File(...),
+    thumbnail: Optional[UploadFile] = File(None),
+    authorization: str = Header(None)
+):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
+
+    file.file.seek(0, os.SEEK_END)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    mime = file.content_type or "video/mp4"
+    
+    drive_file_id = await upload_file_to_drive(file.file, file.filename, mime, file_size)
+
+    thumbnail_drive_id = None
+    if thumbnail is not None and thumbnail.filename:
+        thumbnail.file.seek(0, os.SEEK_END)
+        t_file_size = thumbnail.file.tell()
+        thumbnail.file.seek(0)
+        t_mime = thumbnail.content_type or "image/jpeg"
+        
+        thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
+
+    insert_res = await supabase.table("videos").insert({
+        "user_id": str(user.id),
+        "author_name": nickname,
+        "title": title,
+        "description": description,
+        "drive_file_id": drive_file_id,
+        "thumbnail_drive_id": thumbnail_drive_id,
+        "is_private": is_private,
+        "views": 0,
+        "mime_type": mime
+    }).execute()
+
+    return {"message": "アップロード完了", "video": insert_res.data[0]}
+
+@router.get("/api/videos/{video_id}")
+async def get_video_detail(video_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    king_status = await is_king(user.id)
+    supabase = await get_supabase()
+    
+    res = await supabase.table("videos").select("*").eq("id", video_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="映像が見つかりません")
+    
+    video = res.data[0]
+    if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
+        raise HTTPException(status_code=403, detail="非公開の動画です")
+    
+    prof_res = await supabase.table("profiles").select("avatar_drive_id, channel_desc, external_link").eq("id", video["user_id"]).execute()
+    if prof_res.data:
+        prof = prof_res.data[0]
+        video["avatar_drive_id"] = prof.get("avatar_drive_id")
+        video["channel_desc"] = prof.get("channel_desc")
+        video["external_link"] = prof.get("external_link")
+    
+    now = time.time()
+    view_key = f"{user.id}_{video_id}"
+    last_viewed = _view_history.get(view_key, 0)
+    
+    if now - last_viewed > 3600:
+        try:
+            current_views = video.get("views") or 0
+            await supabase.table("videos").update({"views": current_views + 1}).eq("id", video_id).execute()
+            video["views"] = current_views + 1
+            _view_history[view_key] = now
+        except Exception:
+            pass
+
+    return video
+
+@router.get("/api/videos/{video_id}/stream")
+async def stream_video(video_id: str, request: Request):
+    supabase = await get_supabase()
+    res = await supabase.table("videos").select("drive_file_id, mime_type").eq("id", video_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="映像が見つかりません")
+    
+    drive_file_id = res.data[0]["drive_file_id"]
+    mime_type = res.data[0].get("mime_type") or "video/mp4"
+    token = await get_gdrive_access_token()
+    url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media"
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    range_header = request.headers.get("Range")
+    if range_header:
+        headers["Range"] = range_header
+
+    req = http_client.build_request("GET", url, headers=headers)
+    r = await http_client.send(req, stream=True)
+
+    # --- 【究極高速化】ブラウザの最強キャッシュを引き出す ---
+    resp_headers = {
+        "Content-Type": mime_type,
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable" 
+    }
+
+    for k in ["content-length", "content-range"]:
+        val = r.headers.get(k)
+        if val:
+            resp_headers[k] = val
+
+    async def iter_file():
+        try:
+            # --- 【究極高速化】800MB対応の1MBメガチャンク ---
+            async for chunk in r.aiter_bytes(chunk_size=1024 * 1024):
+                yield chunk
+        finally:
+            await r.aclose()
+
+    return StreamingResponse(
+        iter_file(), 
+        status_code=r.status_code, 
+        headers=resp_headers
+    )
+
+@router.get("/api/videos/{video_id}/comments")
+async def get_comments(video_id: str):
+    supabase = await get_supabase()
+    res = await supabase.table("video_comments").select("*").eq("video_id", video_id).order("created_at", desc=True).execute()
+    return res.data or []
+
+@router.post("/api/videos/{video_id}/comments")
+async def post_comment(video_id: str, data: CommentCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not data.content.strip():
+        raise HTTPException(status_code=400, detail="本文を入力してください")
+
+    supabase = await get_supabase()
+    prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
+
+    await supabase.table("video_comments").insert({
+        "video_id": video_id,
+        "user_id": str(user.id),
+        "author_name": nickname,
+        "content": data.content.strip()
+    }).execute()
+    return {"message": "コメントを投稿しました"}
+
+@router.delete("/api/videos/{video_id}")
+async def delete_video(video_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    king_status = await is_king(user.id)
+    supabase = await get_supabase()
+    
+    res = await supabase.table("videos").select("user_id").eq("id", video_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="映像が存在しません")
+        
+    if res.data[0]["user_id"] != str(user.id) and not king_status:
+        raise HTTPException(status_code=403, detail="権限がありません")
+        
+    await supabase.table("videos").delete().eq("id", video_id).execute()
+    return {"message": "削除しました"}
+
+@router.patch("/api/videos/{video_id}/toggle_private")
+async def toggle_private(video_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    king_status = await is_king(user.id)
+    supabase = await get_supabase()
+    
+    res = await supabase.table("videos").select("user_id, is_private").eq("id", video_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="映像が存在しません")
+        
+    if res.data[0]["user_id"] != str(user.id) and not king_status:
+        raise HTTPException(status_code=403, detail="権限がありません")
+        
+    new_status = not res.data[0].get("is_private", False)
+    await supabase.table("videos").update({"is_private": new_status}).eq("id", video_id).execute()
+    return {"message": "設定を変更しました", "is_private": new_status}
+
+@router.delete("/api/comments/{comment_id}")
+async def delete_comment(comment_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    king_status = await is_king(user.id)
+    supabase = await get_supabase()
+    
+    c_res = await supabase.table("video_comments").select("user_id, video_id").eq("id", comment_id).execute()
+    if not c_res.data:
+        raise HTTPException(status_code=404, detail="コメントがありません")
+    
+    v_res = await supabase.table("videos").select("user_id").eq("id", c_res.data[0]["video_id"]).execute()
+    video_owner = v_res.data[0]["user_id"] if v_res.data else None
+    
+    if c_res.data[0]["user_id"] != str(user.id) and video_owner != str(user.id) and not king_status:
+        raise HTTPException(status_code=403, detail="権限がありません")
+        
+    await supabase.table("video_comments").delete().eq("id", comment_id).execute()
+    return {"message": "削除しました"}
+
+@router.get("/api/profile/me")
+async def get_my_profile(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+    res = await supabase.table("profiles").select("*").eq("id", user.id).execute()
+    return res.data[0] if res.data else {}
+
+@router.post("/api/profile/update")
+async def update_profile(
+    nickname: str = Form(...),
+    channel_desc: str = Form(""),
+    external_link: str = Form(""),
+    avatar: Optional[UploadFile] = File(None),
+    authorization: str = Header(None)
+):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    update_data = {
+        "nickname": nickname,
+        "channel_desc": channel_desc,
+        "external_link": external_link
+    }
+
+    if avatar and avatar.filename:
+        avatar.file.seek(0, os.SEEK_END)
+        a_file_size = avatar.file.tell()
+        avatar.file.seek(0)
+        a_mime = avatar.content_type or "image/jpeg"
+        
+        avatar_drive_id = await upload_file_to_drive(avatar.file, avatar.filename, a_mime, a_file_size)
+        update_data["avatar_drive_id"] = avatar_drive_id
+
+    await supabase.table("profiles").update(update_data).eq("id", user.id).execute()
+    return {"message": "プロフィールを更新しました", "data": update_data}
+
+@router.get("/api/channel/{channel_id}")
+async def get_channel_info(channel_id: str, page: int = Query(1, ge=1)):
+    supabase = await get_supabase()
+    
+    prof_res = await supabase.table("profiles").select("*").eq("id", channel_id).execute()
+    if not prof_res.data:
+        raise HTTPException(status_code=404, detail="チャンネルが見つかりません")
+    profile = prof_res.data[0]
+
+    sub_res = await supabase.table("subscriptions").select("*", count="exact").eq("channel_id", channel_id).execute()
+    sub_count = sub_res.count if sub_res.count else 0
+
+    limit = 24
+    offset = (page - 1) * limit
+    vid_res = await supabase.table("videos").select("*").eq("user_id", channel_id).eq("is_private", False).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+
+    return {
+        "profile": profile,
+        "subscriber_count": sub_count,
+        "videos": vid_res.data or []
+    }
+
+@router.get("/api/channel/{channel_id}/status")
+async def check_subscribe_status(channel_id: str, authorization: str = Header(None)):
+    if not authorization:
+        return {"is_subscribed": False}
+    try:
+        user = await get_user_from_token(authorization)
+        supabase = await get_supabase()
+        res = await supabase.table("subscriptions").select("id").eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+        return {"is_subscribed": len(res.data) > 0}
+    except:
+        return {"is_subscribed": False}
+
+@router.post("/api/channel/{channel_id}/subscribe")
+async def toggle_subscribe(channel_id: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if str(user.id) == channel_id:
+        raise HTTPException(status_code=400, detail="自分自身は登録できません")
+
+    supabase = await get_supabase()
+    res = await supabase.table("subscriptions").select("*").eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+    
+    if res.data:
+        await supabase.table("subscriptions").delete().eq("subscriber_id", user.id).eq("channel_id", channel_id).execute()
+        return {"message": "登録を解除しました", "is_subscribed": False}
+    else:
+        await supabase.table("subscriptions").insert({
+            "subscriber_id": str(user.id),
+            "channel_id": channel_id
+        }).execute()
+        return {"message": "チャンネル登録しました", "is_subscribed": True}
