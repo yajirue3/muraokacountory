@@ -23,8 +23,25 @@
 
         .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        .player-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; background: #000000; overflow: hidden; }
-        .player-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
+        /* 変更点: padding-bottomのハックをやめ、aspect-ratioとmin-heightで柔軟に対応 */
+        .player-wrapper { 
+            position: relative; 
+            width: 100%; 
+            aspect-ratio: 16 / 9; 
+            min-height: 260px; /* スマホでGoogle DriveのUIが崩れない最低限の高さ */
+            background: #000000; 
+            overflow: hidden; 
+        }
+        
+        .player-wrapper iframe, .player-wrapper video { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            border: none;
+            outline: none; 
+        }
         
         .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
         .title { font-size: 18px; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; }
@@ -265,7 +282,6 @@
                 
                 document.getElementById("player-container").innerHTML = `
                     <iframe src="${iframeUrl}" 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
                             allow="autoplay; fullscreen" 
                             allowfullscreen>
                     </iframe>
