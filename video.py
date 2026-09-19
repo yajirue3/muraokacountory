@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException, Header, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
@@ -37,7 +38,6 @@ async def get_gdrive_access_token() -> str:
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.post(url, data=data)
         if res.status_code != 200:
-            # Googleからの詳細なエラーをフロントに返す
             raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code} {res.text}")
         return res.json()["access_token"]
 
@@ -124,6 +124,7 @@ async def upload_video(
     description: str = Form(""),
     is_private: bool = Form(False),
     file: UploadFile = File(...),
+    thumbnail: Optional[UploadFile] = File(None),
     authorization: str = Header(None)
 ):
     user = await get_user_from_token(authorization)
@@ -132,8 +133,9 @@ async def upload_video(
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "名無し"
 
-    suffix = Path(file.filename).suffix or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    # 1. 動画本体のアップロード
+    v_suffix = Path(file.filename).suffix or ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=v_suffix) as tmp:
         tmp_path = tmp.name
         
     try:
@@ -149,12 +151,34 @@ async def upload_video(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+    # 2. サムネイル画像のアップロード（指定された場合のみ）
+    thumbnail_drive_id = None
+    if thumbnail and thumbnail.filename:
+        t_suffix = Path(thumbnail.filename).suffix or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
+            t_tmp_path = t_tmp.name
+            
+        try:
+            with open(t_tmp_path, "wb") as t_buffer:
+                while True:
+                    t_chunk = await thumbnail.read(1024 * 1024)
+                    if not t_chunk: break
+                    t_buffer.write(t_chunk)
+                    
+            t_mime = thumbnail.content_type or "image/jpeg"
+            thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
+        finally:
+            if os.path.exists(t_tmp_path):
+                os.remove(t_tmp_path)
+
+    # 3. DBへ記録
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
         "author_name": nickname,
         "title": title,
         "description": description,
         "drive_file_id": drive_file_id,
+        "thumbnail_drive_id": thumbnail_drive_id,
         "is_private": is_private,
         "views": 0
     }).execute()
