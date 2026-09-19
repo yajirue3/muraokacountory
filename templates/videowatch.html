@@ -13,7 +13,7 @@
         .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
 
-        /* ボトムナビゲーション (YouTube風) */
+        /* ボトムナビゲーション */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
         .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
@@ -23,9 +23,9 @@
         /* コンテナ */
         .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        /* プレイヤー (16:9) */
-        .player-wrapper { width: 100%; background: #000000; position: relative; padding-top: 56.25%; /* 16:9 Aspect Ratio */ }
-        .player-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
+        /* プレイヤー (iframeを16:9で綺麗に埋め込む設定) */
+        .player-wrapper { width: 100%; background: #000000; position: relative; padding-top: 56.25%; }
+        .player-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
         
         /* 動画情報 */
         .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
@@ -39,9 +39,11 @@
         /* コメント欄 */
         .comments { padding: 16px; }
         .comment-count { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
-        .c-form { display: flex; gap: 12px; margin-bottom: 24px; }
-        .c-form input { flex: 1; border: none; border-bottom: 1px solid #737373; padding: 4px 0; font-size: 14px; font-family: inherit; background: transparent; transition: border-bottom-color 0.2s; }
-        .c-form input:focus { outline: none; border-bottom: 2px solid #0f0f0f; }
+        .c-form { display: flex; gap: 16px; margin-bottom: 24px; }
+        .c-input-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .c-input-wrapper input { width: 100%; border: none; border-bottom: 1px solid #737373; padding: 4px 0; font-size: 14px; font-family: inherit; background: transparent; transition: border-bottom-color 0.2s; box-sizing: border-box; }
+        .c-input-wrapper input:focus { outline: none; border-bottom: 2px solid #0f0f0f; }
+        .c-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
         .btn-submit { background: #f2f2f2; color: #0f0f0f; border: none; padding: 8px 16px; border-radius: 18px; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .btn-submit:hover { background: #e5e5e5; }
         .btn-submit.active { background: #065fd4; color: #fff; }
@@ -58,8 +60,8 @@
         @media (min-width: 1000px) {
             .container { padding: 24px; }
             .player-wrapper { border-radius: 12px; overflow: hidden; }
-            header { display: none; /* PCではヘッダー不要 */ }
-            .bottom-nav { display: none; /* PCでは下部ナビ不要 */ }
+            header { display: none; }
+            .bottom-nav { display: none; }
             body { padding-bottom: 0; }
         }
     </style>
@@ -68,11 +70,11 @@
     <header>
         <a href="/videos" class="back-btn">← 戻る</a>
         <div class="logo"><span>▶</span> Video</div>
-        <div style="width: 60px;"></div> <!-- バランス調整用 -->
+        <div style="width: 60px;"></div>
     </header>
 
     <div class="container">
-        <!-- 動画プレイヤー (即時ストリーミング再生対応) -->
+        <!-- Google Drive iframe を画面いっぱいに綺麗に表示 -->
         <div class="player-wrapper" id="player-container">
             <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
         </div>
@@ -95,9 +97,11 @@
             <div class="comment-count">コメント</div>
             <div class="c-form">
                 <div class="c-avatar" id="my-avatar">👤</div>
-                <div style="display: flex; flex-direction: column; flex: 1; align-items: flex-end; gap: 8px;">
+                <div class="c-input-wrapper">
                     <input type="text" id="c-input" placeholder="コメントを追加..." oninput="checkInput()">
-                    <button class="btn-submit" id="btn-submit" onclick="postComment()" disabled>コメント</button>
+                    <div class="c-actions">
+                        <button class="btn-submit" id="btn-submit" onclick="postComment()" disabled>コメント</button>
+                    </div>
                 </div>
             </div>
             <div id="c-list"></div>
@@ -137,17 +141,14 @@
                 document.getElementById("v-avatar").innerText = v.author_name.charAt(0);
                 document.getElementById("v-desc").innerText = v.description || "説明はありません。";
                 
-                // --- Googleの処理完了を待たずに直接ストリーミング再生するHTML5プレイヤー ---
+                // 再生エラーを防ぐため安定の iframe 方式を採用
                 document.getElementById("player-container").innerHTML = `
-                    <video controls autoplay playsinline>
-                        <source src="https://drive.google.com/uc?export=download&id=${v.drive_file_id}" type="video/mp4">
-                        お使いのブラウザは動画の再生に対応していません。
-                    </video>
+                    <iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview"></iframe>
                 `;
                 
                 loadComments();
             } catch(e) {
-                alert("再生できません。権限がないか、動画が削除されています。");
+                alert("再生できません。権限がないか、動画が存在しません。");
                 location.href = "/videos";
             }
         }
