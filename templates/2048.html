@@ -40,7 +40,6 @@
         .score-label { font-size: 0.7rem; font-weight: 700; color: #eee4da; text-transform: uppercase; margin-bottom: 2px; }
         .score-val { font-size: 1.25rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; transition: transform 0.1s; }
         
-        /* スコア加算時のミニポップアップ */
         .score-addition {
             position: absolute; top: 10px; right: 10px; font-size: 1.2rem; font-weight: bold; color: rgba(119,110,101,0.9);
             animation: moveUp 0.6s ease-in forwards; z-index: 100; pointer-events: none;
@@ -79,7 +78,6 @@
             font-size: 2.2rem; font-weight: 700; transition: background-color 0.15s;
         }
 
-        /* フローティングスコア（合体位置から浮かぶ） */
         .floating-score {
             position: absolute; font-size: 1.8rem; font-weight: bold; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.3);
             animation: float-score-anim 0.7s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; z-index: 50; width: calc(25% - (var(--gap) * 3 / 4)); text-align: center; pointer-events: none;
@@ -90,7 +88,6 @@
             100% { opacity: 0; transform: translateY(-40px) scale(1); }
         }
 
-        /* タイルカラーとリッチな発光 */
         .tile-2    { background: #eee4da; color: #776e65; }
         .tile-4    { background: #ede0c8; color: #776e65; }
         .tile-8    { background: #f2b179; color: #f9f6f2; }
@@ -108,14 +105,12 @@
         @keyframes popIn { 0% { transform: scale(0); opacity: 0;} 100% { transform: scale(1); opacity: 1;} }
         @keyframes popMerge { 0% { transform: scale(1); } 50% { transform: scale(1.18); filter: brightness(1.2); } 100% { transform: scale(1); filter: brightness(1); } }
 
-        /* 1024, 2048達成時の全体フラッシュ */
         body.hyper-flash { animation: hyper-flash-bg 0.4s ease-out; }
         @keyframes hyper-flash-bg { 0% { background-color: #edc22e; } 100% { background-color: var(--bg-color); } }
         
         .board-container.shake { animation: shake-board 0.3s ease-in-out; }
         @keyframes shake-board { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-3px, 2px); } 50% { transform: translate(3px, -2px); } 75% { transform: translate(-2px, -3px); } }
 
-        /* モーダル汎用 */
         .overlay {
             display: none; position: fixed; inset: 0; background: rgba(238, 228, 218, 0.85); backdrop-filter: blur(5px);
             z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
@@ -197,43 +192,106 @@
 <script>
     function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
-    // --- Web Audio API (効果音シンセサイザー) ---
+    // --- 音響設定（アンビエントBGM自動生成 & 効果音） ---
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
     let soundEnabled = true;
+    
+    // BGM（ドローン）用ノード管理
+    let droneOscs = [];
+    let droneGains = [];
+    let isBgmPlaying = false;
+
+    function playBGM() {
+        if (isBgmPlaying || !soundEnabled) return;
+        isBgmPlaying = true;
+        // 思考を邪魔しない低域中心の和音 (C2, G2, C3)
+        const baseFreqs = [65.41, 98.00, 130.81]; 
+        
+        baseFreqs.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            
+            // うねり（揺らぎ）を生むLFO
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 0.05 + (i * 0.02);
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 0.015;
+            lfo.connect(lfoGain);
+            lfoGain.connect(gain.gain);
+            
+            // 2秒かけてフェードイン
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 2);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(); 
+            lfo.start();
+            
+            droneOscs.push({osc, lfo});
+            droneGains.push(gain);
+        });
+    }
+
+    function stopBGM() {
+        if (!isBgmPlaying) return;
+        isBgmPlaying = false;
+        droneGains.forEach(gain => {
+            gain.gain.cancelScheduledValues(audioCtx.currentTime);
+            // 3秒かけてフェードアウト
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
+        });
+        setTimeout(() => {
+            droneOscs.forEach(nodes => { nodes.osc.stop(); nodes.lfo.stop(); });
+            droneOscs = [];
+            droneGains = [];
+        }, 3000);
+    }
 
     function toggleSound() {
         soundEnabled = !soundEnabled;
         document.getElementById("sound-toggle").innerText = soundEnabled ? "🔊" : "🔇";
-        if(soundEnabled && audioCtx.state === 'suspended') audioCtx.resume();
+        if(soundEnabled) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (!isGameOver) playBGM();
+        } else {
+            stopBGM();
+        }
     }
 
-    function playTone(freq, type, duration, vol) {
+    // アコースティックなマリンバ風打点音（triangle波 + 急速減衰）
+    function playMarimbaTone(freq, duration, maxVol) {
         if (!soundEnabled) return;
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = type;
+        osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(maxVol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
     }
 
-    function playMoveSound() { playTone(150, 'sine', 0.1, 0.05); }
+    function playMoveSound() { 
+        playMarimbaTone(140, 0.08, 0.1); 
+    }
     
     function playMergeSound(val, combo) {
         if (!soundEnabled) return;
-        // 数字が大きいほど、コンボが繋がるほどピッチと和音がリッチになる
-        let index = Math.log2(val) - 1;
-        let baseFreq = 261.6 * Math.pow(1.059463, index * 2 + (combo * 2));
+        // 低〜中音域の落ち着いた音階
+        const scale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.2, 587.3, 659.2, 783.9];
+        let index = Math.min(Math.floor(Math.log2(val)) - 1, scale.length - 1);
+        let freq = scale[Math.max(0, index)];
         
-        playTone(baseFreq, 'sine', 0.3, 0.1);
-        if (val >= 64) playTone(baseFreq * 1.5, 'triangle', 0.4, 0.05); // 5度の和音
-        if (val >= 256) playTone(baseFreq * 2.0, 'sine', 0.5, 0.05); // 1オクターブ上
+        playMarimbaTone(freq, 0.15, 0.2);
+        if (val >= 64) playMarimbaTone(freq * 1.5, 0.2, 0.1); // 和音も丸い音で追加
     }
 
     // ---------------------------------------------
@@ -256,8 +314,10 @@
 
     document.addEventListener("touchmove", (e) => { if (e.target.closest('.board-container')) e.preventDefault(); }, { passive: false });
     
-    // 初回タップでAudioContextのロック解除
-    document.addEventListener("click", () => { if(audioCtx.state === 'suspended') audioCtx.resume(); }, { once: true });
+    document.addEventListener("click", () => { 
+        if(audioCtx.state === 'suspended') audioCtx.resume(); 
+        if(soundEnabled && !isBgmPlaying && !isGameOver) playBGM();
+    }, { once: true });
 
     function createTile(r, c, val) {
         const wrapper = document.createElement("div");
@@ -322,10 +382,10 @@
         closeModal();
         addRandomTile(); addRandomTile();
         renderDOM();
+        if(soundEnabled && !isBgmPlaying) playBGM();
     }
 
     function showScorePopup(val, r, c) {
-        // 合体した場所からスコアが飛び出す演出
         const pop = document.createElement("div");
         pop.className = "floating-score";
         pop.innerText = "+" + val;
@@ -333,7 +393,6 @@
         pop.style.left = `calc(${c} * 25% + var(--gap))`;
         layer.appendChild(pop);
         
-        // ヘッダーのスコア欄にも小さいポップアップ
         const headPop = document.createElement("div");
         headPop.className = "score-addition";
         headPop.innerText = "+" + val;
@@ -403,7 +462,6 @@
             playMergeSound(maxMergedVal, combo);
             showScorePopup(gainedScore, lastMergePos.r, lastMergePos.c);
             
-            // 爽快感演出（高レベルタイル合成時）
             if (maxMergedVal >= 512) {
                 const board = document.getElementById("touch-area");
                 board.classList.remove("shake");
@@ -438,9 +496,8 @@
 
     async function handleFinish() {
         if(soundEnabled) {
-            // ゲームオーバー時のディスコードな和音
-            playTone(150, 'sawtooth', 0.5, 0.1);
-            playTone(140, 'sawtooth', 0.5, 0.1);
+            playMarimbaTone(130, 0.4, 0.3);
+            stopBGM();
         }
 
         document.getElementById("modal-main-title").innerText = "Game Over!";
