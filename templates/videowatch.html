@@ -7,27 +7,23 @@
     <style>
         body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
         
-        /* トップヘッダー */
         header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
         .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
 
-        /* ボトムナビゲーション */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; cursor: pointer; }
         .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
         .nav-item .label { font-size: 10px; font-weight: 500; }
         .nav-item:hover { background: #f2f2f2; }
 
-        /* コンテナ */
         .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        /* プレイヤー (スマホでも崩れない16:9固定設定) */
-        .player-wrapper { position: relative; width: 100%; height: 0; padding-bottom: 56.25%; background: #000000; overflow: hidden; }
-        .player-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+        /* プレイヤー設定 (HTML5 Videoタグ用) */
+        .player-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; background: #000000; overflow: hidden; }
+        .player-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
         
-        /* 動画情報 */
         .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
         .title { font-size: 18px; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; }
         .meta { font-size: 14px; color: #606060; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
@@ -36,7 +32,6 @@
         .author-name { font-weight: 500; font-size: 15px; }
         .desc-box { background: #f2f2f2; border-radius: 12px; padding: 12px; font-size: 14px; white-space: pre-wrap; line-height: 1.5; color: #0f0f0f; }
 
-        /* コメント欄 */
         .comments { padding: 16px; }
         .comment-count { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
         .c-form { display: flex; gap: 16px; margin-bottom: 24px; }
@@ -59,6 +54,7 @@
 
         @media (min-width: 1000px) {
             .container { padding: 24px; }
+            .player-wrapper { border-radius: 12px; }
             header { display: none; }
             .bottom-nav { display: none; }
             body { padding-bottom: 0; }
@@ -73,7 +69,7 @@
     </header>
 
     <div class="container">
-        <!-- 動画プレイヤー領域 -->
+        <!-- 最強のストリーミングプレイヤー (自社サーバー経由) -->
         <div class="player-wrapper" id="player-container">
             <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
         </div>
@@ -140,9 +136,12 @@
                 document.getElementById("v-avatar").innerText = v.author_name.charAt(0);
                 document.getElementById("v-desc").innerText = v.description || "説明はありません。";
                 
-                // allowfullscreen 等の属性を追加してスマホでも正常に描写させる
+                // 自社サーバーのストリーミングAPIを経由させることでスマホのブロックを突破
                 document.getElementById("player-container").innerHTML = `
-                    <iframe src="https://drive.google.com/file/d/${v.drive_file_id}/preview" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
+                    <video controls autoplay playsinline>
+                        <source src="/api/videos/${videoId}/stream" type="video/mp4">
+                        お使いのブラウザは動画の再生に対応していません。
+                    </video>
                 `;
                 
                 loadComments();
