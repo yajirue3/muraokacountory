@@ -1,5 +1,4 @@
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -23,6 +22,13 @@ FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
 
 _view_history = {}
 
+# --- 高速化の要 ---
+# HTTP接続を使い回す（コネクションプーリング）ことで、リクエストごとのTLSハンドシェイクを削減
+http_client = httpx.AsyncClient(
+    timeout=120.0, 
+    limits=httpx.Limits(max_keepalive_connections=50, max_connections=100)
+)
+
 class CommentCreate(BaseModel):
     content: str
 
@@ -38,15 +44,15 @@ async def get_gdrive_access_token() -> str:
         "grant_type": "refresh_token"
     }
     
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.post(url, data=data)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code}")
-        return res.json()["access_token"]
+    # 共通のクライアントを使用
+    res = await http_client.post(url, data=data)
+    if res.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code}")
+    return res.json()["access_token"]
 
-async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) -> str:
+
+async def upload_file_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
     token = await get_gdrive_access_token()
-    file_size = os.path.getsize(file_path)
 
     init_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
     headers = {
@@ -59,40 +65,43 @@ async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) ->
     if FOLDER_ID:
         metadata["parents"] = [FOLDER_ID]
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        init_res = await client.post(init_url, headers=headers, json=metadata)
-        if init_res.status_code != 200:
-            raise HTTPException(status_code=500, detail="アップロードセッション作成失敗")
-        
-        session_url = init_res.headers.get("Location")
-        chunk_size = 8 * 1024 * 1024  
-        file_id = None
+    # 共通のクライアントを使用
+    init_res = await http_client.post(init_url, headers=headers, json=metadata)
+    if init_res.status_code != 200:
+        raise HTTPException(status_code=500, detail="アップロードセッション作成失敗")
+    
+    session_url = init_res.headers.get("Location")
+    
+    # チャンクサイズを 32MB に拡大（転送回数を減らし高速化）
+    chunk_size = 32 * 1024 * 1024  
+    file_id = None
 
-        with open(file_path, "rb") as f:
-            start = 0
-            while start < file_size:
-                chunk = f.read(chunk_size)
-                if not chunk: break
-                end = start + len(chunk) - 1
-                chunk_headers = {
-                    "Content-Range": f"bytes {start}-{end}/{file_size}",
-                    "Content-Length": str(len(chunk))
-                }
-                upload_res = await client.put(session_url, headers=chunk_headers, content=chunk)
-                
-                if upload_res.status_code in (200, 201):
-                    file_id = upload_res.json().get("id")
-                    break
-                elif upload_res.status_code != 308:
-                    raise HTTPException(status_code=500, detail="ファイル転送エラー")
-                start = end + 1
+    start = 0
+    file_obj.seek(0)
+    
+    while start < file_size:
+        chunk = file_obj.read(chunk_size)
+        if not chunk: break
+        end = start + len(chunk) - 1
+        chunk_headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(len(chunk))
+        }
+        # 共通のクライアントを使用
+        upload_res = await http_client.put(session_url, headers=chunk_headers, content=chunk)
+        
+        if upload_res.status_code in (200, 201):
+            file_id = upload_res.json().get("id")
+            break
+        elif upload_res.status_code != 308:
+            raise HTTPException(status_code=500, detail="ファイル転送エラー")
+        start = end + 1
 
     if not file_id:
         raise HTTPException(status_code=500, detail="ファイルIDの取得失敗")
 
     perm_url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        await client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
+    await http_client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
         
     return file_id
 
@@ -128,7 +137,6 @@ async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(Non
     
     return {"videos": res.data or [], "is_king": king_status, "user_id": str(user.id)}
 
-# --- 登録中チャンネル一覧の取得 ---
 @router.get("/api/subscriptions")
 async def get_my_subscriptions(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -149,7 +157,6 @@ async def get_my_subscriptions(authorization: str = Header(None)):
         print(f"[ERROR] get_my_subscriptions: {e}")
         return []
 
-# --- 登録チャンネルの新着動画一覧の取得 (※ /api/videos/{video_id} より上に定義する必要あり) ---
 @router.get("/api/videos/subscribed")
 async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -211,41 +218,23 @@ async def upload_video(
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
-    v_suffix = Path(file.filename).suffix or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=v_suffix) as tmp:
-        tmp_path = tmp.name
-        
-    try:
-        with open(tmp_path, "wb") as buffer:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk: break
-                buffer.write(chunk)
-                
-        mime = file.content_type or "video/mp4"
-        drive_file_id = await upload_file_to_drive(tmp_path, file.filename, mime)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    # --- 高速化: 一時ファイル廃止・直接転送 ---
+    file.file.seek(0, os.SEEK_END)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    mime = file.content_type or "video/mp4"
+    
+    drive_file_id = await upload_file_to_drive(file.file, file.filename, mime, file_size)
 
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
-        t_suffix = Path(thumbnail.filename).suffix or ".jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
-            t_tmp_path = t_tmp.name
-            
-        try:
-            with open(t_tmp_path, "wb") as t_buffer:
-                while True:
-                    t_chunk = await thumbnail.read(1024 * 1024)
-                    if not t_chunk: break
-                    t_buffer.write(t_chunk)
-                    
-            t_mime = thumbnail.content_type or "image/jpeg"
-            thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
-        finally:
-            if os.path.exists(t_tmp_path):
-                os.remove(t_tmp_path)
+        # サムネイルも同様に直接転送
+        thumbnail.file.seek(0, os.SEEK_END)
+        t_file_size = thumbnail.file.tell()
+        thumbnail.file.seek(0)
+        t_mime = thumbnail.content_type or "image/jpeg"
+        
+        thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
 
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
@@ -312,6 +301,7 @@ async def stream_video(video_id: str, request: Request):
     if range_header:
         headers["Range"] = range_header
 
+    # ストリーミング再生時は長時間の接続保持となるため、個別のClientを生成
     client = httpx.AsyncClient()
     req = client.build_request("GET", url, headers=headers)
     r = await client.send(req, stream=True)
@@ -432,26 +422,18 @@ async def update_profile(
     }
 
     if avatar and avatar.filename:
-        t_suffix = Path(avatar.filename).suffix or ".jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
-            t_tmp_path = t_tmp.name
-        try:
-            with open(t_tmp_path, "wb") as t_buffer:
-                while True:
-                    t_chunk = await avatar.read(1024 * 1024)
-                    if not t_chunk: break
-                    t_buffer.write(t_chunk)
-            t_mime = avatar.content_type or "image/jpeg"
-            avatar_drive_id = await upload_file_to_drive(t_tmp_path, avatar.filename, t_mime)
-            update_data["avatar_drive_id"] = avatar_drive_id
-        finally:
-            if os.path.exists(t_tmp_path):
-                os.remove(t_tmp_path)
+        # プロフィール画像も直接転送に修正
+        avatar.file.seek(0, os.SEEK_END)
+        a_file_size = avatar.file.tell()
+        avatar.file.seek(0)
+        a_mime = avatar.content_type or "image/jpeg"
+        
+        avatar_drive_id = await upload_file_to_drive(avatar.file, avatar.filename, a_mime, a_file_size)
+        update_data["avatar_drive_id"] = avatar_drive_id
 
     await supabase.table("profiles").update(update_data).eq("id", user.id).execute()
     return {"message": "プロフィールを更新しました", "data": update_data}
 
-# --- チャンネル情報の取得 ---
 @router.get("/api/channel/{channel_id}")
 async def get_channel_info(channel_id: str, page: int = Query(1, ge=1)):
     supabase = await get_supabase()
@@ -474,7 +456,6 @@ async def get_channel_info(channel_id: str, page: int = Query(1, ge=1)):
         "videos": vid_res.data or []
     }
 
-# --- チャンネル登録状態の確認 ---
 @router.get("/api/channel/{channel_id}/status")
 async def check_subscribe_status(channel_id: str, authorization: str = Header(None)):
     if not authorization:
@@ -487,7 +468,6 @@ async def check_subscribe_status(channel_id: str, authorization: str = Header(No
     except:
         return {"is_subscribed": False}
 
-# --- チャンネル登録の実行・解除 ---
 @router.post("/api/channel/{channel_id}/subscribe")
 async def toggle_subscribe(channel_id: str, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
