@@ -8,14 +8,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from db import get_supabase
-# main.pyから既存のアカウントシステムを直接インポート
 from main import get_user_from_token, is_king
 
 router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-# 環境変数
 CLIENT_ID = os.getenv("GDRIVE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GDRIVE_CLIENT_SECRET")
 REFRESH_TOKEN = os.getenv("GDRIVE_REFRESH_TOKEN")
@@ -27,6 +25,7 @@ class CommentCreate(BaseModel):
 async def get_gdrive_access_token() -> str:
     if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
         raise HTTPException(status_code=500, detail="Driveの認証情報が設定されていません")
+    
     url = "https://oauth2.googleapis.com/token"
     data = {
         "client_id": CLIENT_ID,
@@ -34,13 +33,14 @@ async def get_gdrive_access_token() -> str:
         "refresh_token": REFRESH_TOKEN,
         "grant_type": "refresh_token"
     }
+    
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.post(url, data=data)
         if res.status_code != 200:
-            raise HTTPException(status_code=500, detail="Driveアクセストークンの取得に失敗しました")
+            # Googleからの詳細なエラーをフロントに返す
+            raise HTTPException(status_code=500, detail=f"Googleトークン取得エラー: {res.status_code} {res.text}")
         return res.json()["access_token"]
 
-# --- Google Drive アップロード (メモリ節約チャンク転送) ---
 async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) -> str:
     token = await get_gdrive_access_token()
     file_size = os.path.getsize(file_path)
@@ -59,10 +59,10 @@ async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) ->
     async with httpx.AsyncClient(timeout=60.0) as client:
         init_res = await client.post(init_url, headers=headers, json=metadata)
         if init_res.status_code != 200:
-            raise HTTPException(status_code=500, detail="アップロードの初期化に失敗しました")
+            raise HTTPException(status_code=500, detail=f"アップロードセッション作成失敗: {init_res.status_code} {init_res.text}")
         
         session_url = init_res.headers.get("Location")
-        chunk_size = 8 * 1024 * 1024  # 8MBずつ転送してサーバーメモリを節約
+        chunk_size = 8 * 1024 * 1024  
         file_id = None
 
         with open(file_path, "rb") as f:
@@ -76,22 +76,23 @@ async def upload_file_to_drive(file_path: str, filename: str, mime_type: str) ->
                     "Content-Length": str(len(chunk))
                 }
                 upload_res = await client.put(session_url, headers=chunk_headers, content=chunk)
+                
                 if upload_res.status_code in (200, 201):
                     file_id = upload_res.json().get("id")
                     break
                 elif upload_res.status_code != 308:
-                    raise HTTPException(status_code=500, detail="ファイル転送エラー")
+                    raise HTTPException(status_code=500, detail=f"ファイル転送エラー: {upload_res.status_code} {upload_res.text}")
                 start = end + 1
 
     if not file_id:
-        raise HTTPException(status_code=500, detail="ファイルIDが取得できませんでした")
+        raise HTTPException(status_code=500, detail="ファイルIDの取得に失敗しました")
 
     perm_url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
     async with httpx.AsyncClient(timeout=10.0) as client:
         await client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
+        
     return file_id
 
-# --- 画面ルーティング ---
 @router.get("/videos", response_class=HTMLResponse)
 async def get_videos_page(request: Request):
     return templates.TemplateResponse(request=request, name="videos.html")
@@ -104,7 +105,6 @@ async def get_watch_page(request: Request):
 async def get_manage_page(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
-# --- API群 ---
 @router.get("/api/videos")
 async def get_videos(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -137,7 +137,6 @@ async def upload_video(
         tmp_path = tmp.name
         
     try:
-        # メモリ圧迫を防ぐため、受信データも1MBずつ書き込む
         with open(tmp_path, "wb") as buffer:
             while True:
                 chunk = await file.read(1024 * 1024)
