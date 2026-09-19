@@ -228,10 +228,10 @@ def get_videowatch(request: Request):
 def get_videomanage(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
+@app.get("/google1234567890abcdef.html", response_class=HTMLResponse)
+def verify_google(request: Request):
+    return templates.TemplateResponse(request=request, name="google1234567890abcdef.html")
 
-@app.get("/google0296c26e6b9651c8.html", response_class=HTMLResponse)
-def get_google0296c26e6b9651c8.html(request: Request):
-    return templates.TemplateResponse(request=request, name="google0296c26e6b9651c8.html")
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
