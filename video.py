@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException, Header, Request, UploadFile, File, Form, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -21,7 +21,6 @@ CLIENT_SECRET = os.getenv("GDRIVE_CLIENT_SECRET")
 REFRESH_TOKEN = os.getenv("GDRIVE_REFRESH_TOKEN")
 FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
 
-# --- 連続再生数稼ぎ防止用のメモリキャッシュ ---
 _view_history = {}
 
 class CommentCreate(BaseModel):
@@ -140,7 +139,6 @@ async def upload_video(
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
-    # 1. 動画の保存とアップロード
     v_suffix = Path(file.filename).suffix or ".mp4"
     with tempfile.NamedTemporaryFile(delete=False, suffix=v_suffix) as tmp:
         tmp_path = tmp.name
@@ -158,7 +156,6 @@ async def upload_video(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    # 2. サムネイルの保存とアップロード
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
         t_suffix = Path(thumbnail.filename).suffix or ".jpg"
@@ -178,7 +175,6 @@ async def upload_video(
             if os.path.exists(t_tmp_path):
                 os.remove(t_tmp_path)
 
-    # 3. データベースへ書き込み
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
         "author_name": nickname,
@@ -206,22 +202,59 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
     if video.get("is_private") and video["user_id"] != str(user.id) and not king_status:
         raise HTTPException(status_code=403, detail="非公開の動画です")
     
-    # --- F5連打の再生数稼ぎ対策 ---
     now = time.time()
     view_key = f"{user.id}_{video_id}"
     last_viewed = _view_history.get(view_key, 0)
     
-    # 前回アクセスから3600秒（1時間）経過していればカウントアップ
     if now - last_viewed > 3600:
         try:
             current_views = video.get("views") or 0
             await supabase.table("videos").update({"views": current_views + 1}).eq("id", video_id).execute()
             video["views"] = current_views + 1
-            _view_history[view_key] = now  # 履歴を更新
+            _view_history[view_key] = now
         except Exception:
             pass
 
     return video
+
+# --- 最強のスマホ対応：自前ストリーミング中継機能 ---
+@router.get("/api/videos/{video_id}/stream")
+async def stream_video(video_id: str, request: Request):
+    supabase = await get_supabase()
+    res = await supabase.table("videos").select("drive_file_id").eq("id", video_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="映像が見つかりません")
+    
+    drive_file_id = res.data[0]["drive_file_id"]
+    token = await get_gdrive_access_token()
+    url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media"
+    
+    # ブラウザからのRangeヘッダー（シークバー操作）をGoogleにそのままパス
+    headers = {"Authorization": f"Bearer {token}"}
+    range_header = request.headers.get("Range")
+    if range_header:
+        headers["Range"] = range_header
+
+    client = httpx.AsyncClient()
+    req = client.build_request("GET", url, headers=headers)
+    r = await client.send(req, stream=True)
+
+    # Googleからのレスポンスヘッダーを抽出
+    resp_headers = {}
+    for k, v in r.headers.items():
+        if k.lower() in ["content-type", "content-length", "content-range", "accept-ranges"]:
+            resp_headers[k] = v
+
+    # 1MBずつ中継してサーバーメモリのパンクを防止
+    async def iter_file():
+        try:
+            async for chunk in r.aiter_bytes(chunk_size=1024 * 1024):
+                yield chunk
+        finally:
+            await r.aclose()
+            await client.aclose()
+
+    return StreamingResponse(iter_file(), status_code=r.status_code, headers=resp_headers)
 
 @router.get("/api/videos/{video_id}/comments")
 async def get_comments(video_id: str):
