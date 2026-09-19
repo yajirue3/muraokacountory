@@ -196,77 +196,80 @@
     let audioCtx = null;
     let soundEnabled = true;
     
-    let bgmSource, bgmFilter, bgmMasterGain, alphaOsc1, alphaOsc2;
+    // 音響ノード
+    let bgmSource, bgmFilter, bgmMasterGain, waveLFO;
     let isBgmPlaying = false;
+    let convolver = null; // 立体音響（リバーブ）用
 
     function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new AudioContext();
-        }
+        if (!audioCtx) audioCtx = new AudioContext();
     }
 
-    // --- アルファ波誘導（ピンクノイズ＋ゆったりとした10Hzバイノーラル揺らぎ） ---
+    // 立体音響用の深い反響空間（インパルス応答）を動的生成
+    function initReverb() {
+        if (convolver) return;
+        convolver = audioCtx.createConvolver();
+        const rate = audioCtx.sampleRate;
+        const length = rate * 2.5; // 2.5秒の深いリバーブ
+        const impulse = audioCtx.createBuffer(2, length, rate);
+        for (let i = 0; i < 2; i++) {
+            const channel = impulse.getChannelData(i);
+            for (let j = 0; j < length; j++) {
+                // 指数減衰による木製ホールの響きをシミュレート
+                const decay = Math.pow(1 - j / length, 4.0);
+                channel[j] = (Math.random() * 2 - 1) * decay;
+            }
+        }
+        convolver.buffer = impulse;
+    }
+
+    // --- 波の音（ブツブツ音完全排除＆波のうねり強化） ---
     function playBGM() {
         initAudio();
         if (isBgmPlaying || !soundEnabled) return;
         isBgmPlaying = true;
         
-        // 滑らかなピンクノイズのバッファ作成（プチプチ音を低減するフィルター適用）
-        const bufferSize = audioCtx.sampleRate * 6;
+        // ピュアなホワイトノイズを生成（ループ時のノイズを消すため加工なし）
+        const bufferSize = audioCtx.sampleRate * 4;
         const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
-        
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
         for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            b0 = 0.99886 * b0 + white * 0.0555179;
-            b1 = 0.99332 * b1 + white * 0.0750759;
-            b2 = 0.96900 * b2 + white * 0.1538520;
-            b3 = 0.86650 * b3 + white * 0.3104856;
-            b4 = 0.55000 * b4 + white * 0.5329522;
-            b5 = -0.7616 * b5 - white * 0.0168980;
-            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-            output[i] *= 0.05;
-            b6 = white * 0.115926;
+            output[i] = Math.random() * 2 - 1; 
         }
 
         bgmSource = audioCtx.createBufferSource();
         bgmSource.buffer = noiseBuffer;
-        bgmSource.loop = true;
+        bgmSource.loop = true; // 生ノイズのループはブツブツ鳴らない
 
-        // 深いリラックス感を誘うローパスフィルター
+        // 低音の波の音に変換する連続フィルター
         bgmFilter = audioCtx.createBiquadFilter();
         bgmFilter.type = 'lowpass';
-        bgmFilter.frequency.setValueAtTime(150, audioCtx.currentTime);
+        bgmFilter.frequency.value = 250; // 波の音がしっかり聞こえる帯域に調整
 
-        // 脳波をアルファ波（10Hz）へ自然に導く超低域のうねり（トーン）
-        alphaOsc1 = audioCtx.createOscillator();
-        alphaOsc2 = audioCtx.createOscillator();
-        const alphaGain = audioCtx.createGain();
+        // アルファ波誘導の12秒周期の「波の満ち引き（うねり）」
+        waveLFO = audioCtx.createOscillator();
+        waveLFO.type = 'sine';
+        waveLFO.frequency.value = 0.08; 
         
-        alphaOsc1.type = 'sine';
-        alphaOsc2.type = 'sine';
-        alphaOsc1.frequency.setValueAtTime(108, audioCtx.currentTime); // 108Hz
-        alphaOsc2.frequency.setValueAtTime(118, audioCtx.currentTime); // 118Hz (差分10Hz = アルファ波帯域)
-        
-        alphaGain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0.5; // 音量の揺れ幅
+        waveLFO.connect(lfoGain);
+
+        const waveVolumeNode = audioCtx.createGain();
+        waveVolumeNode.gain.value = 0.5; // ベース音量
+        lfoGain.connect(waveVolumeNode.gain); 
 
         bgmMasterGain = audioCtx.createGain();
         bgmMasterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-        bgmMasterGain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 3);
+        bgmMasterGain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 3); // 音量をしっかり出す
 
         bgmSource.connect(bgmFilter);
-        bgmFilter.connect(bgmMasterGain);
-        
-        alphaOsc1.connect(alphaGain);
-        alphaOsc2.connect(alphaGain);
-        alphaGain.connect(bgmMasterGain);
-
+        bgmFilter.connect(waveVolumeNode);
+        waveVolumeNode.connect(bgmMasterGain);
         bgmMasterGain.connect(audioCtx.destination);
 
         bgmSource.start();
-        alphaOsc1.start();
-        alphaOsc2.start();
+        waveLFO.start();
     }
 
     function stopBGM() {
@@ -280,8 +283,7 @@
         
         setTimeout(() => {
             if (bgmSource) try { bgmSource.stop(); } catch(e){}
-            if (alphaOsc1) try { alphaOsc1.stop(); } catch(e){}
-            if (alphaOsc2) try { alphaOsc2.stop(); } catch(e){}
+            if (waveLFO) try { waveLFO.stop(); } catch(e){}
         }, 2000);
     }
 
@@ -297,62 +299,80 @@
         }
     }
 
-    // --- 効果音：オーガニックなアコースティック木琴（シロフォン／マリンバ）音 ---
-    function playXylophoneTone(freq, duration, volume) {
+    // --- 効果音：立体音響リバーブ＋オーガニック木琴音 ---
+    function playAcousticWood(freq, panValue, volScale = 1.0) {
         if (!soundEnabled) return;
         initAudio();
+        initReverb();
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
         const now = audioCtx.currentTime;
 
-        // 基音（木材の響き）
-        const osc1 = audioCtx.createOscillator();
-        const gain1 = audioCtx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(freq, now);
+        // 立体音響：パンニング（左右の配置）
+        const panner = audioCtx.createStereoPanner();
+        panner.pan.value = panValue; 
 
-        // 高倍音（マレットが木に当たったアタック感）
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(freq * 3.0, now); // 木琴特有の倍音
+        // ダイレクト音（乾いた音）
+        const dryGain = audioCtx.createGain();
+        dryGain.gain.value = 0.65 * volScale;
+        
+        // 反響音（リバーブ空間へ）
+        const wetGain = audioCtx.createGain();
+        wetGain.gain.value = 1.0 * volScale; // 深い反響
 
-        // エンベロープ設定（急激な立ち上がりと温かみのある減衰）
-        gain1.gain.setValueAtTime(0, now);
-        gain1.gain.linearRampToValueAtTime(volume, now + 0.002);
-        gain1.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        panner.connect(dryGain);
+        panner.connect(wetGain);
+        dryGain.connect(audioCtx.destination);
+        wetGain.connect(convolver);
+        convolver.connect(audioCtx.destination);
 
-        gain2.gain.setValueAtTime(0, now);
-        gain2.gain.linearRampToValueAtTime(volume * 0.4, now + 0.001);
-        gain2.gain.exponentialRampToValueAtTime(0.0001, now + (duration * 0.3));
+        // 胴鳴り（木そのものの響き）
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
 
-        osc1.connect(gain1);
-        osc2.connect(gain2);
-        gain1.connect(audioCtx.destination);
-        gain2.connect(audioCtx.destination);
+        // マレットの打撃音（コンッという鋭いアタック）
+        const strike = audioCtx.createOscillator();
+        const strikeGain = audioCtx.createGain();
+        strike.type = 'triangle';
+        strike.frequency.setValueAtTime(freq * 3.5, now);
 
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + duration);
-        osc2.stop(now + duration);
+        // 柔らかく広がる余韻のエンベロープ
+        oscGain.gain.setValueAtTime(0, now);
+        oscGain.gain.linearRampToValueAtTime(0.8, now + 0.005);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+        // 瞬間的な打点音のエンベロープ
+        strikeGain.gain.setValueAtTime(0, now);
+        strikeGain.gain.linearRampToValueAtTime(0.4, now + 0.002);
+        strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+        osc.connect(oscGain).connect(panner);
+        strike.connect(strikeGain).connect(panner);
+
+        osc.start(now);
+        strike.start(now);
+        osc.stop(now + 0.6);
+        strike.stop(now + 0.6);
     }
 
     function playMoveSound() { 
-        playXylophoneTone(220, 0.08, 0.08); 
+        playAcousticWood(180, 0, 0.4); 
     }
     
-    function playMergeSound(val, combo) {
+    function playMergeSound(val, colIndex) {
         if (!soundEnabled) return;
-        // 木琴に適したペンタトニックスケール（和音の美しさと落ち着き）
         const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
         let index = Math.min(Math.floor(Math.log2(val)) - 1, scale.length - 1);
         let freq = scale[Math.max(0, index)];
         
-        playXylophoneTone(freq, 0.25, 0.22);
+        // 盤面の位置(0〜3)から左右のパンニング(-0.6〜0.6)を計算して立体音響化
+        let panValue = (colIndex !== undefined) ? (colIndex / 3) * 1.2 - 0.6 : 0;
+        
+        playAcousticWood(freq, panValue, 0.8);
         if (val >= 64) {
-            setTimeout(() => {
-                playXylophoneTone(freq * 1.25, 0.3, 0.15);
-            }, 40);
+            setTimeout(() => { playAcousticWood(freq * 1.25, panValue, 0.4); }, 45);
         }
     }
 
@@ -378,6 +398,7 @@
     
     document.addEventListener("click", () => { 
         initAudio();
+        initReverb();
         if(audioCtx.state === 'suspended') audioCtx.resume(); 
         if(soundEnabled && !isBgmPlaying && !isGameOver) playBGM();
     }, { once: true });
@@ -467,9 +488,8 @@
     function operate(dir) {
         if (isGameOver) return;
         let moved = false, gainedScore = 0;
-        let combo = 0;
         let maxMergedVal = 0;
-        let lastMergePos = null;
+        let lastMergePos = {r: 1, c: 1};
 
         const oldPositions = new Map(tiles.map(t => [t.id, {r: t.r, c: t.c}]));
         const newGrid = Array(4).fill(null).map(() => Array(4).fill(null));
@@ -488,7 +508,6 @@
                 if (k < line.length - 1 && line[k].val === line[k+1].val && !line[k].isDeleted && !line[k+1].isDeleted) {
                     let val = line[k].val * 2;
                     gainedScore += val;
-                    combo++;
                     if (val > maxMergedVal) maxMergedVal = val;
                     
                     let newTile = createTile(0, 0, val);
@@ -522,7 +541,7 @@
         
         if (gainedScore > 0) {
             moved = true;
-            playMergeSound(maxMergedVal, combo);
+            playMergeSound(maxMergedVal, lastMergePos.c);
             showScorePopup(gainedScore, lastMergePos.r, lastMergePos.c);
             
             if (maxMergedVal >= 512) {
@@ -559,7 +578,7 @@
 
     async function handleFinish() {
         if(soundEnabled) {
-            playXylophoneTone(130, 0.5, 0.2);
+            playAcousticWood(130, 0, 0.7);
             stopBGM();
         }
 
