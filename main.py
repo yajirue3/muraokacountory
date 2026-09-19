@@ -233,6 +233,11 @@ def verify_google(request: Request):
     return templates.TemplateResponse(request=request, name="google0296c26e6b9651c8.html")
 
 
+@app.get("/channel", response_class=HTMLResponse)
+def get_channel(request: Request):
+    return templates.TemplateResponse(request=request, name="channel.html")
+
+
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
