@@ -237,6 +237,9 @@ def verify_google(request: Request):
 def get_channel(request: Request):
     return templates.TemplateResponse(request=request, name="channel.html")
 
+@app.get("/subscribe", response_class=HTMLResponse)
+def get_subscribe(request: Request):
+    return templates.TemplateResponse(request=request, name="substrate.html")
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
