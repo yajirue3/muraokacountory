@@ -22,8 +22,6 @@ FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
 
 _view_history = {}
 
-# --- 【究極高速化】コネクションプールの拡張 ---
-# 800MB動画のシーク（複数回リクエスト）にも即座に応答できるよう最大接続数を大幅引き上げ
 http_client = httpx.AsyncClient(
     timeout=120.0, 
     limits=httpx.Limits(max_keepalive_connections=100, max_connections=500)
@@ -51,6 +49,7 @@ async def get_gdrive_access_token() -> str:
 
 
 async def upload_file_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
+    # サムネイルなどの軽量ファイルアップロード用に残しています
     token = await get_gdrive_access_token()
 
     init_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
@@ -72,7 +71,6 @@ async def upload_file_to_drive(file_obj, filename: str, mime_type: str, file_siz
     
     chunk_size = 32 * 1024 * 1024  
     file_id = None
-
     start = 0
     file_obj.seek(0)
     
@@ -198,12 +196,45 @@ async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str =
     except Exception:
         return {"videos": []}
 
-@router.post("/api/videos/upload")
-async def upload_video(
+
+# --- 【変更】ステップ1: ダイレクトアップロード用の専用URLを取得 ---
+@router.post("/api/videos/get_upload_url")
+async def get_upload_url(
+    filename: str = Form(...),
+    file_size: int = Form(...),
+    mime_type: str = Form(...),
+    authorization: str = Header(None)
+):
+    user = await get_user_from_token(authorization)
+    token = await get_gdrive_access_token()
+
+    init_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": mime_type,
+        "X-Upload-Content-Length": str(file_size)
+    }
+    metadata = {"name": filename}
+    if FOLDER_ID:
+        metadata["parents"] = [FOLDER_ID]
+
+    init_res = await http_client.post(init_url, headers=headers, json=metadata)
+    if init_res.status_code != 200:
+        raise HTTPException(status_code=500, detail="アップロードセッション作成失敗")
+    
+    session_url = init_res.headers.get("Location")
+    return {"upload_url": session_url}
+
+
+# --- 【変更】ステップ2: Googleからの完了通知を受けてDBへ保存 ---
+@router.post("/api/videos/save_metadata")
+async def save_metadata(
     title: str = Form(...),
     description: str = Form(""),
     is_private: bool = Form(False),
-    file: UploadFile = File(...),
+    drive_file_id: str = Form(...),
+    mime_type: str = Form(...),
     thumbnail: Optional[UploadFile] = File(None),
     authorization: str = Header(None)
 ):
@@ -212,21 +243,19 @@ async def upload_video(
 
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
-
-    file.file.seek(0, os.SEEK_END)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    mime = file.content_type or "video/mp4"
     
-    drive_file_id = await upload_file_to_drive(file.file, file.filename, mime, file_size)
+    # アップロードされた動画の権限を一般公開(Anyone)に設定
+    token = await get_gdrive_access_token()
+    perm_url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}/permissions"
+    await http_client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
 
+    # サムネイルは軽いので従来通りサーバー経由
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
         thumbnail.file.seek(0, os.SEEK_END)
         t_file_size = thumbnail.file.tell()
         thumbnail.file.seek(0)
         t_mime = thumbnail.content_type or "image/jpeg"
-        
         thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
 
     insert_res = await supabase.table("videos").insert({
@@ -238,10 +267,11 @@ async def upload_video(
         "thumbnail_drive_id": thumbnail_drive_id,
         "is_private": is_private,
         "views": 0,
-        "mime_type": mime
+        "mime_type": mime_type
     }).execute()
 
     return {"message": "アップロード完了", "video": insert_res.data[0]}
+
 
 @router.get("/api/videos/{video_id}")
 async def get_video_detail(video_id: str, authorization: str = Header(None)):
@@ -299,7 +329,6 @@ async def stream_video(video_id: str, request: Request):
     req = http_client.build_request("GET", url, headers=headers)
     r = await http_client.send(req, stream=True)
 
-    # --- 【究極高速化】ブラウザの最強キャッシュを引き出す ---
     resp_headers = {
         "Content-Type": mime_type,
         "Accept-Ranges": "bytes",
@@ -313,7 +342,6 @@ async def stream_video(video_id: str, request: Request):
 
     async def iter_file():
         try:
-            # --- 【究極高速化】800MB対応の1MBメガチャンク ---
             async for chunk in r.aiter_bytes(chunk_size=1024 * 1024):
                 yield chunk
         finally:
