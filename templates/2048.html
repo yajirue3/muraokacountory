@@ -193,79 +193,100 @@
     function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
+    let audioCtx = null;
     let soundEnabled = true;
     
-    let bgmSource, bgmFilter, bgmLFO, bgmMasterGain;
+    let bgmSource, bgmFilter, bgmMasterGain, alphaOsc1, alphaOsc2;
     let isBgmPlaying = false;
 
-    // --- アルファ波誘導（ブラウンノイズ生成と呼吸フィルター） ---
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new AudioContext();
+        }
+    }
+
+    // --- アルファ波誘導（ピンクノイズ＋ゆったりとした10Hzバイノーラル揺らぎ） ---
     function playBGM() {
+        initAudio();
         if (isBgmPlaying || !soundEnabled) return;
         isBgmPlaying = true;
         
-        // 5秒分のノイズバッファを作成
-        const bufferSize = audioCtx.sampleRate * 5;
+        // 滑らかなピンクノイズのバッファ作成（プチプチ音を低減するフィルター適用）
+        const bufferSize = audioCtx.sampleRate * 6;
         const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
         
-        // ホワイトノイズを積分してブラウンノイズ（波や風の自然音）を近似生成
-        let lastOut = 0;
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
         for (let i = 0; i < bufferSize; i++) {
             let white = Math.random() * 2 - 1;
-            output[i] = (lastOut + (0.02 * white)) / 1.02;
-            lastOut = output[i];
-            output[i] *= 3.5; 
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+            output[i] *= 0.05;
+            b6 = white * 0.115926;
         }
 
         bgmSource = audioCtx.createBufferSource();
         bgmSource.buffer = noiseBuffer;
         bgmSource.loop = true;
 
-        // 電子音感を消すためのローパス（低音通過）フィルター
+        // 深いリラックス感を誘うローパスフィルター
         bgmFilter = audioCtx.createBiquadFilter();
         bgmFilter.type = 'lowpass';
-        bgmFilter.frequency.value = 180; // 基本の深い風の音
+        bgmFilter.frequency.setValueAtTime(150, audioCtx.currentTime);
 
-        // 呼吸の周期（アルファ波誘導）のゆったりとした波の揺らぎ
-        bgmLFO = audioCtx.createOscillator();
-        bgmLFO.type = 'sine';
-        bgmLFO.frequency.value = 0.08; // 約12秒で1サイクルのゆっくりとした変化
+        // 脳波をアルファ波（10Hz）へ自然に導く超低域のうねり（トーン）
+        alphaOsc1 = audioCtx.createOscillator();
+        alphaOsc2 = audioCtx.createOscillator();
+        const alphaGain = audioCtx.createGain();
         
-        const lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 100; // フィルターの開閉幅
+        alphaOsc1.type = 'sine';
+        alphaOsc2.type = 'sine';
+        alphaOsc1.frequency.setValueAtTime(108, audioCtx.currentTime); // 108Hz
+        alphaOsc2.frequency.setValueAtTime(118, audioCtx.currentTime); // 118Hz (差分10Hz = アルファ波帯域)
         
-        bgmLFO.connect(lfoGain);
-        lfoGain.connect(bgmFilter.frequency);
+        alphaGain.gain.setValueAtTime(0.015, audioCtx.currentTime);
 
         bgmMasterGain = audioCtx.createGain();
         bgmMasterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-        bgmMasterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 3); // 3秒かけてフェードイン
+        bgmMasterGain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 3);
 
         bgmSource.connect(bgmFilter);
         bgmFilter.connect(bgmMasterGain);
+        
+        alphaOsc1.connect(alphaGain);
+        alphaOsc2.connect(alphaGain);
+        alphaGain.connect(bgmMasterGain);
+
         bgmMasterGain.connect(audioCtx.destination);
 
         bgmSource.start();
-        bgmLFO.start();
+        alphaOsc1.start();
+        alphaOsc2.start();
     }
 
     function stopBGM() {
-        if (!isBgmPlaying) return;
+        if (!isBgmPlaying || !audioCtx) return;
         isBgmPlaying = false;
         
         if (bgmMasterGain) {
             bgmMasterGain.gain.cancelScheduledValues(audioCtx.currentTime);
-            bgmMasterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
+            bgmMasterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
         }
         
         setTimeout(() => {
-            if (bgmSource) bgmSource.stop();
-            if (bgmLFO) bgmLFO.stop();
-        }, 3000);
+            if (bgmSource) try { bgmSource.stop(); } catch(e){}
+            if (alphaOsc1) try { alphaOsc1.stop(); } catch(e){}
+            if (alphaOsc2) try { alphaOsc2.stop(); } catch(e){}
+        }, 2000);
     }
 
     function toggleSound() {
+        initAudio();
         soundEnabled = !soundEnabled;
         document.getElementById("sound-toggle").innerText = soundEnabled ? "🔊" : "🔇";
         if(soundEnabled) {
@@ -276,34 +297,63 @@
         }
     }
 
-    // --- 効果音：アコースティックなマリンバ風打点音 ---
-    function playMarimbaTone(freq, duration, maxVol) {
+    // --- 効果音：オーガニックなアコースティック木琴（シロフォン／マリンバ）音 ---
+    function playXylophoneTone(freq, duration, volume) {
         if (!soundEnabled) return;
+        initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(maxVol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+
+        const now = audioCtx.currentTime;
+
+        // 基音（木材の響き）
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(freq, now);
+
+        // 高倍音（マレットが木に当たったアタック感）
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(freq * 3.0, now); // 木琴特有の倍音
+
+        // エンベロープ設定（急激な立ち上がりと温かみのある減衰）
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(volume, now + 0.002);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        gain2.gain.setValueAtTime(0, now);
+        gain2.gain.linearRampToValueAtTime(volume * 0.4, now + 0.001);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + (duration * 0.3));
+
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        gain1.connect(audioCtx.destination);
+        gain2.connect(audioCtx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration);
+        osc2.stop(now + duration);
     }
 
     function playMoveSound() { 
-        playMarimbaTone(140, 0.08, 0.1); 
+        playXylophoneTone(220, 0.08, 0.08); 
     }
     
     function playMergeSound(val, combo) {
         if (!soundEnabled) return;
-        const scale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.2, 587.3, 659.2, 783.9];
+        // 木琴に適したペンタトニックスケール（和音の美しさと落ち着き）
+        const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
         let index = Math.min(Math.floor(Math.log2(val)) - 1, scale.length - 1);
         let freq = scale[Math.max(0, index)];
         
-        playMarimbaTone(freq, 0.15, 0.2);
-        if (val >= 64) playMarimbaTone(freq * 1.5, 0.2, 0.1);
+        playXylophoneTone(freq, 0.25, 0.22);
+        if (val >= 64) {
+            setTimeout(() => {
+                playXylophoneTone(freq * 1.25, 0.3, 0.15);
+            }, 40);
+        }
     }
 
     // ---------------------------------------------
@@ -327,6 +377,7 @@
     document.addEventListener("touchmove", (e) => { if (e.target.closest('.board-container')) e.preventDefault(); }, { passive: false });
     
     document.addEventListener("click", () => { 
+        initAudio();
         if(audioCtx.state === 'suspended') audioCtx.resume(); 
         if(soundEnabled && !isBgmPlaying && !isGameOver) playBGM();
     }, { once: true });
@@ -508,7 +559,7 @@
 
     async function handleFinish() {
         if(soundEnabled) {
-            playMarimbaTone(130, 0.4, 0.3);
+            playXylophoneTone(130, 0.5, 0.2);
             stopBGM();
         }
 
