@@ -236,6 +236,7 @@ async def upload_video(
         
         thumbnail_drive_id = await upload_file_to_drive(thumbnail.file, thumbnail.filename, t_mime, t_file_size)
 
+    # MIMEタイプもDBに保存する
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
         "author_name": nickname,
@@ -244,7 +245,8 @@ async def upload_video(
         "drive_file_id": drive_file_id,
         "thumbnail_drive_id": thumbnail_drive_id,
         "is_private": is_private,
-        "views": 0
+        "views": 0,
+        "mime_type": mime
     }).execute()
 
     return {"message": "アップロード完了", "video": insert_res.data[0]}
@@ -288,11 +290,13 @@ async def get_video_detail(video_id: str, authorization: str = Header(None)):
 @router.get("/api/videos/{video_id}/stream")
 async def stream_video(video_id: str, request: Request):
     supabase = await get_supabase()
-    res = await supabase.table("videos").select("drive_file_id").eq("id", video_id).execute()
+    # mime_typeも取得する
+    res = await supabase.table("videos").select("drive_file_id, mime_type").eq("id", video_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="映像が見つかりません")
     
     drive_file_id = res.data[0]["drive_file_id"]
+    mime_type = res.data[0].get("mime_type") or "video/mp4"
     token = await get_gdrive_access_token()
     url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media"
     
@@ -311,8 +315,8 @@ async def stream_video(video_id: str, request: Request):
         if k.lower() in ["content-length", "content-range", "accept-ranges"]:
             resp_headers[k] = v
             
-    # 【重要】ブラウザが動画として認識できるように Content-Type を強制的に上書き
-    resp_headers["Content-Type"] = "video/mp4"
+    # データベースから取得したMIMEタイプを動的に割り当てる
+    resp_headers["Content-Type"] = mime_type
 
     async def iter_file():
         try:
