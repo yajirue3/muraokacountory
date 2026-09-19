@@ -2,17 +2,17 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画一覧 - M-Tube</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>動画再生 - M-Tube</title>
     <style>
-        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 70px; }
         
-        /* トップヘッダー */
-        header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
-        .logo { font-size: 20px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
+        .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
-        
-        /* ボトムナビゲーション (YouTube風) */
+
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
         .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; height: 100%; cursor: pointer; border: none; background: transparent; padding: 0; margin: 0; }
         .nav-item .icon-wrap { height: 24px; display: flex; align-items: center; justify-content: center; }
@@ -21,22 +21,66 @@
         .nav-item .label { font-size: 10px; font-weight: 500; margin-top: 2px; line-height: 1; }
         .nav-item:hover { background: #f2f2f2; }
 
-        /* グリッドレイアウト */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 30px 16px; padding: 24px; max-width: 1600px; margin: 0 auto; }
-        .card { text-decoration: none; color: inherit; display: block; }
-        .thumb-wrap { width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 12px; overflow: hidden; background: #f2f2f2; }
-        .thumb-img { width: 100%; height: 100%; object-fit: cover; }
-        .badge { position: absolute; top: 6px; right: 6px; background: rgba(204, 0, 0, 0.9); color: #fff; font-size: 11px; font-weight: bold; padding: 3px 6px; border-radius: 4px; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0; }
         
-        .info { margin-top: 10px; display: flex; flex-direction: column; padding: 0 4px; }
-        .title { font-size: 15px; font-weight: 500; margin: 0 0 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; color: #0f0f0f; }
-        .meta { font-size: 13px; color: #606060; }
+        /* 変更点: padding-bottomのハックをやめ、aspect-ratioとmin-heightで柔軟に対応 */
+        .player-wrapper { 
+            position: relative; 
+            width: 100%; 
+            aspect-ratio: 16 / 9; 
+            min-height: 260px; /* スマホでGoogle DriveのUIが崩れない最低限の高さ */
+            background: #000000; 
+            overflow: hidden; 
+        }
         
-        .load-more-container { text-align: center; padding: 20px; display: none; }
-        .btn { border: none; border-radius: 18px; padding: 0 16px; height: 36px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; background: #f2f2f2; color: #0f0f0f; }
-        .btn:hover { background: #e5e5e5; }
+        .player-wrapper iframe, .player-wrapper video { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            border: none;
+            outline: none; 
+        }
         
-        /* モーダル */
+        .info { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+        .title { font-size: 18px; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; }
+        .meta { font-size: 14px; color: #606060; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        
+        .channel-info { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+        .channel-author-wrap { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #cc0000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; object-fit: cover; flex-shrink: 0; }
+        .author-name { font-weight: 500; font-size: 15px; }
+
+        .btn-subscribe { background: #0f0f0f; color: #ffffff; border: none; padding: 0 16px; height: 36px; border-radius: 18px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-subscribe:hover { background: #272727; }
+        .btn-subscribe.subscribed { background: #f2f2f2; color: #0f0f0f; }
+        .btn-subscribe.subscribed:hover { background: #e5e5e5; }
+
+        .desc-box { background: #f2f2f2; border-radius: 12px; padding: 12px; font-size: 14px; white-space: pre-wrap; line-height: 1.5; color: #0f0f0f; }
+
+        .comments { padding: 16px; }
+        .comment-count { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
+        .c-form { display: flex; gap: 16px; margin-bottom: 24px; }
+        .c-input-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .c-input-wrapper input { width: 100%; border: none; border-bottom: 1px solid #737373; padding: 4px 0; font-size: 14px; font-family: inherit; background: transparent; transition: border-bottom-color 0.2s; box-sizing: border-box; }
+        .c-input-wrapper input:focus { outline: none; border-bottom: 2px solid #0f0f0f; }
+        .c-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+        .btn-submit { background: #f2f2f2; color: #0f0f0f; border: none; padding: 8px 16px; border-radius: 18px; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        .btn-submit:hover { background: #e5e5e5; }
+        .btn-submit.active { background: #065fd4; color: #fff; }
+
+        .c-item { display: flex; gap: 12px; margin-bottom: 16px; }
+        .c-avatar-link { text-decoration: none; }
+        .c-avatar { width: 36px; height: 36px; border-radius: 50%; background: #606060; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; object-fit: cover; }
+        .c-content-wrap { flex: 1; }
+        .c-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .c-author { font-size: 13px; font-weight: 500; color: #0f0f0f; text-decoration: none; }
+        .c-author:hover { text-decoration: underline; }
+        .c-text { font-size: 14px; line-height: 1.4; color: #0f0f0f; }
+        .c-del { color: #606060; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 12px; }
+        .c-del:hover { background: #f2f2f2; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 200; padding: 20px; box-sizing: border-box; }
         .modal-content { background: #ffffff; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .modal h3 { margin: 0 0 20px 0; font-size: 18px; color: #0f0f0f; }
@@ -46,63 +90,91 @@
         .modal input[type="text"]:focus, .modal textarea:focus { outline: none; border-color: #0f0f0f; }
         .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 20px 0; cursor: pointer; color: #0f0f0f; }
         .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        .btn { border: none; border-radius: 18px; padding: 0 16px; height: 36px; font-size: 14px; font-weight: 500; cursor: pointer; background: #f2f2f2; color: #0f0f0f; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:hover { background: #e5e5e5; }
         .btn-primary { background: #cc0000; color: #ffffff; }
         .btn-primary:hover { background: #990000; }
 
-        @media (max-width: 600px) {
-            .grid { padding: 16px; grid-template-columns: 1fr; gap: 20px; }
-            .thumb-wrap { border-radius: 0; }
-            .card { margin: -16px; margin-bottom: 0; padding-bottom: 16px; }
-            .info { padding: 0 16px; }
+        @media (min-width: 1000px) {
+            .container { padding: 24px; }
+            .player-wrapper { border-radius: 12px; }
+            header { display: none; }
+            .bottom-nav { display: none; }
+            body { padding-bottom: 0; }
         }
     </style>
 </head>
 <body>
     <header>
-        <a href="/videos" class="logo"><span>▶</span> M-Tube</a>
-        <a href="/dashboard" class="btn" style="height: 32px; font-size: 13px;">ホームへ</a>
+        <a href="/videos" class="back-btn">← 戻る</a>
+        <div class="logo"><span>▶</span> M-Tube</div>
+        <div style="width: 60px;"></div>
     </header>
 
-    <div class="grid" id="grid"></div>
-    
-    <div class="load-more-container" id="load-more-container">
-        <button class="btn" onclick="loadVideos()" id="load-more-btn">さらに読み込む</button>
+    <div class="container">
+        <div class="player-wrapper" id="player-container">
+            <div style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff;">読み込み中...</div>
+        </div>
+
+        <div class="info">
+            <h1 class="title" id="v-title">読み込み中...</h1>
+            <div class="meta" id="v-meta">
+                <span id="v-views">0 回視聴</span>
+            </div>
+            
+            <div class="channel-info">
+                <a href="#" id="v-author-link" class="channel-author-wrap">
+                    <div id="v-avatar-container">
+                        <div class="avatar" id="v-avatar">?</div>
+                    </div>
+                    <div class="author-name" id="v-author">名無し</div>
+                </a>
+                <button class="btn-subscribe" id="btn-subscribe" onclick="toggleSubscribe()" style="display: none;">チャンネル登録</button>
+            </div>
+
+            <div class="desc-box" id="v-desc"></div>
+        </div>
+
+        <div class="comments">
+            <div class="comment-count" id="c-count">コメント</div>
+            <div class="c-form">
+                <div id="my-avatar-container">
+                    <div class="c-avatar" id="my-avatar">👤</div>
+                </div>
+                <div class="c-input-wrapper">
+                    <input type="text" id="c-input" placeholder="コメントを追加..." oninput="checkInput()">
+                    <div class="c-actions">
+                        <button class="btn-submit" id="btn-submit" onclick="postComment()" disabled>コメント</button>
+                    </div>
+                </div>
+            </div>
+            <div id="c-list"></div>
+        </div>
     </div>
 
-    <!-- 画面下部ナビゲーション -->
     <nav class="bottom-nav">
-        <!-- 1. 動画一覧 (/videos に行くため何も起こらない) -->
-        <a href="javascript:void(0)" class="nav-item">
+        <a href="/videos" class="nav-item">
             <div class="icon-wrap"><span class="icon">🎬</span></div>
             <span class="label">動画一覧</span>
         </a>
-        
-        <!-- 2. 自分のチャンネル -->
         <a href="javascript:void(0)" id="my-channel-btn" onclick="goToMyChannel()" class="nav-item">
             <div class="icon-wrap"><span class="icon">👤</span></div>
             <span class="label">チャンネル</span>
         </a>
-        
-        <!-- 3. アップロード (真ん中) -->
         <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
             <div class="icon-wrap"><span class="icon-plus">⊕</span></div>
             <span class="label">アップロード</span>
         </div>
-        
-        <!-- 4. 登録チャンネル -->
         <a href="/subscribe" class="nav-item">
             <div class="icon-wrap"><span class="icon">🔔</span></div>
             <span class="label">登録チャンネル</span>
         </a>
-        
-        <!-- 5. 管理ページ -->
         <a href="/manage_videos" class="nav-item">
             <div class="icon-wrap"><span class="icon">⚙️</span></div>
             <span class="label">管理</span>
         </a>
     </nav>
 
-    <!-- アップロード用モーダル -->
     <div class="modal" id="modal">
         <div class="modal-content">
             <h3>動画のアップロード</h3>
@@ -136,11 +208,22 @@
 
     <script>
         const token = localStorage.getItem("access_token");
-        if (!token) location.href = "/";
+        const videoId = new URLSearchParams(location.search).get('v');
+        if (!token || !videoId) location.href = "/videos";
 
-        let currentPage = 1;
-        let isFetching = false;
         let myUserId = null;
+        let authorUserId = null;
+        let isSubscribed = false;
+
+        function createAvatarHTML(avatarDriveId, name, className = 'avatar') {
+            if (avatarDriveId) {
+                const src = `https://drive.google.com/thumbnail?id=${avatarDriveId}&sz=w100`;
+                return `<img src="${src}" class="${className}" alt="${name || ''}">`;
+            } else {
+                const initial = (name && name.length > 0) ? name.charAt(0).toUpperCase() : '?';
+                return `<div class="${className}">${initial}</div>`;
+            }
+        }
 
         async function goToMyChannel() {
             if (myUserId) {
@@ -165,66 +248,219 @@
             }
         }
 
-        async function loadVideos() {
-            if (isFetching) return;
-            isFetching = true;
-            
+        async function init() {
             try {
-                const res = await fetch(`/api/videos?page=${currentPage}`, { headers: { "Authorization": `Bearer ${token}` } });
-                const data = await res.json();
+                fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(prof => { 
+                        if (prof) {
+                            myUserId = prof.id;
+                            const myAvatarWrap = document.getElementById("my-avatar-container");
+                            myAvatarWrap.innerHTML = createAvatarHTML(prof.avatar_drive_id, prof.nickname || prof.username, "c-avatar");
+                        }
+                    })
+                    .catch(() => {});
+
+                const res = await fetch(`/api/videos/${videoId}`, { headers: { "Authorization": `Bearer ${token}` } });
+                if (!res.ok) throw new Error();
+                const v = await res.json();
                 
-                if (data.user_id) {
-                    myUserId = data.user_id;
-                }
+                authorUserId = v.user_id;
 
-                const grid = document.getElementById("grid");
-                const btnContainer = document.getElementById("load-more-container");
+                document.getElementById("v-title").innerText = v.title;
+                document.getElementById("v-views").innerText = `${v.views || 0} 回視聴`;
+                document.getElementById("v-author").innerText = v.author_name || "名無し";
+                document.getElementById("v-desc").innerText = v.description || "説明はありません。";
                 
-                if (data.videos.length === 0 && currentPage === 1) {
-                    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #606060; padding: 40px;">動画がありません</div>`;
-                    return;
+                if (authorUserId) {
+                    document.getElementById("v-author-link").href = `/channel?id=${authorUserId}`;
                 }
+
+                document.getElementById("v-avatar-container").innerHTML = createAvatarHTML(v.avatar_drive_id, v.author_name, "avatar");
                 
-                const html = data.videos.map(v => {
-                    const thumbUrl = v.thumbnail_drive_id 
-                        ? `https://drive.google.com/thumbnail?id=${v.thumbnail_drive_id}&sz=w600`
-                        : `https://drive.google.com/thumbnail?id=${v.drive_file_id}&sz=w600`;
-
-                    return `
-                    <a href="/watch?v=${v.id}" class="card">
-                        <div class="thumb-wrap">
-                            ${v.is_private ? '<span class="badge">非公開</span>' : ''}
-                            <img src="${thumbUrl}" class="thumb-img" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'16\\' height=\\'9\\' viewBox=\\'0 0 16 9\\'%3E%3Crect fill=\\'%23f2f2f2\\' width=\\'16\\' height=\\'9\\'/%3E%3C/svg%3E';">
-                        </div>
-                        <div class="info">
-                            <h3 class="title">${v.title}</h3>
-                            <div class="meta">
-                                <span>${v.author_name}</span> • <span>${v.views || 0} 回視聴</span>
-                            </div>
-                        </div>
-                    </a>
-                `}).join('');
-
-                if (currentPage === 1) {
-                    grid.innerHTML = html;
-                } else {
-                    grid.insertAdjacentHTML('beforeend', html);
-                }
-
-                if (data.videos.length < 24) {
-                    btnContainer.style.display = "none";
-                } else {
-                    btnContainer.style.display = "block";
-                    currentPage++;
-                }
-
+                const iframeUrl = `https://drive.google.com/file/d/${v.drive_file_id}/preview`;
+                
+                document.getElementById("player-container").innerHTML = `
+                    <iframe src="${iframeUrl}" 
+                            allow="autoplay; fullscreen" 
+                            allowfullscreen>
+                    </iframe>
+                `;
+                
+                checkSubscriptionStatus();
+                loadComments();
             } catch(e) {
-                alert("読み込みエラーが発生しました。");
-            } finally {
-                isFetching = false;
+                alert("再生できません。権限がないか、動画が存在しません。");
+                location.href = "/videos";
             }
         }
 
+        async function checkSubscriptionStatus() {
+            if (!authorUserId) return;
+            const subBtn = document.getElementById("btn-subscribe");
+            
+            if (myUserId && String(myUserId) === String(authorUserId)) {
+                subBtn.style.display = "none";
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/channel/${authorUserId}/status`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    isSubscribed = !!data.is_subscribed;
+                }
+            } catch(e) {}
+
+            updateSubscribeButton();
+            subBtn.style.display = "inline-flex";
+        }
+
+        function updateSubscribeButton() {
+            const subBtn = document.getElementById("btn-subscribe");
+            if (isSubscribed) {
+                subBtn.innerText = "登録済み";
+                subBtn.classList.add("subscribed");
+            } else {
+                subBtn.innerText = "チャンネル登録";
+                subBtn.classList.remove("subscribed");
+            }
+        }
+
+        async function toggleSubscribe() {
+            if (!authorUserId) return;
+            const subBtn = document.getElementById("btn-subscribe");
+            subBtn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/channel/${authorUserId}/subscribe`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    isSubscribed = data.is_subscribed;
+                    updateSubscribeButton();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || "処理に失敗しました。");
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました。");
+            } finally {
+                subBtn.disabled = false;
+            }
+        }
+
+        async function loadComments() {
+            try {
+                const res = await fetch(`/api/videos/${videoId}/comments`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const comments = await res.json();
+                
+                document.getElementById("c-count").innerText = `コメント (${comments.length})`;
+
+                const userIds = [...new Set(comments.map(c => c.user_id).filter(Boolean))];
+                const userProfiles = {};
+
+                await Promise.all(userIds.map(async (uid) => {
+                    try {
+                        const pRes = await fetch(`/api/channel/${uid}`);
+                        if (pRes.ok) {
+                            const pData = await pRes.json();
+                            if (pData && pData.profile) {
+                                userProfiles[uid] = pData.profile;
+                            }
+                        }
+                    } catch(e) {}
+                }));
+
+                document.getElementById("c-list").innerHTML = comments.map(c => {
+                    const prof = userProfiles[c.user_id] || {};
+                    const avatarDriveId = prof.avatar_drive_id || c.avatar_drive_id;
+                    const authorName = prof.nickname || c.author_name || '名無し';
+                    const avatarHTML = createAvatarHTML(avatarDriveId, authorName, "c-avatar");
+                    const channelUrl = `/channel?id=${c.user_id}`;
+                    const canDelete = (myUserId && String(c.user_id) === String(myUserId));
+
+                    return `
+                    <div class="c-item">
+                        <a href="${channelUrl}" class="c-avatar-link">
+                            ${avatarHTML}
+                        </a>
+                        <div class="c-content-wrap">
+                            <div class="c-header">
+                                <a href="${channelUrl}" class="c-author">${authorName}</a>
+                                ${canDelete ? `<button class="c-del" onclick="delComment('${c.id}')">削除</button>` : ''}
+                            </div>
+                            <div class="c-text">${c.content}</div>
+                        </div>
+                    </div>
+                `}).join('');
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function checkInput() {
+            const val = document.getElementById("c-input").value.trim();
+            const btn = document.getElementById("btn-submit");
+            if (val) {
+                btn.disabled = false;
+                btn.classList.add("active");
+            } else {
+                btn.disabled = true;
+                btn.classList.remove("active");
+            }
+        }
+
+        async function postComment() {
+            const val = document.getElementById("c-input").value;
+            if(!val.trim()) return;
+            
+            const btn = document.getElementById("btn-submit");
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch(`/api/videos/${videoId}/comments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ content: val })
+                });
+                if (res.ok) {
+                    document.getElementById("c-input").value = "";
+                    checkInput();
+                    loadComments();
+                } else {
+                    alert("コメントの投稿に失敗しました");
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
+                btn.disabled = false;
+            }
+        }
+
+        async function delComment(id) {
+            if(!confirm("このコメントを削除しますか？")) return;
+            try {
+                const res = await fetch(`/api/comments/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    loadComments();
+                } else {
+                    alert("削除する権限がないか、エラーが発生しました");
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
+            }
+        }
+
+        // ここから修正：ダイレクトアップロード機能に変更
         async function uploadVideo(e) {
             e.preventDefault();
             const btn = document.getElementById("btn-up");
@@ -237,7 +473,7 @@
             btn.innerText = "準備中...";
 
             try {
-                // --- 1. PythonサーバーからセッションURL（アップロード専用URL）を取得 ---
+                // 1. PythonサーバーからセッションURL（アップロード専用URL）を取得
                 const initFd = new FormData();
                 initFd.append("filename", file.name);
                 initFd.append("file_size", file.size);
@@ -252,7 +488,7 @@
                 if (!initRes.ok) throw new Error("セッションURLの取得に失敗しました");
                 const { upload_url } = await initRes.json();
 
-                // --- 2. ブラウザからGoogle Driveへ直接PUT送信（進捗バー付き） ---
+                // 2. ブラウザからGoogle Driveへ直接PUT送信（進捗バー付き）
                 btn.innerText = "Googleへ直接送信中... (0%)";
                 
                 const driveFileId = await new Promise((resolve, reject) => {
@@ -280,7 +516,7 @@
                     xhr.send(file);
                 });
 
-                // --- 3. Pythonサーバーに完了通知を送り、DB保存と権限変更を行う ---
+                // 3. Pythonサーバーに完了通知を送り、DB保存と権限変更を行う
                 btn.innerText = "データ保存中...";
                 const metaFd = new FormData();
                 metaFd.append("title", document.getElementById("up-title").value);
@@ -304,8 +540,6 @@
                     alert("アップロードが完了しました");
                     document.getElementById("modal").style.display = 'none';
                     e.target.reset();
-                    currentPage = 1;
-                    loadVideos();
                 } else {
                     const err = await finalRes.json();
                     alert("エラー: " + err.detail);
@@ -318,7 +552,7 @@
             }
         }
 
-        loadVideos();
+        init();
     </script>
 </body>
 </html>
