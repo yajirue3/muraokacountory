@@ -129,22 +129,32 @@
         .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
         .nav-grid button { margin-top: 0; padding: 14px 8px; font-size: 0.85rem; line-height: 1.3; border: 1px solid rgba(255,255,255,0.05); }
 
-        /* 新要素 M-Tube（強調表示） */
+        /* 新要素 M-Tube（グラデーション & 光る演出） */
         .btn-mtube { 
-            background: linear-gradient(135deg, #ff0000 0%, #b30000 100%); 
+            background: linear-gradient(135deg, #ff0055 0%, #ff0000 50%, #990000 100%); 
             grid-column: span 2; 
-            border: 1px solid #ff4d4d !important; 
+            border: 1px solid #ff4d6d !important; 
             font-size: 1.05rem; 
             font-weight: 900;
             letter-spacing: 0.5px;
-            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.4);
+            animation: mtube-glow 3s infinite alternate;
         }
+
+        @keyframes mtube-glow {
+            0% {
+                box-shadow: 0 0 10px rgba(255, 0, 85, 0.4), 0 0 20px rgba(255, 0, 0, 0.2);
+            }
+            100% {
+                box-shadow: 0 0 20px rgba(255, 0, 85, 0.8), 0 0 35px rgba(255, 0, 0, 0.5);
+            }
+        }
+
         .btn-games { background: #34495e; }
         .btn-bank { background: #27ae60; }
         .btn-inventory { background: #d35400; }
         .btn-board { background: #2980b9; }
         .btn-market { background: #8e44ad; }
-        .btn-casino { background: #c0392b; grid-column: span 2; }
+        .btn-casino { background: #c0392b; } /* 綺麗な2列に収まるように変更 */
 
         /* 国王専用ボタン */
         .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; border: 1px solid #ffd700 !important; display: none; }
@@ -224,7 +234,7 @@
 
     <!-- メニューナビゲーション -->
     <div class="nav-grid">
-        <!-- 【新要素】 M-Tube 強調表示 -->
+        <!-- 【新要素】 M-Tube グラデーション & ネオン発光強調 -->
         <button class="btn-mtube" onclick="location.href='/videos'">▶️ M-Tube（動画共有）</button>
 
         <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場</button>
