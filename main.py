@@ -57,6 +57,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 class UserAuth(BaseModel):
     email: str
     password: str
+    nickname: Optional[str] = None
+    real_name: Optional[str] = None
 
 class ProfileUpdate(BaseModel):
     nickname: str
@@ -254,6 +256,16 @@ async def signup(user: UserAuth):
         res = await client.auth.sign_up({"email": user.email, "password": user.password})
         if res.user:
             await ensure_default_wallet(res.user.id)
+            profile_data = {}
+            if user.nickname:
+                profile_data["nickname"] = user.nickname
+            if user.real_name:
+                profile_data["real_name"] = user.real_name
+            if profile_data:
+                await client.table("profiles").upsert({
+                    "id": res.user.id,
+                    **profile_data
+                }).execute()
         return {"message": "国民登録が完了しました！"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
