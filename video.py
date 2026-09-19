@@ -438,3 +438,54 @@ async def toggle_subscribe(channel_id: str, authorization: str = Header(None)):
             "channel_id": channel_id
         }).execute()
         return {"message": "チャンネル登録しました", "is_subscribed": True}
+
+
+# --- 登録中チャンネル一覧の取得 ---
+@router.get("/api/subscriptions")
+async def get_my_subscriptions(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    # 自分が登録しているチャンネルのID一覧を取得
+    sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", user.id).execute()
+    if not sub_res.data:
+        return []
+
+    channel_ids = [s["channel_id"] for s in sub_res.data]
+
+    # プロフィール情報をまとめて取得
+    prof_res = await supabase.table("profiles").select("id, nickname, avatar_drive_id").in_("id", channel_ids).execute()
+    return prof_res.data or []
+
+# --- 登録チャンネルの新着動画一覧の取得 ---
+@router.get("/api/videos/subscribed")
+async def get_subscribed_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    # 自分が登録しているチャンネルのID一覧を取得
+    sub_res = await supabase.table("subscriptions").select("channel_id").eq("subscriber_id", user.id).execute()
+    if not sub_res.data:
+        return []
+
+    channel_ids = [s["channel_id"] for s in sub_res.data]
+
+    limit = 24
+    offset = (page - 1) * limit
+
+    # 登録チャンネルが投稿した公開動画を取得
+    vid_res = await supabase.table("videos").select("*").in_("user_id", channel_ids).eq("is_private", False).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+    videos = vid_res.data or []
+
+    if not videos:
+        return []
+
+    # 動画投稿者のプロフィール（アイコン等）を追加取得して結合
+    author_ids = list(set([v["user_id"] for v in videos]))
+    prof_res = await supabase.table("profiles").select("id, avatar_drive_id").in_("id", author_ids).execute()
+    prof_map = {p["id"]: p.get("avatar_drive_id") for p in (prof_res.data or [])}
+
+    for v in videos:
+        v["author_avatar_drive_id"] = prof_map.get(v["user_id"])
+
+    return videos
