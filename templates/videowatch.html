@@ -261,9 +261,10 @@
 
                 document.getElementById("v-avatar-container").innerHTML = createAvatarHTML(v.avatar_drive_id, v.author_name, "avatar");
                 
-                // type属性を削除してブラウザの自動判定に任せる
+                // --- 【究極高速化】プレロードとクロスオリジン許可 ---
+                // preload="auto" でブラウザに最速でインデックスを取りに行かせる
                 document.getElementById("player-container").innerHTML = `
-                    <video controls autoplay playsinline>
+                    <video controls autoplay playsinline preload="auto" crossorigin="anonymous">
                         <source src="/api/videos/${videoId}/stream">
                         お使いのブラウザは動画の再生に対応していません。
                     </video>
