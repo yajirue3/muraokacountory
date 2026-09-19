@@ -66,19 +66,32 @@
         <button class="btn" onclick="loadVideos()" id="load-more-btn">さらに読み込む</button>
     </div>
 
-    <!-- 画面下部ナビゲーション (YouTube風) -->
+    <!-- 画面下部ナビゲーション -->
     <nav class="bottom-nav">
-        <a href="/dashboard" class="nav-item">
-            <span class="icon">🏠</span>
-            <span class="label">ホーム</span>
+        <!-- 1. 動画一覧 (/videos に行くため何も起こらない) -->
+        <a href="javascript:void(0)" class="nav-item">
+            <span class="icon">🎬</span>
+            <span class="label">動画一覧</span>
         </a>
+        <!-- 2. 自分のチャンネル -->
+        <a href="/channel" id="my-channel-link" class="nav-item">
+            <span class="icon">👤</span>
+            <span class="label">チャンネル</span>
+        </a>
+        <!-- 3. アップロード (真ん中) -->
         <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
             <span class="icon" style="font-size: 26px; font-weight: 300;">⊕</span>
             <span class="label">アップロード</span>
         </div>
+        <!-- 4. 登録チャンネル -->
+        <a href="/subscribe" class="nav-item">
+            <span class="icon">🔔</span>
+            <span class="label">登録チャンネル</span>
+        </a>
+        <!-- 5. 管理ページ -->
         <a href="/manage_videos" class="nav-item">
             <span class="icon">📁</span>
-            <span class="label">管理所</span>
+            <span class="label">管理</span>
         </a>
     </nav>
 
@@ -121,6 +134,21 @@
         let currentPage = 1;
         let isFetching = false;
 
+        // 自分のプロフィールを取得してチャンネルリンクにIDを付与
+        async function loadMyProfile() {
+            try {
+                const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    const profile = await res.json();
+                    if (profile && profile.id) {
+                        document.getElementById("my-channel-link").href = `/channel?c=${profile.id}`;
+                    }
+                }
+            } catch(e) {
+                console.error("プロフィール情報の取得に失敗しました", e);
+            }
+        }
+
         async function loadVideos() {
             if (isFetching) return;
             isFetching = true;
@@ -138,7 +166,6 @@
                 }
                 
                 const html = data.videos.map(v => {
-                    // サムネイルが指定されていればそれを使用し、なければ動画の自動生成サムネイルを使用
                     const thumbUrl = v.thumbnail_drive_id 
                         ? `https://drive.google.com/thumbnail?id=${v.thumbnail_drive_id}&sz=w600`
                         : `https://drive.google.com/thumbnail?id=${v.drive_file_id}&sz=w600`;
@@ -220,6 +247,7 @@
             }
         }
 
+        loadMyProfile();
         loadVideos();
     </script>
 </body>
