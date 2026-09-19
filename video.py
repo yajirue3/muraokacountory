@@ -105,7 +105,6 @@ async def get_watch_page(request: Request):
 async def get_manage_page(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
 
-# 動画の一括取得を廃止し、24件ずつのページネーション(分割取得)に変更
 @router.get("/api/videos")
 async def get_videos(page: int = Query(1, ge=1), authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -137,7 +136,7 @@ async def upload_video(
     prof_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
 
-    # 1. 動画本体のアップロード
+    # 1. 動画の保存とアップロード
     v_suffix = Path(file.filename).suffix or ".mp4"
     with tempfile.NamedTemporaryFile(delete=False, suffix=v_suffix) as tmp:
         tmp_path = tmp.name
@@ -155,24 +154,27 @@ async def upload_video(
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    # 2. サムネイル画像のアップロード（判定を強化）
+    # 2. サムネイルの保存とアップロード（バグ修正済み：チャンク書き込みで確実にディスクに保存）
     thumbnail_drive_id = None
     if thumbnail is not None and thumbnail.filename:
-        t_content = await thumbnail.read()
-        if len(t_content) > 0:  # 空ファイルでないことを確実にチェック
-            t_suffix = Path(thumbnail.filename).suffix or ".jpg"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
-                t_tmp.write(t_content)
-                t_tmp_path = t_tmp.name
-                
-            try:
-                t_mime = thumbnail.content_type or "image/jpeg"
-                thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
-            finally:
-                if os.path.exists(t_tmp_path):
-                    os.remove(t_tmp_path)
+        t_suffix = Path(thumbnail.filename).suffix or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=t_suffix) as t_tmp:
+            t_tmp_path = t_tmp.name
+            
+        try:
+            with open(t_tmp_path, "wb") as t_buffer:
+                while True:
+                    t_chunk = await thumbnail.read(1024 * 1024)
+                    if not t_chunk: break
+                    t_buffer.write(t_chunk)
+                    
+            t_mime = thumbnail.content_type or "image/jpeg"
+            thumbnail_drive_id = await upload_file_to_drive(t_tmp_path, thumbnail.filename, t_mime)
+        finally:
+            if os.path.exists(t_tmp_path):
+                os.remove(t_tmp_path)
 
-    # 3. DBへ記録
+    # 3. データベースへ書き込み
     insert_res = await supabase.table("videos").insert({
         "user_id": str(user.id),
         "author_name": nickname,
