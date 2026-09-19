@@ -13,25 +13,36 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 0;
+            margin: 20px 0;
+        }
+        .main-wrapper {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 720px;
+            width: 100%;
+            padding: 0 16px;
         }
         .container {
             background: #2a2a2a;
             border: 2px solid #555;
             border-radius: 12px;
-            padding: 32px;
+            padding: 28px;
             width: 320px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            box-sizing: border-box;
         }
-        h1 {
-            font-size: 1.4rem;
+        h1, h2 {
+            font-size: 1.3rem;
             text-align: center;
             color: #d4af37; /* 金色 */
-            margin-bottom: 24px;
+            margin-top: 0;
+            margin-bottom: 20px;
             letter-spacing: 1px;
         }
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         label {
             display: block;
@@ -39,7 +50,14 @@
             margin-bottom: 6px;
             color: #aaa;
         }
-        input {
+        .optional {
+            font-size: 0.75rem;
+            color: #888;
+            margin-left: 4px;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
             width: 100%;
             padding: 10px;
             border-radius: 6px;
@@ -52,6 +70,27 @@
         input:focus {
             outline: none;
             border-color: #d4af37;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            margin-bottom: 16px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .checkbox-group a {
+            color: #d4af37;
+            text-decoration: underline;
         }
         button {
             width: 100%;
@@ -71,42 +110,62 @@
             background-color: #f1c40f;
         }
         .btn-secondary {
-            background-color: #444;
-            color: #ccc;
+            background-color: #4a90e2;
+            color: #fff;
         }
         .btn-secondary:hover {
-            background-color: #555;
-        }
-        .divider {
-            border-top: 1px solid #444;
-            margin: 20px 0;
+            background-color: #357abd;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>村岡王国 入国管理所</h1>
-
-    <!-- ログインフォーム -->
-    <div class="form-group">
-        <label for="login-email">国民ID (Email)</label>
-        <input type="email" id="login-email" placeholder="mail@example.com">
+<div class="main-wrapper">
+    <!-- ログイン枠 -->
+    <div class="container">
+        <h1>入国（ログイン）</h1>
+        <div class="form-group">
+            <label for="login-email">国民ID (Email)</label>
+            <input type="email" id="login-email" placeholder="mail@example.com">
+        </div>
+        <div class="form-group">
+            <label for="login-password">暗証番号 (Password)</label>
+            <input type="password" id="login-password" placeholder="••••••••">
+        </div>
+        <button class="btn-primary" onclick="login()">入国する</button>
     </div>
-    <div class="form-group">
-        <label for="login-password">暗証番号 (Password)</label>
-        <input type="password" id="login-password" placeholder="••••••••">
+
+    <!-- 新規登録枠 -->
+    <div class="container">
+        <h2>新規国民登録</h2>
+        <div class="form-group">
+            <label for="signup-email">国民ID (Email)</label>
+            <input type="email" id="signup-email" placeholder="mail@example.com">
+        </div>
+        <div class="form-group">
+            <label for="signup-password">暗証番号 (Password)</label>
+            <input type="password" id="signup-password" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+            <label for="signup-nickname">ニックネーム<span class="optional">(任意)</span></label>
+            <input type="text" id="signup-nickname" placeholder="名無しの労働奴隷">
+        </div>
+        <div class="form-group">
+            <label for="signup-realname">リアルネーム<span class="optional">(任意)</span></label>
+            <input type="text" id="signup-realname" placeholder="山田 太郎">
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="terms-agree">
+            <label for="terms-agree">利用規約に同意する</label>
+        </div>
+
+        <button class="btn-secondary" onclick="signup()">申請する</button>
     </div>
-    <button class="btn-primary" onclick="login()">入国する（ログイン）</button>
-
-    <div class="divider"></div>
-
-    <!-- 新規登録フォーム -->
-    <button class="btn-secondary" onclick="signup()">新規国民登録（サインアップ）</button>
 </div>
 
 <script>
-    // すでにログイン済みの場合は自動でダッシュボードへ飛ばす
+    // ログイン済みの場合は自動でダッシュボードへ飛ばす
     if (localStorage.getItem("access_token")) {
         window.location.href = "/dashboard";
     }
@@ -142,11 +201,19 @@
     }
 
     async function signup() {
-        const email = document.getElementById("login-email").value;
-        const password = document.getElementById("login-password").value;
+        const email = document.getElementById("signup-email").value;
+        const password = document.getElementById("signup-password").value;
+        const nickname = document.getElementById("signup-nickname").value;
+        const realName = document.getElementById("signup-realname").value;
+        const agreed = document.getElementById("terms-agree").checked;
 
         if (!email || !password) {
             alert("登録するIDと暗証番号を入力してください");
+            return;
+        }
+
+        if (!agreed) {
+            alert("利用規約への同意が必要です");
             return;
         }
 
@@ -154,12 +221,17 @@
             const res = await fetch("/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ 
+                    email: email, 
+                    password: password,
+                    nickname: nickname || null,
+                    real_name: realName || null
+                })
             });
             const data = await res.json();
             
             if (res.ok) {
-                alert(data.message + " そのまま入国ボタンを押してください。");
+                alert(data.message + "\n左側のフォームからログインしてください。");
             } else {
                 alert(data.detail || "登録に失敗しました");
             }
