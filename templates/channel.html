@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>チャンネル</title>
+    <title>チャンネル - M-Tube</title>
     <style>
         body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
         
@@ -12,10 +12,14 @@
         .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
         .logo span { color: #cc0000; }
 
+        /* ボトムナビゲーション (videos.htmlと統一) */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; }
-        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
-        .nav-item .label { font-size: 10px; font-weight: 500; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; height: 100%; cursor: pointer; border: none; background: transparent; padding: 0; margin: 0; }
+        .nav-item .icon-wrap { height: 24px; display: flex; align-items: center; justify-content: center; }
+        .nav-item .icon { font-size: 20px; line-height: 1; }
+        .nav-item .icon-plus { font-size: 24px; line-height: 1; font-weight: 300; }
+        .nav-item .label { font-size: 10px; font-weight: 500; margin-top: 2px; line-height: 1; }
+        .nav-item:hover { background: #f2f2f2; }
 
         .container { max-width: 1200px; margin: 0 auto; padding: 0; }
         
@@ -47,6 +51,21 @@
         .load-more { text-align: center; padding: 20px; display: none; }
         .btn-more { border: none; border-radius: 18px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; background: #f2f2f2; color: #0f0f0f; }
 
+        /* モーダル */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 200; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: #ffffff; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal h3 { margin: 0 0 20px 0; font-size: 18px; color: #0f0f0f; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #606060; }
+        .modal input[type="text"], .modal textarea, .modal input[type="file"] { width: 100%; padding: 10px; border: 1px solid #cccccc; border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
+        .modal input[type="text"]:focus, .modal textarea:focus { outline: none; border-color: #0f0f0f; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 20px 0; cursor: pointer; color: #0f0f0f; }
+        .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        .btn { border: none; border-radius: 18px; padding: 0 16px; height: 36px; font-size: 14px; font-weight: 500; cursor: pointer; background: #f2f2f2; color: #0f0f0f; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:hover { background: #e5e5e5; }
+        .btn-primary { background: #cc0000; color: #ffffff; }
+        .btn-primary:hover { background: #990000; }
+
         @media (max-width: 600px) {
             .channel-header { flex-direction: column; text-align: center; padding: 24px 16px; }
             .c-avatar { width: 80px; height: 80px; }
@@ -60,7 +79,7 @@
 <body>
     <header>
         <a href="javascript:history.back()" class="back-btn">← 戻る</a>
-        <div class="logo"><span>▶</span> Video</div>
+        <div class="logo"><span>▶</span> M-Tube</div>
         <div style="width: 60px;"></div>
     </header>
 
@@ -88,10 +107,68 @@
 
     <!-- スマホ用下部ナビゲーション -->
     <nav class="bottom-nav">
-        <a href="/dashboard" class="nav-item"><span class="icon">🏠</span><span class="label">ホーム</span></a>
-        <a href="/videos" class="nav-item"><span class="icon">📺</span><span class="label">動画一覧</span></a>
-        <a href="/manage_videos" class="nav-item"><span class="icon">📁</span><span class="label">管理所</span></a>
+        <!-- 1. 動画一覧 -->
+        <a href="/videos" class="nav-item">
+            <div class="icon-wrap"><span class="icon">🎬</span></div>
+            <span class="label">動画一覧</span>
+        </a>
+        
+        <!-- 2. 自分のチャンネル -->
+        <a href="javascript:void(0)" id="my-channel-btn" onclick="goToMyChannel()" class="nav-item">
+            <div class="icon-wrap"><span class="icon">👤</span></div>
+            <span class="label">チャンネル</span>
+        </a>
+        
+        <!-- 3. アップロード (真ん中) -->
+        <div class="nav-item" onclick="document.getElementById('modal').style.display='flex'">
+            <div class="icon-wrap"><span class="icon-plus">⊕</span></div>
+            <span class="label">アップロード</span>
+        </div>
+        
+        <!-- 4. 登録チャンネル -->
+        <a href="/subscribe" class="nav-item">
+            <div class="icon-wrap"><span class="icon">🔔</span></div>
+            <span class="label">登録チャンネル</span>
+        </a>
+        
+        <!-- 5. 管理ページ -->
+        <a href="/manage_videos" class="nav-item">
+            <div class="icon-wrap"><span class="icon">⚙️</span></div>
+            <span class="label">管理</span>
+        </a>
     </nav>
+
+    <!-- アップロード用モーダル -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h3>動画のアップロード</h3>
+            <form onsubmit="uploadVideo(event)">
+                <div class="form-group">
+                    <label class="form-label">タイトル (必須)</label>
+                    <input type="text" id="up-title" required placeholder="タイトルを追加">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">説明 (任意)</label>
+                    <textarea id="up-desc" placeholder="動画について視聴者に伝える..." rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">動画ファイル (必須)</label>
+                    <input type="file" id="up-file" accept="video/*" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">サムネイル画像 (任意)</label>
+                    <input type="file" id="up-thumb" accept="image/*">
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="up-private"> 非公開
+                </label>
+                <div class="actions">
+                    <button type="button" class="btn" onclick="document.getElementById('modal').style.display='none'">キャンセル</button>
+                    <button type="submit" class="btn btn-primary" id="btn-up">アップロード</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         const token = localStorage.getItem("access_token");
@@ -100,6 +177,34 @@
 
         let currentPage = 1;
         let isFetching = false;
+        let myUserId = null;
+
+        // 自分のチャンネルへ移動する処理
+        async function goToMyChannel() {
+            if (myUserId) {
+                // すでに自分のチャンネルを見ている場合は何もしない
+                if (myUserId === channelId) return;
+                location.href = `/channel?id=${myUserId}`;
+                return;
+            }
+            try {
+                const res = await fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    const profile = await res.json();
+                    if (profile && profile.id) {
+                        myUserId = profile.id;
+                        if (myUserId === channelId) return;
+                        location.href = `/channel?id=${myUserId}`;
+                    } else {
+                        location.href = "/channel";
+                    }
+                } else {
+                    location.href = "/channel";
+                }
+            } catch(e) {
+                location.href = "/channel";
+            }
+        }
 
         async function initChannel() {
             try {
@@ -126,6 +231,12 @@
                 const statusRes = await fetch(`/api/channel/${channelId}/status`, { headers: { "Authorization": `Bearer ${token}` } });
                 const statusData = await statusRes.json();
                 updateSubButton(statusData.is_subscribed);
+
+                // 自分のプロフィールIDを取得しておく（ボトムナビの自分のチャンネル遷移用）
+                fetch("/api/profile/me", { headers: { "Authorization": `Bearer ${token}` } })
+                    .then(r => r.json())
+                    .then(prof => { if (prof && prof.id) myUserId = prof.id; })
+                    .catch(() => {});
 
                 // 初回動画描画
                 renderVideos(data.videos);
@@ -233,6 +344,52 @@
             } catch (e) {
                 alert("通信エラー");
                 btn.disabled = false;
+            }
+        }
+
+        // アップロード処理 (videos.htmlと共通)
+        async function uploadVideo(e) {
+            e.preventDefault();
+            const btn = document.getElementById("btn-up");
+            btn.disabled = true;
+            btn.innerText = "アップロード中...";
+
+            const fd = new FormData();
+            fd.append("title", document.getElementById("up-title").value);
+            fd.append("description", document.getElementById("up-desc").value);
+            fd.append("is_private", document.getElementById("up-private").checked);
+            fd.append("file", document.getElementById("up-file").files[0]);
+
+            const thumbFile = document.getElementById("up-thumb").files[0];
+            if (thumbFile) {
+                fd.append("thumbnail", thumbFile);
+            }
+
+            try {
+                const res = await fetch("/api/videos/upload", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: fd
+                });
+                
+                if (res.ok) {
+                    alert("アップロードが完了しました");
+                    document.getElementById("modal").style.display = 'none';
+                    e.target.reset();
+                    // 自分のチャンネルを見ている場合はリストをリフレッシュする
+                    if (myUserId === channelId) {
+                        currentPage = 1;
+                        initChannel();
+                    }
+                } else {
+                    const err = await res.json();
+                    alert("エラー: " + err.detail);
+                }
+            } catch(e) {
+                alert("通信エラーが発生しました");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "アップロード";
             }
         }
 
