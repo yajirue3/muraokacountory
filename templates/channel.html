@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>チャンネル</title>
+    <style>
+        body { margin: 0; font-family: Roboto, Arial, sans-serif; background: #ffffff; color: #0f0f0f; -webkit-font-smoothing: antialiased; padding-bottom: 60px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 56px; position: sticky; top: 0; background: #ffffff; z-index: 100; border-bottom: 1px solid #e5e5e5; }
+        .back-btn { text-decoration: none; color: #0f0f0f; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 18px; font-weight: bold; color: #0f0f0f; text-decoration: none; letter-spacing: -0.5px; }
+        .logo span { color: #cc0000; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffffff; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-around; align-items: center; height: 56px; z-index: 100; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #0f0f0f; width: 100%; }
+        .nav-item .icon { font-size: 20px; margin-bottom: 2px; }
+        .nav-item .label { font-size: 10px; font-weight: 500; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0; }
+        
+        /* チャンネルヘッダー情報 */
+        .channel-header { padding: 24px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #e5e5e5; flex-wrap: wrap; }
+        .c-avatar { width: 120px; height: 120px; border-radius: 50%; background: #e5e5e5; object-fit: cover; flex-shrink: 0; border: 1px solid #ddd; }
+        .c-info { flex: 1; min-width: 250px; }
+        .c-name { font-size: 24px; font-weight: bold; margin: 0 0 8px 0; }
+        .c-meta { font-size: 14px; color: #606060; margin-bottom: 12px; }
+        .c-desc { font-size: 14px; color: #0f0f0f; margin-bottom: 12px; white-space: pre-wrap; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .c-link { display: inline-block; font-size: 13px; color: #065fd4; text-decoration: none; background: #f2f2f2; padding: 6px 12px; border-radius: 16px; font-weight: 500; }
+        
+        /* 登録ボタン */
+        .btn-subscribe { background: #0f0f0f; color: #ffffff; border: none; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-subscribe:hover { background: #272727; }
+        .btn-subscribe.subscribed { background: #f2f2f2; color: #0f0f0f; }
+        .btn-subscribe.subscribed:hover { background: #e5e5e5; }
+        .btn-subscribe:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 動画グリッド */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px 16px; padding: 24px; }
+        .card { text-decoration: none; color: inherit; display: block; }
+        .thumb-wrap { width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 12px; overflow: hidden; background: #f2f2f2; }
+        .thumb-img { width: 100%; height: 100%; object-fit: cover; }
+        .info-box { margin-top: 12px; }
+        .v-title { font-size: 15px; font-weight: 500; margin: 0 0 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
+        .v-meta { font-size: 13px; color: #606060; }
+        
+        .load-more { text-align: center; padding: 20px; display: none; }
+        .btn-more { border: none; border-radius: 18px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; background: #f2f2f2; color: #0f0f0f; }
+
+        @media (max-width: 600px) {
+            .channel-header { flex-direction: column; text-align: center; padding: 24px 16px; }
+            .c-avatar { width: 80px; height: 80px; }
+            .grid { padding: 16px; grid-template-columns: 1fr; gap: 20px; }
+            .thumb-wrap { border-radius: 0; }
+            .card { margin: -16px; margin-bottom: 0; padding-bottom: 16px; }
+            .info-box { padding: 0 16px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="javascript:history.back()" class="back-btn">← 戻る</a>
+        <div class="logo"><span>▶</span> Video</div>
+        <div style="width: 60px;"></div>
+    </header>
+
+    <div class="container">
+        <!-- チャンネルヘッダー -->
+        <div class="channel-header">
+            <img class="c-avatar" id="ch-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E">
+            <div class="c-info">
+                <h1 class="c-name" id="ch-name">読み込み中...</h1>
+                <div class="c-meta" id="ch-meta">チャンネル登録者数 0 人</div>
+                <div class="c-desc" id="ch-desc"></div>
+                <a id="ch-link" class="c-link" href="#" target="_blank" style="display:none;"></a>
+            </div>
+            <div>
+                <button class="btn-subscribe" id="btn-sub" onclick="toggleSubscribe()" disabled>登録する</button>
+            </div>
+        </div>
+
+        <!-- 動画一覧 -->
+        <div class="grid" id="grid"></div>
+        <div class="load-more" id="load-more-container">
+            <button class="btn-more" onclick="loadVideos()">さらに読み込む</button>
+        </div>
+    </div>
+
+    <!-- スマホ用下部ナビゲーション -->
+    <nav class="bottom-nav">
+        <a href="/dashboard" class="nav-item"><span class="icon">🏠</span><span class="label">ホーム</span></a>
+        <a href="/videos" class="nav-item"><span class="icon">📺</span><span class="label">動画一覧</span></a>
+        <a href="/manage_videos" class="nav-item"><span class="icon">📁</span><span class="label">管理所</span></a>
+    </nav>
+
+    <script>
+        const token = localStorage.getItem("access_token");
+        const channelId = new URLSearchParams(location.search).get('id');
+        if (!token || !channelId) location.href = "/videos";
+
+        let currentPage = 1;
+        let isFetching = false;
+
+        async function initChannel() {
+            try {
+                const res = await fetch(`/api/channel/${channelId}`, { headers: { "Authorization": `Bearer ${token}` } });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                
+                // ヘッダー情報の反映
+                document.getElementById("ch-name").innerText = data.profile.nickname || "名無し";
+                document.getElementById("ch-meta").innerText = `チャンネル登録者数 ${data.subscriber_count} 人`;
+                document.getElementById("ch-desc").innerText = data.profile.channel_desc || "説明はありません。";
+                
+                if (data.profile.avatar_drive_id) {
+                    document.getElementById("ch-avatar").src = `https://drive.google.com/thumbnail?id=${data.profile.avatar_drive_id}&sz=w300`;
+                }
+                if (data.profile.external_link) {
+                    const linkEl = document.getElementById("ch-link");
+                    linkEl.href = data.profile.external_link;
+                    linkEl.innerText = "🔗 " + data.profile.external_link;
+                    linkEl.style.display = "inline-block";
+                }
+
+                // 登録状態の確認とボタン更新
+                const statusRes = await fetch(`/api/channel/${channelId}/status`, { headers: { "Authorization": `Bearer ${token}` } });
+                const statusData = await statusRes.json();
+                updateSubButton(statusData.is_subscribed);
+
+                // 初回動画描画
+                renderVideos(data.videos);
+
+            } catch(e) {
+                alert("チャンネル情報の取得に失敗しました。");
+                location.href = "/videos";
+            }
+        }
+
+        async function loadVideos() {
+            if (isFetching) return;
+            isFetching = true;
+            try {
+                currentPage++;
+                const res = await fetch(`/api/channel/${channelId}?page=${currentPage}`, { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                renderVideos(data.videos, true);
+            } catch (e) {
+                console.error("追加読み込み失敗");
+            } finally {
+                isFetching = false;
+            }
+        }
+
+        function renderVideos(videos, append = false) {
+            const grid = document.getElementById("grid");
+            const btnContainer = document.getElementById("load-more-container");
+            
+            if (videos.length === 0 && !append) {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #606060; padding: 40px;">公開されている動画はありません</div>`;
+                return;
+            }
+            
+            const html = videos.map(v => {
+                const thumbUrl = v.thumbnail_drive_id 
+                    ? `https://drive.google.com/thumbnail?id=${v.thumbnail_drive_id}&sz=w600`
+                    : `https://drive.google.com/thumbnail?id=${v.drive_file_id}&sz=w600`;
+
+                return `
+                <a href="/watch?v=${v.id}" class="card">
+                    <div class="thumb-wrap">
+                        <img src="${thumbUrl}" class="thumb-img" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'16\\' height=\\'9\\' viewBox=\\'0 0 16 9\\'%3E%3Crect fill=\\'%23f2f2f2\\' width=\\'16\\' height=\\'9\\'/%3E%3C/svg%3E';">
+                    </div>
+                    <div class="info-box">
+                        <h3 class="v-title">${v.title}</h3>
+                        <div class="v-meta">👀 ${v.views || 0} 回視聴</div>
+                    </div>
+                </a>
+            `}).join('');
+
+            if (append) {
+                grid.insertAdjacentHTML('beforeend', html);
+            } else {
+                grid.innerHTML = html;
+            }
+
+            if (videos.length < 24) {
+                btnContainer.style.display = "none";
+            } else {
+                btnContainer.style.display = "block";
+            }
+        }
+
+        function updateSubButton(isSubscribed) {
+            const btn = document.getElementById("btn-sub");
+            btn.disabled = false;
+            if (isSubscribed) {
+                btn.classList.add("subscribed");
+                btn.innerText = "登録済み";
+            } else {
+                btn.classList.remove("subscribed");
+                btn.innerText = "登録する";
+            }
+        }
+
+        async function toggleSubscribe() {
+            const btn = document.getElementById("btn-sub");
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/channel/${channelId}/subscribe`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                
+                if (res.status === 400) {
+                    alert("自分自身のチャンネルは登録できません");
+                    btn.disabled = false;
+                    return;
+                }
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    updateSubButton(data.is_subscribed);
+                    
+                    // 登録者数の表示を更新（簡易的）
+                    const metaEl = document.getElementById("ch-meta");
+                    let count = parseInt(metaEl.innerText.replace(/[^0-9]/g, '')) || 0;
+                    count = data.is_subscribed ? count + 1 : count - 1;
+                    metaEl.innerText = `チャンネル登録者数 ${count} 人`;
+                } else {
+                    alert("エラーが発生しました");
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert("通信エラー");
+                btn.disabled = false;
+            }
+        }
+
+        initChannel();
+    </script>
+</body>
+</html>
