@@ -5,24 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>村岡王国 - 王立無償遊技場</title>
     <style>
+        /* 各ゲーム用フォントの読み込み */
         @import url('https://fonts.googleapis.com/css2?family=Clear+Sans:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
         :root {
-            --bg-color: #faf8ef;
-            --text-main: #776e65;
-            --text-light: #8f7a66;
-            --card-bg: #ffffff;
-            --item-bg: #eee4da;
-            --item-border: #bbada0;
-            --btn-bg: #8f7a66;
-            --btn-hover: #9f8b77;
-            --text-white: #f9f6f2;
+            /* ページ全体はダークテーマ */
+            --bg-color: #121212;
+            --text-main: #e0e0e0;
+            --card-bg: #1e1e1e;
+            --item-border: #333333;
+            --btn-back-bg: #2a2a2a;
+            --btn-back-hover: #404040;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body { 
-            font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif; 
+            font-family: sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-main); 
             display: flex; 
@@ -42,10 +43,10 @@
 
         .main-card { 
             background: var(--card-bg); 
-            border: 2px solid var(--item-bg); 
+            border: 1px solid var(--item-border); 
             border-radius: 12px; 
             padding: 24px 20px; 
-            box-shadow: 0 10px 25px rgba(119, 110, 101, 0.1); 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8); 
         }
 
         .header { 
@@ -53,44 +54,37 @@
             font-weight: 700; 
             color: var(--text-main); 
             text-align: center; 
-            border-bottom: 2px solid var(--item-bg); 
+            border-bottom: 2px solid var(--item-border); 
             padding-bottom: 12px; 
-            margin-bottom: 20px; 
+            margin-bottom: 24px; 
             letter-spacing: 1px;
         }
 
         .game-card { 
-            background: var(--item-bg); 
             border-radius: 8px; 
             padding: 16px; 
-            margin-bottom: 16px; 
+            margin-bottom: 20px; 
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
         }
         .game-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(119, 110, 101, 0.15);
         }
 
-        .badge-pickup {
+        .badge {
             position: absolute;
             top: -10px;
             right: 12px;
-            background: #d29922;
-            color: #fff;
             font-size: 0.65rem;
             font-weight: 700;
             padding: 4px 10px;
-            border-radius: 12px;
-            box-shadow: 0 2px 5px rgba(210, 153, 34, 0.3);
             letter-spacing: 0.5px;
+            z-index: 10;
         }
 
         .game-title { 
-            font-weight: 700; 
-            color: var(--text-main); 
             font-size: 1.1rem; 
-            margin-bottom: 8px; 
+            margin-bottom: 10px; 
             display: flex; 
             align-items: center; 
             gap: 8px; 
@@ -98,16 +92,14 @@
 
         .game-desc { 
             font-size: 0.85rem; 
-            color: var(--text-light); 
-            margin-bottom: 14px; 
-            line-height: 1.5; 
+            margin-bottom: 16px; 
+            line-height: 1.6; 
         }
         
         button { 
             width: 100%; 
             padding: 12px; 
             border: none; 
-            border-radius: 6px; 
             font-weight: 700; 
             cursor: pointer; 
             font-size: 0.95rem; 
@@ -115,21 +107,71 @@
         }
         button:active { transform: scale(0.98); }
 
-        .btn-play { 
-            background: var(--btn-bg); 
-            color: var(--text-white); 
+        /* =========================================
+           2048 テーマ 
+           ========================================= */
+        .theme-2048 {
+            background: #faf8ef;
+            font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+            border: 2px solid #bbada0;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
         }
-        .btn-play:hover { 
-            background: var(--btn-hover); 
-        }
+        .theme-2048:hover { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6); }
+        .theme-2048 .game-title { font-weight: 700; color: #776e65; }
+        .theme-2048 .game-desc { color: #8f7a66; }
+        .theme-2048 .badge { background: #edc22e; color: #fff; border-radius: 12px; box-shadow: 0 2px 5px rgba(237, 194, 46, 0.4); }
+        .theme-2048 .btn-play { background: #8f7a66; color: #f9f6f2; border-radius: 6px; }
+        .theme-2048 .btn-play:hover { background: #9f8b77; }
 
+        /* =========================================
+           さめがめ (SameGame) テーマ 
+           ========================================= */
+        .theme-samegame {
+            background: #111;
+            font-family: 'DotGothic16', sans-serif;
+            border: 4px solid #555;
+            border-radius: 2px; /* ドット絵風に角を立てる */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+        }
+        .theme-samegame:hover { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.8); }
+        .theme-samegame .game-title { 
+            font-family: 'Press Start 2P', cursive; 
+            color: #E70012; 
+            text-shadow: 1px 1px 0 #fff; 
+            font-size: 0.9rem; /* 英語ピクセルフォントは大きいので微調整 */
+            padding-top: 4px;
+            padding-bottom: 4px;
+        }
+        .theme-samegame .game-desc { color: #ddd; }
+        .theme-samegame .badge { 
+            background: #0088FF; 
+            color: #fff; 
+            border: 2px solid #fff; 
+            border-radius: 0; 
+            font-family: 'DotGothic16', sans-serif; 
+        }
+        .theme-samegame .btn-play { 
+            background: #555; 
+            color: #fff; 
+            border: 2px solid #888; 
+            border-radius: 0; 
+            font-family: 'DotGothic16', sans-serif;
+            font-size: 1.1rem;
+        }
+        .theme-samegame .btn-play:hover { background: #777; }
+        .theme-samegame .btn-play:active { transform: translateY(2px); }
+
+        /* =========================================
+           共通ボタン 
+           ========================================= */
         .btn-back { 
-            background: var(--item-bg); 
+            background: var(--btn-back-bg); 
             color: var(--text-main); 
             margin-top: 10px; 
+            border-radius: 6px;
         }
         .btn-back:hover { 
-            background: var(--item-border); 
+            background: var(--btn-back-hover); 
             color: #fff;
         }
     </style>
@@ -138,16 +180,26 @@
 
 <div class="container">
     <div class="main-card">
-        <div class="header">🏛️ 王立無償遊技場</div>
+        <div class="header">🎮 王立無償遊技場</div>
         
-        <!-- 2048 -->
-        <div class="game-card" style="background: #eed7a1;">
-            <div class="badge-pickup" style="background: #e3b341;">NEW / 人気</div>
-            <div class="game-title">🧩 2048（Strategic Puzzle）</div>
-            <div class="game-desc" style="color: #8c7335;">
-                運要素ゼロの完全思考型パズル。金に縛られるな。数字を重ねて限界を目指せ。全プレイヤー共通のランキングで覇を競え！
+        <!-- 2048 カード -->
+        <div class="game-card theme-2048">
+            <div class="badge">定番</div>
+            <div class="game-title">🧩 2048（Strategic Merge）</div>
+            <div class="game-desc">
+                運要素ゼロの完全思考型パズル。数字を重ねて限界を目指せ。全プレイヤー共通のランキングで覇を競え！
             </div>
-            <button class="btn-play" style="background: #c89d38;" onclick="location.href='/2048'">プレイする</button>
+            <button class="btn-play" onclick="location.href='/2048'">プレイする</button>
+        </div>
+
+        <!-- さめがめ カード -->
+        <div class="game-card theme-samegame">
+            <div class="badge">NEW!</div>
+            <div class="game-title">👾 SAMEGAME</div>
+            <div class="game-desc">
+                隣接する同色ブロックを消して盤面を圧縮しろ。まとめて消すほどスコアが跳ね上がる。目指せ全消しパーフェクト！
+            </div>
+            <button class="btn-play" onclick="location.href='/samegame'">START</button>
         </div>
 
         <!-- ダッシュボードへ戻るボタン -->
