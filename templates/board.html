@@ -23,13 +23,11 @@
         .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
         .header { font-size: 1.2rem; font-weight: bold; color: var(--gold); text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px; }
         
-        /* トースト通知 */
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { background: rgba(30, 30, 30, 0.95); border-left: 4px solid var(--gold); padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-size: 0.85rem; color: #fff; animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; pointer-events: auto; }
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
 
-        /* 投稿フォーム */
         textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff; box-sizing: border-box; font-size: 0.9rem; resize: vertical; white-space: pre-wrap; transition: border-color 0.2s; }
         textarea:focus { outline: none; border-color: var(--gold); }
         .char-counter { text-align: right; font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; }
@@ -44,7 +42,6 @@
         button.btn-toggle { background: #2c2c2c; color: #ccc; border: 1px solid #444; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; margin-top: 8px; width: 100%; text-align: center; }
         button.btn-toggle:hover { background: #3a3a3a; }
 
-        /* 投稿一覧 */
         .post-card { background: #252525; border: 1px solid #3a3a3a; border-radius: 10px; padding: 14px; margin-bottom: 12px; position: relative; transition: transform 0.1s; }
         .post-pinned { border-color: var(--gold); border-left: 4px solid var(--gold); background: #2a281e; }
         .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -53,7 +50,6 @@
         .post-meta { font-size: 0.7rem; color: var(--text-sub); }
         .post-content { font-size: 0.9rem; line-height: 1.6; color: #ddd; white-space: pre-wrap; word-break: break-all; margin-bottom: 12px; }
         
-        /* リアクション＆アクション */
         .post-actions { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #333; padding-top: 12px; align-items: center; }
         .react-btn { background: #333; border: 1px solid #444; border-radius: 20px; padding: 4px 12px; font-size: 0.85rem; color: #ccc; display: flex; align-items: center; gap: 4px; }
         .react-btn.active { background: rgba(212, 175, 55, 0.2); color: var(--gold); border-color: var(--gold); }
@@ -61,20 +57,17 @@
         .action-btn { background: transparent; border: none; color: var(--text-sub); font-size: 0.8rem; padding: 4px; }
         .action-btn:hover { color: var(--gold); }
         
-        /* エアドロップカード */
         .airdrop-card { background: linear-gradient(135deg, #2c3e50, #922b21); border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 12px; border: 1px solid #c0392b; }
         .airdrop-title { color: #fff; font-weight: bold; font-size: 0.85rem; margin-bottom: 8px; }
         .btn-airdrop { background: var(--gold-hover); color: #000; border: none; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; }
         .btn-airdrop:disabled { background: #7f8c8d; color: #ccc; cursor: not-allowed; }
 
-        /* ページネーション & UI */
         .top-nav { display: flex; justify-content: space-between; margin-bottom: 16px; }
         .btn-nav { background: #333; color: #fff; border: 1px solid #444; padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; }
         .btn-nav:hover { background: #444; }
         .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
         .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
         
-        /* 国王専用パネル (画面内に埋め込み) */
         #admin-panel { display: none; background: #1a1a1a; border: 1px solid var(--danger); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
         .admin-header { background: #2c1a1a; color: #ff6b6b; font-weight: bold; font-size: 0.9rem; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .admin-header:hover { background: #3a2222; }
@@ -88,10 +81,36 @@
 <div class="container">
     <div class="top-nav">
         <button class="btn-nav" onclick="location.href='/dashboard'">◀ 戻る</button>
-        <button class="btn-nav" style="border-color: var(--success); color: var(--success);" onclick="loadPosts(currentPage)">🔄 更新</button>
+        <button class="btn-nav" style="border-color: var(--success); color: var(--success);" onclick="refreshAll()">🔄 更新</button>
     </div>
 
-    <!-- 国王用 通報パネル (リスト内に埋め込み) -->
+    <!-- 投票エリア (NEW) -->
+    <div class="card" style="border-color: var(--primary);">
+        <div class="header" style="color: var(--primary); border-color: #333;">📊 国民投票所</div>
+        
+        <div id="polls-container">
+            <div style="text-align:center; padding: 10px; color:#888;">読み込み中...</div>
+        </div>
+
+        <button class="btn-toggle" style="border-color: var(--primary); color: var(--primary);" onclick="togglePollUI()">+ 新しい投票を作成する</button>
+        
+        <div id="poll-create-ui" class="airdrop-box" style="border-color: var(--primary); display: none;">
+            <div style="font-size:0.75rem; color:#aaa; margin-bottom: 8px;">皆の意見を聞いてみましょう</div>
+            <input type="text" id="poll-title" placeholder="投票のタイトル (例: 次の給付金は？)" maxlength="100">
+            <input type="text" id="poll-desc" placeholder="詳細な説明 (任意)">
+            <input type="number" id="poll-hours" placeholder="期限 (時間) 例: 24" value="24" min="1" max="720">
+            
+            <div id="poll-options-container">
+                <input type="text" class="poll-option-input" placeholder="選択肢 1">
+                <input type="text" class="poll-option-input" placeholder="選択肢 2">
+            </div>
+            
+            <button class="btn-toggle" onclick="addPollOption()">+ 選択肢を追加</button>
+            <button class="btn-primary" style="background: var(--primary); color: #fff;" onclick="submitPoll()">投票を開始する</button>
+        </div>
+    </div>
+
+    <!-- 国王用 通報パネル -->
     <div id="admin-panel">
         <div class="admin-header" onclick="toggleAdminPanel()">
             <span>🚨 密告リスト (国王専用)</span>
@@ -143,14 +162,18 @@
 
     document.addEventListener("DOMContentLoaded", async () => {
         await fetchWallets();
-        loadPosts(currentPage);
+        refreshAll();
         
         document.getElementById("post-content").addEventListener("input", function() {
             document.getElementById("char-count").innerText = this.value.length;
         });
     });
 
-    // トースト通知システム
+    function refreshAll() {
+        loadPolls();
+        loadPosts(currentPage);
+    }
+
     function showToast(message, isError = false) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -176,6 +199,134 @@
             else userTitle = "鉱山労働奴隷";
         }
     }
+
+    // --- 投票関連の機能 ---
+    async function loadPolls() {
+        const res = await fetch(`/api/board/polls`, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const container = document.getElementById("polls-container");
+        if (data.polls.length === 0) {
+            container.innerHTML = "<div style='text-align:center; padding:10px; color:#888;'>現在アクティブな投票はありません。</div>";
+            return;
+        }
+
+        container.innerHTML = data.polls.map(p => {
+            const expireDate = new Date(p.expires_at);
+            const timeStr = `${expireDate.getMonth()+1}/${expireDate.getDate()} ${String(expireDate.getHours()).padStart(2,'0')}:${String(expireDate.getMinutes()).padStart(2,'0')}`;
+            
+            let optionsHtml = p.board_poll_options.map(opt => {
+                const percent = p.total_votes > 0 ? Math.round((opt.vote_count / p.total_votes) * 100) : 0;
+                const isMyVote = p.my_vote_option_id === opt.id;
+                const btnStyle = isMyVote ? "border-color: var(--primary);" : "";
+                const barColor = isMyVote ? "rgba(52, 152, 219, 0.4)" : "rgba(255, 255, 255, 0.1)";
+                
+                return `
+                    <div style="margin-bottom: 8px;">
+                        <button class="btn-toggle" style="text-align: left; position: relative; overflow: hidden; padding: 12px; ${btnStyle}" onclick="votePoll(${p.id}, ${opt.id})">
+                            <div style="position: absolute; top: 0; left: 0; height: 100%; width: ${percent}%; background: ${barColor}; z-index: 0; transition: width 0.5s;"></div>
+                            <span style="position: relative; z-index: 1; display: flex; justify-content: space-between; text-shadow: 1px 1px 2px #000;">
+                                <span>${isMyVote ? '✅ ' : ''}${escapeHtml(opt.option_text)}</span>
+                                <span style="color:#bbb;">${opt.vote_count}票 (${percent}%)</span>
+                            </span>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="post-card" style="border-left: 4px solid var(--primary); margin-bottom: 16px;">
+                    <div class="post-header">
+                        <div class="post-user" style="color: var(--primary);">${escapeHtml(p.title)}</div>
+                        <div class="post-meta" style="color: var(--danger);">〆切: ${timeStr}</div>
+                    </div>
+                    ${p.description ? `<div class="post-content" style="font-size: 0.8rem; margin-bottom: 12px;">${escapeHtml(p.description)}</div>` : ''}
+                    <div>${optionsHtml}</div>
+                    <div class="post-meta" style="text-align: right; margin-top: 8px;">総投票数: ${p.total_votes}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function togglePollUI() {
+        const ui = document.getElementById("poll-create-ui");
+        ui.style.display = ui.style.display === "block" ? "none" : "block";
+    }
+
+    function addPollOption() {
+        const container = document.getElementById("poll-options-container");
+        const inputs = container.getElementsByClassName("poll-option-input");
+        if (inputs.length >= 10) {
+            showToast("選択肢は最大10個までです", true);
+            return;
+        }
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "poll-option-input";
+        input.placeholder = `選択肢 ${inputs.length + 1}`;
+        container.appendChild(input);
+    }
+
+    async function submitPoll() {
+        const title = document.getElementById("poll-title").value.trim();
+        const desc = document.getElementById("poll-desc").value.trim();
+        const hours = parseInt(document.getElementById("poll-hours").value) || 24;
+        
+        const inputs = document.getElementsByClassName("poll-option-input");
+        const options = [];
+        for (let input of inputs) {
+            if (input.value.trim()) options.push(input.value.trim());
+        }
+
+        if (!title) return showToast("タイトルを入力してください", true);
+        if (options.length < 2) return showToast("選択肢は最低2つ必要です", true);
+
+        try {
+            const res = await fetch("/api/board/polls", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ title, description: desc, expires_in_hours: hours, options })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById("poll-title").value = "";
+                document.getElementById("poll-desc").value = "";
+                document.getElementById("poll-hours").value = "24";
+                document.getElementById("poll-options-container").innerHTML = `
+                    <input type="text" class="poll-option-input" placeholder="選択肢 1">
+                    <input type="text" class="poll-option-input" placeholder="選択肢 2">
+                `;
+                togglePollUI();
+                showToast(data.message);
+                loadPolls();
+            } else {
+                showToast(data.detail || "エラーが発生しました", true);
+            }
+        } catch (e) {
+            showToast("通信エラーが発生しました", true);
+        }
+    }
+
+    async function votePoll(pollId, optionId) {
+        try {
+            const res = await fetch(`/api/board/polls/${pollId}/vote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ option_id: optionId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message);
+                loadPolls(); // 投票状況を再読み込みして反映
+            } else {
+                showToast(data.detail || "エラーが発生しました", true);
+            }
+        } catch (e) {
+            showToast("通信エラーが発生しました", true);
+        }
+    }
+    // ----------------------
 
     function toggleAirdropUI() {
         const ui = document.getElementById("airdrop-ui");
@@ -349,7 +500,6 @@
         loadPosts(1);
     }
 
-    /* 国王パネル用 (アコーディオン制御) */
     function toggleAdminPanel() {
         const content = document.getElementById("admin-reports-list");
         const icon = document.getElementById("admin-toggle-icon");
