@@ -102,14 +102,20 @@ async def get_samegame_page(request: Request):
 async def get_samegame_ranking():
     supabase = await get_supabase()
     
-    # 1人1枠のビューからトップ10を取得
-    daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
-    alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
-    
-    return {
-        "daily": daily_res.data or [],
-        "alltime": alltime_res.data or []
-    }
+    try:
+        # 1人1枠のビューからトップ10を取得
+        daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
+        alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
+        
+        return {
+            "daily": daily_res.data or [],
+            "alltime": alltime_res.data or []
+        }
+    except Exception as e:
+        import traceback
+        print("=== SAMEGAME RANKING ERROR ===")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"ランキング取得エラー: {str(e)}")
 
 # --- スコア登録 & ランキング返却 ---
 @router.post("/api/samegame/score")
@@ -120,30 +126,43 @@ async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = 
     if data.score < 0 or data.remaining_blocks < 0:
         raise HTTPException(status_code=400, detail="無効なスコアデータです")
 
-    profile_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = profile_res.data[0].get("nickname") if profile_res.data else "名無し"
-    if not nickname:
+    try:
         nickname = "名無し"
+        
+        # profilesテーブルの取得でエラーが起きてもクラッシュしないように保護
+        try:
+            profile_res = await supabase.table("profiles").select("nickname").eq("id", str(user.id)).execute()
+            if profile_res.data and len(profile_res.data) > 0:
+                nickname = profile_res.data[0].get("nickname") or "名無し"
+        except Exception as pe:
+            print(f"[Warning] profiles取得スキップ: {pe}")
+            nickname = "名無し"
 
-    # ログとして全記録をInsertする
-    await supabase.table("scores_samegame").insert({
-        "user_id": str(user.id),
-        "nickname": nickname,
-        "score": data.score,
-        "remaining_blocks": data.remaining_blocks
-    }).execute()
+        # ログとして全記録をInsertする
+        await supabase.table("scores_samegame").insert({
+            "user_id": str(user.id),
+            "nickname": nickname,
+            "score": data.score,
+            "remaining_blocks": data.remaining_blocks
+        }).execute()
 
-    # 更新後の最新ランキングを取得
-    daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
-    alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
-    
-    # 自分の累計順位を判定
-    higher_scores = await supabase.table("view_samegame_alltime").select("user_id", count="exact").gt("score", data.score).execute()
-    my_rank = (higher_scores.count or 0) + 1
+        # 更新後の最新ランキングを取得
+        daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
+        alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
+        
+        # 自分の累計順位を判定
+        higher_scores = await supabase.table("view_samegame_alltime").select("user_id", count="exact").gt("score", data.score).execute()
+        my_rank = (higher_scores.count or 0) + 1
 
-    return {
-        "success": True,
-        "my_rank": my_rank,
-        "daily": daily_res.data or [],
-        "alltime": alltime_res.data or []
-    }
+        return {
+            "success": True,
+            "my_rank": my_rank,
+            "daily": daily_res.data or [],
+            "alltime": alltime_res.data or []
+        }
+    except Exception as e:
+        import traceback
+        print("=== SAMEGAME SCORE ERROR ===")
+        traceback.print_exc()
+        # 原因をクライアント（HTML側）に返して特定する
+        raise HTTPException(status_code=500, detail=f"DB処理エラー: {str(e)}")
