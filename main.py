@@ -107,6 +107,11 @@ class LoanRepay(BaseModel):
     repay_amount: int = Field(..., gt=0, description="返済額は1以上でなければなりません")
 # -------------------------------------
 
+# --- 追加: 称号付け替え用モデル ---
+class EquipTitleRequest(BaseModel):
+    title: str
+# -------------------------------------
+
 def generate_wallet_id():
     return "MW-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
@@ -225,7 +230,6 @@ def get_videos(request: Request):
 def get_videowatch(request: Request):
     return templates.TemplateResponse(request=request, name="videowatch.html")
 
-
 @app.get("/videomanage", response_class=HTMLResponse)
 def get_videomanage(request: Request):
     return templates.TemplateResponse(request=request, name="videomanage.html")
@@ -234,7 +238,6 @@ def get_videomanage(request: Request):
 def verify_google(request: Request):
     return templates.TemplateResponse(request=request, name="google0296c26e6b9651c8.html")
 
-
 @app.get("/channel", response_class=HTMLResponse)
 def get_channel(request: Request):
     return templates.TemplateResponse(request=request, name="channel.html")
@@ -242,7 +245,6 @@ def get_channel(request: Request):
 @app.get("/subscribe", response_class=HTMLResponse)
 def get_subscribe(request: Request):
     return templates.TemplateResponse(request=request, name="subscribe.html")
-
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
@@ -266,6 +268,13 @@ async def signup(user: UserAuth):
                     "id": res.user.id,
                     **profile_data
                 }).execute()
+            
+            # 初期称号の付与
+            await client.table("user_titles").insert({
+                "user_id": res.user.id,
+                "title": "鉱山労働奴隷"
+            }).execute()
+
         return {"message": "国民登録が完了しました！"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -300,6 +309,7 @@ async def get_profile(authorization: str = Header(None)):
         "id": user.id, 
         "nickname": "名無しの労働奴隷", 
         "role": "slave",
+        "equipped_title": "鉱山労働奴隷",
         "agreed_terms_version": 0
     }
 
@@ -315,6 +325,39 @@ async def update_profile(data: ProfileUpdate, authorization: str = Header(None))
         return {"message": "国民情報を更新しました"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新失敗: {str(e)}")
+
+# --- 追加: 称号API ---
+@app.get("/api/titles")
+async def get_titles(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    titles_res = await client.table("user_titles").select("title").eq("user_id", user.id).order("unlocked_at", desc=False).execute()
+    owned_titles = [t["title"] for t in titles_res.data] if titles_res.data else []
+    
+    if "鉱山労働奴隷" not in owned_titles:
+        owned_titles.insert(0, "鉱山労働奴隷")
+        
+    prof_res = await client.table("profiles").select("equipped_title").eq("id", user.id).execute()
+    equipped_title = prof_res.data[0].get("equipped_title") if prof_res.data else "鉱山労働奴隷"
+    
+    if not equipped_title:
+        equipped_title = "鉱山労働奴隷"
+        
+    return {"owned_titles": owned_titles, "equipped_title": equipped_title}
+
+@app.post("/api/titles/equip")
+async def equip_title(data: EquipTitleRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    titles_res = await client.table("user_titles").select("title").eq("user_id", user.id).eq("title", data.title).execute()
+    if not titles_res.data and data.title != "鉱山労働奴隷":
+        raise HTTPException(status_code=400, detail="その称号は所持していません。")
+        
+    await client.table("profiles").update({"equipped_title": data.title}).eq("id", user.id).execute()
+    return {"message": f"称号を「{data.title}」に変更しました。"}
+# ---------------------
 
 @app.post("/api/pay-tax")
 async def pay_tax(data: PayTaxRequest, authorization: str = Header(None)):
@@ -398,8 +441,6 @@ async def get_transfer_logs(authorization: str = Header(None)):
     res = await client.table("transfer_logs").select("*").or_(filter_str).order("created_at", desc=True).limit(20).execute()
     
     return {"logs": res.data, "my_wallets": my_wallet_ids}
-
-
 
 # --------------------------------------------------
 # 掲示板API（高機能版・ゼロトラスト対応）
@@ -503,8 +544,14 @@ async def create_board_post(data: BoardPostCreate, authorization: str = Header(N
         raise HTTPException(status_code=400, detail="本文は400文字以内で入力してください。")
 
     client = await get_supabase()
-    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
+    prof_res = await client.table("profiles").select("nickname, equipped_title, role").eq("id", user.id).execute()
     nickname = prof_res.data[0]["nickname"] if prof_res.data else "不明"
+    
+    # --- 称号偽装ブロック: ユーザーがフロントから送る値を無視してDBの値を強制適用 ---
+    db_user_title = prof_res.data[0].get("equipped_title") or "鉱山労働奴隷"
+    if prof_res.data and prof_res.data[0].get("role") == "king":
+        db_user_title = "村岡国王"
+    # ---------------------------------------------------------------------------------
 
     # ばらまき設定の整合性チェック
     if data.airdrop_amount > 0 and data.airdrop_total > 0:
@@ -523,7 +570,7 @@ async def create_board_post(data: BoardPostCreate, authorization: str = Header(N
     await client.table("board_posts").insert({
         "user_id": user.id,
         "nickname": nickname,
-        "user_title": data.user_title,
+        "user_title": db_user_title,
         "content": clean_content,
         "airdrop_amount": data.airdrop_amount,
         "airdrop_total": data.airdrop_total
@@ -626,7 +673,6 @@ async def toggle_pin_post(post_id: int, authorization: str = Header(None)):
     new_status = not post.data[0]["is_pinned"]
     await client.table("board_posts").update({"is_pinned": new_status}).eq("id", post_id).execute()
     return {"message": "布告(ピン)状態を切り替えました。"}
-
 
 # --------------------------------------------------
 # カジノモジュールの登録
@@ -946,7 +992,7 @@ async def admin_force_repay_loan(loan_id: int, authorization: str = Header(None)
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
 # ==================================================
-# 投票システム API (追記分)
+# 投票システム API
 # ==================================================
 class PollCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
@@ -962,7 +1008,6 @@ async def get_polls(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     
-    # 現在時刻より期限が後のものを取得（進行中の投票）
     now_iso = datetime.now(timezone.utc).isoformat()
     polls_res = await client.table("board_polls").select("*, board_poll_options(*), board_poll_votes(*)").gte("expires_at", now_iso).order("created_at", desc=True).execute()
     
