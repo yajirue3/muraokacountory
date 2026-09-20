@@ -540,14 +540,23 @@
         }
 
         if (!canMove) {
-            if (remainingBlocks === 0) {
-                // パーフェクト時はスコアを加算して次のステージへ
-                isProcessing = true; // 操作不能にする
-                score += 10000;
+            if (remainingBlocks <= 10) {
+                // 10個以下ならクリアとして次のステージへ
+                isProcessing = true;
+                
+                // 0個なら10000点、1〜10個なら残りが少ないほど高得点のボーナス
+                let bonus = remainingBlocks === 0 ? 10000 : (10 - remainingBlocks + 1) * 500;
+                score += bonus;
+                
                 updateScoreDOM();
                 document.body.classList.add("hyper-flash");
                 playClearAllSound();
                 
+                if (remainingBlocks === 0) {
+                    stageMsg.innerHTML = 'PERFECT!<br><span style="font-size:0.8rem; color:#fff;">NEXT STAGE</span>';
+                } else {
+                    stageMsg.innerHTML = `CLEAR!<br><span style="font-size:0.8rem; color:#fff;">BONUS +${bonus}</span>`;
+                }
                 stageMsg.style.display = "block";
                 
                 setTimeout(() => {
@@ -555,7 +564,7 @@
                     startNextStage();
                 }, 2500);
             } else {
-                // 手詰まり時はそのままゲームオーバーでスコア送信
+                // 11個以上残った場合はゲームオーバー
                 isGameOver = true;
                 playGameOverSound();
                 setTimeout(() => handleFinish(remainingBlocks), 1000);
@@ -577,7 +586,6 @@
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ score, remaining_blocks: remainingBlocks })
             });
-            // 通信エラーの原因を詳細に捉えるための処理
             if (!res.ok) {
                 const errorText = await res.text();
                 throw new Error(`HTTP ${res.status}: ${errorText || res.statusText}`);
@@ -587,7 +595,6 @@
             switchTab('daily');
         } catch (e) { 
             console.error(e);
-            // 通信エラーの原因を画面に表示
             lbEl.innerHTML = `<div style="text-align:center; color:#E70012; font-size:1.2rem; margin-top:20px;">通信エラー<br><span style="font-size:0.7rem; color:#888;">${e.message}</span></div>`; 
         }
     }
