@@ -91,6 +91,8 @@
         .checkbox-group a {
             color: #d4af37;
             text-decoration: underline;
+            font-size: 0.8rem;
+            cursor: pointer;
         }
         button {
             width: 100%;
@@ -115,6 +117,13 @@
         }
         .btn-secondary:hover {
             background-color: #357abd;
+        }
+        .btn-close {
+            background-color: #444;
+            color: #fff;
+        }
+        .btn-close:hover {
+            background-color: #555;
         }
     </style>
 </head>
@@ -158,9 +167,19 @@
         <div class="checkbox-group">
             <input type="checkbox" id="terms-agree">
             <label for="terms-agree">利用規約に同意する</label>
+            <a onclick="openPolicyViewer()">（規約を読む）</a>
         </div>
 
         <button class="btn-secondary" onclick="signup()">申請する</button>
+    </div>
+</div>
+
+<!-- 利用規約モーダル -->
+<div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
+    <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
+        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
+        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 12px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5;">読み込み中...</div>
+        <button type="button" class="btn-close" onclick="closePolicyViewer()">閉じる</button>
     </div>
 </div>
 
@@ -238,6 +257,34 @@
         } catch (e) {
             alert("通信エラーが発生しました");
         }
+    }
+
+    // 利用規約モーダル関連の処理
+    let isPolicyFetching = false;
+    async function openPolicyViewer() {
+        if (isPolicyFetching) return;
+        const modal = document.getElementById("policy-view-modal");
+        const contentBox = document.getElementById("policy-view-content");
+        try {
+            isPolicyFetching = true;
+            contentBox.innerText = "規約を読み込んでいます...";
+            modal.style.display = "flex";
+            const res = await fetch("/api/policy/latest");
+            if (res.ok) {
+                const data = await res.json();
+                contentBox.innerText = data.content || "規約本文がありません。";
+            } else {
+                contentBox.innerText = "規約の読み込みに失敗しました。";
+            }
+        } catch (e) {
+            contentBox.innerText = "通信エラーが発生しました。";
+        } finally { 
+            isPolicyFetching = false; 
+        }
+    }
+    
+    function closePolicyViewer() { 
+        document.getElementById("policy-view-modal").style.display = "none"; 
     }
 </script>
 
