@@ -5,97 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - ダッシュボード</title>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #121212; 
-            color: #e0e0e0; 
-            display: flex; 
-            justify-content: center; 
-            padding: 20px 10px; 
-            margin: 0; 
-            min-height: 100vh;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 10px; margin: 0; min-height: 100vh; }
         .container { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+        .card { background: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .header { font-size: 1.05rem; font-weight: bold; color: #d4af37; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; margin-bottom: 12px; }
         
-        /* 汎用カード */
-        .card { 
-            background: #1e1e1e; 
-            border: 1px solid rgba(255, 255, 255, 0.08); 
-            border-radius: 12px; 
-            padding: 16px; 
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4); 
-        }
+        .id-card-wrapper { background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); border-radius: 12px; padding: 16px; color: #1a1a1a; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); position: relative; overflow: hidden; border: 1px solid #fff; margin-bottom: 4px; }
+        .id-card-wrapper::before { content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; }
+        @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
+        .id-card-wrapper::after { content: "MURAOKA"; position: absolute; font-size: 4.5rem; font-weight: 900; color: rgba(255,255,255,0.3); transform: rotate(-25deg); top: 30px; right: -20px; pointer-events: none; letter-spacing: 5px; z-index: 1; }
         
-        .header { 
-            font-size: 1.05rem; 
-            font-weight: bold; 
-            color: #d4af37; 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
-            padding-bottom: 8px; 
-            margin-bottom: 12px; 
-        }
-
-        /* リアルな国民証（IDカード）のスタイル */
-        .id-card-wrapper {
-            background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%);
-            border-radius: 12px;
-            padding: 16px;
-            color: #1a1a1a;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6);
-            position: relative;
-            overflow: hidden;
-            border: 1px solid #fff;
-            margin-bottom: 4px;
-        }
-        
-        /* プラスチックカードの光沢反射アニメーション */
-        .id-card-wrapper::before {
-            content: "";
-            position: absolute;
-            top: 0; left: -150%;
-            width: 50%; height: 100%;
-            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%);
-            transform: skewX(-25deg);
-            animation: card-shine 6s infinite;
-            z-index: 3;
-            pointer-events: none;
-        }
-        @keyframes card-shine {
-            0% { left: -150%; }
-            15% { left: 200%; }
-            100% { left: 200%; }
-        }
-
-        .id-card-wrapper::after {
-            content: "MURAOKA";
-            position: absolute;
-            font-size: 4.5rem;
-            font-weight: 900;
-            color: rgba(255,255,255,0.3);
-            transform: rotate(-25deg);
-            top: 30px; right: -20px;
-            pointer-events: none;
-            letter-spacing: 5px;
-            z-index: 1;
-        }
-        .id-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #2c3e50;
-            padding-bottom: 6px;
-            margin-bottom: 12px;
-            position: relative;
-            z-index: 2;
-        }
+        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 6px; margin-bottom: 12px; position: relative; z-index: 2; }
         .id-country { font-weight: 900; font-size: 1.1rem; color: #2c3e50; letter-spacing: 1px; }
         .id-title { font-size: 0.75rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .id-body { display: flex; gap: 12px; position: relative; z-index: 2; }
-        .id-photo {
-            width: 70px; height: 90px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px;
-            display: flex; justify-content: center; align-items: center; font-size: 2.5rem; color: #95a5a6;
-            box-shadow: inset 0 0 5px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1);
-        }
+        .id-photo { width: 70px; height: 90px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2.5rem; color: #95a5a6; box-shadow: inset 0 0 5px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1); }
         .id-details { flex: 1; display: flex; flex-direction: column; gap: 6px; }
         .id-row { display: flex; flex-direction: column; }
         .id-label { font-size: 0.65rem; color: #7f8c8d; font-weight: bold; }
@@ -103,70 +27,38 @@
         .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; margin-top: 2px; box-shadow: 0 2px 4px rgba(139,0,0,0.3); }
         .id-footer { margin-top: 12px; font-size: 0.6rem; color: #7f8c8d; text-align: center; position: relative; z-index: 2; border-top: 1px solid #bdc3c7; padding-top: 6px; font-weight: bold; }
 
-        /* フォーム系 */
         .label { color: #aaa; font-size: 0.75rem; margin-top: 8px; font-weight: bold; }
-        input, select { 
-            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; 
-            background: #2a2a2a; color: #fff; box-sizing: border-box; margin-top: 6px; margin-bottom: 12px; 
-            font-size: 0.85rem; transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        input:focus, select:focus {
-            outline: none; border-color: #d4af37; box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
-        }
+        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; box-sizing: border-box; margin-top: 6px; margin-bottom: 12px; font-size: 0.85rem; transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus, select:focus { outline: none; border-color: #d4af37; box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2); }
         
-        button { 
-            width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; 
-            cursor: pointer; color: #fff; font-size: 0.9rem; transition: filter 0.2s, transform 0.1s, box-shadow 0.2s; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; font-size: 0.9rem; transition: filter 0.2s, transform 0.1s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
         button:hover { filter: brightness(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
         button:active { transform: scale(0.98); }
 
         .btn-primary { background: #d4af37; color: #1a1a1a; margin-top: 8px; }
         .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); margin-top: 6px; }
 
-        /* ナビゲーション用のグリッドレイアウト */
         .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
         .nav-grid button { margin-top: 0; padding: 14px 8px; font-size: 0.85rem; line-height: 1.3; border: 1px solid rgba(255,255,255,0.05); }
 
-        /* 新要素 M-Tube（グラデーション & 光る演出） */
-        .btn-mtube { 
-            background: linear-gradient(135deg, #ff0055 0%, #ff0000 50%, #990000 100%); 
-            grid-column: span 2; 
-            border: 1px solid #ff4d6d !important; 
-            font-size: 1.05rem; 
-            font-weight: 900;
-            letter-spacing: 0.5px;
-            animation: mtube-glow 3s infinite alternate;
-        }
-
-        @keyframes mtube-glow {
-            0% {
-                box-shadow: 0 0 10px rgba(255, 0, 85, 0.4), 0 0 20px rgba(255, 0, 0, 0.2);
-            }
-            100% {
-                box-shadow: 0 0 20px rgba(255, 0, 85, 0.8), 0 0 35px rgba(255, 0, 0, 0.5);
-            }
-        }
+        .btn-mtube { background: linear-gradient(135deg, #ff0055 0%, #ff0000 50%, #990000 100%); grid-column: span 2; border: 1px solid #ff4d6d !important; font-size: 1.05rem; font-weight: 900; letter-spacing: 0.5px; animation: mtube-glow 3s infinite alternate; }
+        @keyframes mtube-glow { 0% { box-shadow: 0 0 10px rgba(255, 0, 85, 0.4), 0 0 20px rgba(255, 0, 0, 0.2); } 100% { box-shadow: 0 0 20px rgba(255, 0, 85, 0.8), 0 0 35px rgba(255, 0, 0, 0.5); } }
 
         .btn-games { background: #34495e; }
         .btn-bank { background: #27ae60; }
         .btn-inventory { background: #d35400; }
         .btn-board { background: #2980b9; }
         .btn-market { background: #8e44ad; }
-        .btn-casino { background: #c0392b; } /* 綺麗な2列に収まるように変更 */
+        .btn-casino { background: #c0392b; }
 
-        /* 国王専用ボタン */
         .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; border: 1px solid #ffd700 !important; display: none; }
         .btn-policy-view { background: #34495e; color: #ecf0f1; grid-column: span 2; }
         .btn-logout { background: #2a2a2a; color: #aaa; border: 1px solid #444; box-shadow: none; margin-top: 8px; }
 
-        /* 次回納税額用カード */
         .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.3); }
         .tax-display-amount { color: #e74c3c; font-size: 1.6rem; font-weight: 900; margin: 8px 0; font-variant-numeric: tabular-nums; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         .tax-display-note { font-size: 0.7rem; color: #a0a0a0; }
 
-        /* 路地裏イベント用スタイル */
         .alley-card { background: #191b1f; border: 1px dashed #4a5568; border-radius: 12px; padding: 16px; text-align: center; }
         .btn-alley { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; padding: 10px; font-size: 0.85rem; }
         
@@ -177,7 +69,6 @@
 
 <div class="container">
     
-    <!-- リアルな国民証エリア -->
     <div class="id-card-wrapper">
         <div class="id-header">
             <div class="id-country">村岡王国</div>
@@ -195,8 +86,8 @@
                     <span class="id-value" id="user-email" style="font-size: 0.7rem;">-</span>
                 </div>
                 <div class="id-row">
-                    <span class="id-label">階級 (RANK)</span>
-                    <span class="id-badge" id="user-rank">読込中...</span>
+                    <span class="id-label">称号 (TITLE)</span>
+                    <span class="id-badge" id="user-title-display">読込中...</span>
                 </div>
             </div>
         </div>
@@ -205,17 +96,24 @@
         </div>
     </div>
 
-    <!-- 次回納税額表示 -->
     <div class="card tax-display-card">
         <div class="header" style="color: #f39c12; border-bottom: none; margin-bottom: 0;">💰 次回所得税 徴収予定額</div>
         <div class="tax-display-amount" id="my-tax-amount">計算中...</div>
         <div class="tax-display-note">※毎週 火曜・金曜 9:00に自動徴収（10万G超のみ 0.5%）</div>
     </div>
 
-    <!-- 登録情報と納税操作 -->
+    <!-- 称号の付け替え・基本設定 -->
     <div class="card">
-        <div class="header">基本設定 / 納税口座</div>
+        <div class="header">名乗る称号 / 基本設定</div>
         
+        <div class="label">所持している称号から選ぶ</div>
+        <select id="title-select">
+            <option value="">称号を読み込み中...</option>
+        </select>
+        <button class="btn-primary" onclick="equipTitle()" style="margin-bottom: 20px;">称号を変更する</button>
+
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0;"></div>
+
         <div class="label">納税報酬の受取口座</div>
         <select id="tax-wallet-select">
             <option value="">口座を読み込み中...</option>
@@ -232,11 +130,8 @@
         <button class="btn-primary" onclick="saveProfile()">情報を保存する</button>
     </div>
 
-    <!-- メニューナビゲーション -->
     <div class="nav-grid">
-        <!-- 【新要素】 M-Tube グラデーション & ネオン発光強調 -->
         <button class="btn-mtube" onclick="location.href='/videos'">▶️ M-Tube（動画共有）</button>
-
         <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場</button>
         <button class="btn-bank" onclick="location.href='/wallet'">🏦 王国中央銀行</button>
         <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品（バッグ）</button>
@@ -244,16 +139,13 @@
         <button class="btn-market" onclick="location.href='/market'">⚖️ 王国自由市場</button>
         <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ（一攫千金）</button>
         
-        <!-- 国王専用ボタン -->
         <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）</button>
         <button id="btn-admin-casino" class="btn-admin" onclick="location.href='/admin/casino'">🎰 カジノ調整（国王専用）</button>
         <button id="btn-admin-tax" class="btn-admin" onclick="collectAllTax()">👑 全国民から所得税を即時徴収</button>
         
-        <!-- 規約確認ボタン -->
         <button class="btn-policy-view" onclick="openPolicyViewer()">📜 利用規約・ポリシーを確認</button>
     </div>
 
-    <!-- 路地裏イベント -->
     <div class="alley-card">
         <div style="font-size: 0.75rem; color: #718096; margin-bottom: 10px;">
             👀 視線を感じる... 街の裏路地で怪しげな男がこちらの様子を伺っている。
@@ -261,7 +153,6 @@
         <button class="btn-alley" onclick="openAlleyModal()">🕵️ 男に近づいて話しかける</button>
     </div>
 
-    <!-- ログアウト（一番下に配置） -->
     <button class="btn-logout" onclick="logout()">王国を離脱（ログアウト）</button>
 </div>
 
@@ -276,16 +167,8 @@
     } else {
         document.getElementById("user-email").innerText = localStorage.getItem("user_email") || "";
         loadProfile();
+        loadTitles();
         loadWalletsForTax();
-    }
-
-    function getRankName(balance) {
-        if (balance <= 100) return "鉱山労働奴隷";
-        if (balance <= 500) return "商人に雇われた奴隷";
-        if (balance <= 1000) return "平民";
-        if (balance <= 1500) return "金持ち";
-        if (balance <= 10000) return "貴族";
-        return "王族";
     }
 
     function calculateWealthTax(balance) {
@@ -313,6 +196,36 @@
         } catch (e) { console.error(e); }
     }
 
+    async function loadTitles() {
+        try {
+            const res = await fetch("/api/titles", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById("user-title-display").innerText = data.equipped_title;
+
+                const select = document.getElementById("title-select");
+                select.innerHTML = data.owned_titles.map(t => 
+                    `<option value="${escapeHtml(t)}" ${t === data.equipped_title ? 'selected' : ''}>${escapeHtml(t)}</option>`
+                ).join('');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function equipTitle() {
+        const title = document.getElementById("title-select").value;
+        if (!title) return alert("称号を選択してください");
+        try {
+            const res = await fetch("/api/titles/equip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ title })
+            });
+            const data = await res.json();
+            alert(res.ok ? data.message : "エラー: " + data.detail);
+            if (res.ok) loadTitles();
+        } catch (e) { alert("通信エラーが発生しました"); }
+    }
+
     async function loadWalletsForTax() {
         try {
             const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
@@ -320,8 +233,6 @@
                 const wallets = await res.json();
                 const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
                 
-                document.getElementById("user-rank").innerText = getRankName(totalBalance);
-
                 const taxAmount = calculateWealthTax(totalBalance);
                 const taxDisplay = document.getElementById("my-tax-amount");
                 if (taxDisplay) taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
@@ -394,7 +305,6 @@
         window.location.href = "/";
     }
 
-    /* 路地裏の男イベントモーダル処理 */
     function openAlleyModal() {
         document.getElementById("alley-text").innerHTML = "「……あ？ なんだお前、俺に何か用か？」";
         document.getElementById("alley-choices-initial").style.display = "flex";
@@ -450,7 +360,6 @@
     function closePolicyViewer() { document.getElementById("policy-view-modal").style.display = "none"; }
 </script>
 
-<!-- ================= 規約同意モーダル ================= -->
 <div id="terms-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff;">
         <h3 style="color: #ffd700; margin-top: 0; text-align: center;">📜 利用規約の同意</h3>
@@ -498,7 +407,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 </script>
 
-<!-- ================= 閲覧専用 ポリシー確認機能 ================= -->
 <div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
     <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
         <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
@@ -507,7 +415,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>
 </div>
 
-<!-- ================= 路地裏の男会話モーダル ================= -->
 <div id="alley-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 9998; justify-content: center; align-items: center;">
     <div style="background: #1c1e22; border: 2px solid #3a4a5e; border-radius: 12px; width: 90%; max-width: 380px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #e2e8f0;">
         <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男</h3>
