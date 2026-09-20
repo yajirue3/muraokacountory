@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SameGame</title>
     <style>
-        /* 英語/数字用ピクセルフォントと、日本語用ピクセルフォントを読み込み */
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
@@ -38,9 +37,9 @@
         .title { font-family: 'Press Start 2P', cursive; font-size: 1.8rem; color: #E70012; line-height: 1.2; text-shadow: 2px 2px 0 #fff; }
         
         .scores-container { display: flex; gap: 8px; }
-        .score-box { background: var(--board-bg); border: 2px solid #555; padding: 6px 12px; text-align: center; min-width: 75px; color: white; position: relative; }
-        .score-label { font-size: 0.8rem; color: #aaa; margin-bottom: 2px; }
-        .score-val { font-family: 'Press Start 2P', cursive; font-size: 0.9rem; line-height: 1.2; transition: transform 0.1s; margin-top: 4px; }
+        .score-box { background: var(--board-bg); border: 2px solid #555; padding: 6px 8px; text-align: center; min-width: 60px; color: white; position: relative; }
+        .score-label { font-size: 0.7rem; color: #aaa; margin-bottom: 2px; }
+        .score-val { font-family: 'Press Start 2P', cursive; font-size: 0.85rem; line-height: 1.2; transition: transform 0.1s; margin-top: 4px; }
         
         .score-addition {
             position: absolute; top: 15px; right: 10px; font-family: 'Press Start 2P', cursive; font-size: 0.8rem; color: #FFCC00;
@@ -98,11 +97,11 @@
         
         .tile-wrapper:active .tile-inner { filter: brightness(1.3); transform: scale(0.9); }
 
-        .color-0 { background-color: #E70012; } /* アーケードレッド */
-        .color-1 { background-color: #0088FF; } /* アーケードブルー */
-        .color-2 { background-color: #00A600; } /* アーケードグリーン */
-        .color-3 { background-color: #FFCC00; } /* アーケードイエロー */
-        .color-4 { background-color: #9900CC; } /* アーケードパープル */
+        .color-0 { background-color: #E70012; }
+        .color-1 { background-color: #0088FF; }
+        .color-2 { background-color: #00A600; }
+        .color-3 { background-color: #FFCC00; }
+        .color-4 { background-color: #9900CC; }
 
         .floating-score {
             position: absolute; font-family: 'Press Start 2P', cursive; font-size: 0.8rem; color: #fff; text-shadow: 2px 2px 0 #000;
@@ -148,6 +147,13 @@
 
         .modal-title { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: #fff; margin-bottom: 20px; line-height: 1.4; }
         .modal-title.jp { font-family: 'DotGothic16', sans-serif; font-size: 2rem; font-weight: bold; }
+        
+        /* 次のステージへのメッセージ表示用 */
+        .stage-message {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: #FFCC00; text-shadow: 2px 2px 0 #000;
+            z-index: 200; display: none; text-align: center; line-height: 1.5; pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -155,6 +161,10 @@
 <div class="header-top">
     <div class="title">SAME<br>GAME</div>
     <div class="scores-container">
+        <div class="score-box">
+            <div class="score-label">STAGE</div>
+            <div class="score-val" id="stage-display">1</div>
+        </div>
         <div class="score-box" id="score-box-wrapper">
             <div class="score-label">SCORE</div>
             <div class="score-val" id="score-display">0</div>
@@ -176,6 +186,7 @@
 <div class="board-container" id="touch-area">
     <div class="grid-bg" id="grid-bg"></div>
     <div class="tile-layer" id="tile-layer"></div>
+    <div class="stage-message" id="stage-message">PERFECT!<br><span style="font-size:0.8rem; color:#fff;">NEXT STAGE</span></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -213,7 +224,6 @@
 
     function getAuthToken() { return localStorage.getItem("access_token") || localStorage.getItem("token") || ""; }
 
-    // 【重要修正】AudioContextが他の変数と競合しないように別名で保持
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
     let soundEnabled = true;
@@ -228,7 +238,7 @@
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         
-        osc.type = type; // 'square', 'sawtooth', 'triangle'
+        osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         
         gain.gain.setValueAtTime(vol, audioCtx.currentTime);
@@ -262,13 +272,8 @@
         }
     }
 
-    function playDropSound() {
-        playTone('triangle', 60, 0.1, 0.2);
-    }
-
-    function playErrorSound() {
-        playTone('sawtooth', 150, 0.15, 0.1);
-    }
+    function playDropSound() { playTone('triangle', 60, 0.1, 0.2); }
+    function playErrorSound() { playTone('sawtooth', 150, 0.15, 0.1); }
 
     function playGameOverSound() {
         if (!soundEnabled) return;
@@ -316,6 +321,7 @@
     let grid = [];
     let tileIdSeq = 0;
     let score = 0;
+    let stage = 1;
     let bestScore = parseInt(localStorage.getItem("samegame_best")) || 0;
     let isProcessing = false;
     let isGameOver = false;
@@ -323,9 +329,11 @@
 
     const layer = document.getElementById("tile-layer");
     const scoreDisplay = document.getElementById("score-display");
+    const stageDisplay = document.getElementById("stage-display");
     const bestDisplay = document.getElementById("best-display");
     const overlay = document.getElementById("overlay");
     const lbEl = document.getElementById("leaderboard");
+    const stageMsg = document.getElementById("stage-message");
 
     bestDisplay.innerText = bestScore;
 
@@ -357,14 +365,25 @@
 
     function resetGame() {
         score = 0;
+        stage = 1;
         isGameOver = false;
+        isProcessing = false;
         closeModal();
+        initGrid();
+        updateScoreDOM();
+    }
+
+    function startNextStage() {
+        stage++;
+        isGameOver = false;
+        isProcessing = false;
         initGrid();
         updateScoreDOM();
     }
 
     function updateScoreDOM() {
         scoreDisplay.innerText = score;
+        stageDisplay.innerText = stage;
         if (score > bestScore) {
             bestScore = score;
             bestDisplay.innerText = bestScore;
@@ -387,10 +406,8 @@
             connected.push(curr);
 
             const neighbors = [
-                {c: curr.c, r: curr.r - 1},
-                {c: curr.c, r: curr.r + 1},
-                {c: curr.c - 1, r: curr.r},
-                {c: curr.c + 1, r: curr.r}
+                {c: curr.c, r: curr.r - 1}, {c: curr.c, r: curr.r + 1},
+                {c: curr.c - 1, r: curr.r}, {c: curr.c + 1, r: curr.r}
             ];
 
             for(let n of neighbors) {
@@ -483,7 +500,9 @@
         }
 
         checkGameOver();
-        isProcessing = false;
+        if(!isGameOver && document.getElementById("stage-message").style.display !== "block") {
+            isProcessing = false;
+        }
     }
 
     function showScorePopup(val, r, c) {
@@ -521,20 +540,26 @@
         }
 
         if (!canMove) {
-            isGameOver = true;
             if (remainingBlocks === 0) {
+                // パーフェクト時はスコアを加算して次のステージへ
+                isProcessing = true; // 操作不能にする
                 score += 10000;
                 updateScoreDOM();
                 document.body.classList.add("hyper-flash");
                 playClearAllSound();
-                document.getElementById("modal-main-title").innerText = "パーフェクト！";
-                document.getElementById("modal-main-title").style.color = "#FFCC00";
+                
+                stageMsg.style.display = "block";
+                
+                setTimeout(() => {
+                    stageMsg.style.display = "none";
+                    startNextStage();
+                }, 2500);
             } else {
+                // 手詰まり時はそのままゲームオーバーでスコア送信
+                isGameOver = true;
                 playGameOverSound();
-                document.getElementById("modal-main-title").innerText = "ゲームオーバー";
-                document.getElementById("modal-main-title").style.color = "#fff";
+                setTimeout(() => handleFinish(remainingBlocks), 1000);
             }
-            setTimeout(() => handleFinish(remainingBlocks), 1000);
         }
     }
 
@@ -552,25 +577,40 @@
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ score, remaining_blocks: remainingBlocks })
             });
+            // 通信エラーの原因を詳細に捉えるための処理
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`HTTP ${res.status}: ${errorText || res.statusText}`);
+            }
             const data = await res.json();
             rankingData = { daily: data.daily || [], alltime: data.alltime || [] };
             switchTab('daily');
-        } catch (e) { lbEl.innerHTML = '<div style="text-align:center; color:#E70012; font-size:1rem;">通信エラー</div>'; }
+        } catch (e) { 
+            console.error(e);
+            // 通信エラーの原因を画面に表示
+            lbEl.innerHTML = `<div style="text-align:center; color:#E70012; font-size:1.2rem; margin-top:20px;">通信エラー<br><span style="font-size:0.7rem; color:#888;">${e.message}</span></div>`; 
+        }
     }
 
     async function openRankingModal() {
         document.getElementById("modal-main-title").innerText = "ランキング";
-        document.getElementById("modal-main-title").style.color = "#fff";
         document.getElementById("btn-close-modal").style.display = "block";
         document.getElementById("btn-restart-modal").style.display = isGameOver ? "block" : "none";
         overlay.style.display = "flex";
 
         try {
             const res = await fetch("/api/samegame/ranking");
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`HTTP ${res.status}: ${errorText || res.statusText}`);
+            }
             const data = await res.json();
             rankingData = { daily: data.daily || [], alltime: data.alltime || [] };
             switchTab('daily');
-        } catch(e) { lbEl.innerHTML = '<div style="text-align:center; color:#E70012; font-size:1rem;">通信エラー</div>'; }
+        } catch(e) { 
+            console.error(e);
+            lbEl.innerHTML = `<div style="text-align:center; color:#E70012; font-size:1.2rem; margin-top:20px;">通信エラー<br><span style="font-size:0.7rem; color:#888;">${e.message}</span></div>`; 
+        }
     }
 
     function switchTab(type) {
@@ -588,7 +628,6 @@
         list.forEach((entry, idx) => {
             const row = document.createElement("div");
             row.className = `lb-row ${idx < 3 ? "lb-top" : ""}`;
-            // 数字部分はアーケードフォントを適用するためにspanを分ける
             row.innerHTML = `<span><span style="font-family:'Press Start 2P', cursive; font-size:0.8rem;">${idx + 1}.</span> ${escapeHtml(entry.nickname)}</span><span style="font-family:'Press Start 2P', cursive; font-size:0.8rem;">${entry.score.toLocaleString()}</span>`;
             lbEl.appendChild(row);
         });
