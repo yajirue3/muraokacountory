@@ -84,7 +84,7 @@
         <button class="btn-nav" style="border-color: var(--success); color: var(--success);" onclick="refreshAll()">🔄 更新</button>
     </div>
 
-    <!-- 投票エリア (NEW) -->
+    <!-- 投票エリア -->
     <div class="card" style="border-color: var(--primary);">
         <div class="header" style="color: var(--primary); border-color: #333;">📊 国民投票所</div>
         
@@ -154,13 +154,14 @@
 
     let currentPage = 1;
     let isKing = false;
-    let userTitle = "奴隷";
+    let userTitle = "鉱山労働奴隷";
     let myWallets = [];
 
     const params = new URLSearchParams(window.location.search);
     if (params.has('page')) currentPage = parseInt(params.get('page')) || 1;
 
     document.addEventListener("DOMContentLoaded", async () => {
+        await loadMyProfile();
         await fetchWallets();
         refreshAll();
         
@@ -184,19 +185,25 @@
         setTimeout(() => toast.remove(), 3000);
     }
 
+    // DB側でセットしている称号を取得
+    async function loadMyProfile() {
+        try {
+            const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                userTitle = data.equipped_title || "鉱山労働奴隷";
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     async function fetchWallets() {
         const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
         if (res.ok) {
             myWallets = await res.json();
             const select = document.getElementById("wallet-select");
             select.innerHTML = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残高:${w.balance}G)</option>`).join('');
-            
-            const total = myWallets.reduce((s, w) => s + w.balance, 0);
-            if (total > 10000) userTitle = "貴族";
-            else if (total > 1500) userTitle = "金持ち";
-            else if (total > 1000) userTitle = "平民";
-            else if (total > 500) userTitle = "商人に雇われた奴隷";
-            else userTitle = "鉱山労働奴隷";
         }
     }
 
@@ -318,7 +325,7 @@
             const data = await res.json();
             if (res.ok) {
                 showToast(data.message);
-                loadPolls(); // 投票状況を再読み込みして反映
+                loadPolls(); 
             } else {
                 showToast(data.detail || "エラーが発生しました", true);
             }
@@ -326,7 +333,6 @@
             showToast("通信エラーが発生しました", true);
         }
     }
-    // ----------------------
 
     function toggleAirdropUI() {
         const ui = document.getElementById("airdrop-ui");
