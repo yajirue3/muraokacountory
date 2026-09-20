@@ -44,10 +44,18 @@
 
         .post-card { background: #252525; border: 1px solid #3a3a3a; border-radius: 10px; padding: 14px; margin-bottom: 12px; position: relative; transition: transform 0.1s; }
         .post-pinned { border-color: var(--gold); border-left: 4px solid var(--gold); background: #2a281e; }
-        .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .post-user { font-weight: bold; color: var(--gold); font-size: 0.95rem; cursor: pointer; }
-        .post-badge { background: #8b0000; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
-        .post-meta { font-size: 0.7rem; color: var(--text-sub); }
+        
+        /* 投稿ヘッダー見切れ防止・レイアウト修正 */
+        .post-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px; }
+        .post-header-left { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .post-user { font-weight: bold; color: var(--gold); font-size: 0.95rem; cursor: pointer; word-break: break-all; line-height: 1.3; }
+        .post-badge { background: #8b0000; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+        .post-meta { font-size: 0.75rem; color: #aaa; text-align: right; flex-shrink: 0; white-space: nowrap; line-height: 1.4; }
+        
+        /* 視認性の高いIDリンクボタン */
+        .post-id-link { color: #fff; font-weight: bold; cursor: pointer; background: #333; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; border: 1px solid #555; transition: 0.2s; }
+        .post-id-link:hover { background: var(--primary); border-color: var(--primary); }
+
         .post-content { font-size: 0.9rem; line-height: 1.6; color: #ddd; white-space: pre-wrap; word-break: break-all; margin-bottom: 12px; }
         
         .post-actions { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #333; padding-top: 12px; align-items: center; }
@@ -74,6 +82,11 @@
         .admin-content { padding: 12px; display: none; }
         .admin-content.open { display: block; }
         .report-item { background: #252525; padding: 10px; border-left: 3px solid var(--danger); margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; }
+
+        /* 投票エリアの折りたたみ用ヘッダー */
+        .poll-section-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; font-weight: bold; color: var(--primary); padding-bottom: 8px; border-bottom: 1px solid rgba(52, 152, 219, 0.3); margin-bottom: 12px; }
+        .poll-section-header:hover { opacity: 0.8; }
+        #polls-container-wrapper { display: block; }
     </style>
 </head>
 <body>
@@ -84,29 +97,34 @@
         <button class="btn-nav" style="border-color: var(--success); color: var(--success);" onclick="refreshAll()">🔄 更新</button>
     </div>
 
-    <!-- 投票エリア -->
+    <!-- 投票エリア (折りたたみ可能) -->
     <div class="card" style="border-color: var(--primary);">
-        <div class="header" style="color: var(--primary); border-color: #333;">📊 国民投票所</div>
-        
-        <div id="polls-container">
-            <div style="text-align:center; padding: 10px; color:#888;">読み込み中...</div>
+        <div class="poll-section-header" onclick="togglePolls()">
+            <span>📊 国民投票所</span>
+            <span id="poll-toggle-icon">▼</span>
         </div>
-
-        <button class="btn-toggle" style="border-color: var(--primary); color: var(--primary);" onclick="togglePollUI()">+ 新しい投票を作成する</button>
         
-        <div id="poll-create-ui" class="airdrop-box" style="border-color: var(--primary); display: none;">
-            <div style="font-size:0.75rem; color:#aaa; margin-bottom: 8px;">皆の意見を聞いてみましょう</div>
-            <input type="text" id="poll-title" placeholder="投票のタイトル (例: 次の給付金は？)" maxlength="100">
-            <input type="text" id="poll-desc" placeholder="詳細な説明 (任意)">
-            <input type="number" id="poll-hours" placeholder="期限 (時間) 例: 24" value="24" min="1" max="720">
-            
-            <div id="poll-options-container">
-                <input type="text" class="poll-option-input" placeholder="選択肢 1">
-                <input type="text" class="poll-option-input" placeholder="選択肢 2">
+        <div id="polls-container-wrapper">
+            <div id="polls-container">
+                <div style="text-align:center; padding: 10px; color:#888;">読み込み中...</div>
             </div>
+
+            <button class="btn-toggle" style="border-color: var(--primary); color: var(--primary);" onclick="togglePollUI()">+ 新しい投票を作成する</button>
             
-            <button class="btn-toggle" onclick="addPollOption()">+ 選択肢を追加</button>
-            <button class="btn-primary" style="background: var(--primary); color: #fff;" onclick="submitPoll()">投票を開始する</button>
+            <div id="poll-create-ui" class="airdrop-box" style="border-color: var(--primary); display: none;">
+                <div style="font-size:0.75rem; color:#aaa; margin-bottom: 8px;">皆の意見を聞いてみましょう</div>
+                <input type="text" id="poll-title" placeholder="投票のタイトル (例: 次の給付金は？)" maxlength="100">
+                <input type="text" id="poll-desc" placeholder="詳細な説明 (任意)">
+                <input type="number" id="poll-hours" placeholder="期限 (時間) 例: 24" value="24" min="1" max="720">
+                
+                <div id="poll-options-container">
+                    <input type="text" class="poll-option-input" placeholder="選択肢 1">
+                    <input type="text" class="poll-option-input" placeholder="選択肢 2">
+                </div>
+                
+                <button class="btn-toggle" onclick="addPollOption()">+ 選択肢を追加</button>
+                <button class="btn-primary" style="background: var(--primary); color: #fff;" onclick="submitPoll()">投票を開始する</button>
+            </div>
         </div>
     </div>
 
@@ -121,7 +139,7 @@
 
     <div class="card">
         <div class="header">📜 王国回覧板</div>
-        <textarea id="post-content" rows="3" maxlength="400" placeholder="労働成果、雑談、王への忠誠を書き込め... (>>番号 で返信)"></textarea>
+        <textarea id="post-content" rows="3" maxlength="400" placeholder="労働成果、雑談、王への忠誠を書き込め... (IDタップで返信)"></textarea>
         <div class="char-counter"><span id="char-count">0</span> / 400</div>
 
         <button class="btn-toggle" onclick="toggleAirdropUI()">💸 お金をばらまく（施し機能）</button>
@@ -185,7 +203,19 @@
         setTimeout(() => toast.remove(), 3000);
     }
 
-    // DB側でセットしている称号を取得
+    // 投票エリアの折りたたみ機能
+    function togglePolls() {
+        const wrapper = document.getElementById("polls-container-wrapper");
+        const icon = document.getElementById("poll-toggle-icon");
+        if (wrapper.style.display === "none") {
+            wrapper.style.display = "block";
+            icon.innerText = "▼";
+        } else {
+            wrapper.style.display = "none";
+            icon.innerText = "▲";
+        }
+    }
+
     async function loadMyProfile() {
         try {
             const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
@@ -244,7 +274,7 @@
 
             return `
                 <div class="post-card" style="border-left: 4px solid var(--primary); margin-bottom: 16px;">
-                    <div class="post-header">
+                    <div class="post-header" style="margin-bottom: 4px;">
                         <div class="post-user" style="color: var(--primary);">${escapeHtml(p.title)}</div>
                         <div class="post-meta" style="color: var(--danger);">〆切: ${timeStr}</div>
                     </div>
@@ -406,7 +436,9 @@
         container.innerHTML = data.posts.map(p => {
             const d = new Date(p.created_at);
             const timeStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-            let safeContent = escapeHtml(p.content).replace(/&gt;&gt;(\d+)/g, '<span style="color:var(--primary); cursor:pointer; font-weight:bold;" onclick="replyTo($1)">>>$1</span>');
+            
+            // 本文内の「>>番号」をアンカータップでスクロール移動するように置換
+            let safeContent = escapeHtml(p.content).replace(/&gt;&gt;(\d+)/g, '<span style="color:var(--primary); cursor:pointer; font-weight:bold; text-decoration:underline;" onclick="scrollToPost($1)">>>$1</span>');
 
             let airdropHtml = '';
             if (p.airdrop_total > 0) {
@@ -427,11 +459,14 @@
             return `
                 <div class="${cardClass}" id="post-${p.id}">
                     <div class="post-header">
-                        <div>
+                        <div class="post-header-left">
                             <span class="post-user" onclick="replyTo(${p.id})">${pinHtml}⛏️ ${escapeHtml(p.nickname)}</span>
                             <span class="post-badge">${escapeHtml(p.user_title)}</span>
                         </div>
-                        <div class="post-meta">ID:${p.id} - ${timeStr}</div>
+                        <div class="post-meta">
+                            <span class="post-id-link" onclick="replyTo(${p.id})">ID:${p.id} ↩</span><br>
+                            ${timeStr}
+                        </div>
                     </div>
                     ${airdropHtml}
                     <div class="post-content">${safeContent}</div>
@@ -453,11 +488,31 @@
 
     function changePage(delta) { loadPosts(currentPage + delta); window.scrollTo(0, 0); }
 
+    // IDをタップした時に入力欄へ挿入し、フォーカス＆スクロール
     function replyTo(id) {
         const ta = document.getElementById("post-content");
         ta.value = `>>${id}\n` + ta.value;
         ta.focus();
-        window.scrollTo(0, 0);
+        ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // 本文内の「>>番号」をタップした時にそのレスへ移動してハイライト
+    function scrollToPost(id) {
+        const target = document.getElementById(`post-${id}`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // 一瞬光らせる（ハイライト）
+            const originalBg = target.style.backgroundColor;
+            target.style.transition = 'background-color 0.5s';
+            target.style.backgroundColor = 'rgba(52, 152, 219, 0.3)';
+            setTimeout(() => {
+                target.style.backgroundColor = originalBg;
+                setTimeout(() => target.style.transition = '', 500);
+            }, 1000);
+        } else {
+            showToast(`ID:${id} の投稿はこのページに見つかりません`, true);
+        }
     }
 
     async function reactPost(id, type) {
