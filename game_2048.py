@@ -83,3 +83,67 @@ async def submit_2048_score(data: Score2048Submit, authorization: str = Header(N
         "daily": daily_res.data or [],
         "alltime": alltime_res.data or []
     }
+
+# ==========================================
+# さめがめ (SameGame) 用エンドポイント
+# ==========================================
+
+class ScoreSameGameSubmit(BaseModel):
+    score: int
+    remaining_blocks: int  # 0なら全消しボーナス達成などの指標に利用
+
+# --- 画面配信 ---
+@router.get("/samegame", response_class=HTMLResponse)
+async def get_samegame_page(request: Request):
+    return templates.TemplateResponse(request=request, name="samegame.html")
+
+# --- ランキング単体取得（いつでも見れる用） ---
+@router.get("/api/samegame/ranking")
+async def get_samegame_ranking():
+    supabase = await get_supabase()
+    
+    # 1人1枠のビューからトップ10を取得
+    daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
+    alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
+    
+    return {
+        "daily": daily_res.data or [],
+        "alltime": alltime_res.data or []
+    }
+
+# --- スコア登録 & ランキング返却 ---
+@router.post("/api/samegame/score")
+async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    if data.score < 0 or data.remaining_blocks < 0:
+        raise HTTPException(status_code=400, detail="無効なスコアデータです")
+
+    profile_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    nickname = profile_res.data[0].get("nickname") if profile_res.data else "名無し"
+    if not nickname:
+        nickname = "名無し"
+
+    # ログとして全記録をInsertする
+    await supabase.table("scores_samegame").insert({
+        "user_id": str(user.id),
+        "nickname": nickname,
+        "score": data.score,
+        "remaining_blocks": data.remaining_blocks
+    }).execute()
+
+    # 更新後の最新ランキングを取得
+    daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
+    alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
+    
+    # 自分の累計順位を判定
+    higher_scores = await supabase.table("view_samegame_alltime").select("user_id", count="exact").gt("score", data.score).execute()
+    my_rank = (higher_scores.count or 0) + 1
+
+    return {
+        "success": True,
+        "my_rank": my_rank,
+        "daily": daily_res.data or [],
+        "alltime": alltime_res.data or []
+    }
