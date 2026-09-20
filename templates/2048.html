@@ -42,12 +42,12 @@
         
         .score-addition {
             position: absolute; top: 10px; right: 10px; font-size: 1.2rem; font-weight: bold; color: rgba(119,110,101,0.9);
-            animation: moveUp 0.6s ease-in forwards; z-index: 100; pointer-events: none;
+            animation: moveUp 0.6s ease-in forwards; z-index: 100; pointer-events: none; white-space: nowrap;
         }
         @keyframes moveUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-40px); } }
 
         .controls-row {
-            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 10px;
+            width: 100%; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px;
         }
 
         .action-btn {
@@ -57,6 +57,15 @@
         .action-btn:active { background: #9f8b77; transform: scale(0.96); }
         .btn-secondary { background: var(--board-bg); }
         .sound-btn { flex: 0.4; font-size: 1.1rem; padding: 10px; }
+
+        /* コンボUIのスタイル */
+        .combo-container {
+            width: 100%; max-width: 400px; text-align: center; font-weight: 700; color: #f67c5f;
+            margin-bottom: 8px; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+            height: 24px; display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .combo-container.active { opacity: 1; animation: combo-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes combo-pop { 0% { transform: scale(0.8); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
         .board-container {
             position: relative; width: 100%; max-width: 400px; aspect-ratio: 1 / 1;
@@ -79,8 +88,8 @@
         }
 
         .floating-score {
-            position: absolute; font-size: 1.8rem; font-weight: bold; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            animation: float-score-anim 0.7s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; z-index: 50; width: calc(25% - (var(--gap) * 3 / 4)); text-align: center; pointer-events: none;
+            position: absolute; font-size: 1.5rem; font-weight: bold; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            animation: float-score-anim 0.7s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; z-index: 50; width: calc(25% - (var(--gap) * 3 / 4)); text-align: center; pointer-events: none; white-space: nowrap;
         }
         @keyframes float-score-anim {
             0% { opacity: 0; transform: translateY(10px) scale(0.8); }
@@ -159,6 +168,11 @@
     <button class="action-btn" onclick="resetGame()">再挑戦</button>
 </div>
 
+<!-- コンボ表示用UI -->
+<div class="combo-container" id="combo-container">
+    <span id="combo-val" style="font-size: 1.5rem;">0</span> COMBO! 🔥
+</div>
+
 <div class="board-container" id="touch-area">
     <div class="grid-bg">
         <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
@@ -199,23 +213,21 @@
     // 音響ノード
     let bgmSource, bgmFilter, bgmMasterGain, waveLFO;
     let isBgmPlaying = false;
-    let convolver = null; // 立体音響（リバーブ）用
+    let convolver = null; 
 
     function initAudio() {
         if (!audioCtx) audioCtx = new AudioContext();
     }
 
-    // 立体音響用の深い反響空間（インパルス応答）を動的生成
     function initReverb() {
         if (convolver) return;
         convolver = audioCtx.createConvolver();
         const rate = audioCtx.sampleRate;
-        const length = rate * 2.5; // 2.5秒の深いリバーブ
+        const length = rate * 2.5;
         const impulse = audioCtx.createBuffer(2, length, rate);
         for (let i = 0; i < 2; i++) {
             const channel = impulse.getChannelData(i);
             for (let j = 0; j < length; j++) {
-                // 指数減衰による木製ホールの響きをシミュレート
                 const decay = Math.pow(1 - j / length, 4.0);
                 channel[j] = (Math.random() * 2 - 1) * decay;
             }
@@ -223,13 +235,11 @@
         convolver.buffer = impulse;
     }
 
-    // --- 波の音（ブツブツ音完全排除＆波のうねり強化） ---
     function playBGM() {
         initAudio();
         if (isBgmPlaying || !soundEnabled) return;
         isBgmPlaying = true;
         
-        // ピュアなホワイトノイズを生成（ループ時のノイズを消すため加工なし）
         const bufferSize = audioCtx.sampleRate * 4;
         const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
@@ -239,29 +249,27 @@
 
         bgmSource = audioCtx.createBufferSource();
         bgmSource.buffer = noiseBuffer;
-        bgmSource.loop = true; // 生ノイズのループはブツブツ鳴らない
+        bgmSource.loop = true;
 
-        // 低音の波の音に変換する連続フィルター
         bgmFilter = audioCtx.createBiquadFilter();
         bgmFilter.type = 'lowpass';
-        bgmFilter.frequency.value = 250; // 波の音がしっかり聞こえる帯域に調整
+        bgmFilter.frequency.value = 250; 
 
-        // アルファ波誘導の12秒周期の「波の満ち引き（うねり）」
         waveLFO = audioCtx.createOscillator();
         waveLFO.type = 'sine';
         waveLFO.frequency.value = 0.08; 
         
         const lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 0.5; // 音量の揺れ幅
+        lfoGain.gain.value = 0.5; 
         waveLFO.connect(lfoGain);
 
         const waveVolumeNode = audioCtx.createGain();
-        waveVolumeNode.gain.value = 0.5; // ベース音量
+        waveVolumeNode.gain.value = 0.5; 
         lfoGain.connect(waveVolumeNode.gain); 
 
         bgmMasterGain = audioCtx.createGain();
         bgmMasterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-        bgmMasterGain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 3); // 音量をしっかり出す
+        bgmMasterGain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 3);
 
         bgmSource.connect(bgmFilter);
         bgmFilter.connect(waveVolumeNode);
@@ -299,7 +307,6 @@
         }
     }
 
-    // --- 効果音：立体音響リバーブ＋オーガニック木琴音 ---
     function playAcousticWood(freq, panValue, volScale = 1.0) {
         if (!soundEnabled) return;
         initAudio();
@@ -308,17 +315,14 @@
 
         const now = audioCtx.currentTime;
 
-        // 立体音響：パンニング（左右の配置）
         const panner = audioCtx.createStereoPanner();
         panner.pan.value = panValue; 
 
-        // ダイレクト音（乾いた音）
         const dryGain = audioCtx.createGain();
         dryGain.gain.value = 0.65 * volScale;
         
-        // 反響音（リバーブ空間へ）
         const wetGain = audioCtx.createGain();
-        wetGain.gain.value = 1.0 * volScale; // 深い反響
+        wetGain.gain.value = 1.0 * volScale; 
 
         panner.connect(dryGain);
         panner.connect(wetGain);
@@ -326,24 +330,20 @@
         wetGain.connect(convolver);
         convolver.connect(audioCtx.destination);
 
-        // 胴鳴り（木そのものの響き）
         const osc = audioCtx.createOscillator();
         const oscGain = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
 
-        // マレットの打撃音（コンッという鋭いアタック）
         const strike = audioCtx.createOscillator();
         const strikeGain = audioCtx.createGain();
         strike.type = 'triangle';
         strike.frequency.setValueAtTime(freq * 3.5, now);
 
-        // 柔らかく広がる余韻のエンベロープ
         oscGain.gain.setValueAtTime(0, now);
         oscGain.gain.linearRampToValueAtTime(0.8, now + 0.005);
         oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
 
-        // 瞬間的な打点音のエンベロープ
         strikeGain.gain.setValueAtTime(0, now);
         strikeGain.gain.linearRampToValueAtTime(0.4, now + 0.002);
         strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
@@ -367,7 +367,6 @@
         let index = Math.min(Math.floor(Math.log2(val)) - 1, scale.length - 1);
         let freq = scale[Math.max(0, index)];
         
-        // 盤面の位置(0〜3)から左右のパンニング(-0.6〜0.6)を計算して立体音響化
         let panValue = (colIndex !== undefined) ? (colIndex / 3) * 1.2 - 0.6 : 0;
         
         playAcousticWood(freq, panValue, 0.8);
@@ -376,12 +375,11 @@
         }
     }
 
-    // ---------------------------------------------
-
     let grid = Array(4).fill(null).map(() => Array(4).fill(null));
     let tiles = [];
     let tileIdSeq = 0;
     let score = 0;
+    let combo = 0; // コンボ管理
     let bestScore = parseInt(localStorage.getItem("2048_best")) || 0;
     let isGameOver = false;
     let rankingData = { daily: [], alltime: [] };
@@ -462,6 +460,8 @@
         grid = Array(4).fill(null).map(() => Array(4).fill(null));
         tiles = [];
         score = 0;
+        combo = 0; // コンボ初期化
+        updateComboDisplay(0);
         isGameOver = false;
         closeModal();
         addRandomTile(); addRandomTile();
@@ -469,10 +469,24 @@
         if(soundEnabled && !isBgmPlaying) playBGM();
     }
 
-    function showScorePopup(val, r, c) {
+    function updateComboDisplay(c) {
+        const container = document.getElementById("combo-container");
+        const val = document.getElementById("combo-val");
+        if (c > 1) {
+            val.innerText = c;
+            container.classList.remove("active");
+            void container.offsetWidth; // リフローをトリガーしてアニメーション再起動
+            container.classList.add("active");
+            container.style.opacity = "1";
+        } else {
+            container.style.opacity = "0";
+        }
+    }
+
+    function showScorePopup(val, r, c, currentCombo) {
         const pop = document.createElement("div");
         pop.className = "floating-score";
-        pop.innerText = "+" + val;
+        pop.innerText = "+" + val + (currentCombo > 1 ? ` (x${currentCombo})` : "");
         pop.style.top = `calc(${r} * 25% + var(--gap))`;
         pop.style.left = `calc(${c} * 25% + var(--gap))`;
         layer.appendChild(pop);
@@ -539,10 +553,16 @@
         grid = newGrid;
         tiles.forEach(t => { let old = oldPositions.get(t.id); if (old && (old.r !== t.r || old.c !== t.c)) moved = true; });
         
+        let totalGained = 0;
+        
         if (gainedScore > 0) {
             moved = true;
+            combo++;
+            totalGained = gainedScore * combo; // コンボボーナス適用
+            
+            updateComboDisplay(combo);
             playMergeSound(maxMergedVal, lastMergePos.c);
-            showScorePopup(gainedScore, lastMergePos.r, lastMergePos.c);
+            showScorePopup(totalGained, lastMergePos.r, lastMergePos.c, combo);
             
             if (maxMergedVal >= 512) {
                 const board = document.getElementById("touch-area");
@@ -557,11 +577,14 @@
                 }
             }
         } else if (moved) {
+            // 移動したのにマージが発生しなかった場合はコンボリセット
+            combo = 0;
+            updateComboDisplay(0);
             playMoveSound();
         }
 
         if (moved) {
-            score += gainedScore;
+            score += totalGained;
             addRandomTile(); renderDOM(); checkGameOver();
         }
     }
