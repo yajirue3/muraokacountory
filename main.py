@@ -944,3 +944,94 @@ async def admin_force_repay_loan(loan_id: int, authorization: str = Header(None)
         return {"message": f"強制取り立てを実行し {rec}G を回収しました。残債: {rem}G"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# ==================================================
+# 投票システム API (追記分)
+# ==================================================
+class PollCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    description: str = ""
+    expires_in_hours: int = Field(24, gt=0, le=720, description="1時間から30日まで")
+    options: List[str] = Field(..., min_items=2, max_items=10, description="選択肢は最低2つ必要")
+
+class PollVote(BaseModel):
+    option_id: int
+
+@app.get("/api/board/polls")
+async def get_polls(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    # 現在時刻より期限が後のものを取得（進行中の投票）
+    now_iso = datetime.now(timezone.utc).isoformat()
+    polls_res = await client.table("board_polls").select("*, board_poll_options(*), board_poll_votes(*)").gte("expires_at", now_iso).order("created_at", desc=True).execute()
+    
+    polls = polls_res.data or []
+    for poll in polls:
+        votes = poll.get("board_poll_votes", [])
+        poll["total_votes"] = len(votes)
+        
+        my_vote = next((v for v in votes if v["user_id"] == user.id), None)
+        poll["my_vote_option_id"] = my_vote["option_id"] if my_vote else None
+        
+        options = poll.get("board_poll_options", [])
+        for opt in options:
+            opt["vote_count"] = len([v for v in votes if v["option_id"] == opt["id"]])
+            
+        poll.pop("board_poll_votes", None)
+        
+    return {"polls": polls}
+
+@app.post("/api/board/polls")
+async def create_poll(data: PollCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=data.expires_in_hours)
+    
+    poll_res = await client.table("board_polls").insert({
+        "creator_id": user.id,
+        "title": data.title,
+        "description": data.description,
+        "expires_at": expires_at.isoformat()
+    }).execute()
+    
+    if not poll_res.data:
+        raise HTTPException(status_code=400, detail="投票の作成に失敗しました")
+        
+    poll_id = poll_res.data[0]["id"]
+    
+    valid_options = [opt.strip() for opt in data.options if opt.strip()]
+    if len(valid_options) < 2:
+        await client.table("board_polls").delete().eq("id", poll_id).execute()
+        raise HTTPException(status_code=400, detail="有効な選択肢が2つ以上必要です")
+        
+    options_data = [{"poll_id": poll_id, "option_text": opt} for opt in valid_options]
+    await client.table("board_poll_options").insert(options_data).execute()
+    
+    return {"message": "新しい投票を作成しました！"}
+
+@app.post("/api/board/polls/{poll_id}/vote")
+async def vote_poll(poll_id: int, data: PollVote, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    poll_res = await client.table("board_polls").select("expires_at").eq("id", poll_id).execute()
+    if not poll_res.data:
+        raise HTTPException(status_code=404, detail="投票が見つかりません")
+        
+    expires_at = datetime.fromisoformat(poll_res.data[0]["expires_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="この投票は既に終了しています")
+        
+    exist = await client.table("board_poll_votes").select("*").eq("poll_id", poll_id).eq("user_id", user.id).execute()
+    if exist.data:
+        await client.table("board_poll_votes").update({"option_id": data.option_id}).eq("id", exist.data[0]["id"]).execute()
+        return {"message": "投票先を変更しました"}
+    else:
+        await client.table("board_poll_votes").insert({
+            "poll_id": poll_id,
+            "option_id": data.option_id,
+            "user_id": user.id
+        }).execute()
+        return {"message": "投票しました！"}
