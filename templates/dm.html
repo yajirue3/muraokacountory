@@ -242,7 +242,7 @@
         setTimeout(() => t.remove(), 3000);
     }
 
-    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace/>/g, "&gt;"); }
 
     function showView(viewId) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -286,7 +286,8 @@
             const subscription = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
             const subData = JSON.parse(JSON.stringify(subscription));
             
-            const res = await fetch('/api/dm/subscribe', {
+            // バックエンド側の変更にあわせて /push-subscribe に変更
+            const res = await fetch('/api/dm/push-subscribe', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth })
             });
