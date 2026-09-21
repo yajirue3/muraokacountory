@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - アイテム貸金庫</title>
-    <!-- QRコード読み取り用ライブラリ -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: sans-serif; background-color: #1a1a1a; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 0; margin: 0; }
@@ -18,10 +17,9 @@
         .btn-back:hover { background: #555; }
         .label { color: #888; font-size: 0.75rem; }
 
-        /* アイテム一覧用スタイル */
         .acc-section { background: #222; border: 1px solid #444; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
         .acc-title { color: #d4af37; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; border-bottom: 1px dashed #555; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
-        .acc-id { font-size: 0.65rem; color: #666; font-family: monospace; }
+        .acc-id { font-size: 0.65rem; color: #666; font-family: monospace; display: block; }
         .item-row { display: flex; flex-direction: column; background: #1a1a1a; padding: 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #333; }
         .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .item-name { font-weight: bold; color: #fff; font-size: 0.85rem; }
@@ -29,13 +27,15 @@
         .item-desc { font-size: 0.7rem; color: #aaa; margin-bottom: 4px; }
         .item-price { font-size: 0.7rem; color: #f39c12; }
 
-        /* アクション切り替えパネル */
         .action-group { display: none; background: #1a1a1a; padding: 10px; border-radius: 6px; border: 1px solid #444; margin-bottom: 10px; }
         .action-group.active { display: block; }
 
-        /* QR用ボタン・モーダル */
+        /* QR用スタイル */
+        .btn-qr-show { width: auto; padding: 4px 8px; background: #8e44ad; font-size: 0.7rem; border-radius: 4px; margin: 0; }
+        .btn-qr-show:hover { background: #9b59b6; }
         .btn-qr-scan { width: auto; margin: 0; padding: 0 14px; background: #3498db; border-radius: 6px; font-size: 0.8rem; }
         .btn-qr-scan:hover { background: #2980b9; }
+        
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; }
         .modal-content { background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 360px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); text-align: center; }
     </style>
@@ -43,13 +43,11 @@
 <body>
 
 <div class="container">
-    <!-- アイテム口座一覧 -->
     <div class="card">
         <div class="header">🧳 所持アイテム一覧</div>
         <div id="accounts-list">読み込み中...</div>
     </div>
 
-    <!-- 新規アイテム口座開設 -->
     <div class="card">
         <div class="header">➕ 新規アイテム口座開設</div>
         <div class="label">口座名 (例: 裏帳簿用金庫)</div>
@@ -57,14 +55,11 @@
         <button onclick="createItemAccount()">口座を開設する</button>
     </div>
 
-    <!-- 統合アイテム操作パネル -->
     <div class="card">
         <div class="header">🔄 アイテム操作 (売却・移動・譲渡)</div>
         
         <div class="label">対象アイテム</div>
-        <select id="action-inv-id">
-            <option value="">読込中...</option>
-        </select>
+        <select id="action-inv-id"><option value="">読込中...</option></select>
 
         <div class="label">操作内容</div>
         <select id="action-type" onchange="toggleActionGroup()">
@@ -76,23 +71,21 @@
         <div class="label">数量</div>
         <input type="number" id="action-qty" value="1" min="1" placeholder="例: 5">
 
-        <!-- ▼ 売却用パネル -->
         <div id="group-sell" class="action-group active">
             <div class="label">入金先Gold口座</div>
             <select id="sell-wallet"></select>
         </div>
 
-        <!-- ▼ 移動用パネル -->
         <div id="group-move" class="action-group">
             <div class="label">移動先のアイテム口座</div>
             <select id="move-account"></select>
         </div>
 
-        <!-- ▼ 譲渡用パネル -->
         <div id="group-transfer" class="action-group">
-            <div class="label">受取人のメールアドレス</div>
+            <div class="label">受取先のアイテム口座ID</div>
             <div style="display: flex; gap: 8px; margin-top: 4px;">
-                <input type="email" id="transfer-email" placeholder="例: user@example.com" style="margin: 0; flex: 1;">
+                <!-- ▼ ID入力に修正 -->
+                <input type="text" id="transfer-account-id" placeholder="例: a1b2c3d4..." style="margin: 0; flex: 1;">
                 <button class="btn-qr-scan" onclick="startQRScanner()">📷 読取</button>
             </div>
         </div>
@@ -103,14 +96,25 @@
     <button class="btn-back" onclick="location.href='/dashboard'">◀ 国民証に戻る</button>
 </div>
 
+<!-- ================= 受取用QR表示モーダル ================= -->
+<div id="qr-show-modal" class="modal-overlay" onclick="closeQRShow(event)">
+    <div class="modal-content" style="border-color: #8e44ad;" onclick="event.stopPropagation()">
+        <h3 style="color: #9b59b6; margin-top: 0;">📱 受取用QRコード</h3>
+        <p style="font-size: 0.8rem; color: #ccc; margin-bottom: 15px;">相手にこのアイテム口座のQRをスキャンしてもらってください</p>
+        <div style="background: #fff; padding: 10px; display: inline-block; border-radius: 8px; margin-bottom: 15px;">
+            <img id="my-qr-img" src="" alt="QR Code" width="200" height="200">
+        </div>
+        <div id="my-qr-id-text" style="font-family: monospace; font-size: 0.9rem; color: #d4af37; font-weight: bold; margin-bottom: 15px; user-select: all; word-break: break-all;">-</div>
+        <button onclick="closeQRShow()" style="background: #444;">閉じる</button>
+    </div>
+</div>
+
 <!-- ================= QRスキャンモーダル ================= -->
 <div id="qr-scan-modal" class="modal-overlay">
     <div class="modal-content" style="border-color: #3498db;">
         <h3 style="color: #3498db; margin-top: 0;">📷 スキャン</h3>
-        <p style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;">相手のメールアドレスQRを読み取ってください</p>
-        
+        <p style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;">相手の受取QRコードを枠に収めてください</p>
         <div id="qr-reader" style="width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; background: #000;"></div>
-        
         <button onclick="stopQRScanner()" style="background: #e74c3c;">キャンセル</button>
     </div>
 </div>
@@ -129,7 +133,6 @@
 
     function escapeHtml(str) { return str ? String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; }
 
-    // アクションパネルの切り替え
     function toggleActionGroup() {
         const type = document.getElementById("action-type").value;
         document.getElementById("group-sell").classList.remove("active");
@@ -172,7 +175,6 @@
                 return;
             }
 
-            // 1. 口座一覧の描画
             listContainer.innerHTML = myItemAccounts.map(acc => {
                 const items = (acc.user_inventories || []).filter(inv => inv.quantity > 0);
                 
@@ -193,21 +195,22 @@
                 return `
                     <div class="acc-section">
                         <div class="acc-title">
-                            <span>${escapeHtml(acc.account_name)}</span>
-                            <span class="acc-id">ID: ${acc.account_id.substring(0,8)}...</span>
+                            <div>
+                                <div>${escapeHtml(acc.account_name)}</div>
+                                <span class="acc-id">ID: ${acc.account_id}</span>
+                            </div>
+                            <button class="btn-qr-show" onclick="showMyQR('${acc.account_id}')">受取QR</button>
                         </div>
                         ${itemsHtml}
                     </div>
                 `;
             }).join('');
 
-            // 2. セレクトボックスの動的生成（全アイテムをフラットに一覧化）
             let invOptions = [];
             let accOptions = [];
             
             myItemAccounts.forEach(acc => {
                 accOptions.push(`<option value="${acc.account_id}">${escapeHtml(acc.account_name)}</option>`);
-                
                 (acc.user_inventories || []).filter(i => i.quantity > 0).forEach(inv => {
                     const item = inv.items || {};
                     invOptions.push(`<option value="${inv.id}">[${escapeHtml(acc.account_name)}] ${escapeHtml(item.name)} (所持:${inv.quantity})</option>`);
@@ -239,7 +242,6 @@
         } catch(e) { alert("作成に失敗しました"); }
     }
 
-    // 統合アクション実行処理
     async function executeAction() {
         const invId = document.getElementById("action-inv-id").value;
         const type = document.getElementById("action-type").value;
@@ -262,10 +264,10 @@
             endpoint = "/api/move-item";
             payload.target_account_id = targetAcc;
         } else if (type === "transfer") {
-            const email = document.getElementById("transfer-email").value.trim();
-            if (!email) return alert("譲渡先のEmailを入力してください");
+            const targetAccId = document.getElementById("transfer-account-id").value.trim();
+            if (!targetAccId) return alert("受取先の口座IDを入力してください");
             endpoint = "/api/transfer-item";
-            payload.target_email = email;
+            payload.target_account_id = targetAccId;
         }
 
         try {
@@ -278,7 +280,6 @@
             
             if(res.ok) {
                 alert(data.message);
-                // 売却時はウォレット残高も変わるため再読み込み
                 if (type === "sell") await loadWallets();
                 await loadInventory();
             } else {
@@ -290,25 +291,34 @@
         }
     }
 
+    /* ================= QRコード表示機能 ================= */
+    function showMyQR(accountId) {
+        document.getElementById("my-qr-id-text").innerText = accountId;
+        document.getElementById("my-qr-img").src = `https://quickchart.io/qr?text=${encodeURIComponent(accountId)}&size=200&margin=1`;
+        document.getElementById("qr-show-modal").style.display = "flex";
+    }
+
+    function closeQRShow(e) {
+        if (e && e.target !== document.getElementById("qr-show-modal")) return;
+        document.getElementById("qr-show-modal").style.display = "none";
+    }
+
     /* ================= QRコード読取機能 ================= */
     let html5QrCode;
-
     function startQRScanner() {
         document.getElementById("qr-scan-modal").style.display = "flex";
         if (html5QrCode) html5QrCode.clear();
-
         html5QrCode = new Html5Qrcode("qr-reader");
         html5QrCode.start(
             { facingMode: "environment" },
             { fps: 10, qrbox: { width: 200, height: 200 } },
             (decodedText) => {
-                // スキャン成功時、メールアドレス入力欄へセット
-                document.getElementById("transfer-email").value = decodedText;
+                document.getElementById("transfer-account-id").value = decodedText;
                 stopQRScanner();
             },
-            (err) => {} // ノイズ無視
+            (err) => {} 
         ).catch((err) => {
-            alert("カメラの起動に失敗しました。権限が許可されているか確認してください。\n" + err);
+            alert("カメラの起動に失敗しました。\n" + err);
             stopQRScanner();
         });
     }
