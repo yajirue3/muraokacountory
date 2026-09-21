@@ -179,6 +179,18 @@ async def complete_general_auction(auction_id: int, authorization: str = Header(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
+# ==========================================
+# チャット履歴取得 API（追加分）
+# ==========================================
+@router.get("/{auction_id}/comments")
+async def get_auction_comments(auction_id: int):
+    client = await get_supabase()
+    res = await client.table("auction_comments").select("*").eq("auction_id", auction_id).order("created_at", desc=False).execute()
+    return res.data
+
+# ==========================================
+# チャット投稿 API
+# ==========================================
 @router.post("/{auction_id}/comments")
 async def post_auction_comment(auction_id: int, data: AuctionCommentCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
