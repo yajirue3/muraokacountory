@@ -19,6 +19,7 @@ from card import router as card_router
 from db import get_supabase
 from game_2048 import router as game_2048_router
 from auction import router as auction_router
+from fastapi.responses import FileResponse
 from dm import router as dm_router
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -703,7 +704,7 @@ app.include_router(game_2048_router)
 from video import router as video_router
 app.include_router(video_router)
 app.include_router(auction_router)
-app.include_router(dm_router)
+app.include_router(dm_router, prefix="/api/dm", tags=["dm"])
 
 # ==================================================
 # 資産保有税（所得税・保管料）処理モジュール (main.py用)
