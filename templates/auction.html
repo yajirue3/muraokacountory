@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>村岡王国 - 大競売場 (Auctions)</title>
+    <style>
+        :root {
+            --bg-dark: #0f1115; --card-bg: #1c1e24; --border: #333842; 
+            --gold: #d4af37; --success: #10b981; --blue: #3b82f6; --purple: #8e44ad; 
+            --text-main: #e2e8f0; --text-muted: #94a3b8; --danger: #ef4444;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-dark); color: var(--text-main); display: flex; justify-content: center; padding: 20px 0; margin: 0; min-height: 100vh; }
+        .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 16px; padding: 0 10px; box-sizing: border-box; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+        
+        /* タブUI (market.html流用) */
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; min-width: 30%; padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; text-align: center; }
+        .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* リストアイテム */
+        .list-item { background: #15171a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
+        .list-item:hover { border-color: var(--gold); transform: translateY(-2px); }
+        .type-badge { padding: 3px 6px; border-radius: 6px; font-size: 0.65rem; font-weight: bold; }
+        .badge-item { background: rgba(59,130,246,0.2); color: var(--blue); border: 1px solid var(--blue); }
+        .badge-general { background: rgba(142,68,173,0.2); color: var(--purple); border: 1px solid var(--purple); }
+        
+        .price-text { font-size: 1.2rem; font-weight: bold; color: var(--gold); }
+        .timer-text { font-family: monospace; font-size: 1.1rem; color: #fff; font-weight: bold; }
+        .timer-urgent { color: var(--danger); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* フォーム要素 */
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #15171a; color: #fff; box-sizing: border-box; margin-bottom: 12px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.1s; margin-top: 8px; }
+        button:active:not(:disabled) { transform: scale(0.96) translateY(2px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-action { background: linear-gradient(145deg, var(--gold), #b8860b); color: #1a1a1a; }
+        .btn-sub { background: #262932; color: #fff; border: 1px solid var(--border); }
+        .btn-danger { background: var(--danger); color: #fff; }
+
+        /* 特設ライブチャット (2カラムモーダル) */
+        #auction-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: var(--bg-dark); width: 100%; max-width: 900px; height: 85vh; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: row; overflow: hidden; box-shadow: 0 0 30px rgba(212,175,55,0.2); }
+        @media (max-width: 768px) { .modal-content { flex-direction: column; height: 95vh; } }
+        
+        .modal-left { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); background: #15171a; }
+        .modal-right { flex: 1; display: flex; flex-direction: column; background: var(--card-bg); }
+        
+        /* チャットエリア (board.html流用) */
+        .chat-header { background: #15171a; padding: 10px; text-align: center; font-size: 0.85rem; color: #94a3b8; border-bottom: 1px solid var(--border); }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .chat-input-area { padding: 15px; background: #15171a; border-top: 1px solid var(--border); }
+        
+        .msg-item { background: #262932; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; align-self: flex-start; max-width: 85%; }
+        .msg-system { background: rgba(212,175,55,0.1); color: var(--gold); border: 1px solid rgba(212,175,55,0.3); text-align: center; align-self: center; font-weight: bold; max-width: 95%; }
+        
+        /* トースト (board.html流用) */
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast { background: rgba(30,30,30,0.95); border-left: 4px solid var(--gold); padding: 12px 20px; border-radius: 6px; color: #fff; animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
+        @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="container">
+    <div class="card">
+        <div class="header">⚖️ 王国大競売場</div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('list', this)">📜 開催中</button>
+            <button class="tab-btn" onclick="switchTab('create', this)">🔨 出品する</button>
+            <button class="tab-btn" onclick="switchTab('my', this)">👑 自分の参加</button>
+        </div>
+
+        <!-- 開催中リスト -->
+        <div id="tab-list" class="tab-content active">
+            <div id="auction-list"><div style="text-align:center; color:#888;">読み込み中...</div></div>
+            <button class="btn-sub" onclick="loadAuctions()">🔄 リロード</button>
+        </div>
+
+        <!-- 出品フォーム -->
+        <div id="tab-create" class="tab-content">
+            <select id="c-category" onchange="updateCreateForm()">
+                <option value="ITEM">🎒 所持アイテムを出品する</option>
+                <option value="GENERAL">📜 自由出品 (役務・権利など)</option>
+            </select>
+
+            <div id="create-item-area">
+                <label style="font-size: 0.75rem; color: #94a3b8;">出品するアイテム口座</label>
+                <select id="c-inventory-id"></select>
+                <input type="number" id="c-quantity" placeholder="個数" min="1" value="1">
+            </div>
+
+            <div id="create-general-area" style="display:none;">
+                <input type="text" id="c-title" placeholder="タイトル (例: 1日護衛権)" maxlength="100">
+                <textarea id="c-desc" placeholder="詳細な説明や条件" rows="3"></textarea>
+            </div>
+
+            <label style="font-size: 0.75rem; color: #94a3b8;">価格設定 (Gold)</label>
+            <input type="number" id="c-start-price" placeholder="開始価格 (必須)" min="1">
+            <input type="number" id="c-buyout-price" placeholder="即決価格 (任意・空白可)" min="1">
+            
+            <label style="font-size: 0.75rem; color: #94a3b8;">期間と設定</label>
+            <select id="c-duration">
+                <option value="1">1時間</option>
+                <option value="6">6時間</option>
+                <option value="24" selected>24時間</option>
+                <option value="72">3日間</option>
+            </select>
+
+            <select id="c-chat-setting">
+                <option value="OPEN">チャット: 誰でも参加可能 (お祭り用)</option>
+                <option value="RESTRICTED">チャット: 入札者のみ (本気・荒らし対策)</option>
+            </select>
+
+            <label style="font-size: 0.75rem; color: #94a3b8;">売上受取用 Gold口座</label>
+            <select id="c-wallet-id"></select>
+
+            <button class="btn-action" onclick="submitAuction()">出品を確定する</button>
+        </div>
+
+        <!-- 自分の参加 -->
+        <div id="tab-my" class="tab-content">
+            <h4 style="color:var(--gold); margin-bottom: 8px;">自分の出品</h4>
+            <div id="my-sales-list"></div>
+            <h4 style="color:var(--blue); margin-top: 16px; margin-bottom: 8px;">現在入札中</h4>
+            <div id="my-bids-list"></div>
+        </div>
+
+        <button class="btn-sub" style="margin-top:20px;" onclick="location.href='/dashboard'">◀ ダッシュボードへ戻る</button>
+    </div>
+</div>
+
+<!-- 特設ライブチャット モーダル -->
+<div id="auction-modal">
+    <div class="modal-content">
+        <!-- 左カラム: 情報と入札 -->
+        <div class="modal-left" id="modal-left-content">
+            <button class="btn-sub" style="margin-bottom:15px;" onclick="closeAuction()">✖ 閉じる</button>
+            <div id="detail-badges" style="margin-bottom:8px;"></div>
+            <h2 id="detail-title" style="margin: 0 0 10px 0;"></h2>
+            <div id="detail-seller" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px;"></div>
+            <div id="detail-desc" style="background: #0f1115; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; white-space: pre-wrap;"></div>
+            
+            <div style="text-align: center; background: #1c1e24; border: 1px solid var(--border); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <div style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 4px;">残り時間</div>
+                <div id="detail-timer" class="timer-text" style="font-size: 2rem;">00:00:00</div>
+            </div>
+
+            <div style="background: rgba(212,175,55,0.05); border: 1px solid var(--gold); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="color: var(--gold); font-size: 0.9rem;">現在価格</span>
+                    <span id="detail-current-price" class="price-text" style="font-size: 2.2rem;">0 G</span>
+                </div>
+                <div id="detail-buyout-area" style="text-align: right; font-size: 0.85rem; color: var(--purple); margin-top: 4px;"></div>
+            </div>
+
+            <!-- 動的アクションエリア -->
+            <div id="detail-action-area"></div>
+        </div>
+
+        <!-- 右カラム: ライブチャット -->
+        <div class="modal-right">
+            <div class="chat-header">🔴 特設ライブチャット <span id="chat-mode-badge"></span></div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-area">
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="chat-input" placeholder="メッセージを入力..." style="margin:0; flex:1;">
+                    <button class="btn-action" style="width:auto; margin:0; padding:10px 20px;" onclick="sendComment()">送信</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let myWallets = [];
+    let myItemAccounts = [];
+    let myInventories = [];
+    let currentUser = null;
+    let isKingUser = false;
+    
+    let currentPollingInterval = null;
+    let currentAuctionId = null;
+    let mainTimerInterval = null;
+    let auctionsData = [];
+
+    // 初期化
+    async function init() {
+        await loadProfile();
+        await loadWallets();
+        await loadInventory();
+        await loadAuctions();
+        
+        // 全体のタイマー更新
+        mainTimerInterval = setInterval(updateAllTimers, 1000);
+    }
+
+    function showToast(message, isError = false) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = message;
+        if (isError) toast.style.borderLeftColor = 'var(--danger)';
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${tabId}`).classList.add('active');
+    }
+
+    // データ読み込み系
+    async function loadProfile() {
+        const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
+        if(res.ok) {
+            currentUser = await res.json();
+            isKingUser = (currentUser.role === 'king');
+        }
+    }
+
+    async function loadWallets() {
+        const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+        if(res.ok) {
+            myWallets = await res.json();
+            const options = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残: ${w.balance}G)</option>`).join('');
+            document.getElementById("c-wallet-id").innerHTML = options;
+        }
+    }
+
+    async function loadInventory() {
+        const res = await fetch("/api/inventory", { headers: { "Authorization": `Bearer ${token}` } });
+        if(res.ok) {
+            const data = await res.json();
+            myItemAccounts = data.accounts || [];
+            
+            let invOptions = '';
+            myItemAccounts.forEach(acc => {
+                if(acc.user_inventories) {
+                    acc.user_inventories.forEach(inv => {
+                        myInventories.push({ ...inv, account_name: acc.account_name, account_id: acc.account_id });
+                        invOptions += `<option value="${inv.id}">[${escapeHtml(acc.account_name)}] ${escapeHtml(inv.items.name)} (所持: ${inv.quantity})</option>`;
+                    });
+                }
+            });
+            document.getElementById("c-inventory-id").innerHTML = invOptions || '<option value="">アイテムがありません</option>';
+        }
+    }
+
+    function updateCreateForm() {
+        const type = document.getElementById("c-category").value;
+        if(type === "ITEM") {
+            document.getElementById("create-item-area").style.display = "block";
+            document.getElementById("create-general-area").style.display = "none";
+        } else {
+            document.getElementById("create-item-area").style.display = "none";
+            document.getElementById("create-general-area").style.display = "block";
+        }
+    }
+
+    // 出品
+    async function submitAuction() {
+        const cat = document.getElementById("c-category").value;
+        const start = parseInt(document.getElementById("c-start-price").value);
+        const buyoutRaw = document.getElementById("c-buyout-price").value;
+        const buyout = buyoutRaw ? parseInt(buyoutRaw) : null;
+        const hours = parseInt(document.getElementById("c-duration").value);
+        const end_at = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+        
+        const payload = {
+            category: cat,
+            seller_wallet_id: document.getElementById("c-wallet-id").value,
+            start_price: start,
+            buyout_price: buyout,
+            end_at: end_at,
+            chat_setting: document.getElementById("c-chat-setting").value
+        };
+
+        if(cat === "ITEM") {
+            payload.inventory_id = parseInt(document.getElementById("c-inventory-id").value);
+            payload.quantity = parseInt(document.getElementById("c-quantity").value);
+            payload.title = "アイテム出品"; // サーバ側でアイテム名にする想定、一旦ダミー
+            if(!payload.inventory_id) return showToast("出品するアイテムがありません", true);
+        } else {
+            payload.title = document.getElementById("c-title").value.trim();
+            payload.description = document.getElementById("c-desc").value.trim();
+            payload.quantity = 1;
+            if(!payload.title) return showToast("タイトルを入力してください", true);
+        }
+
+        if(isNaN(start) || start <= 0) return showToast("開始価格を正しく入力してください", true);
+
+        try {
+            const res = await fetch("/api/auctions", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message);
+                switchTab('list', document.querySelector('.tab-btn'));
+                await loadInventory();
+                await loadAuctions();
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    // オークション一覧読み込み
+    async function loadAuctions() {
+        const res = await fetch("/api/auctions?status_filter=OPEN");
+        if(res.ok) {
+            auctionsData = await res.json();
+            renderAuctionList();
+        }
+    }
+
+    function renderAuctionList() {
+        const listEl = document.getElementById("auction-list");
+        const mySalesEl = document.getElementById("my-sales-list");
+        const myBidsEl = document.getElementById("my-bids-list");
+        
+        let allHtml = '', salesHtml = '', bidsHtml = '';
+        const now = Date.now();
+
+        auctionsData.forEach(a => {
+            const isMine = a.seller_user_id === currentUser?.id;
+            const isHighest = a.highest_bidder_id === currentUser?.id;
+            const endMs = new Date(a.end_at).getTime();
+            
+            const badgeCat = a.category === 'ITEM' ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般枠</span>';
+            const badgeTop = isHighest ? '<span class="type-badge" style="background:var(--gold); color:#000;">👑 あなたが最高入札中</span>' : '';
+            const buyoutStr = a.buyout_price ? `<span style="font-size:0.7rem; color:var(--purple);">即決: ${a.buyout_price}G</span>` : '';
+
+            const html = `
+                <div class="list-item" onclick="openAuction(${a.id})">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <div>${badgeCat} ${badgeTop}</div>
+                        ${buyoutStr}
+                    </div>
+                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:8px;">${escapeHtml(a.title)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                        <div>
+                            <div style="font-size:0.7rem; color:#94a3b8;">現在価格</div>
+                            <div class="price-text">${a.current_price} G</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:0.7rem; color:#94a3b8;">残り時間</div>
+                            <div class="timer-text list-timer" data-end="${endMs}">計算中...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            allHtml += html;
+            if(isMine) salesHtml += html;
+            if(isHighest) bidsHtml += html;
+        });
+
+        listEl.innerHTML = allHtml || '<div style="text-align:center; color:#888;">現在開催中のオークションはありません</div>';
+        mySalesEl.innerHTML = salesHtml || '<div style="text-align:center; color:#888; font-size:0.8rem;">なし</div>';
+        myBidsEl.innerHTML = bidsHtml || '<div style="text-align:center; color:#888; font-size:0.8rem;">なし</div>';
+    }
+
+    function updateAllTimers() {
+        const now = Date.now();
+        document.querySelectorAll('.list-timer').forEach(el => {
+            const end = parseInt(el.getAttribute('data-end'));
+            el.innerText = formatTimeLeft(end - now);
+            if(end - now < 300000) el.classList.add('timer-urgent'); // 5分未満
+            else el.classList.remove('timer-urgent');
+        });
+
+        // モーダル表示中のタイマーも更新
+        const modalTimer = document.getElementById('detail-timer');
+        if(modalTimer && currentAuctionId) {
+            const end = parseInt(modalTimer.getAttribute('data-end'));
+            if(end) {
+                const left = end - now;
+                modalTimer.innerText = formatTimeLeft(left);
+                if(left < 300000) modalTimer.classList.add('timer-urgent');
+                else modalTimer.classList.remove('timer-urgent');
+                
+                // 終了検知 (リロードトリガー)
+                if(left <= 0 && !modalTimer.classList.contains('ended')) {
+                    modalTimer.classList.add('ended');
+                    fetchAuctionLive(currentAuctionId); // 最終状態取得
+                }
+            }
+        }
+    }
+
+    function formatTimeLeft(ms) {
+        if(ms <= 0) return "00:00:00 (終了)";
+        const totalSec = Math.floor(ms / 1000);
+        const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+        const s = String(totalSec % 60).padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    }
+
+    // ==========================================
+    // ライブ会場 (詳細＆チャット)
+    // ==========================================
+    async function openAuction(id) {
+        currentAuctionId = id;
+        document.getElementById('auction-modal').style.display = 'flex';
+        await fetchAuctionLive(id);
+        
+        // 2秒おきにポーリング開始 (擬似リアルタイム)
+        if(currentPollingInterval) clearInterval(currentPollingInterval);
+        currentPollingInterval = setInterval(() => fetchAuctionLive(id, true), 2000);
+    }
+
+    function closeAuction() {
+        if(currentPollingInterval) clearInterval(currentPollingInterval);
+        currentPollingInterval = null;
+        currentAuctionId = null;
+        document.getElementById('auction-modal').style.display = 'none';
+        document.getElementById('detail-timer').classList.remove('ended');
+    }
+
+    async function fetchAuctionLive(id, isBackground = false) {
+        try {
+            // 本来は専用の詳細APIが望ましいですが、リストから探して再フェッチをシミュレート
+            // 実際は supabase supabase.channel などWebSocketが理想[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+            const res = await fetch(`/api/auctions?status_filter=OPEN`);
+            const data = await res.json();
+            const a = data.find(x => x.id === id);
+            
+            if(!a) {
+                if(!isBackground) showToast("オークションが見つかりません(終了済みの可能性)");
+                return;
+            }
+
+            // UI反映
+            document.getElementById('detail-badges').innerHTML = a.category === 'ITEM' ? '<span class="type-badge badge-item">🎒 アイテム枠</span>' : '<span class="type-badge badge-general">📜 一般枠</span>';
+            document.getElementById('detail-title').innerText = a.title;
+            document.getElementById('detail-desc').innerText = a.description || '説明なし';
+            document.getElementById('detail-timer').setAttribute('data-end', new Date(a.end_at).getTime());
+            
+            // 価格更新時アニメーション
+            const priceEl = document.getElementById('detail-current-price');
+            if(priceEl.innerText !== `${a.current_price} G`) {
+                priceEl.innerText = `${a.current_price} G`;
+                priceEl.style.transform = "scale(1.2)";
+                setTimeout(() => priceEl.style.transform = "scale(1)", 200);
+            }
+            
+            if(a.buyout_price) document.getElementById('detail-buyout-area').innerHTML = `即決価格: <b style="font-size:1.1rem;">${a.buyout_price} G</b>`;
+            else document.getElementById('detail-buyout-area').innerHTML = '';
+
+            document.getElementById('chat-mode-badge').innerText = a.chat_setting === 'RESTRICTED' ? '🔒 入札者限定' : '🔓 全員参加';
+
+            buildActionArea(a);
+
+            // コメントフェッチ (別途APIを用意する想定だが、フロントでモック実装またはRPCから取得)
+            // ※ここではAPIエンドポイントが存在する前提で記述
+            // const cRes = await fetch(`/api/auctions/${id}/comments`);
+            // if(cRes.ok) renderComments(await cRes.json());
+
+        } catch(e) {}
+    }
+
+    function buildActionArea(a) {
+        const area = document.getElementById('detail-action-area');
+        const isMine = a.seller_user_id === currentUser?.id;
+        const isHighest = a.highest_bidder_id === currentUser?.id;
+        const isEnded = new Date(a.end_at).getTime() <= Date.now();
+
+        if(isEnded) {
+            area.innerHTML = `<div style="text-align:center; padding:15px; color:var(--danger); font-weight:bold;">このオークションは終了しました</div>`;
+            return;
+        }
+
+        if(isMine) {
+            if(!a.highest_bidder_id) {
+                area.innerHTML = `<button class="btn-danger" onclick="executeCancel(${a.id})">出品を取り下げる</button>`;
+            } else {
+                area.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:0.85rem;">入札者がいるため取り下げできません</div>`;
+            }
+            return;
+        }
+
+        // 入札用UI
+        let walletSelect = `<select id="bid-wallet-select" style="margin-bottom:8px;">${myWallets.map(w=>`<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('')}</select>`;
+        let itemAccSelect = '';
+        if(a.category === 'ITEM') {
+            itemAccSelect = `<select id="bid-acc-select" style="margin-bottom:8px;">${myItemAccounts.map(acc=>`<option value="${acc.account_id}">${escapeHtml(acc.account_name)}</option>`).join('')}</select>`;
+        }
+
+        if(isHighest) {
+            // 増額UI
+            area.innerHTML = `
+                <div style="background:rgba(59,130,246,0.1); border:1px solid var(--blue); padding:12px; border-radius:8px; margin-bottom:15px;">
+                    <div style="color:var(--blue); font-weight:bold; margin-bottom:8px; text-align:center;">👑 あなたが最高入札者です</div>
+                    ${walletSelect}
+                    <input type="number" id="bid-amount" placeholder="新しく提示する総額" min="${a.current_price + 1}">
+                    <button class="btn-action" onclick="executeBid(${a.id}, true)">差額を払って増額する</button>
+                </div>
+            `;
+        } else {
+            // 通常入札UI
+            area.innerHTML = `
+                ${walletSelect}
+                ${itemAccSelect}
+                <div style="display:flex; gap:8px;">
+                    <input type="number" id="bid-amount" placeholder="${a.current_price + 1}G 以上を入力" style="margin:0;">
+                    <button class="btn-action" style="width:120px; margin:0;" onclick="executeBid(${a.id}, false)">入札</button>
+                </div>
+                ${a.buyout_price ? `<button class="btn-action" style="background:var(--purple); color:#fff; margin-top:8px;" onclick="document.getElementById('bid-amount').value=${a.buyout_price}; executeBid(${a.id}, false)">🛒 ${a.buyout_price}G で即決購入</button>` : ''}
+            `;
+        }
+
+        if(isKingUser) {
+            area.innerHTML += `<div style="margin-top:20px; padding-top:10px; border-top:1px dashed var(--danger);"><button class="btn-danger" onclick="executeCancel(${a.id})">👑 王命強制キャンセル</button></div>`;
+        }
+    }
+
+    async function executeBid(auctionId, isIncrease) {
+        const amount = parseInt(document.getElementById('bid-amount').value);
+        const walletId = document.getElementById('bid-wallet-select').value;
+        const accSelect = document.getElementById('bid-acc-select');
+        const accId = accSelect ? accSelect.value : null;
+
+        if(!amount || !walletId) return showToast("入力が不足しています", true);
+        if(!isIncrease && accSelect && !accId) return showToast("受取用アイテム口座を作成してください", true);
+
+        try {
+            const res = await fetch(`/api/auctions/${auctionId}/bid`, {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ bidder_wallet_id: walletId, target_item_account_id: accId, bid_amount: amount })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message);
+                fetchAuctionLive(auctionId);
+                loadWallets();
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    async function executeCancel(auctionId) {
+        if(!confirm("本当にこのオークションを取り消しますか？")) return;
+        const res = await fetch(`/api/auctions/${auctionId}/cancel`, { method: "POST", headers: { "Authorization": `Bearer ${token}` }});
+        if(res.ok) { showToast("取り消しました"); closeAuction(); loadAuctions(); }
+    }
+
+    // チャット送信
+    async function sendComment() {
+        if(!currentAuctionId) return;
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if(!text) return;
+        
+        try {
+            const res = await fetch(`/api/auctions/${currentAuctionId}/comments`, {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ message: text })
+            });
+            if(res.ok) {
+                input.value = "";
+                // fetchAuctionLive(currentAuctionId); // ポーリングが拾う
+            } else {
+                const d = await res.json();
+                showToast(d.detail || "エラー", true);
+            }
+        } catch(e) {}
+    }
+
+    // コメント描画 (ダミー表示用、実際はバックエンドから取得)
+    function renderComments(comments) {
+        const box = document.getElementById('chat-messages');
+        const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 10;
+        
+        box.innerHTML = comments.map(c => {
+            if(c.is_system_log) return `<div class="msg-system">${escapeHtml(c.message)}</div>`;
+            const isMe = c.user_id === currentUser?.id;
+            return `
+                <div class="msg-item" style="${isMe ? 'align-self:flex-end; background:#334155;' : ''}">
+                    <div style="font-size:0.7rem; color:#94a3b8; margin-bottom:2px;">[${escapeHtml(c.user_title)}] ${escapeHtml(c.nickname)}</div>
+                    <div>${escapeHtml(c.message)}</div>
+                </div>
+            `;
+        }).join('');
+
+        if(isAtBottom) box.scrollTop = box.scrollHeight;
+    }
+
+    init();
+</script>
+</body>
+</html>
