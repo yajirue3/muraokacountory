@@ -127,4 +127,38 @@ async def complete_general_auction(auction_id: int, authorization: str = Header(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
-@router.
+@router.post("/{auction_id}/comments")
+async def post_auction_comment(auction_id: int, data: AuctionCommentCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    enforce_rate_limit(user.id)  # スパム防止流用
+    client = await get_supabase()
+    
+    # 参加資格チェック
+    auction_res = await client.table("auctions").select("chat_setting, seller_user_id, status").eq("id", auction_id).execute()
+    if not auction_res.data:
+        raise HTTPException(status_code=404, detail="オークションが見つかりません")
+    
+    auction = auction_res.data[0]
+    if auction["status"] != "OPEN":
+        raise HTTPException(status_code=400, detail="終了したオークションでは発言できません")
+        
+    if auction["chat_setting"] == "RESTRICTED" and auction["seller_user_id"] != user.id:
+        # 入札実績があるかチェック
+        bids = await client.table("auction_bids").select("id").eq("auction_id", auction_id).eq("bidder_user_id", user.id).limit(1).execute()
+        if not bids.data:
+            raise HTTPException(status_code=403, detail="このオークションは入札者のみ発言可能な設定です")
+
+    # 称号取得
+    prof = await client.table("profiles").select("nickname, equipped_title").eq("id", user.id).execute()
+    nickname = prof.data[0].get("nickname", "不明") if prof.data else "不明"
+    title = prof.data[0].get("equipped_title", "鉱山労働奴隷") if prof.data else "鉱山労働奴隷"
+
+    await client.table("auction_comments").insert({
+        "auction_id": auction_id,
+        "user_id": str(user.id),
+        "nickname": nickname,
+        "user_title": title,
+        "message": data.message.strip()
+    }).execute()
+    
+    return {"message": "送信しました"}
