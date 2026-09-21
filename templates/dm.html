@@ -6,9 +6,14 @@
     <title>村岡王国 - 密書 (DM)</title>
     <style>
         :root { 
-            --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
-            --primary: #d4af37; --primary-hover: #b8962e; 
-            --text: #e7e9ea; --sub: #71767b; --danger: #ef4444;
+            --bg: #000000; 
+            --card-bg: #16181c; 
+            --border: #2f3336; 
+            --primary: #d4af37; 
+            --primary-hover: #b8962e; 
+            --text: #e7e9ea; 
+            --sub: #71767b; 
+            --danger: #ef4444;
         }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -34,7 +39,20 @@
             box-sizing: border-box;
         }
         
-        .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
+        .header { 
+            height: 60px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 16px; 
+            border-bottom: 1px solid var(--border); 
+            background: rgba(0,0,0,0.85); 
+            backdrop-filter: blur(12px); 
+            z-index: 10; 
+            font-weight: bold; 
+            font-size: 1.1rem; 
+            flex-shrink: 0; 
+        }
         
         .view { display: none; flex-direction: column; height: 100%; width: 100%; min-height: 0; }
         .view.active { display: flex; animation: fadein 0.2s ease-out; }
@@ -53,16 +71,32 @@
         .unread-badge { background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
 
         /* チャット画面 */
-        .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
-        .msg-row { display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        .msg-row { display: flex; flex-direction: column; width: 100%; }
+        
+        /* 自分のメッセージ（右寄せ） */
         .msg-mine { align-items: flex-end; }
+        .msg-mine .msg-bubble { 
+            background: var(--primary); 
+            color: #000; 
+            border-radius: 18px 18px 2px 18px; 
+            font-weight: 500;
+        }
+        
+        /* 相手のメッセージ（左寄せ） */
         .msg-other { align-items: flex-start; }
+        .msg-other .msg-bubble { 
+            background: var(--card-bg); 
+            border: 1px solid var(--border); 
+            color: var(--text); 
+            border-radius: 18px 18px 18px 2px; 
+        }
         
-        .msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; }
-        .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 20px 20px 4px 20px; }
-        .msg-other .msg-bubble { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 20px 20px 20px 4px; }
-        .msg-meta { font-size: 0.75rem; color: var(--sub); margin-top: 4px; }
-        
+        .msg-sender-label { font-size: 0.75rem; color: var(--primary); margin-bottom: 4px; font-weight: bold; }
+        .msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .msg-meta { font-size: 0.7rem; color: var(--sub); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+        .msg-role-tag { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; background: #2f3336; color: #aaa; }
+
         .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
         .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 14px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; transition: 0.2s; }
         .chat-input-wrapper input:focus { outline: none; border-color: var(--primary); background: #000; }
@@ -195,10 +229,11 @@
 
     let activeDmId = null;
     let activeUserId = null; 
-    let myId = null;
+    let activePartnerName = "相手";
+    let myUserId = null;
     let isAdminMode = false;
 
-    // --- モーダル開閉関数 ---
+    // --- モーダル開閉 ---
     function openSettingsModal() { 
         const m = document.getElementById('settings-modal');
         if(m) m.style.display = 'flex'; 
@@ -218,6 +253,7 @@
             const res = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
             if(res.ok) {
                 const data = await res.json();
+                if(data.id) myUserId = data.id;
                 if(!data.dm_id) openSettingsModal();
                 if(data.role === 'king') {
                     const btn = document.getElementById('btn-admin-mode');
@@ -234,7 +270,7 @@
         
         fetchThreads();
         
-        // 定期更新
+        // 定期自動更新 (4秒間隔)
         setInterval(() => {
             if (activeDmId || activeUserId) {
                 if (isAdminMode && activeUserId) {
@@ -281,7 +317,9 @@
         
         try {
             const res = await fetch("/api/dm/set-id", {
-                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ dm_id: id })
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ dm_id: id })
             });
             const text = await res.text();
             let data;
@@ -310,7 +348,8 @@
             const subData = JSON.parse(JSON.stringify(subscription));
             
             const res = await fetch('/api/dm/push-subscribe', {
-                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth })
             });
             if (res.ok) {
@@ -416,7 +455,8 @@
     async function openChat(dmId, name) {
         if (isAdminMode) return;
         activeDmId = dmId;
-        document.getElementById('chat-title').innerText = name;
+        activePartnerName = name || `@${dmId}`;
+        document.getElementById('chat-title').innerText = activePartnerName;
         document.getElementById('chat-subtitle').innerText = `@${dmId}`;
         
         showView('view-chat');
@@ -466,14 +506,17 @@
             }
             
             const data = await res.json();
-            if(!myId) {
-                try {
-                    const meRes = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
-                    if(meRes.ok) {
-                        const meData = await meRes.json();
-                        myId = meData.id;
+            
+            // レスポンスに自分が含まれていれば相手のID以外を myUserId と定義
+            if (data.partner_user_id) {
+                const sampleMsg = (data.messages || [])[0];
+                if (sampleMsg) {
+                    if (sampleMsg.sender_id === data.partner_user_id) {
+                        myUserId = sampleMsg.receiver_id;
+                    } else {
+                        myUserId = sampleMsg.sender_id;
                     }
-                } catch(e) {}
+                }
             }
             
             renderMessagesList(data.messages || [], isBackground);
@@ -490,21 +533,38 @@
         
         let html = '';
         messages.forEach(m => {
-            const isMine = isAdminMode ? false : (m.sender_id === myId);
+            let isMine = false;
+            
+            if (!isAdminMode) {
+                if (myUserId) {
+                    isMine = (String(m.sender_id) === String(myUserId));
+                } else {
+                    // フォールバック: 送信先DM IDから逆算
+                    isMine = false; 
+                }
+            }
+
             const cls = isMine ? 'msg-mine' : 'msg-other';
             const timeStr = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
             let senderLabel = '';
-            if(isAdminMode) {
+            if (isAdminMode) {
                 const sName = escapeHtml(m.sender?.nickname || "不明");
-                senderLabel = `<div class="msg-meta" style="margin-bottom:4px;">${sName}</div>`;
+                senderLabel = `<div class="msg-sender-label">${sName}</div>`;
+            } else if (!isMine) {
+                senderLabel = `<div class="msg-sender-label">${escapeHtml(activePartnerName)}</div>`;
             }
+
+            const roleTag = isMine ? '<span class="msg-role-tag">自分</span>' : '<span class="msg-role-tag">相手</span>';
 
             html += `
                 <div class="msg-row ${cls}">
                     ${senderLabel}
                     <div class="msg-bubble">${escapeHtml(m.content)}</div>
-                    <div class="msg-meta">${timeStr}</div>
+                    <div class="msg-meta">
+                        ${timeStr}
+                        ${!isAdminMode ? roleTag : ''}
+                    </div>
                 </div>`;
         });
         
