@@ -251,6 +251,16 @@ def get_subscribe(request: Request):
 def get_auction(request: Request):
     return templates.TemplateResponse(request=request, name="auction.html")
 
+from fastapi.responses import FileResponse
+
+@app.get("/sw.js")
+def get_sw():
+    return FileResponse("sw.js", media_type="application/javascript")
+
+@app.get("/dm", response_class=HTMLResponse)
+def get_dm_page(request: Request):
+    return templates.TemplateResponse(request=request, name="dm.html")
+
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
