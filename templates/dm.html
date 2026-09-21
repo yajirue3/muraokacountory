@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - メッセージ</title>
+    <title>村岡王国 - 密書 (DM)</title>
     <style>
         :root { 
             --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
@@ -15,14 +15,15 @@
         .container { width: 100%; max-width: 1000px; display: flex; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; }
         
         /* 共通ヘッダー */
-        .header { height: 53px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 1.2rem; }
+        .header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 1.1rem; }
         
         /* 左カラム (スレッド一覧) */
         .sidebar { width: 380px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
+        .sidebar-actions { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
         .thread-list { flex: 1; overflow-y: auto; }
         .thread-item { padding: 16px; display: flex; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid transparent; }
         .thread-item:hover { background: var(--card-bg); }
-        .thread-item.active { background: rgba(212, 175, 55, 0.1); border-right: 2px solid var(--primary); }
+        .thread-item.active { background: rgba(212, 175, 55, 0.1); border-right: 3px solid var(--primary); }
         
         .avatar { width: 44px; height: 44px; border-radius: 50%; background: #333; margin-right: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
         .thread-info { flex: 1; overflow: hidden; }
@@ -39,30 +40,42 @@
         .msg-mine { align-items: flex-end; }
         .msg-other { align-items: flex-start; }
         
-        .msg-bubble { max-width: 70%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+        .msg-bubble { max-width: 75%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
         .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 20px 20px 4px 20px; }
         .msg-other .msg-bubble { background: var(--border); color: var(--text); border-radius: 20px 20px 20px 4px; }
         
         .msg-meta { font-size: 0.75rem; color: var(--sub); margin-top: 4px; }
         
+        /* 空状態のUI */
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sub); text-align: center; padding: 20px; line-height: 1.6; }
+        
         /* チャット入力部 */
         .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 12px; align-items: center; }
-        .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 12px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; transition: 0.2s; }
+        .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 14px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; transition: 0.2s; }
         .chat-input-wrapper input:focus { outline: none; border-color: var(--primary); background: #000; }
-        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 20px; height: 42px; border-radius: 21px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 20px; height: 44px; border-radius: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-send:hover { background: var(--primary-hover); }
 
         /* モーダル */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
         .modal-content { background: #000; padding: 32px; border-radius: 16px; width: 400px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         .modal-content h2 { margin-top: 0; font-size: 1.2rem; }
         
-        .input-text { width: 100%; padding: 12px 16px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin: 12px 0; box-sizing: border-box; font-size: 0.95rem; }
+        .input-text { width: 100%; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin: 12px 0; box-sizing: border-box; font-size: 0.95rem; }
         .input-text:focus { outline: none; border-color: var(--primary); }
         
-        .btn-full { width: 100%; padding: 14px; background: var(--text); color: var(--bg); border: none; border-radius: 24px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.95rem; }
+        .btn-full { width: 100%; padding: 14px; background: var(--text); color: var(--bg); border: none; border-radius: 24px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.95rem; transition: 0.2s; }
+        .btn-full:hover { opacity: 0.9; }
         .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-outline:hover { background: var(--card-bg); }
+        .btn-primary-solid { background: var(--primary); color: #000; }
+        .btn-primary-solid:hover { background: var(--primary-hover); }
+
+        /* ナビゲーション・アイコンボタン */
+        .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; transition: 0.2s; }
+        .nav-btn:hover { background: var(--border); }
+        .nav-icon { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.2rem; padding: 8px; border-radius: 50%; transition: 0.2s; }
+        .nav-icon:hover { background: var(--card-bg); }
 
         /* トースト通知 */
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -77,9 +90,6 @@
             .show-chat .sidebar { display: none; }
             .show-chat .chat-area { display: flex; }
         }
-        
-        .nav-btn { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.1rem; padding: 8px; }
-        .nav-btn:hover { background: var(--card-bg); border-radius: 50%; }
     </style>
 </head>
 <body>
@@ -90,33 +100,41 @@
     <!-- 左カラム: スレッド一覧 -->
     <div class="sidebar">
         <div class="header">
-            <span id="sidebar-title">メッセージ</span>
-            <div>
-                <button class="nav-btn" onclick="requestPushPermission()" title="通知をオンにする">🔔</button>
-                <button class="nav-btn" id="btn-admin-mode" style="display:none;" onclick="toggleAdminMode()" title="王国検閲モード">👁️</button>
-                <button class="nav-btn" onclick="openSettingsModal()" title="DM ID設定">⚙️</button>
-                <button class="nav-btn" onclick="openNewModal()" title="新規メッセージ">✉️</button>
+            <span id="sidebar-title">密書 (DM)</span>
+            <div style="display:flex; gap: 4px;">
+                <button class="nav-icon" onclick="requestPushPermission()" title="通知をオンにする">🔔</button>
+                <button class="nav-icon" onclick="openSettingsModal()" title="DM ID設定">⚙️</button>
+                <button class="nav-btn" onclick="location.href='/dashboard'" title="ダッシュボードへ戻る">◀ 国民証</button>
             </div>
         </div>
-        <div class="thread-list" id="thread-list"></div>
+        <div class="sidebar-actions">
+            <button class="btn-full btn-primary-solid" style="margin:0;" onclick="openNewModal()">＋ 新しい密書を送る</button>
+            <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モード</button>
+        </div>
+        <div class="thread-list" id="thread-list">
+            <!-- ロード前 -->
+            <div class="empty-state">読み込み中...</div>
+        </div>
     </div>
 
     <!-- 右カラム: チャット画面 -->
     <div class="chat-area">
         <div class="header">
             <div style="display:flex; align-items:center;">
-                <button class="nav-btn" style="display:none; margin-right:8px;" id="back-btn" onclick="closeChat()">←</button>
+                <button class="nav-icon" style="display:none; margin-right:8px;" id="back-btn" onclick="closeChat()">←</button>
                 <span id="chat-title">選択してください</span>
             </div>
             <span id="chat-subtitle" style="font-size:0.8rem; color:var(--sub); font-weight:normal;"></span>
         </div>
         <div class="chat-messages" id="chat-messages">
-            <div style="display:flex; height:100%; align-items:center; justify-content:center; color:var(--sub);">
-                左側のリストからメッセージを選択してください
+            <div class="empty-state">
+                <div style="font-size: 2rem; margin-bottom: 12px;">✉️</div>
+                左側のリストから<br>相手を選択してください
             </div>
         </div>
         <div class="chat-input-wrapper" id="chat-input-wrapper">
-            <input type="text" id="chat-input" placeholder="新しいメッセージを開始" onkeypress="if(event.key==='Enter') sendMessage()">
+            <!-- 入力欄は更新処理(innerHTML)から完全に分離されているため、入力中に消えることはありません -->
+            <input type="text" id="chat-input" placeholder="新しいメッセージを開始..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button class="btn-send" onclick="sendMessage()">送信</button>
         </div>
     </div>
@@ -128,7 +146,7 @@
         <h2>DM IDの設定</h2>
         <p style="color:var(--sub); font-size:0.9rem; line-height:1.5;">相手に教えるための専用ID (@英数字) を設定します。<br>一度設定すると変更できないため注意してください。</p>
         <input type="text" id="my-dm-id" class="input-text" placeholder="例: muraoka_king">
-        <button class="btn-full" onclick="saveDMID()">設定を保存</button>
+        <button class="btn-full btn-primary-solid" onclick="saveDMID()">設定を保存</button>
         <button class="btn-full btn-outline" onclick="closeModal('settings-modal')">閉じる</button>
     </div>
 </div>
@@ -136,13 +154,13 @@
 <!-- モーダル: 新規メッセージ -->
 <div class="modal" id="new-modal">
     <div class="modal-content">
-        <h2>新しいメッセージ</h2>
-        <p style="color:var(--sub); font-size:0.9rem;">相手のDM IDを入力してください。</p>
+        <h2>新しい密書</h2>
+        <p style="color:var(--sub); font-size:0.9rem;">相手のDM IDを入力してチャットを開始します。</p>
         <div style="display:flex; align-items:center; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin: 12px 0; padding:0 12px;">
-            <span style="color:var(--sub);">@</span>
+            <span style="color:var(--sub); font-weight:bold;">@</span>
             <input type="text" id="target-dm-id" class="input-text" style="border:none; margin:0;" placeholder="muraoka_king">
         </div>
-        <button class="btn-full" onclick="startNewChat()">チャットを開始</button>
+        <button class="btn-full btn-primary-solid" onclick="startNewChat()">チャットを開始</button>
         <button class="btn-full btn-outline" onclick="closeModal('new-modal')">キャンセル</button>
     </div>
 </div>
@@ -154,8 +172,8 @@
     let activeDmId = null;
     let activeUserId = null; // Admin用
     let myId = null;
-    let isKing = false;
     let isAdminMode = false;
+    let lastMessageCount = 0; // スクロール制御用
 
     // --- 初期化 ---
     async function init() {
@@ -166,16 +184,18 @@
             const data = await res.json();
             if(!data.dm_id) openSettingsModal();
             if(data.role === 'king') {
-                isKing = true;
-                document.getElementById('btn-admin-mode').style.display = 'inline-block';
+                document.getElementById('btn-admin-mode').style.display = 'block';
             }
         }
         
         fetchThreads();
-        // 4秒おきに最新をポーリング
+        
+        // リアルタイム更新 (ポーリング)
         setInterval(() => {
             fetchThreads(true);
-            if (activeDmId && !isAdminMode) fetchMessages(activeDmId, true);
+            if (activeDmId && !isAdminMode) {
+                fetchMessages(activeDmId, true);
+            }
         }, 4000);
     }
 
@@ -200,6 +220,7 @@
         document.getElementById('layout').classList.remove('show-chat'); 
         activeDmId = null; 
         activeUserId = null;
+        lastMessageCount = 0;
     }
 
     // --- ID設定 ---
@@ -263,7 +284,8 @@
     // --- 王国検閲モード (King専用) ---
     function toggleAdminMode() {
         isAdminMode = !isAdminMode;
-        document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 全スレッド監視" : "メッセージ";
+        document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 全スレッド監視" : "密書 (DM)";
+        document.getElementById('btn-admin-mode').innerText = isAdminMode ? "◀ 通常モードに戻る" : "👁️ 王国検閲モード";
         document.getElementById('chat-input-wrapper').style.display = isAdminMode ? "none" : "flex";
         closeChat();
         fetchThreads();
@@ -321,13 +343,22 @@
             });
         }
         
-        if(!html && !isBackground) html = '<div style="color:var(--sub); text-align:center; padding:20px;">メッセージはありません</div>';
+        // 何もない場合の処理
+        if(!html) {
+            html = `
+                <div class="empty-state">
+                    何もないようだ...<br>
+                    <span style="font-size:0.85rem; margin-top:8px;">「＋ 新しい密書を送る」から<br>会話を始めよう</span>
+                </div>`;
+        }
+        
         document.getElementById('thread-list').innerHTML = html;
     }
 
     async function openChat(dmId, name) {
         if (isAdminMode) return;
         activeDmId = dmId;
+        lastMessageCount = 0;
         document.getElementById('chat-title').innerText = name;
         document.getElementById('chat-subtitle').innerText = `@${dmId}`;
         document.getElementById('layout').classList.add('show-chat');
@@ -338,6 +369,7 @@
 
     async function openAdminChat(idA, idB, nameA, nameB) {
         activeUserId = idA + "/" + idB;
+        lastMessageCount = 0;
         document.getElementById('chat-title').innerText = `${nameA} ⇄ ${nameB}`;
         document.getElementById('chat-subtitle').innerText = `王国検閲中`;
         document.getElementById('layout').classList.add('show-chat');
@@ -389,10 +421,23 @@
                 </div>`;
         });
         
-        box.innerHTML = html || '<div style="text-align:center; color:var(--sub); margin-top:40px;">メッセージを開始しましょう</div>';
+        // メッセージが1件もない場合
+        if(!html) {
+            html = `
+                <div class="empty-state">
+                    まだ何もないようだ...<br>
+                    <span style="font-size:0.85rem; margin-top:8px;">下の入力欄から最初の密書を送ろう</span>
+                </div>`;
+        }
         
-        if(!isBackground || isAtBottom) {
-            box.scrollTop = box.scrollHeight;
+        // 新しいメッセージが追加された時のみHTMLを更新 (入力欄は別のdivにあるため影響を受けません)
+        if (messages.length !== lastMessageCount || !isBackground) {
+            box.innerHTML = html;
+            lastMessageCount = messages.length;
+            
+            if(!isBackground || isAtBottom) {
+                box.scrollTop = box.scrollHeight;
+            }
         }
     }
 
@@ -401,6 +446,7 @@
         const content = input.value.trim();
         if(!content || !activeDmId || isAdminMode) return;
         
+        // 送信と同時に入力欄をクリア
         input.value = '';
         
         const res = await fetch('/api/dm/send', { 
