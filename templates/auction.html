@@ -583,6 +583,13 @@
 
     function buildActionArea(a) {
         const area = document.getElementById('detail-action-area');
+        
+        // ★入力欄にフォーカスがある（文字を入力している最中）場合は、勝手に消えないように更新をスキップ
+        const activeEl = document.activeElement;
+        if (activeEl && area.contains(activeEl) && activeEl.tagName === 'INPUT') {
+            return;
+        }
+
         const isMine = a.seller_user_id === currentUser?.id;
         const isHighest = a.highest_bidder_id === currentUser?.id;
         const isEnded = new Date(a.end_at).getTime() <= Date.now();
