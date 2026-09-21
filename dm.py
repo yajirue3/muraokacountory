@@ -222,13 +222,12 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
     # 未読メッセージを既読に更新
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).eq("is_read", False).execute()
 
-    # チャット履歴取得
-    filter_str1 = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id})"
-    filter_str2 = f"and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
+    # チャット履歴取得（Supabaseの .or_ 構文エラーを修正）
+    cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
     
     res = await client.table("direct_messages").select(
         "id, sender_id, receiver_id, content, is_read, created_at"
-    ).or_(f"{filter_str1},{filter_str2}").order("created_at", desc=False).limit(200).execute()
+    ).or_(cond).order("created_at", desc=False).limit(200).execute()
     
     return {"messages": res.data or [], "partner_user_id": partner_id}
 
@@ -291,12 +290,12 @@ async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorizatio
         
     client = await get_supabase()
     
-    filter_str1 = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id})"
-    filter_str2 = f"and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
+    # チャット履歴取得（Supabaseの .or_ 構文エラーを修正）
+    cond = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id}),and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
     
     res = await client.table("direct_messages").select(
         "id, sender_id, receiver_id, content, created_at"
-    ).or_(f"{filter_str1},{filter_str2}").order("created_at", desc=False).limit(200).execute()
+    ).or_(cond).order("created_at", desc=False).limit(200).execute()
     
     msgs = res.data or []
     
