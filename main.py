@@ -247,6 +247,11 @@ def get_channel(request: Request):
 def get_subscribe(request: Request):
     return templates.TemplateResponse(request=request, name="subscribe.html")
 
+@app.get("/auction", response_class=HTMLResponse)
+def get_auction(request: Request):
+    return templates.TemplateResponse(request=request, name="auction.html")
+
+
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
 # --------------------------------------------------
