@@ -14,6 +14,7 @@
             --text: #e7e9ea; 
             --sub: #71767b; 
             --danger: #ef4444;
+            --danger-hover: #dc2626;
         }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -72,7 +73,7 @@
 
         /* チャット画面 */
         .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
-        .msg-row { display: flex; flex-direction: column; width: 100%; }
+        .msg-row { display: flex; flex-direction: column; width: 100%; position: relative; }
         
         /* 自分のメッセージ（右寄せ） */
         .msg-mine { align-items: flex-end; }
@@ -93,9 +94,29 @@
         }
         
         .msg-sender-label { font-size: 0.75rem; color: var(--primary); margin-bottom: 4px; font-weight: bold; }
-        .msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .msg-bubble-wrapper { display: flex; align-items: center; gap: 8px; max-width: 85%; }
+        .msg-mine .msg-bubble-wrapper { flex-direction: row-reverse; }
+        .msg-bubble { padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .msg-meta { font-size: 0.7rem; color: var(--sub); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
         .msg-role-tag { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; background: #2f3336; color: #aaa; }
+
+        /* 個別削除ボタン */
+        .btn-msg-delete {
+            background: transparent;
+            border: none;
+            color: var(--sub);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+        .btn-msg-delete:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            opacity: 1;
+        }
 
         .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
         .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 14px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; transition: 0.2s; }
@@ -142,7 +163,8 @@
             .thread-id { font-size: 0.8rem; }
             .thread-msg { font-size: 0.85rem; margin-top: 4px; }
             .chat-messages { padding: 12px 10px; gap: 12px; }
-            .msg-bubble { max-width: 85%; padding: 10px 14px; font-size: 0.9rem; }
+            .msg-bubble-wrapper { max-width: 90%; }
+            .msg-bubble { padding: 10px 14px; font-size: 0.9rem; }
             .chat-input-wrapper { padding: 8px 10px; gap: 8px; }
             .chat-input-wrapper input { padding: 12px; font-size: 0.9rem; }
             .btn-send { height: 38px; padding: 0 16px; font-size: 0.9rem; }
@@ -507,7 +529,6 @@
             
             const data = await res.json();
             
-            // レスポンスに自分が含まれていれば相手のID以外を myUserId と定義
             if (data.partner_user_id) {
                 const sampleMsg = (data.messages || [])[0];
                 if (sampleMsg) {
@@ -539,7 +560,6 @@
                 if (myUserId) {
                     isMine = (String(m.sender_id) === String(myUserId));
                 } else {
-                    // フォールバック: 送信先DM IDから逆算
                     isMine = false; 
                 }
             }
@@ -557,10 +577,18 @@
 
             const roleTag = isMine ? '<span class="msg-role-tag">自分</span>' : '<span class="msg-role-tag">相手</span>';
 
+            // 検閲モード時、または自分のメッセージの場合に個別削除ボタンを表示
+            const deleteBtnHtml = (isAdminMode || isMine) 
+                ? `<button class="btn-msg-delete" onclick="deleteSingleMessage('${m.id}')" title="メッセージを削除">🗑️</button>` 
+                : '';
+
             html += `
                 <div class="msg-row ${cls}">
                     ${senderLabel}
-                    <div class="msg-bubble">${escapeHtml(m.content)}</div>
+                    <div class="msg-bubble-wrapper">
+                        <div class="msg-bubble">${escapeHtml(m.content)}</div>
+                        ${deleteBtnHtml}
+                    </div>
                     <div class="msg-meta">
                         ${timeStr}
                         ${!isAdminMode ? roleTag : ''}
@@ -584,6 +612,40 @@
                     box.scrollTop = box.scrollHeight;
                 }
             }, 10);
+        }
+    }
+
+    // --- 個別メッセージ削除処理 ---
+    async function deleteSingleMessage(messageId) {
+        if (!confirm("このメッセージを削除してもよろしいですか？")) return;
+
+        try {
+            // 国王検閲モードAPI
+            const url = `/api/dm/admin/messages/${messageId}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch(e) { data = { detail: text }; }
+
+            if (res.ok) {
+                showToast("メッセージを削除しました");
+                // 画面の更新
+                if (isAdminMode && activeUserId) {
+                    const ids = activeUserId.split('/');
+                    fetchAdminMessages(ids[0], ids[1], false);
+                } else if (activeDmId) {
+                    fetchMessages(activeDmId, false);
+                }
+            } else {
+                showToast(`[${res.status}] 削除失敗: ${data.detail || text}`, true);
+            }
+        } catch (e) {
+            console.error(e);
+            showToast(`削除エラー: ${e.message || e}`, true);
         }
     }
 
