@@ -18,6 +18,7 @@ from factory import router as factory_router
 from card import router as card_router
 from db import get_supabase
 from game_2048 import router as game_2048_router
+from auction import router as auction_router
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -685,6 +686,7 @@ app.include_router(card_router)
 app.include_router(game_2048_router)
 from video import router as video_router
 app.include_router(video_router)
+app.include_router(auction_router)
 
 # ==================================================
 # 資産保有税（所得税・保管料）処理モジュール (main.py用)
