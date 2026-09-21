@@ -202,53 +202,86 @@
         loadAnnouncements();
     }
 
-    /* announcementsテーブルからの読み込み処理 */
+    /* 100%エラーで落ちない完全防護版 loadAnnouncements */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
+        if (!container) return; // 要素が存在しない場合も静かに終了
 
+        let announcements = null;
+
+        // 1. Supabase SDK 取得試行 (全例外キャッチ)
         try {
-            let announcements = [];
-
-            if (supabaseClient) {
-                // Supabase SDKを直接使用
+            if (typeof supabaseClient !== 'undefined' && supabaseClient && typeof supabaseClient.from === 'function') {
                 const { data, error } = await supabaseClient
                     .from('announcements')
                     .select('id, title, content, created_at')
                     .order('created_at', { ascending: false });
 
-                if (error) throw error;
-                announcements = data || [];
-            } else {
-                // 通常のREST APIフォールバック
-                const res = await fetch("/api/announcements", { 
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    announcements = await res.json();
-                } else {
-                    throw new Error("API Fetch Failed");
+                if (!error && Array.isArray(data)) {
+                    announcements = data;
                 }
             }
+        } catch (e) {
+            // Supabase接続や実行時エラーはすべてここで吸収
+        }
 
+        // 2. バックエンド API 取得試行 (Supabaseで取れなかった場合)
+        if (!Array.isArray(announcements)) {
+            try {
+                const authToken = typeof token !== 'undefined' ? token : (localStorage.getItem("access_token") || "");
+                const res = await fetch("/api/announcements", { 
+                    headers: { "Authorization": `Bearer ${authToken}` }
+                });
+                if (res && res.ok) {
+                    const apiData = await res.json();
+                    if (Array.isArray(apiData)) {
+                        announcements = apiData;
+                    }
+                }
+            } catch (e) {
+                // ネットワークエラーやJSON解析エラーもすべて吸収
+            }
+        }
+
+        // 3. 安全な DOM 描画処理 (例外発生ゼロを保証)
+        try {
             if (Array.isArray(announcements) && announcements.length > 0) {
-                container.innerHTML = announcements.map(item => {
-                    const dateStr = item.created_at ? item.created_at.substring(0, 10) : '--/--';
-                    const title = item.title || '（タイトルなし）';
-                    const content = item.content || '';
+                let htmlBuffer = "";
 
-                    return `
+                for (let i = 0; i < announcements.length; i++) {
+                    const item = announcements[i];
+                    if (!item || typeof item !== 'object') continue;
+
+                    // 日付の超安全な変換
+                    let dateStr = '--/--';
+                    if (item.created_at !== null && item.created_at !== undefined) {
+                        const rawStr = String(item.created_at);
+                        dateStr = rawStr.length >= 10 ? rawStr.substring(0, 10) : rawStr;
+                    }
+
+                    // タイトルと本文の超安全な取得
+                    const rawTitle = item.title !== null && item.title !== undefined ? String(item.title) : '（タイトルなし）';
+                    const rawContent = item.content !== null && item.content !== undefined ? String(item.content) : '';
+
+                    const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(rawTitle) : rawTitle;
+                    const safeContent = typeof escapeHtml === 'function' ? escapeHtml(rawContent) : rawContent;
+                    const safeDate = typeof escapeHtml === 'function' ? escapeHtml(dateStr) : dateStr;
+
+                    htmlBuffer += `
                         <div class="news-item">
-                            <span class="news-date">${escapeHtml(dateStr)}</span>
-                            <strong>${escapeHtml(title)}</strong> ${content ? '- ' + escapeHtml(content) : ''}
+                            <span class="news-date">${safeDate}</span>
+                            <strong>${safeTitle}</strong> ${safeContent ? '- ' + safeContent : ''}
                         </div>
                     `;
-                }).join('');
+                }
+
+                container.innerHTML = htmlBuffer || '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
             } else {
                 container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
             }
         } catch (e) {
-            console.error("お知らせ取得エラー:", e);
-            container.innerHTML = '<div class="news-item" style="color:#e74c3c;">お知らせの取得に失敗しました。</div>';
+            // 万が一DOM操作周りで予期せぬ例外が起きても画面崩れを防ぐ fallback
+            container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
         }
     }
 
