@@ -110,13 +110,8 @@
             <input type="number" id="c-start-price" placeholder="開始価格 (必須)" min="1">
             <input type="number" id="c-buyout-price" placeholder="即決価格 (任意・空白可)" min="1">
             
-            <label style="font-size: 0.75rem; color: #94a3b8;">期間と設定</label>
-            <select id="c-duration">
-                <option value="1">1時間</option>
-                <option value="6">6時間</option>
-                <option value="24" selected>24時間</option>
-                <option value="72">3日間</option>
-            </select>
+            <label style="font-size: 0.75rem; color: #94a3b8;">終了日時（自由設定）</label>
+            <input type="datetime-local" id="c-end-at">
 
             <select id="c-chat-setting">
                 <option value="OPEN">チャット: 誰でも参加可能 (お祭り用)</option>
@@ -205,6 +200,13 @@
         await loadInventory();
         await loadAuctions();
         
+        // デフォルトで終了日時を「現在時刻の24時間後」に設定しておく
+        const defaultEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        // datetime-local用のフォーマット (YYYY-MM-DDThh:mm) に変換
+        const tzOffset = defaultEnd.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(defaultEnd - tzOffset)).toISOString().slice(0, 16);
+        document.getElementById("c-end-at").value = localISOTime;
+
         // 全体のタイマー更新
         mainTimerInterval = setInterval(updateAllTimers, 1000);
     }
@@ -282,8 +284,14 @@
         const start = parseInt(document.getElementById("c-start-price").value);
         const buyoutRaw = document.getElementById("c-buyout-price").value;
         const buyout = buyoutRaw ? parseInt(buyoutRaw) : null;
-        const hours = parseInt(document.getElementById("c-duration").value);
-        const end_at = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+        
+        const endAtVal = document.getElementById("c-end-at").value;
+        if(!endAtVal) return showToast("終了日時を設定してください", true);
+        
+        const end_at = new Date(endAtVal).toISOString();
+        if(new Date(endAtVal).getTime() <= Date.now()) {
+            return showToast("終了日時は未来の時間を指定してください", true);
+        }
         
         const payload = {
             category: cat,
@@ -297,7 +305,7 @@
         if(cat === "ITEM") {
             payload.inventory_id = parseInt(document.getElementById("c-inventory-id").value);
             payload.quantity = parseInt(document.getElementById("c-quantity").value);
-            payload.title = "アイテム出品"; // サーバ側でアイテム名にする想定、一旦ダミー
+            payload.title = "アイテム出品"; 
             if(!payload.inventory_id) return showToast("出品するアイテムがありません", true);
         } else {
             payload.title = document.getElementById("c-title").value.trim();
@@ -402,7 +410,7 @@
                 // 終了検知 (リロードトリガー)
                 if(left <= 0 && !modalTimer.classList.contains('ended')) {
                     modalTimer.classList.add('ended');
-                    fetchAuctionLive(currentAuctionId); // 最終状態取得
+                    fetchAuctionLive(currentAuctionId); 
                 }
             }
         }
@@ -411,9 +419,14 @@
     function formatTimeLeft(ms) {
         if(ms <= 0) return "00:00:00 (終了)";
         const totalSec = Math.floor(ms / 1000);
-        const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+        const days = Math.floor(totalSec / 86400);
+        const h = String(Math.floor((totalSec % 86400) / 3600)).padStart(2, '0');
         const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
         const s = String(totalSec % 60).padStart(2, '0');
+        
+        if (days > 0) {
+            return `${days}日 ${h}:${m}:${s}`;
+        }
         return `${h}:${m}:${s}`;
     }
 
@@ -425,7 +438,6 @@
         document.getElementById('auction-modal').style.display = 'flex';
         await fetchAuctionLive(id);
         
-        // 2秒おきにポーリング開始 (擬似リアルタイム)
         if(currentPollingInterval) clearInterval(currentPollingInterval);
         currentPollingInterval = setInterval(() => fetchAuctionLive(id, true), 2000);
     }
@@ -440,8 +452,6 @@
 
     async function fetchAuctionLive(id, isBackground = false) {
         try {
-            // 本来は専用の詳細APIが望ましいですが、リストから探して再フェッチをシミュレート
-            // 実際は supabase supabase.channel などWebSocketが理想[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
             const res = await fetch(`/api/auctions?status_filter=OPEN`);
             const data = await res.json();
             const a = data.find(x => x.id === id);
@@ -451,13 +461,11 @@
                 return;
             }
 
-            // UI反映
             document.getElementById('detail-badges').innerHTML = a.category === 'ITEM' ? '<span class="type-badge badge-item">🎒 アイテム枠</span>' : '<span class="type-badge badge-general">📜 一般枠</span>';
             document.getElementById('detail-title').innerText = a.title;
             document.getElementById('detail-desc').innerText = a.description || '説明なし';
             document.getElementById('detail-timer').setAttribute('data-end', new Date(a.end_at).getTime());
             
-            // 価格更新時アニメーション
             const priceEl = document.getElementById('detail-current-price');
             if(priceEl.innerText !== `${a.current_price} G`) {
                 priceEl.innerText = `${a.current_price} G`;
@@ -471,11 +479,6 @@
             document.getElementById('chat-mode-badge').innerText = a.chat_setting === 'RESTRICTED' ? '🔒 入札者限定' : '🔓 全員参加';
 
             buildActionArea(a);
-
-            // コメントフェッチ (別途APIを用意する想定だが、フロントでモック実装またはRPCから取得)
-            // ※ここではAPIエンドポイントが存在する前提で記述
-            // const cRes = await fetch(`/api/auctions/${id}/comments`);
-            // if(cRes.ok) renderComments(await cRes.json());
 
         } catch(e) {}
     }
@@ -500,7 +503,6 @@
             return;
         }
 
-        // 入札用UI
         let walletSelect = `<select id="bid-wallet-select" style="margin-bottom:8px;">${myWallets.map(w=>`<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('')}</select>`;
         let itemAccSelect = '';
         if(a.category === 'ITEM') {
@@ -508,7 +510,6 @@
         }
 
         if(isHighest) {
-            // 増額UI
             area.innerHTML = `
                 <div style="background:rgba(59,130,246,0.1); border:1px solid var(--blue); padding:12px; border-radius:8px; margin-bottom:15px;">
                     <div style="color:var(--blue); font-weight:bold; margin-bottom:8px; text-align:center;">👑 あなたが最高入札者です</div>
@@ -518,7 +519,6 @@
                 </div>
             `;
         } else {
-            // 通常入札UI
             area.innerHTML = `
                 ${walletSelect}
                 ${itemAccSelect}
@@ -566,7 +566,6 @@
         if(res.ok) { showToast("取り消しました"); closeAuction(); loadAuctions(); }
     }
 
-    // チャット送信
     async function sendComment() {
         if(!currentAuctionId) return;
         const input = document.getElementById('chat-input');
@@ -580,31 +579,11 @@
             });
             if(res.ok) {
                 input.value = "";
-                // fetchAuctionLive(currentAuctionId); // ポーリングが拾う
             } else {
                 const d = await res.json();
                 showToast(d.detail || "エラー", true);
             }
         } catch(e) {}
-    }
-
-    // コメント描画 (ダミー表示用、実際はバックエンドから取得)
-    function renderComments(comments) {
-        const box = document.getElementById('chat-messages');
-        const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 10;
-        
-        box.innerHTML = comments.map(c => {
-            if(c.is_system_log) return `<div class="msg-system">${escapeHtml(c.message)}</div>`;
-            const isMe = c.user_id === currentUser?.id;
-            return `
-                <div class="msg-item" style="${isMe ? 'align-self:flex-end; background:#334155;' : ''}">
-                    <div style="font-size:0.7rem; color:#94a3b8; margin-bottom:2px;">[${escapeHtml(c.user_title)}] ${escapeHtml(c.nickname)}</div>
-                    <div>${escapeHtml(c.message)}</div>
-                </div>
-            `;
-        }).join('');
-
-        if(isAtBottom) box.scrollTop = box.scrollHeight;
     }
 
     init();
