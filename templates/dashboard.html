@@ -105,7 +105,7 @@
         </div>
     </div>
 
-    <!-- 2. お知らせ (テーブルから正確に読み込む) -->
+    <!-- 2. お知らせ (announcementsテーブルから読み込み) -->
     <div class="card news-card">
         <div class="header" style="font-size: 0.85rem; margin-bottom: 6px;">📢 王国からのお知らせ</div>
         <div class="news-list" id="announcement-list">
@@ -154,7 +154,6 @@
         <button class="btn-auction" onclick="location.href='/auction'">🔨 王国競売所 (Auction)</button>
         <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ</button>
         <button class="btn-comingsoon" disabled>🔒 Coming Soon</button>
-        <button class="btn-comingsoon" disabled>🔒 Coming Soon</button>
         
         <!-- 国王専用メニュー -->
         <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）</button>
@@ -191,7 +190,7 @@
         loadAnnouncements();
     }
 
-    /* お知らせ取得処理（announcementsテーブルからそのまま取得） */
+    /* お知らせ取得処理（announcementsテーブルから取得） */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
 
