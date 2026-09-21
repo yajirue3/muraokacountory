@@ -12,51 +12,49 @@
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
         
-        .container { width: 100%; max-width: 1000px; display: flex; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; }
+        /* 全体のコンテナ (スマホアプリ風のシングルカラム) */
+        .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; position: relative; }
         
         /* 共通ヘッダー */
-        .header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 1.1rem; }
+        .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
         
-        /* 左カラム (スレッド一覧) */
-        .sidebar { width: 380px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
-        .sidebar-actions { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+        /* 画面ビューの切り替え */
+        .view { display: none; flex-direction: column; height: 100%; width: 100%; }
+        .view.active { display: flex; animation: fadein 0.2s ease-out; }
+        
+        /* --- リスト画面 (view-list) --- */
+        .action-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
         .thread-list { flex: 1; overflow-y: auto; }
-        .thread-item { padding: 16px; display: flex; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid transparent; }
+        .thread-item { padding: 16px; display: flex; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid var(--border); }
         .thread-item:hover { background: var(--card-bg); }
-        .thread-item.active { background: rgba(212, 175, 55, 0.1); border-right: 3px solid var(--primary); }
         
-        .avatar { width: 44px; height: 44px; border-radius: 50%; background: #333; margin-right: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
-        .thread-info { flex: 1; overflow: hidden; }
-        .thread-name { font-weight: bold; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; background: #333; margin-right: 14px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0; }
+        .thread-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .thread-name { font-weight: bold; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
         .thread-id { color: var(--sub); font-size: 0.85rem; font-weight: normal; margin-left: 6px; }
-        .thread-msg { color: var(--sub); font-size: 0.9rem; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-        .unread-badge { background: var(--primary); color: #000; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .thread-msg { color: var(--sub); font-size: 0.9rem; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+        .unread-badge { background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
 
-        /* 右カラム (チャット) */
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; }
+        /* --- チャット画面 (view-chat) --- */
         .chat-messages { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
-        
         .msg-row { display: flex; flex-direction: column; }
         .msg-mine { align-items: flex-end; }
         .msg-other { align-items: flex-start; }
         
-        .msg-bubble { max-width: 75%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+        .msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; }
         .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 20px 20px 4px 20px; }
-        .msg-other .msg-bubble { background: var(--border); color: var(--text); border-radius: 20px 20px 20px 4px; }
-        
+        .msg-other .msg-bubble { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 20px 20px 20px 4px; }
         .msg-meta { font-size: 0.75rem; color: var(--sub); margin-top: 4px; }
         
-        /* 空状態のUI */
-        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sub); text-align: center; padding: 20px; line-height: 1.6; }
-        
-        /* チャット入力部 */
-        .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 12px; align-items: center; }
+        .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
         .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 14px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; transition: 0.2s; }
         .chat-input-wrapper input:focus { outline: none; border-color: var(--primary); background: #000; }
-        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 20px; height: 44px; border-radius: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 20px; height: 44px; border-radius: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .btn-send:hover { background: var(--primary-hover); }
 
-        /* モーダル */
+        /* --- 共通・UIパーツ --- */
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sub); text-align: center; padding: 40px 20px; line-height: 1.6; }
+        
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
         .modal-content { background: #000; padding: 32px; border-radius: 16px; width: 400px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         .modal-content h2 { margin-top: 0; font-size: 1.2rem; }
@@ -71,34 +69,25 @@
         .btn-primary-solid { background: var(--primary); color: #000; }
         .btn-primary-solid:hover { background: var(--primary-hover); }
 
-        /* ナビゲーション・アイコンボタン */
         .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; transition: 0.2s; }
         .nav-btn:hover { background: var(--border); }
-        .nav-icon { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.2rem; padding: 8px; border-radius: 50%; transition: 0.2s; }
+        .nav-icon { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.3rem; padding: 8px; border-radius: 50%; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
         .nav-icon:hover { background: var(--card-bg); }
 
-        /* トースト通知 */
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
-
-        /* レスポンシブ (スマホ向け) */
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; }
-            .chat-area { display: none; width: 100%; }
-            .show-chat .sidebar { display: none; }
-            .show-chat .chat-area { display: flex; }
-        }
     </style>
 </head>
 <body>
 
 <div id="toast-container"></div>
 
-<div class="container" id="layout">
-    <!-- 左カラム: スレッド一覧 -->
-    <div class="sidebar">
+<div class="container">
+    
+    <!-- === リスト画面 === -->
+    <div id="view-list" class="view active">
         <div class="header">
             <span id="sidebar-title">密書 (DM)</span>
             <div style="display:flex; gap: 4px;">
@@ -107,9 +96,9 @@
                 <button class="nav-btn" onclick="location.href='/dashboard'" title="ダッシュボードへ戻る">◀ 国民証</button>
             </div>
         </div>
-        <div class="sidebar-actions">
+        <div class="action-bar">
             <button class="btn-full btn-primary-solid" style="margin:0;" onclick="openNewModal()">＋ 新しい密書を送る</button>
-            <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モード</button>
+            <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
         </div>
         <div class="thread-list" id="thread-list">
             <!-- ロード前 -->
@@ -117,27 +106,27 @@
         </div>
     </div>
 
-    <!-- 右カラム: チャット画面 -->
-    <div class="chat-area">
+    <!-- === チャット画面 === -->
+    <div id="view-chat" class="view">
         <div class="header">
-            <div style="display:flex; align-items:center;">
-                <button class="nav-icon" style="display:none; margin-right:8px;" id="back-btn" onclick="closeChat()">←</button>
-                <span id="chat-title">選択してください</span>
+            <div style="display:flex; align-items:center; gap: 8px;">
+                <button class="nav-icon" onclick="closeChat()" style="margin-left: -8px;">←</button>
+                <div style="display:flex; flex-direction:column;">
+                    <span id="chat-title" style="line-height:1.2;">相手の名前</span>
+                    <span id="chat-subtitle" style="font-size:0.75rem; color:var(--sub); font-weight:normal;"></span>
+                </div>
             </div>
-            <span id="chat-subtitle" style="font-size:0.8rem; color:var(--sub); font-weight:normal;"></span>
         </div>
         <div class="chat-messages" id="chat-messages">
-            <div class="empty-state">
-                <div style="font-size: 2rem; margin-bottom: 12px;">✉️</div>
-                左側のリストから<br>相手を選択してください
-            </div>
+            <div class="empty-state">読み込み中...</div>
         </div>
         <div class="chat-input-wrapper" id="chat-input-wrapper">
-            <!-- 入力欄は更新処理(innerHTML)から完全に分離されているため、入力中に消えることはありません -->
-            <input type="text" id="chat-input" placeholder="新しいメッセージを開始..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <!-- 入力欄は独立しているため自動更新で消えません -->
+            <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button class="btn-send" onclick="sendMessage()">送信</button>
         </div>
     </div>
+
 </div>
 
 <!-- モーダル: DM ID設定 -->
@@ -177,8 +166,6 @@
 
     // --- 初期化 ---
     async function init() {
-        if(window.innerWidth <= 768) document.getElementById('back-btn').style.display = 'block';
-        
         const res = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
         if(res.ok) {
             const data = await res.json();
@@ -190,11 +177,19 @@
         
         fetchThreads();
         
-        // リアルタイム更新 (ポーリング)
+        // 4秒おきに最新をポーリング
         setInterval(() => {
-            fetchThreads(true);
-            if (activeDmId && !isAdminMode) {
-                fetchMessages(activeDmId, true);
+            if (activeDmId || activeUserId) {
+                // チャット画面を開いている時
+                if (isAdminMode && activeUserId) {
+                    const ids = activeUserId.split('/');
+                    fetchAdminMessages(ids[0], ids[1], true);
+                } else if (!isAdminMode && activeDmId) {
+                    fetchMessages(activeDmId, true);
+                }
+            } else {
+                // リスト画面を開いている時
+                fetchThreads(true);
             }
         }, 4000);
     }
@@ -211,17 +206,24 @@
 
     function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
+    // --- 画面切り替え ---
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    function closeChat() { 
+        showView('view-list');
+        activeDmId = null; 
+        activeUserId = null;
+        lastMessageCount = 0;
+        fetchThreads(true);
+    }
+
     // --- モーダル制御 ---
     function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
     function openNewModal() { document.getElementById('new-modal').style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    
-    function closeChat() { 
-        document.getElementById('layout').classList.remove('show-chat'); 
-        activeDmId = null; 
-        activeUserId = null;
-        lastMessageCount = 0;
-    }
 
     // --- ID設定 ---
     async function saveDMID() {
@@ -246,7 +248,6 @@
     // --- Push通知 ---
     async function requestPushPermission() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return showToast("通知非対応のブラウザです", true);
-        
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return showToast("通知が許可されませんでした", true);
 
@@ -285,9 +286,7 @@
     function toggleAdminMode() {
         isAdminMode = !isAdminMode;
         document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 全スレッド監視" : "密書 (DM)";
-        document.getElementById('btn-admin-mode').innerText = isAdminMode ? "◀ 通常モードに戻る" : "👁️ 王国検閲モード";
-        document.getElementById('chat-input-wrapper').style.display = isAdminMode ? "none" : "flex";
-        closeChat();
+        document.getElementById('btn-admin-mode').innerText = isAdminMode ? "◀ 通常モードに戻る" : "👁️ 王国検閲モードを開始";
         fetchThreads();
     }
 
@@ -310,10 +309,8 @@
         
         if (isAdminMode) {
             data.threads.forEach(t => {
-                const threadKey = t.user_a_id + "/" + t.user_b_id;
-                const act = threadKey === activeUserId ? 'active' : '';
                 html += `
-                    <div class="thread-item ${act}" onclick="openAdminChat('${t.user_a_id}', '${t.user_b_id}', '${escapeHtml(t.user_a_name)}', '${escapeHtml(t.user_b_name)}')">
+                    <div class="thread-item" onclick="openAdminChat('${t.user_a_id}', '${t.user_b_id}', '${escapeHtml(t.user_a_name)}', '${escapeHtml(t.user_b_name)}')">
                         <div class="avatar" style="background:var(--danger);">👁️</div>
                         <div class="thread-info">
                             <div class="thread-name">
@@ -326,11 +323,9 @@
         } else {
             data.conversations.forEach(c => {
                 if(!c.partner_dm_id) return;
-                const act = c.partner_dm_id === activeDmId ? 'active' : '';
                 const badge = c.unread_count > 0 ? `<div class="unread-badge">${c.unread_count}</div>` : '';
-                
                 html += `
-                    <div class="thread-item ${act}" onclick="openChat('${c.partner_dm_id}', '${escapeHtml(c.partner_name)}')">
+                    <div class="thread-item" onclick="openChat('${c.partner_dm_id}', '${escapeHtml(c.partner_name)}')">
                         <div class="avatar">${escapeHtml(c.partner_name.charAt(0))}</div>
                         <div class="thread-info">
                             <div class="thread-name">
@@ -347,6 +342,7 @@
         if(!html) {
             html = `
                 <div class="empty-state">
+                    <div style="font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5;">📭</div>
                     何もないようだ...<br>
                     <span style="font-size:0.85rem; margin-top:8px;">「＋ 新しい密書を送る」から<br>会話を始めよう</span>
                 </div>`;
@@ -361,9 +357,11 @@
         lastMessageCount = 0;
         document.getElementById('chat-title').innerText = name;
         document.getElementById('chat-subtitle').innerText = `@${dmId}`;
-        document.getElementById('layout').classList.add('show-chat');
         
-        fetchThreads(true);
+        showView('view-chat');
+        document.getElementById('chat-input-wrapper').style.display = 'flex';
+        document.getElementById('chat-messages').innerHTML = '<div class="empty-state">読み込み中...</div>';
+        
         await fetchMessages(dmId, false);
     }
 
@@ -372,14 +370,19 @@
         lastMessageCount = 0;
         document.getElementById('chat-title').innerText = `${nameA} ⇄ ${nameB}`;
         document.getElementById('chat-subtitle').innerText = `王国検閲中`;
-        document.getElementById('layout').classList.add('show-chat');
         
-        fetchThreads(true);
+        showView('view-chat');
+        document.getElementById('chat-input-wrapper').style.display = 'none';
+        document.getElementById('chat-messages').innerHTML = '<div class="empty-state">読み込み中...</div>';
         
+        await fetchAdminMessages(idA, idB, false);
+    }
+
+    async function fetchAdminMessages(idA, idB, isBackground) {
         const res = await fetch(`/api/dm/admin/messages/${idA}/${idB}`, { headers: { "Authorization": `Bearer ${token}` } });
         if(res.ok) {
             const data = await res.json();
-            renderMessagesList(data.messages, false);
+            renderMessagesList(data.messages, isBackground);
         }
     }
 
@@ -388,7 +391,6 @@
         if(!res.ok) return;
         
         const data = await res.json();
-        
         if(!myId) {
             const meRes = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
             myId = (await meRes.json()).id;
@@ -399,7 +401,7 @@
 
     function renderMessagesList(messages, isBackground) {
         const box = document.getElementById('chat-messages');
-        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
         
         let html = '';
         messages.forEach(m => {
@@ -410,7 +412,7 @@
             let senderLabel = '';
             if(isAdminMode) {
                 const sName = escapeHtml(m.sender?.nickname || "不明");
-                senderLabel = `<div class="msg-meta" style="margin-bottom:2px;">${sName}</div>`;
+                senderLabel = `<div class="msg-meta" style="margin-bottom:4px;">${sName}</div>`;
             }
 
             html += `
@@ -421,16 +423,15 @@
                 </div>`;
         });
         
-        // メッセージが1件もない場合
         if(!html) {
             html = `
                 <div class="empty-state">
-                    まだ何もないようだ...<br>
+                    <div style="font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5;">💬</div>
+                    まだメッセージがありません<br>
                     <span style="font-size:0.85rem; margin-top:8px;">下の入力欄から最初の密書を送ろう</span>
                 </div>`;
         }
         
-        // 新しいメッセージが追加された時のみHTMLを更新 (入力欄は別のdivにあるため影響を受けません)
         if (messages.length !== lastMessageCount || !isBackground) {
             box.innerHTML = html;
             lastMessageCount = messages.length;
@@ -446,7 +447,6 @@
         const content = input.value.trim();
         if(!content || !activeDmId || isAdminMode) return;
         
-        // 送信と同時に入力欄をクリア
         input.value = '';
         
         const res = await fetch('/api/dm/send', { 
@@ -457,7 +457,6 @@
         
         if (res.ok) {
             fetchMessages(activeDmId, false);
-            fetchThreads(true);
         } else {
             showToast((await res.json()).detail, true);
         }
