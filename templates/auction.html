@@ -73,14 +73,42 @@
         .msg-item { background: #262932; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; align-self: flex-start; max-width: 85%; word-break: break-word; }
         .msg-system { background: rgba(212,175,55,0.1); color: var(--gold); border: 1px solid rgba(212,175,55,0.3); text-align: center; align-self: center; font-weight: bold; max-width: 95%; }
         
-        /* レスポンシブ (768px以下のモバイル設定) */
+        /* レスポンシブ (768px以下のモバイル設定 - ややコンパクトに調整) */
         @media (max-width: 768px) {
+            body { padding: 10px 0; }
+            .container { padding: 0 6px; gap: 12px; }
+            .card { padding: 14px; border-radius: 10px; }
+            .header { font-size: 1.15rem; padding-bottom: 10px; margin-bottom: 12px; }
+
+            .tabs { gap: 4px; margin-bottom: 14px; }
+            .tab-btn { padding: 8px 2px; font-size: 0.78rem; border-radius: 6px; }
+
+            .list-item { padding: 10px 12px; margin-bottom: 8px; }
+            .list-item .price-text { font-size: 1.05rem; }
+            .list-item .timer-text { font-size: 0.95rem; }
+
+            input, select, textarea { padding: 8px; font-size: 0.85rem; margin-bottom: 8px; }
+            button { padding: 10px; font-size: 0.85rem; margin-top: 6px; }
+
             #auction-modal { padding: 0; }
             .modal-content { height: 100vh; max-height: 100vh; border-radius: 0; border: none; }
+            .modal-header { padding: 8px 12px; }
             .modal-nav-tabs { display: flex; }
+            .modal-nav-btn { padding: 8px; font-size: 0.8rem; }
             .modal-left { border-right: none; display: none; }
             .modal-right { display: none; }
             
+            .modal-left-scroll { padding: 10px; }
+            .modal-left-action { padding: 10px; }
+            #detail-title { font-size: 1.05rem !important; }
+            #detail-timer { font-size: 1.3rem !important; }
+            #detail-current-price { font-size: 1.5rem !important; }
+
+            .chat-header { padding: 8px; font-size: 0.78rem; }
+            .chat-messages { padding: 10px; gap: 8px; }
+            .chat-input-area { padding: 8px; }
+            .msg-item { padding: 6px 10px; font-size: 0.8rem; }
+
             /* アクティブなタブだけ表示 */
             .modal-body.show-info .modal-left { display: flex; width: 100%; }
             .modal-body.show-chat .modal-right { display: flex; width: 100%; }
@@ -500,7 +528,7 @@
         
         // 初回データ取得
         await fetchAuctionLive(id);
-        await fetchAuctionComments(id);
+        await fetchAuctionComments(id, true); // 初回は強制で一番下までスクロール
         
         // ポーリング開始
         if(currentPollingInterval) clearInterval(currentPollingInterval);
@@ -518,13 +546,17 @@
         document.getElementById('detail-timer').classList.remove('ended');
     }
 
-    async function fetchAuctionComments(id) {
+    async function fetchAuctionComments(id, forceScroll = false) {
         try {
             const res = await fetch(`/api/auctions/${id}/comments`, { headers: { "Authorization": `Bearer ${token}` } });
             if (!res.ok) return;
             const comments = await res.json();
             
             const chatBox = document.getElementById('chat-messages');
+            
+            // スクロール位置が「ほぼ最下部」にあるかどうか判定（誤差30px許容）
+            const isAtBottom = forceScroll || (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 30);
+
             let html = '';
             comments.forEach(c => {
                 const isSys = c.user_id === 'system';
@@ -541,10 +573,11 @@
             });
             chatBox.innerHTML = html || '<div style="text-align:center; color:#888; font-size:0.85rem; margin-top:20px;">まだメッセージはありません</div>';
             
-            if (comments.length > lastCommentCount) {
+            // 一番下にいた場合、または強制スクロール指定時のみスクロールを下に戻す
+            if (isAtBottom && comments.length > lastCommentCount) {
                 chatBox.scrollTop = chatBox.scrollHeight;
-                lastCommentCount = comments.length;
             }
+            lastCommentCount = comments.length;
         } catch (e) {}
     }
 
@@ -705,7 +738,7 @@
             });
             if(res.ok) {
                 input.value = "";
-                await fetchAuctionComments(currentAuctionId);
+                await fetchAuctionComments(currentAuctionId, true); // 送信直後は強制で最下にスクロール
             } else {
                 const d = await res.json();
                 showToast(d.detail || "エラー", true);
