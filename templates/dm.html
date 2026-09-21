@@ -92,7 +92,7 @@
         .nav-icon:hover { background: var(--card-bg); }
 
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-        .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
+        .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 4.7s forwards; word-break: break-all; }
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
 
@@ -223,9 +223,13 @@
                     const btn = document.getElementById('btn-admin-mode');
                     if(btn) btn.style.display = 'block';
                 }
+            } else {
+                const errText = await res.text();
+                showToast(`[${res.status}] 初期化エラー: ${errText}`, true);
             }
         } catch(e) {
             console.error("ユーザー情報取得失敗", e);
+            showToast(`初期化エラー: ${e.message || e}`, true);
         }
         
         fetchThreads();
@@ -253,7 +257,7 @@
         t.innerText = msg;
         if(isError) t.style.borderLeftColor = 'var(--danger)';
         c.appendChild(t);
-        setTimeout(() => t.remove(), 3000);
+        setTimeout(() => t.remove(), 5000);
     }
 
     function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -279,11 +283,14 @@
             const res = await fetch("/api/dm/set-id", {
                 method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ dm_id: id })
             });
-            const data = await res.json();
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch(e) { data = { detail: text }; }
+
             if(res.ok) { showToast(data.message); closeModal('settings-modal'); } 
-            else { showToast(data.detail, true); }
+            else { showToast(`[${res.status}] ${data.detail || text}`, true); }
         } catch(e) {
-            showToast("接続エラーが発生しました", true);
+            showToast(`エラー: ${e.message || e}`, true);
         }
     }
 
@@ -295,6 +302,7 @@
         try {
             const swReg = await navigator.serviceWorker.register('/sw.js');
             const keyRes = await fetch('/api/dm/vapid-public-key');
+            if(!keyRes.ok) throw new Error(`VAPIDキー取得失敗: HTTP ${keyRes.status}`);
             const keyData = await keyRes.json();
             const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
 
@@ -305,10 +313,15 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth })
             });
-            if (res.ok) showToast("通知設定を有効化しました");
+            if (res.ok) {
+                showToast("通知設定を有効化しました");
+            } else {
+                const errText = await res.text();
+                showToast(`[${res.status}] ${errText}`, true);
+            }
         } catch (e) {
             console.error(e);
-            showToast("通信エラーが発生しました", true);
+            showToast(`通知設定エラー: ${e.message || e}`, true);
         }
     }
 
@@ -343,7 +356,8 @@
             const url = isAdminMode ? '/api/dm/admin/threads' : '/api/dm/conversations';
             const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
             if(!res.ok) {
-                if(!isBackground && listBox) listBox.innerHTML = '<div class="empty-state">データの取得に失敗しました</div>';
+                const errText = await res.text();
+                if(!isBackground && listBox) listBox.innerHTML = `<div class="empty-state">データの取得に失敗しました<br><span style="font-size:0.75rem; color:var(--danger)">[${res.status}] ${escapeHtml(errText)}</span></div>`;
                 return;
             }
             
@@ -395,7 +409,7 @@
             }
         } catch(e) {
             console.error(e);
-            if(!isBackground && listBox) listBox.innerHTML = '<div class="empty-state">通信エラーが発生しました</div>';
+            if(!isBackground && listBox) listBox.innerHTML = `<div class="empty-state">エラーが発生しました<br><span style="font-size:0.75rem; color:var(--danger)">${escapeHtml(e.message || e)}</span></div>`;
         }
     }
 
@@ -430,14 +444,26 @@
             if(res.ok) {
                 const data = await res.json();
                 renderMessagesList(data.messages || [], isBackground);
+            } else if(!isBackground) {
+                const errText = await res.text();
+                showToast(`[${res.status}] 監視ログ取得失敗: ${errText}`, true);
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { 
+            console.error(e);
+            if(!isBackground) showToast(`取得エラー: ${e.message || e}`, true);
+        }
     }
 
     async function fetchMessages(dmId, isBackground) {
         try {
             const res = await fetch(`/api/dm/messages/${dmId}`, { headers: { "Authorization": `Bearer ${token}` } });
-            if(!res.ok) return;
+            if(!res.ok) {
+                if(!isBackground) {
+                    const errText = await res.text();
+                    showToast(`[${res.status}] メッセージ取得失敗: ${errText}`, true);
+                }
+                return;
+            }
             
             const data = await res.json();
             if(!myId) {
@@ -451,7 +477,10 @@
             }
             
             renderMessagesList(data.messages || [], isBackground);
-        } catch(e) { console.error(e); }
+        } catch(e) { 
+            console.error(e); 
+            if(!isBackground) showToast(`取得エラー: ${e.message || e}`, true);
+        }
     }
 
     function renderMessagesList(messages, isBackground) {
@@ -517,18 +546,20 @@
                 body: JSON.stringify({ target_dm_id: activeDmId, content }) 
             });
             
-            const data = await res.json();
+            const rawText = await res.text();
+            let data;
+            try { data = JSON.parse(rawText); } catch(e) { data = { detail: rawText }; }
             
             if (res.ok) {
                 input.value = '';
                 await fetchMessages(activeDmId, false);
                 fetchThreads(true);
             } else {
-                showToast(data.detail || "送信に失敗しました", true);
+                showToast(`[${res.status}] ${data.detail || rawText}`, true);
             }
         } catch (e) {
             console.error(e);
-            showToast("通信エラーが発生しました", true);
+            showToast(`送信例外エラー: ${e.message || e}`, true);
         } finally {
             input.disabled = false;
             sendBtn.disabled = false;
