@@ -47,7 +47,6 @@ async def is_king_user(user_id: str) -> bool:
 # --- Background Task: 通知送信 ---
 async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
     if VAPID_PRIVATE_KEY in ["YOUR_PRIVATE_KEY_HERE", "YOUR_PUBLIC_KEY_HERE", ""]:
-        print(f"[{datetime.now()}] 警告: VAPID_PRIVATE_KEY が未設定のためPush通知をスキップ")
         return
 
     client = await get_supabase()
@@ -77,16 +76,14 @@ async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
         except WebPushException as e:
             if e.response is not None and e.response.status_code in [404, 410]:
                 await client.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
-            print(f"[{datetime.now()}] WebPush送信エラー: {e}")
-        except Exception as e:
-            print(f"[{datetime.now()}] 予期せぬPushエラー: {e}")
+        except Exception:
+            pass
 
 # =====================================================================
 # API: ユーザー情報・通知設定
 # =====================================================================
 @router.get("/me")
 async def get_my_dm_info(authorization: str = Header(None)):
-    """自分のDM IDと権限(Role)を取得"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     res = await client.table("profiles").select("dm_id, role").eq("id", user.id).execute()
@@ -96,15 +93,12 @@ async def get_my_dm_info(authorization: str = Header(None)):
 
 @router.post("/set-id")
 async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
-    """DM ID (@ユーザー名) を設定"""
     user = await get_user_auth(authorization)
     
     if not re.match(r"^[a-zA-Z0-9_]+$", data.dm_id):
         raise HTTPException(status_code=400, detail="DM IDは半角英数字とアンダースコア(_)のみ使用可能です。")
         
     client = await get_supabase()
-    
-    # 重複チェック
     exist = await client.table("profiles").select("id").eq("dm_id", data.dm_id).neq("id", user.id).execute()
     if exist.data:
         raise HTTPException(status_code=400, detail="そのIDは既に他の国民が使用しています。")
@@ -116,7 +110,6 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
 async def get_vapid_public_key():
     return {"public_key": VAPID_PUBLIC_KEY}
 
-# ★ /subscribe の衝突を避けるため /push-subscribe に修正
 @router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
@@ -142,7 +135,6 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
-    # DM IDから相手のUUIDを特定
     target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
     if not target_res.data:
         raise HTTPException(status_code=404, detail="指定されたDM IDのユーザーは見つかりません。")
@@ -151,7 +143,6 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
     if str(user.id) == str(target_id):
         raise HTTPException(status_code=400, detail="自分自身には送信できません。")
 
-    # メッセージ挿入
     await client.table("direct_messages").insert({
         "sender_id": user.id,
         "receiver_id": target_id,
@@ -167,29 +158,46 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
 
 @router.get("/conversations")
 async def get_conversations(authorization: str = Header(None)):
+    """会話相手ごとに最新メッセージと未読件数を集計（安全な2フェッチ方式）"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
+    # 1. 自分が関与している全メッセージを取得
     filter_str = f"sender_id.eq.{user.id},receiver_id.eq.{user.id}"
     msgs = await client.table("direct_messages").select(
-        "id, sender_id, receiver_id, content, is_read, created_at, sender:sender_id(nickname, dm_id), receiver:receiver_id(nickname, dm_id)"
+        "id, sender_id, receiver_id, content, is_read, created_at"
     ).or_(filter_str).order("created_at", desc=True).execute()
 
     if not msgs.data:
         return {"conversations": []}
 
+    # 相手のユーザーIDを抽出
+    partner_ids = set()
+    for m in msgs.data:
+        p_id = m["receiver_id"] if m["sender_id"] == user.id else m["sender_id"]
+        partner_ids.add(p_id)
+
+    if not partner_ids:
+        return {"conversations": []}
+
+    # 2. 相手全員のプロファイル（dm_id, nickname）を取得
+    profiles_res = await client.table("profiles").select("id, nickname, dm_id").in_("id", list(partner_ids)).execute()
+    prof_map = {p["id"]: p for p in (profiles_res.data or [])}
+
+    # 3. 会話一覧の組み立て
     convs = {}
     for msg in msgs.data:
         is_sender = (msg["sender_id"] == user.id)
         partner_id = msg["receiver_id"] if is_sender else msg["sender_id"]
         
+        p_info = prof_map.get(partner_id)
+        if not p_info or not p_info.get("dm_id"):
+            continue  # DM ID未設定のユーザーは表示からスキップ
+
         if partner_id not in convs:
-            p_data = msg["receiver"] if is_sender else msg["sender"]
-            if not p_data or not p_data.get("dm_id"): continue # ID未設定のユーザーはスキップ
-            
             convs[partner_id] = {
-                "partner_dm_id": p_data.get("dm_id"),
-                "partner_name": p_data.get("nickname"),
+                "partner_dm_id": p_info.get("dm_id"),
+                "partner_name": p_info.get("nickname") or "名無し国民",
                 "latest_message": msg["content"],
                 "latest_time": msg["created_at"],
                 "unread_count": 0
@@ -202,6 +210,7 @@ async def get_conversations(authorization: str = Header(None)):
 
 @router.get("/messages/{partner_dm_id}")
 async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
+    """特定の相手とのメッセージ履歴を取得"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
@@ -210,9 +219,10 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
         return {"messages": []}
     partner_id = target_res.data[0]["id"]
     
-    # 既読処理
+    # 未読メッセージを既読に更新
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).eq("is_read", False).execute()
 
+    # チャット履歴取得
     filter_str1 = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id})"
     filter_str2 = f"and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
     
@@ -223,7 +233,7 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
     return {"messages": res.data or [], "partner_user_id": partner_id}
 
 # =====================================================================
-# API: 国王専用 監視・検閲ツール (Zero Trust)
+# API: 国王専用 監視ツール
 # =====================================================================
 @router.get("/admin/threads")
 async def admin_get_all_threads(authorization: str = Header(None)):
@@ -233,25 +243,37 @@ async def admin_get_all_threads(authorization: str = Header(None)):
         
     client = await get_supabase()
     msgs = await client.table("direct_messages").select(
-        "id, sender_id, receiver_id, content, created_at, sender:sender_id(nickname, dm_id), receiver:receiver_id(nickname, dm_id)"
+        "id, sender_id, receiver_id, content, created_at"
     ).order("created_at", desc=True).limit(500).execute()
 
+    if not msgs.data:
+        return {"threads": []}
+
+    # 全ユーザーIDの抽出とプロファイル一括取得
+    u_ids = set()
+    for m in msgs.data:
+        u_ids.add(m["sender_id"])
+        u_ids.add(m["receiver_id"])
+
+    profs = await client.table("profiles").select("id, nickname, dm_id").in_("id", list(u_ids)).execute()
+    prof_map = {p["id"]: p for p in (profs.data or [])}
+
     threads = {}
-    for msg in (msgs.data or []):
+    for msg in msgs.data:
         users = sorted([msg["sender_id"], msg["receiver_id"]])
         thread_key = f"{users[0]}_{users[1]}"
         
         if thread_key not in threads:
-            sender_p = msg.get("sender") or {}
-            receiver_p = msg.get("receiver") or {}
+            p_a = prof_map.get(msg["sender_id"], {})
+            p_b = prof_map.get(msg["receiver_id"], {})
             
             threads[thread_key] = {
                 "user_a_id": msg["sender_id"],
-                "user_a_name": sender_p.get("nickname", "不明"),
-                "user_a_dm_id": sender_p.get("dm_id", ""),
+                "user_a_name": p_a.get("nickname", "不明"),
+                "user_a_dm_id": p_a.get("dm_id", ""),
                 "user_b_id": msg["receiver_id"],
-                "user_b_name": receiver_p.get("nickname", "不明"),
-                "user_b_dm_id": receiver_p.get("dm_id", ""),
+                "user_b_name": p_b.get("nickname", "不明"),
+                "user_b_dm_id": p_b.get("dm_id", ""),
                 "latest_message": msg["content"],
                 "latest_time": msg["created_at"],
                 "msg_count": 1
@@ -268,11 +290,21 @@ async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorizatio
         raise HTTPException(status_code=403, detail="権限がありません。")
         
     client = await get_supabase()
+    
     filter_str1 = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id})"
     filter_str2 = f"and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
     
     res = await client.table("direct_messages").select(
-        "id, sender_id, receiver_id, content, created_at, sender:sender_id(nickname)"
+        "id, sender_id, receiver_id, content, created_at"
     ).or_(f"{filter_str1},{filter_str2}").order("created_at", desc=False).limit(200).execute()
     
-    return {"messages": res.data or []}
+    msgs = res.data or []
+    
+    # 送信者のニックネーム付与
+    profs = await client.table("profiles").select("id, nickname").in_("id", [user_a_id, user_b_id]).execute()
+    p_map = {p["id"]: p["nickname"] for p in (profs.data or [])}
+    
+    for m in msgs:
+        m["sender"] = {"nickname": p_map.get(m["sender_id"], "不明")}
+
+    return {"messages": msgs}
