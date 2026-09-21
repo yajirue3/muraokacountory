@@ -1,13 +1,66 @@
 from typing import Optional, List
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, Field
 from db import get_supabase
-from main import get_user_from_token, is_king, enforce_rate_limit  # 既存関数をimport
 
+# ==========================================
+# 循環インポート回避のための自己完結関数群
+# ==========================================
+async def get_user_from_token(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="認証トークンがありません")
+    token = authorization.split(" ")[1]
+    try:
+        client = await get_supabase()
+        user_res = await client.auth.get_user(token)
+        return user_res.user
+    except Exception:
+        raise HTTPException(status_code=401, detail="無効なトークンです")
+
+async def is_king(user_id: str) -> bool:
+    try:
+        client = await get_supabase()
+        res = await client.table("profiles").select("role").eq("id", user_id).execute()
+        if res.data and res.data[0].get("role") == "king":
+            return True
+    except Exception:
+        pass
+    return False
+
+# オークションチャット専用の連投制限メモリ
+_auction_post_history = defaultdict(list)
+_auction_banned_until = {}
+
+def enforce_rate_limit(user_id: str):
+    now = time.time()
+    if user_id in _auction_banned_until:
+        if now < _auction_banned_until[user_id]:
+            remain = int(_auction_banned_until[user_id] - now)
+            raise HTTPException(status_code=429, detail=f"連投制限中です。残り {remain} 秒お待ちください。")
+        else:
+            del _auction_banned_until[user_id]
+
+    history = _auction_post_history[user_id]
+    history = [t for t in history if now - t <= 10]
+    
+    if len(history) >= 8:
+        _auction_banned_until[user_id] = now + 60
+        raise HTTPException(status_code=429, detail="スパム行為を検知したため、1分間投稿を禁止します。")
+    
+    if history and now - history[-1] < 1.0:
+        raise HTTPException(status_code=429, detail="送信が早すぎます。1秒お待ちください。")
+    
+    history.append(now)
+    _auction_post_history[user_id] = history
+
+# ==========================================
+# ルーターおよびPydanticモデル定義
+# ==========================================
 router = APIRouter(prefix="/api/auctions", tags=["auctions"])
 
-# --- Pydantic Models ---
 class AuctionCreate(BaseModel):
     category: str = Field(..., pattern="^(ITEM|GENERAL)$")
     seller_wallet_id: str
@@ -29,12 +82,13 @@ class AuctionBid(BaseModel):
 class AuctionCommentCreate(BaseModel):
     message: str = Field(..., min_length=1, max_length=200)
 
-# --- API Endpoints ---
+# ==========================================
+# API エンドポイント
+# ==========================================
 
 @router.get("")
 async def get_auctions(status_filter: str = "OPEN"):
     client = await get_supabase()
-    # 実際はクエリビルダーで詳細にフィルタリング
     res = await client.table("auctions").select("*").eq("status", status_filter).order("end_at", desc=False).execute()
     return res.data
 
@@ -88,7 +142,6 @@ async def place_bid(auction_id: int, data: AuctionBid, authorization: str = Head
 
 @router.post("/{auction_id}/settle")
 async def settle_auction(auction_id: int):
-    # 終了時刻を超えたオークションの確定処理。バッチタスクや画面表示フックで叩かれる想定。
     client = await get_supabase()
     try:
         res = await client.rpc("execute_auction_settle", {"p_auction_id": auction_id}).execute()
@@ -114,7 +167,6 @@ async def cancel_auction(auction_id: int, authorization: str = Header(None)):
 
 @router.post("/{auction_id}/complete")
 async def complete_general_auction(auction_id: int, authorization: str = Header(None)):
-    # 一般枠のエスクロー解除（落札者の受取確認）
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     try:
@@ -130,7 +182,7 @@ async def complete_general_auction(auction_id: int, authorization: str = Header(
 @router.post("/{auction_id}/comments")
 async def post_auction_comment(auction_id: int, data: AuctionCommentCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
-    enforce_rate_limit(user.id)  # スパム防止流用
+    enforce_rate_limit(user.id)
     client = await get_supabase()
     
     # 参加資格チェック
@@ -143,12 +195,10 @@ async def post_auction_comment(auction_id: int, data: AuctionCommentCreate, auth
         raise HTTPException(status_code=400, detail="終了したオークションでは発言できません")
         
     if auction["chat_setting"] == "RESTRICTED" and auction["seller_user_id"] != user.id:
-        # 入札実績があるかチェック
         bids = await client.table("auction_bids").select("id").eq("auction_id", auction_id).eq("bidder_user_id", user.id).limit(1).execute()
         if not bids.data:
             raise HTTPException(status_code=403, detail="このオークションは入札者のみ発言可能な設定です")
 
-    # 称号取得
     prof = await client.table("profiles").select("nickname, equipped_title").eq("id", user.id).execute()
     nickname = prof.data[0].get("nickname", "不明") if prof.data else "不明"
     title = prof.data[0].get("equipped_title", "鉱山労働奴隷") if prof.data else "鉱山労働奴隷"
