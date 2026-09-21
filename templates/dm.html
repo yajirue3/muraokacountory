@@ -96,7 +96,7 @@
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
 
-        /* ★スマホ向け コンパクト化・高さフィット調整 */
+        /* スマホ向け コンパクト化 */
         @media (max-width: 768px) {
             .header { height: 50px; padding: 0 10px; font-size: 1rem; }
             .nav-icon { font-size: 1.1rem; padding: 6px; }
@@ -164,7 +164,7 @@
         </div>
         <div class="chat-input-wrapper" id="chat-input-wrapper">
             <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button class="btn-send" onclick="sendMessage()">送信</button>
+            <button class="btn-send" id="btn-send-msg" onclick="sendMessage()">送信</button>
         </div>
     </div>
 
@@ -454,10 +454,8 @@
                 </div>`;
         }
         
-        // HTMLが変更された場合 または 背景更新でない(即時反映)の場合に上書き
         if (box.innerHTML !== html || !isBackground) {
             box.innerHTML = html;
-            // HTML更新後に確実にスクロールさせるための微小な遅延
             setTimeout(() => {
                 if(!isBackground || isAtBottom) {
                     box.scrollTop = box.scrollHeight;
@@ -468,24 +466,39 @@
 
     async function sendMessage() {
         const input = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('btn-send-msg');
         const content = input.value.trim();
-        if(!content || !activeDmId || isAdminMode) return;
         
-        // ★送信ボタンを押した瞬間に中身を空にする
-        input.value = '';
+        if (!content) return;
+        if (!activeDmId) return showToast("送信先が選択されていません", true);
+        if (isAdminMode) return showToast("検閲モード中は送信できません", true);
         
-        const res = await fetch('/api/dm/send', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
-            body: JSON.stringify({ target_dm_id: activeDmId, content }) 
-        });
+        input.disabled = true;
+        sendBtn.disabled = true;
         
-        if (res.ok) {
-            // ★送信成功後、isBackground=falseとして強制的にスクロール更新をかける
-            await fetchMessages(activeDmId, false);
-            fetchThreads(true);
-        } else {
-            showToast((await res.json()).detail, true);
+        try {
+            const res = await fetch('/api/dm/send', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ target_dm_id: activeDmId, content }) 
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                input.value = '';
+                await fetchMessages(activeDmId, false);
+                fetchThreads(true);
+            } else {
+                showToast(data.detail || "送信に失敗しました", true);
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("通信エラーが発生しました", true);
+        } finally {
+            input.disabled = false;
+            sendBtn.disabled = false;
+            input.focus();
         }
     }
 
