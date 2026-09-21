@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 国民証</title>
+    <!-- Supabase JS SDK CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 16px 10px; margin: 0; min-height: 100vh; }
@@ -11,7 +13,7 @@
         .card { background: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         .header { font-size: 0.95rem; font-weight: bold; color: #d4af37; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 身分証明書 */
+        /* 身分証明書スタイル */
         .id-card-wrapper { background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); border-radius: 12px; padding: 14px; color: #1a1a1a; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); position: relative; overflow: hidden; border: 1px solid #fff; }
         .id-card-wrapper::before { content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; }
         @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
@@ -35,7 +37,7 @@
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
         .news-date { font-size: 0.65rem; color: #888; margin-right: 6px; }
 
-        /* 所得税表示 */
+        /* 税金表示 */
         .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.2); padding: 10px 14px; }
         .tax-display-amount { color: #e74c3c; font-size: 1.3rem; font-weight: 900; margin: 4px 0; font-variant-numeric: tabular-nums; }
         .tax-display-note { font-size: 0.65rem; color: #a0a0a0; }
@@ -175,12 +177,22 @@
 </div>
 
 <script>
+    // Supabaseの環境変数
+    const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
+    
+    // Supabaseクライアントの初期化
+    let supabaseClient = null;
+    if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
     function escapeHtml(str) { 
         return str ? String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; 
     }
 
     const token = localStorage.getItem("access_token");
-    if (!token) {
+    if (!token && !supabaseClient) {
         window.location.href = "/";
     } else {
         document.getElementById("user-email").innerText = localStorage.getItem("user_email") || "";
@@ -190,40 +202,53 @@
         loadAnnouncements();
     }
 
-    /* お知らせ取得処理（announcementsテーブルから取得） */
+    /* announcementsテーブルからの読み込み処理 */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
 
         try {
-            const res = await fetch("/api/announcements", { 
-                headers: { "Authorization": `Bearer ${token}` }
-            });
+            let announcements = [];
 
-            if (res.ok) {
-                const data = await res.json();
-                
-                if (Array.isArray(data) && data.length > 0) {
-                    container.innerHTML = data.map(item => {
-                        const dateStr = item.created_at ? item.created_at.substring(0, 10) : '--/--';
-                        const title = item.title || '（タイトルなし）';
-                        const content = item.content || '';
+            if (supabaseClient) {
+                // Supabase SDKを直接使用
+                const { data, error } = await supabaseClient
+                    .from('announcements')
+                    .select('id, title, content, created_at')
+                    .order('created_at', { ascending: false });
 
-                        return `
-                            <div class="news-item">
-                                <span class="news-date">${escapeHtml(dateStr)}</span>
-                                <strong>${escapeHtml(title)}</strong> ${content ? '- ' + escapeHtml(content) : ''}
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
-                }
+                if (error) throw error;
+                announcements = data || [];
             } else {
-                container.innerHTML = '<div class="news-item" style="color:#e74c3c;">お知らせの取得に失敗しました。</div>';
+                // 通常のREST APIフォールバック
+                const res = await fetch("/api/announcements", { 
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    announcements = await res.json();
+                } else {
+                    throw new Error("API Fetch Failed");
+                }
+            }
+
+            if (Array.isArray(announcements) && announcements.length > 0) {
+                container.innerHTML = announcements.map(item => {
+                    const dateStr = item.created_at ? item.created_at.substring(0, 10) : '--/--';
+                    const title = item.title || '（タイトルなし）';
+                    const content = item.content || '';
+
+                    return `
+                        <div class="news-item">
+                            <span class="news-date">${escapeHtml(dateStr)}</span>
+                            <strong>${escapeHtml(title)}</strong> ${content ? '- ' + escapeHtml(content) : ''}
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
             }
         } catch (e) {
-            console.error("お知らせ読み込みエラー:", e);
-            container.innerHTML = '<div class="news-item" style="color:#e74c3c;">通信エラーにより読み込めませんでした。</div>';
+            console.error("お知らせ取得エラー:", e);
+            container.innerHTML = '<div class="news-item" style="color:#e74c3c;">お知らせの取得に失敗しました。</div>';
         }
     }
 
@@ -468,6 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 </script>
 
+<!-- 利用規約・ポリシー確認モーダル -->
 <div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
     <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
         <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
@@ -476,6 +502,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>
 </div>
 
+<!-- 裏路地モーダル -->
 <div id="alley-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 9998; justify-content: center; align-items: center;">
     <div style="background: #1c1e22; border: 2px solid #3a4a5e; border-radius: 12px; width: 90%; max-width: 380px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #e2e8f0;">
         <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男</h3>
