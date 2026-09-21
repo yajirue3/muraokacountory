@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>村岡王国 - 密書 (DM)</title>
+    <style>
+        :root {
+            --bg-dark: #0f1115; --card-bg: #1c1e24; --border: #333842; 
+            --gold: #d4af37; --blue: #3b82f6; --text-main: #e2e8f0; 
+            --text-muted: #94a3b8; --danger: #ef4444;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
+        .container { width: 100%; max-width: 900px; display: flex; flex-direction: column; background: var(--card-bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+        
+        /* ヘッダー */
+        .header { padding: 12px 16px; background: #15171a; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; margin: 0; color: var(--gold); }
+        
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        
+        /* 左カラム: スレッドリスト */
+        .sidebar { width: 300px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: #15171a; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border); }
+        .tab-btn { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-weight: bold; }
+        .tab-btn.active { color: var(--gold); border-bottom: 2px solid var(--gold); background: rgba(212,175,55,0.05); }
+        .thread-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .thread-item { padding: 12px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #262932; transition: 0.2s; border: 1px solid transparent; }
+        .thread-item:hover { border-color: var(--gold); }
+        .thread-item.active { background: rgba(59,130,246,0.1); border-color: var(--blue); }
+        .thread-name { font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .unread-badge { background: var(--danger); color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; }
+        .thread-msg { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 右カラム: チャットルーム */
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--card-bg); }
+        .chat-header { padding: 12px; border-bottom: 1px solid var(--border); font-weight: bold; background: #1a1c23; text-align: center; color: var(--text-muted); }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .msg-item { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; word-break: break-word; }
+        .msg-mine { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 2px; }
+        .msg-other { align-self: flex-start; background: #262932; color: #fff; border-bottom-left-radius: 2px; }
+        .msg-time { font-size: 0.7rem; color: #aaa; margin-top: 4px; text-align: right; }
+        
+        .chat-input { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: #15171a; }
+        input[type="text"] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #262932; color: #fff; }
+        input[type="text"]:focus { outline: none; border-color: var(--gold); }
+        button { padding: 10px 16px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-action { background: var(--gold); color: #000; }
+        .btn-sub { background: #333; color: #fff; }
+
+        /* 新規作成モーダル */
+        #new-dm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: var(--card-bg); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; border: 1px solid var(--border); }
+        
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast { background: rgba(30,30,30,0.95); border-left: 4px solid var(--gold); padding: 12px 20px; border-radius: 6px; color: #fff; animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
+        @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; display: flex; }
+            .chat-area { display: none; width: 100%; }
+            .main-layout.show-chat .sidebar { display: none; }
+            .main-layout.show-chat .chat-area { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="container">
+    <div class="header">
+        <h1>📜 密書 (DM)</h1>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-sub" onclick="requestPushPermission()">🔔 通知ON</button>
+            <button class="btn-sub" onclick="location.href='/dashboard'">◀ 戻る</button>
+        </div>
+    </div>
+
+    <div class="main-layout" id="main-layout">
+        <!-- 左カラム -->
+        <div class="sidebar">
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-normal" onclick="switchMode('normal')">📩 受信箱</button>
+                <button class="tab-btn" id="tab-admin" style="display:none;" onclick="switchMode('admin')">👁️ 王国検閲</button>
+            </div>
+            <div style="padding: 10px;">
+                <button class="btn-action" style="width:100%;" onclick="openNewDmModal()">+ 新しい密書を送る</button>
+            </div>
+            <div class="thread-list" id="thread-list"></div>
+        </div>
+
+        <!-- 右カラム -->
+        <div class="chat-area" id="chat-area">
+            <div class="chat-header">
+                <button class="btn-sub" style="float:left; padding:4px 8px; font-size:0.8rem; display:none;" id="btn-back-mobile" onclick="closeChatMobile()">◀ 一覧</button>
+                <span id="chat-title">相手を選択してください</span>
+            </div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input" id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="btn-action" onclick="sendMessage()">送信</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新規宛先モーダル -->
+<div id="new-dm-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:var(--gold);">宛先IDを指定</h3>
+        <p style="font-size:0.8rem; color:#aaa;">相手のプロフィール等に記載されているUUIDを入力してください。</p>
+        <input type="text" id="new-dm-target" placeholder="ユーザーID (UUID)" style="width:100%; padding:10px; margin-bottom:12px; box-sizing:border-box;">
+        <div style="display:flex; gap:8px;">
+            <button class="btn-action" style="flex:1;" onclick="startNewChat()">チャット開始</button>
+            <button class="btn-sub" style="flex:1;" onclick="document.getElementById('new-dm-modal').style.display='none'">キャンセル</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let currentUser = null;
+    let isKing = false;
+    let activePartnerId = null;
+    let activePartnerName = null;
+    let viewMode = 'normal'; // normal or admin
+    let pollingInterval = null;
+
+    // --- 初期化 ---
+    async function init() {
+        await checkUser();
+        fetchThreads();
+        
+        // 5秒おきに最新情報をポーリング
+        pollingInterval = setInterval(() => {
+            fetchThreads(true);
+            if(activePartnerId) fetchMessages(activePartnerId, activePartnerName, true);
+        }, 5000);
+        
+        if (window.innerWidth <= 768) {
+            document.getElementById('btn-back-mobile').style.display = 'block';
+        }
+    }
+
+    function showToast(msg, isError=false) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.innerText = msg;
+        if(isError) t.style.borderLeftColor = 'var(--danger)';
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    async function checkUser() {
+        const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
+        if (res.ok) {
+            currentUser = await res.json();
+            if(currentUser.role === 'king') {
+                isKing = true;
+                document.getElementById('tab-admin').style.display = 'block';
+            }
+        }
+    }
+
+    // --- Web Push 購読処理 ---
+    async function requestPushPermission() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            return showToast("このブラウザは通知に対応していません", true);
+        }
+        
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            return showToast("通知が許可されませんでした", true);
+        }
+
+        try {
+            const swReg = await navigator.serviceWorker.register('/sw.js');
+            const keyRes = await fetch('/api/dm/vapid-public-key');
+            const keyData = await keyRes.json();
+            const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
+
+            const subscription = await swReg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: applicationServerKey
+            });
+
+            const subData = JSON.parse(JSON.stringify(subscription));
+            const res = await fetch('/api/dm/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({
+                    endpoint: subData.endpoint,
+                    p256dh: subData.keys.p256dh,
+                    auth: subData.keys.auth
+                })
+            });
+
+            if (res.ok) showToast("通知の設定が完了しました！");
+            else showToast("サーバーへの登録に失敗しました", true);
+
+        } catch (e) {
+            console.error(e);
+            showToast("通知設定エラー", true);
+        }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+        return outputArray;
+    }
+
+    // --- 画面操作 ---
+    function switchMode(mode) {
+        viewMode = mode;
+        document.getElementById('tab-normal').classList.toggle('active', mode === 'normal');
+        document.getElementById('tab-admin').classList.toggle('active', mode === 'admin');
+        
+        // 検閲モード時は入力欄を隠す
+        document.getElementById('chat-input-area').style.display = mode === 'admin' ? 'none' : 'flex';
+        activePartnerId = null;
+        document.getElementById('chat-messages').innerHTML = '';
+        document.getElementById('chat-title').innerText = mode === 'admin' ? "監視するスレッドを選択" : "相手を選択してください";
+        
+        fetchThreads();
+    }
+
+    function openNewDmModal() { document.getElementById('new-dm-modal').style.display = 'flex'; }
+    function startNewChat() {
+        const target = document.getElementById('new-dm-target').value.trim();
+        if(!target) return;
+        document.getElementById('new-dm-modal').style.display = 'none';
+        openChat(target, "新規ユーザー (ID:"+target.substring(0,6)+")");
+    }
+    
+    function closeChatMobile() { document.getElementById('main-layout').classList.remove('show-chat'); }
+
+    // --- データ取得 ---
+    async function fetchThreads(isBackground = false) {
+        const url = viewMode === 'admin' ? '/api/dm/admin/threads' : '/api/dm/conversations';
+        const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        const listEl = document.getElementById('thread-list');
+        let html = '';
+
+        if (viewMode === 'normal') {
+            data.conversations.forEach(c => {
+                const activeCls = c.partner_id === activePartnerId ? 'active' : '';
+                const badge = c.unread_count > 0 ? `<span class="unread-badge">${c.unread_count}</span>` : '';
+                html += `
+                    <div class="thread-item ${activeCls}" onclick="openChat('${c.partner_id}', '${c.partner_name}')">
+                        <div class="thread-name"><span>${escapeHtml(c.partner_name)}</span> ${badge}</div>
+                        <div class="thread-msg">${escapeHtml(c.latest_message)}</div>
+                    </div>`;
+            });
+        } else {
+            data.threads.forEach(t => {
+                const threadId = t.user_a_id + "/" + t.user_b_id;
+                const activeCls = threadId === activePartnerId ? 'active' : '';
+                html += `
+                    <div class="thread-item ${activeCls}" onclick="openAdminChat('${t.user_a_id}', '${t.user_b_id}', '${t.user_a_name}', '${t.user_b_name}')">
+                        <div class="thread-name"><span>${escapeHtml(t.user_a_name)} ⇄ ${escapeHtml(t.user_b_name)}</span></div>
+                        <div class="thread-msg">${escapeHtml(t.latest_message)}</div>
+                    </div>`;
+            });
+        }
+        
+        if(!html && !isBackground) listEl.innerHTML = '<div style="color:#888; font-size:0.9rem; text-align:center; margin-top:20px;">メッセージはありません</div>';
+        else if(html) listEl.innerHTML = html;
+    }
+
+    async function openChat(partnerId, partnerName) {
+        activePartnerId = partnerId;
+        activePartnerName = partnerName;
+        document.getElementById('chat-title').innerText = partnerName;
+        document.getElementById('main-layout').classList.add('show-chat');
+        fetchThreads(true); // アクティブ状態を反映
+        await fetchMessages(partnerId, partnerName, false);
+    }
+
+    async function openAdminChat(userA, userB, nameA, nameB) {
+        activePartnerId = userA + "/" + userB;
+        document.getElementById('chat-title').innerText = `👁️ ${nameA} と ${nameB} の監視`;
+        document.getElementById('main-layout').classList.add('show-chat');
+        fetchThreads(true);
+        
+        const res = await fetch(`/api/dm/admin/messages/${userA}/${userB}`, { headers: { "Authorization": `Bearer ${token}` } });
+        if(res.ok) renderMessages((await res.json()).messages, null);
+    }
+
+    async function fetchMessages(partnerId, partnerName, isBackground) {
+        if(viewMode === 'admin') return; // 管理モードは別途処理
+        const res = await fetch(`/api/dm/messages/${partnerId}`, { headers: { "Authorization": `Bearer ${token}` } });
+        if(res.ok) {
+            const data = await res.json();
+            renderMessages(data.messages, partnerName, isBackground);
+        }
+    }
+
+    function renderMessages(messages, partnerName, isBackground=false) {
+        const box = document.getElementById('chat-messages');
+        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+        
+        let html = '';
+        messages.forEach(m => {
+            const isMine = viewMode === 'normal' ? (m.sender_id === currentUser.id) : false;
+            const cls = isMine ? 'msg-mine' : 'msg-other';
+            const timeStr = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            let senderLabel = '';
+            if(viewMode === 'admin') {
+                senderLabel = `<div style="font-size:0.75rem; color:#aaa; margin-bottom:2px;">ID: ${m.sender_id.substring(0,5)}...</div>`;
+            }
+
+            html += `
+                <div class="msg-item ${cls}">
+                    ${senderLabel}
+                    <div>${escapeHtml(m.content)}</div>
+                    <div class="msg-time">${timeStr}</div>
+                </div>`;
+        });
+        
+        box.innerHTML = html || '<div style="text-align:center; color:#888; font-size:0.85rem; margin-top:20px;">メッセージがありません</div>';
+        if (!isBackground || isAtBottom) {
+            box.scrollTop = box.scrollHeight;
+        }
+    }
+
+    // --- 送信 ---
+    async function sendMessage() {
+        if(viewMode === 'admin' || !activePartnerId) return;
+        const input = document.getElementById('chat-input');
+        const content = input.value.trim();
+        if(!content) return;
+        
+        input.value = ''; // 先にクリア
+        const res = await fetch('/api/dm/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ receiver_id: activePartnerId, content: content })
+        });
+        
+        if (res.ok) {
+            fetchMessages(activePartnerId, activePartnerName, false);
+            fetchThreads(true);
+        } else {
+            showToast((await res.json()).detail, true);
+        }
+    }
+
+    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+    init();
+</script>
+</body>
+</html>
