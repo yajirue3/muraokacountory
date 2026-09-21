@@ -30,13 +30,14 @@
 
         /* お知らせエリア */
         .news-card { background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); }
-        .news-list { display: flex; flex-direction: column; gap: 8px; max-height: 120px; overflow-y: auto; }
-        .news-item { font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; }
+        .news-list { display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto; padding-right: 4px; }
+        .news-item { font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; line-height: 1.4; }
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
         .news-date { font-size: 0.65rem; color: #888; margin-right: 6px; }
-        .news-tag { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px; background: #333; color: #fff; }
+        .news-tag { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px; background: #34495e; color: #fff; }
         .news-tag.event { background: #e67e22; }
         .news-tag.warning { background: #c0392b; }
+        .news-tag.info { background: #2980b9; }
 
         /* 所得税表示 */
         .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.2); padding: 10px 14px; }
@@ -108,7 +109,7 @@
         </div>
     </div>
 
-    <!-- 2. お知らせ (DB更新連動 & 動的読み込み) -->
+    <!-- 2. お知らせ (堅牢化＆フォールバック対応) -->
     <div class="card news-card">
         <div class="header" style="font-size: 0.85rem; margin-bottom: 6px;">📢 王国からのお知らせ</div>
         <div class="news-list" id="announcement-list">
@@ -123,7 +124,7 @@
         <div class="tax-display-note">※毎週 火曜・金曜 9:00 自動徴収（10万G超の0.5%）</div>
     </div>
 
-    <!-- 4. 設定（ゴチャつき防止のためアコーディオン化） -->
+    <!-- 4. 設定 -->
     <div class="card">
         <details>
             <summary>⚙️ 各種設定・称号付け替え・納税</summary>
@@ -146,7 +147,7 @@
         </details>
     </div>
 
-    <!-- 5. ナビゲーション（綺麗な2列グリッド & 高さ統一） -->
+    <!-- 5. ナビゲーション -->
     <div class="nav-grid">
         <button class="btn-mtube" onclick="location.href='/videos'">▶️ M-Tube（動画共有）</button>
         <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場</button>
@@ -180,7 +181,7 @@
 
 <script>
     function escapeHtml(str) { 
-        return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; 
+        return str ? String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; 
     }
 
     const token = localStorage.getItem("access_token");
@@ -194,29 +195,88 @@
         loadAnnouncements();
     }
 
-    /* お知らせ取得 (APIまたはDBテーブル連動、取得できない場合はフォールバック表示) */
+    /* デフォルトのお知らせデータ（API応答がない場合の安全なフォールバック用） */
+    const FALLBACK_ANNOUNCEMENTS = [
+        {
+            title: "【重要】システム定期メンテナンスのおしらせ",
+            content: "毎週火曜・金曜の午前8:30〜9:00はシステム調整を実施いたします。",
+            category: "warning",
+            category_name: "警告",
+            created_at: "2026-09-20"
+        },
+        {
+            title: "【イベント】カジノ開放記念キャンペーン開催！",
+            content: "期間中にログインしたすべての国民にスロット無料利用券を配布中！",
+            category: "event",
+            category_name: "イベント",
+            created_at: "2026-09-18"
+        },
+        {
+            title: "村岡王国ポータルサイトオープン！",
+            content: "国民の皆様が快適に過ごせるよう、新機能を順次拡張予定です。",
+            category: "info",
+            category_name: "通知",
+            created_at: "2026-09-15"
+        }
+    ];
+
+    /* お知らせ取得処理（エラー防止・自動タグ判定・フォールバック内蔵） */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
+        let listData = null;
+
         try {
-            // パイソン側を弄らず動作するよう既存の告示用APIや汎用エンドポイントを試行
-            const res = await fetch("/api/announcements", { headers: { "Authorization": `Bearer ${token}` } });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3秒でタイムアウト
+
+            const res = await fetch("/api/announcements", { 
+                headers: { "Authorization": `Bearer ${token}` },
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
             if (res.ok) {
                 const data = await res.json();
-                if (data && data.length > 0) {
-                    container.innerHTML = data.map(item => `
-                        <div class="news-item">
-                            <span class="news-date">${item.created_at ? item.created_at.substring(5,10) : '最新'}</span>
-                            <span class="news-tag ${item.category || 'info'}">${item.category_name || '通知'}</span>
-                            <strong>${escapeHtml(item.title)}</strong> - ${escapeHtml(item.content)}
-                        </div>
-                    `).join('');
-                    return;
+                if (Array.isArray(data) && data.length > 0) {
+                    listData = data;
                 }
             }
-        } catch (e) { }
+        } catch (e) {
+            console.warn("APIからの通知取得に失敗。デフォルトお知らせを表示します。", e);
+        }
 
+        // APIデータが取得できなかった場合はデフォルトデータを使用
+        if (!listData) {
+            listData = FALLBACK_ANNOUNCEMENTS;
+        }
 
+        // HTML描画処理
+        container.innerHTML = listData.map(item => {
+            // SQLの既存データ構造（category無し）でもキーワードから表示タグを自動補正
+            let tagClass = item.category || 'info';
+            let tagName = item.category_name || '通知';
 
+            if (!item.category) {
+                const text = (item.title + " " + item.content).toLowerCase();
+                if (text.includes("メンテナンス") || text.includes("警告") || text.includes("注意") || text.includes("停止")) {
+                    tagClass = "warning";
+                    tagName = "警告";
+                } else if (text.includes("イベント") || text.includes("キャンペーン") || text.includes("開催")) {
+                    tagClass = "event";
+                    tagName = "イベント";
+                }
+            }
+
+            const dateStr = item.created_at ? item.created_at.substring(5, 10) : '--/--';
+
+            return `
+                <div class="news-item">
+                    <span class="news-date">${dateStr}</span>
+                    <span class="news-tag ${tagClass}">${escapeHtml(tagName)}</span>
+                    <strong>${escapeHtml(item.title)}</strong> - ${escapeHtml(item.content)}
+                </div>
+            `;
+        }).join('');
     }
 
     function calculateWealthTax(balance) {
@@ -249,12 +309,16 @@
             const res = await fetch("/api/titles", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const data = await res.json();
-                document.getElementById("user-title-display").innerText = data.equipped_title;
+                document.getElementById("user-title-display").innerText = data.equipped_title || "一般国民";
 
                 const select = document.getElementById("title-select");
-                select.innerHTML = data.owned_titles.map(t => 
-                    `<option value="${escapeHtml(t)}" ${t === data.equipped_title ? 'selected' : ''}>${escapeHtml(t)}</option>`
-                ).join('');
+                if (data.owned_titles && data.owned_titles.length > 0) {
+                    select.innerHTML = data.owned_titles.map(t => 
+                        `<option value="${escapeHtml(t)}" ${t === data.equipped_title ? 'selected' : ''}>${escapeHtml(t)}</option>`
+                    ).join('');
+                } else {
+                    select.innerHTML = '<option value="">所持称号なし</option>';
+                }
             }
         } catch (e) { console.error(e); }
     }
@@ -279,14 +343,14 @@
             const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const wallets = await res.json();
-                const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
+                const totalBalance = Array.isArray(wallets) ? wallets.reduce((sum, w) => sum + (w.balance || 0), 0) : 0;
                 
                 const taxAmount = calculateWealthTax(totalBalance);
                 const taxDisplay = document.getElementById("my-tax-amount");
                 if (taxDisplay) taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
 
                 const select = document.getElementById("tax-wallet-select");
-                if (wallets.length === 0) {
+                if (!Array.isArray(wallets) || wallets.length === 0) {
                     select.innerHTML = '<option value="">口座がありません</option>';
                     return;
                 }
