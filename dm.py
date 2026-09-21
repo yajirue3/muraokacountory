@@ -46,7 +46,7 @@ async def is_king_user(user_id: str) -> bool:
 
 # --- Background Task: 通知送信 ---
 async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
-    if VAPID_PRIVATE_KEY == "YOUR_PRIVATE_KEY_HERE":
+    if VAPID_PRIVATE_KEY in ["YOUR_PRIVATE_KEY_HERE", "YOUR_PUBLIC_KEY_HERE", ""]:
         print(f"[{datetime.now()}] 警告: VAPID_PRIVATE_KEY が未設定のためPush通知をスキップ")
         return
 
@@ -75,7 +75,7 @@ async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
                 vapid_claims=VAPID_CLAIMS
             )
         except WebPushException as e:
-            if e.response is not None and e.response.status_code == 410:
+            if e.response is not None and e.response.status_code in [404, 410]:
                 await client.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
             print(f"[{datetime.now()}] WebPush送信エラー: {e}")
         except Exception as e:
@@ -104,7 +104,7 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
         
     client = await get_supabase()
     
-    # 他人が使っていないか重複チェック
+    # 重複チェック
     exist = await client.table("profiles").select("id").eq("dm_id", data.dm_id).neq("id", user.id).execute()
     if exist.data:
         raise HTTPException(status_code=400, detail="そのIDは既に他の国民が使用しています。")
@@ -116,7 +116,8 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
 async def get_vapid_public_key():
     return {"public_key": VAPID_PUBLIC_KEY}
 
-@router.post("/subscribe")
+# ★ /subscribe の衝突を避けるため /push-subscribe に修正
+@router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
@@ -147,10 +148,11 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
         raise HTTPException(status_code=404, detail="指定されたDM IDのユーザーは見つかりません。")
         
     target_id = target_res.data[0]["id"]
-    if user.id == target_id:
+    if str(user.id) == str(target_id):
         raise HTTPException(status_code=400, detail="自分自身には送信できません。")
 
-    res = await client.table("direct_messages").insert({
+    # メッセージ挿入
+    await client.table("direct_messages").insert({
         "sender_id": user.id,
         "receiver_id": target_id,
         "content": data.content.strip()
@@ -183,7 +185,7 @@ async def get_conversations(authorization: str = Header(None)):
         
         if partner_id not in convs:
             p_data = msg["receiver"] if is_sender else msg["sender"]
-            if not p_data.get("dm_id"): continue # ID未設定のユーザーはスキップ
+            if not p_data or not p_data.get("dm_id"): continue # ID未設定のユーザーはスキップ
             
             convs[partner_id] = {
                 "partner_dm_id": p_data.get("dm_id"),
@@ -208,7 +210,7 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
         return {"messages": []}
     partner_id = target_res.data[0]["id"]
     
-    # 既読化
+    # 既読処理
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).eq("is_read", False).execute()
 
     filter_str1 = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id})"
@@ -240,13 +242,16 @@ async def admin_get_all_threads(authorization: str = Header(None)):
         thread_key = f"{users[0]}_{users[1]}"
         
         if thread_key not in threads:
+            sender_p = msg.get("sender") or {}
+            receiver_p = msg.get("receiver") or {}
+            
             threads[thread_key] = {
                 "user_a_id": msg["sender_id"],
-                "user_a_name": msg["sender"]["nickname"],
-                "user_a_dm_id": msg["sender"]["dm_id"],
+                "user_a_name": sender_p.get("nickname", "不明"),
+                "user_a_dm_id": sender_p.get("dm_id", ""),
                 "user_b_id": msg["receiver_id"],
-                "user_b_name": msg["receiver"]["nickname"],
-                "user_b_dm_id": msg["receiver"]["dm_id"],
+                "user_b_name": receiver_p.get("nickname", "不明"),
+                "user_b_dm_id": receiver_p.get("dm_id", ""),
                 "latest_message": msg["content"],
                 "latest_time": msg["created_at"],
                 "msg_count": 1
