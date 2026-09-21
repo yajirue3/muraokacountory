@@ -584,11 +584,16 @@
     function buildActionArea(a) {
         const area = document.getElementById('detail-action-area');
         
-        // ★入力欄にフォーカスがある（文字を入力している最中）場合は、勝手に消えないように更新をスキップ
+        // ★入力欄やセレクトボックスを操作中の場合は更新をスキップ（ドロップダウンが閉じるのを防ぐ）
         const activeEl = document.activeElement;
-        if (activeEl && area.contains(activeEl) && activeEl.tagName === 'INPUT') {
+        if (activeEl && area.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT')) {
             return;
         }
+
+        // ★再描画される前に、現在の選択値・入力値を保存しておく
+        const currentWalletId = document.getElementById('bid-wallet-select')?.value;
+        const currentAccId = document.getElementById('bid-acc-select')?.value;
+        const currentAmount = document.getElementById('bid-amount')?.value;
 
         const isMine = a.seller_user_id === currentUser?.id;
         const isHighest = a.highest_bidder_id === currentUser?.id;
@@ -639,6 +644,20 @@
 
         if(isKingUser) {
             area.innerHTML += `<div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--danger);"><button class="btn-danger" style="margin:0;" onclick="executeCancel(${a.id})">👑 王命強制キャンセル</button></div>`;
+        }
+
+        // ★再描画後に、保存しておいた値を復元する
+        if (currentWalletId) {
+            const el = document.getElementById('bid-wallet-select');
+            if (el) el.value = currentWalletId;
+        }
+        if (currentAccId) {
+            const el = document.getElementById('bid-acc-select');
+            if (el) el.value = currentAccId;
+        }
+        if (currentAmount !== undefined && currentAmount !== "") {
+            const el = document.getElementById('bid-amount');
+            if (el) el.value = currentAmount;
         }
     }
 
