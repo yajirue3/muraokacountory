@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - ダッシュボード</title>
+    <title>村岡王国 - 国民証</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 16px 10px; margin: 0; min-height: 100vh; }
@@ -34,10 +34,6 @@
         .news-item { font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; line-height: 1.4; }
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
         .news-date { font-size: 0.65rem; color: #888; margin-right: 6px; }
-        .news-tag { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px; background: #34495e; color: #fff; }
-        .news-tag.event { background: #e67e22; }
-        .news-tag.warning { background: #c0392b; }
-        .news-tag.info { background: #2980b9; }
 
         /* 所得税表示 */
         .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.2); padding: 10px 14px; }
@@ -57,7 +53,7 @@
         .btn-primary { background: #d4af37; color: #1a1a1a; padding: 8px; }
         .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); padding: 8px; }
 
-        /* ナビゲーション（2列揃え・高さ共通化） */
+        /* ナビゲーション（2列揃え） */
         .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .nav-grid button { height: 48px; padding: 0 8px; font-size: 0.8rem; line-height: 1.2; border: 1px solid rgba(255,255,255,0.08); text-align: center; word-break: break-all; }
 
@@ -109,7 +105,7 @@
         </div>
     </div>
 
-    <!-- 2. お知らせ (堅牢化＆フォールバック対応) -->
+    <!-- 2. お知らせ (テーブルから正確に読み込む) -->
     <div class="card news-card">
         <div class="header" style="font-size: 0.85rem; margin-bottom: 6px;">📢 王国からのお知らせ</div>
         <div class="news-list" id="announcement-list">
@@ -195,88 +191,41 @@
         loadAnnouncements();
     }
 
-    /* デフォルトのお知らせデータ（API応答がない場合の安全なフォールバック用） */
-    const FALLBACK_ANNOUNCEMENTS = [
-        {
-            title: "【重要】システム定期メンテナンスのおしらせ",
-            content: "毎週火曜・金曜の午前8:30〜9:00はシステム調整を実施いたします。",
-            category: "warning",
-            category_name: "警告",
-            created_at: "2026-09-20"
-        },
-        {
-            title: "【イベント】カジノ開放記念キャンペーン開催！",
-            content: "期間中にログインしたすべての国民にスロット無料利用券を配布中！",
-            category: "event",
-            category_name: "イベント",
-            created_at: "2026-09-18"
-        },
-        {
-            title: "村岡王国ポータルサイトオープン！",
-            content: "国民の皆様が快適に過ごせるよう、新機能を順次拡張予定です。",
-            category: "info",
-            category_name: "通知",
-            created_at: "2026-09-15"
-        }
-    ];
-
-    /* お知らせ取得処理（エラー防止・自動タグ判定・フォールバック内蔵） */
+    /* お知らせ取得処理（announcementsテーブルからそのまま取得） */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
-        let listData = null;
 
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3秒でタイムアウト
-
             const res = await fetch("/api/announcements", { 
-                headers: { "Authorization": `Bearer ${token}` },
-                signal: controller.signal
+                headers: { "Authorization": `Bearer ${token}` }
             });
-            clearTimeout(timeoutId);
 
             if (res.ok) {
                 const data = await res.json();
+                
                 if (Array.isArray(data) && data.length > 0) {
-                    listData = data;
+                    container.innerHTML = data.map(item => {
+                        const dateStr = item.created_at ? item.created_at.substring(0, 10) : '--/--';
+                        const title = item.title || '（タイトルなし）';
+                        const content = item.content || '';
+
+                        return `
+                            <div class="news-item">
+                                <span class="news-date">${escapeHtml(dateStr)}</span>
+                                <strong>${escapeHtml(title)}</strong> ${content ? '- ' + escapeHtml(content) : ''}
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
                 }
+            } else {
+                container.innerHTML = '<div class="news-item" style="color:#e74c3c;">お知らせの取得に失敗しました。</div>';
             }
         } catch (e) {
-            console.warn("APIからの通知取得に失敗。デフォルトお知らせを表示します。", e);
+            console.error("お知らせ読み込みエラー:", e);
+            container.innerHTML = '<div class="news-item" style="color:#e74c3c;">通信エラーにより読み込めませんでした。</div>';
         }
-
-        // APIデータが取得できなかった場合はデフォルトデータを使用
-        if (!listData) {
-            listData = FALLBACK_ANNOUNCEMENTS;
-        }
-
-        // HTML描画処理
-        container.innerHTML = listData.map(item => {
-            // SQLの既存データ構造（category無し）でもキーワードから表示タグを自動補正
-            let tagClass = item.category || 'info';
-            let tagName = item.category_name || '通知';
-
-            if (!item.category) {
-                const text = (item.title + " " + item.content).toLowerCase();
-                if (text.includes("メンテナンス") || text.includes("警告") || text.includes("注意") || text.includes("停止")) {
-                    tagClass = "warning";
-                    tagName = "警告";
-                } else if (text.includes("イベント") || text.includes("キャンペーン") || text.includes("開催")) {
-                    tagClass = "event";
-                    tagName = "イベント";
-                }
-            }
-
-            const dateStr = item.created_at ? item.created_at.substring(5, 10) : '--/--';
-
-            return `
-                <div class="news-item">
-                    <span class="news-date">${dateStr}</span>
-                    <span class="news-tag ${tagClass}">${escapeHtml(tagName)}</span>
-                    <strong>${escapeHtml(item.title)}</strong> - ${escapeHtml(item.content)}
-                </div>
-            `;
-        }).join('');
     }
 
     function calculateWealthTax(balance) {
@@ -472,7 +421,7 @@
     function closePolicyViewer() { document.getElementById("policy-view-modal").style.display = "none"; }
 </script>
 
-<!-- 利用規約モーダル -->
+<!-- 利用規約同意モーダル -->
 <div id="terms-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff;">
         <h3 style="color: #ffd700; margin-top: 0; text-align: center;">📜 利用規約の同意</h3>
