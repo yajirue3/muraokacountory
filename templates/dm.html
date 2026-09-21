@@ -12,17 +12,14 @@
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
         
-        /* 全体のコンテナ (スマホアプリ風のシングルカラム) */
         .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; position: relative; }
         
-        /* 共通ヘッダー */
         .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
         
-        /* 画面ビューの切り替え */
         .view { display: none; flex-direction: column; height: 100%; width: 100%; }
         .view.active { display: flex; animation: fadein 0.2s ease-out; }
         
-        /* --- リスト画面 (view-list) --- */
+        /* リスト画面 */
         .action-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
         .thread-list { flex: 1; overflow-y: auto; }
         .thread-item { padding: 16px; display: flex; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid var(--border); }
@@ -35,7 +32,7 @@
         .thread-msg { color: var(--sub); font-size: 0.9rem; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
         .unread-badge { background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
 
-        /* --- チャット画面 (view-chat) --- */
+        /* チャット画面 */
         .chat-messages { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
         .msg-row { display: flex; flex-direction: column; }
         .msg-mine { align-items: flex-end; }
@@ -52,7 +49,7 @@
         .btn-send { background: var(--primary); border: none; color: #000; padding: 0 20px; height: 44px; border-radius: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
         .btn-send:hover { background: var(--primary-hover); }
 
-        /* --- 共通・UIパーツ --- */
+        /* UIパーツ */
         .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sub); text-align: center; padding: 40px 20px; line-height: 1.6; }
         
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
@@ -78,6 +75,32 @@
         .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+        /* ★スマホ向け コンパクト化 */
+        @media (max-width: 768px) {
+            .header { height: 50px; padding: 0 10px; font-size: 1rem; }
+            .nav-icon { font-size: 1.1rem; padding: 6px; }
+            .nav-btn { font-size: 0.8rem; padding: 4px 10px; }
+            
+            .action-bar { padding: 8px 10px; }
+            .btn-full { padding: 10px; font-size: 0.9rem; }
+            
+            .thread-item { padding: 12px 10px; }
+            .avatar { width: 38px; height: 38px; margin-right: 10px; font-size: 1rem; }
+            .thread-name { font-size: 0.95rem; }
+            .thread-id { font-size: 0.8rem; }
+            .thread-msg { font-size: 0.85rem; margin-top: 4px; }
+            
+            .chat-messages { padding: 12px 10px; gap: 12px; }
+            .msg-bubble { max-width: 85%; padding: 10px 14px; font-size: 0.9rem; }
+            
+            .chat-input-wrapper { padding: 8px 10px; gap: 8px; }
+            .chat-input-wrapper input { padding: 12px; font-size: 0.9rem; }
+            .btn-send { height: 38px; padding: 0 16px; font-size: 0.9rem; }
+            
+            .modal-content { padding: 20px; }
+            .input-text { padding: 12px; font-size: 0.9rem; }
+        }
     </style>
 </head>
 <body>
@@ -86,7 +109,7 @@
 
 <div class="container">
     
-    <!-- === リスト画面 === -->
+    <!-- リスト画面 -->
     <div id="view-list" class="view active">
         <div class="header">
             <span id="sidebar-title">密書 (DM)</span>
@@ -101,16 +124,15 @@
             <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
         </div>
         <div class="thread-list" id="thread-list">
-            <!-- ロード前 -->
             <div class="empty-state">読み込み中...</div>
         </div>
     </div>
 
-    <!-- === チャット画面 === -->
+    <!-- チャット画面 -->
     <div id="view-chat" class="view">
         <div class="header">
-            <div style="display:flex; align-items:center; gap: 8px;">
-                <button class="nav-icon" onclick="closeChat()" style="margin-left: -8px;">←</button>
+            <div style="display:flex; align-items:center; gap: 4px;">
+                <button class="nav-icon" onclick="closeChat()">←</button>
                 <div style="display:flex; flex-direction:column;">
                     <span id="chat-title" style="line-height:1.2;">相手の名前</span>
                     <span id="chat-subtitle" style="font-size:0.75rem; color:var(--sub); font-weight:normal;"></span>
@@ -121,7 +143,6 @@
             <div class="empty-state">読み込み中...</div>
         </div>
         <div class="chat-input-wrapper" id="chat-input-wrapper">
-            <!-- 入力欄は独立しているため自動更新で消えません -->
             <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button class="btn-send" onclick="sendMessage()">送信</button>
         </div>
@@ -159,10 +180,9 @@
     if (!token) window.location.href = "/";
 
     let activeDmId = null;
-    let activeUserId = null; // Admin用
+    let activeUserId = null; 
     let myId = null;
     let isAdminMode = false;
-    let lastMessageCount = 0; // スクロール制御用
 
     // --- 初期化 ---
     async function init() {
@@ -177,10 +197,9 @@
         
         fetchThreads();
         
-        // 4秒おきに最新をポーリング
+        // 4秒おきの定期更新
         setInterval(() => {
             if (activeDmId || activeUserId) {
-                // チャット画面を開いている時
                 if (isAdminMode && activeUserId) {
                     const ids = activeUserId.split('/');
                     fetchAdminMessages(ids[0], ids[1], true);
@@ -188,7 +207,6 @@
                     fetchMessages(activeDmId, true);
                 }
             } else {
-                // リスト画面を開いている時
                 fetchThreads(true);
             }
         }, 4000);
@@ -206,7 +224,6 @@
 
     function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-    // --- 画面切り替え ---
     function showView(viewId) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(viewId).classList.add('active');
@@ -216,36 +233,25 @@
         showView('view-list');
         activeDmId = null; 
         activeUserId = null;
-        lastMessageCount = 0;
         fetchThreads(true);
     }
 
-    // --- モーダル制御 ---
     function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
     function openNewModal() { document.getElementById('new-modal').style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // --- ID設定 ---
     async function saveDMID() {
         const id = document.getElementById('my-dm-id').value.trim();
         if(!id) return showToast("IDを入力してください", true);
         
         const res = await fetch("/api/dm/set-id", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ dm_id: id })
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ dm_id: id })
         });
-        
         const data = await res.json();
-        if(res.ok) {
-            showToast(data.message);
-            closeModal('settings-modal');
-        } else {
-            showToast(data.detail, true);
-        }
+        if(res.ok) { showToast(data.message); closeModal('settings-modal'); } 
+        else { showToast(data.detail, true); }
     }
 
-    // --- Push通知 ---
     async function requestPushPermission() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return showToast("通知非対応のブラウザです", true);
         const permission = await Notification.requestPermission();
@@ -261,11 +267,9 @@
             const subData = JSON.parse(JSON.stringify(subscription));
             
             const res = await fetch('/api/dm/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth })
             });
-
             if (res.ok) showToast("通知設定を有効化しました");
         } catch (e) {
             console.error(e);
@@ -282,7 +286,6 @@
         return outputArray;
     }
 
-    // --- 王国検閲モード (King専用) ---
     function toggleAdminMode() {
         isAdminMode = !isAdminMode;
         document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 全スレッド監視" : "密書 (DM)";
@@ -290,7 +293,6 @@
         fetchThreads();
     }
 
-    // --- データ取得・描画 ---
     function startNewChat() {
         const id = document.getElementById('target-dm-id').value.trim();
         if(id) { 
@@ -338,7 +340,6 @@
             });
         }
         
-        // 何もない場合の処理
         if(!html) {
             html = `
                 <div class="empty-state">
@@ -348,13 +349,15 @@
                 </div>`;
         }
         
-        document.getElementById('thread-list').innerHTML = html;
+        const listBox = document.getElementById('thread-list');
+        if (listBox.innerHTML !== html) {
+            listBox.innerHTML = html;
+        }
     }
 
     async function openChat(dmId, name) {
         if (isAdminMode) return;
         activeDmId = dmId;
-        lastMessageCount = 0;
         document.getElementById('chat-title').innerText = name;
         document.getElementById('chat-subtitle').innerText = `@${dmId}`;
         
@@ -367,7 +370,6 @@
 
     async function openAdminChat(idA, idB, nameA, nameB) {
         activeUserId = idA + "/" + idB;
-        lastMessageCount = 0;
         document.getElementById('chat-title').innerText = `${nameA} ⇄ ${nameB}`;
         document.getElementById('chat-subtitle').innerText = `王国検閲中`;
         
@@ -432,13 +434,15 @@
                 </div>`;
         }
         
-        if (messages.length !== lastMessageCount || !isBackground) {
+        // HTMLが変更された場合 または 背景更新でない(即時反映)の場合に上書き
+        if (box.innerHTML !== html || !isBackground) {
             box.innerHTML = html;
-            lastMessageCount = messages.length;
-            
-            if(!isBackground || isAtBottom) {
-                box.scrollTop = box.scrollHeight;
-            }
+            // HTML更新後に確実にスクロールさせるための微小な遅延
+            setTimeout(() => {
+                if(!isBackground || isAtBottom) {
+                    box.scrollTop = box.scrollHeight;
+                }
+            }, 10);
         }
     }
 
@@ -447,6 +451,7 @@
         const content = input.value.trim();
         if(!content || !activeDmId || isAdminMode) return;
         
+        // ★送信ボタンを押した瞬間に中身を空にする
         input.value = '';
         
         const res = await fetch('/api/dm/send', { 
@@ -456,7 +461,9 @@
         });
         
         if (res.ok) {
-            fetchMessages(activeDmId, false);
+            // ★送信成功後、isBackground=falseとして強制的にスクロール更新をかける
+            await fetchMessages(activeDmId, false);
+            fetchThreads(true);
         } else {
             showToast((await res.json()).detail, true);
         }
