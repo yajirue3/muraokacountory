@@ -46,25 +46,46 @@
         .btn-danger { background: var(--danger); color: #fff; }
 
         /* 特設ライブチャット (モーダル) */
-        #auction-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-content { background: var(--bg-dark); width: 100%; max-width: 900px; height: 85vh; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: row; overflow: hidden; box-shadow: 0 0 30px rgba(212,175,55,0.2); }
-        @media (max-width: 768px) { .modal-content { flex-direction: column; height: 95vh; } }
+        #auction-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
+        .modal-content { background: var(--bg-dark); width: 100%; max-width: 900px; height: 90vh; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 30px rgba(212,175,55,0.2); }
         
-        /* ★左カラム修正: 情報はスクロール、入札ボタン(アクション)は下部固定 */
+        /* モーダル上部共通ヘッダー */
+        .modal-header { padding: 12px 16px; background: #15171a; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 20; }
+        
+        /* スマホ向けモーダル内切り替えタブ */
+        .modal-nav-tabs { display: none; background: #0f1115; border-bottom: 1px solid var(--border); }
+        .modal-nav-btn { flex: 1; padding: 10px; background: transparent; border: none; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; border-bottom: 2px solid transparent; border-radius: 0; margin: 0; }
+        .modal-nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(212,175,55,0.05); }
+
+        .modal-body { flex: 1; display: flex; flex-direction: row; overflow: hidden; position: relative; }
+        
         .modal-left { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: #15171a; overflow: hidden; }
-        .modal-left-scroll { flex: 1; padding: 20px; overflow-y: auto; }
-        .modal-left-action { padding: 20px; background: var(--card-bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 10px rgba(0,0,0,0.3); z-index: 10; }
+        .modal-left-scroll { flex: 1; padding: 15px; overflow-y: auto; }
+        .modal-left-action { padding: 15px; background: var(--card-bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 10px rgba(0,0,0,0.3); z-index: 10; }
 
         .modal-right { flex: 1; display: flex; flex-direction: column; background: var(--card-bg); }
         
         /* チャットエリア */
         .chat-header { background: #15171a; padding: 10px; text-align: center; font-size: 0.85rem; color: #94a3b8; border-bottom: 1px solid var(--border); }
         .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .chat-input-area { padding: 15px; background: #15171a; border-top: 1px solid var(--border); }
+        .chat-input-area { padding: 12px; background: #15171a; border-top: 1px solid var(--border); }
         
         .msg-item { background: #262932; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; align-self: flex-start; max-width: 85%; word-break: break-word; }
         .msg-system { background: rgba(212,175,55,0.1); color: var(--gold); border: 1px solid rgba(212,175,55,0.3); text-align: center; align-self: center; font-weight: bold; max-width: 95%; }
         
+        /* レスポンシブ (768px以下のモバイル設定) */
+        @media (max-width: 768px) {
+            #auction-modal { padding: 0; }
+            .modal-content { height: 100vh; max-height: 100vh; border-radius: 0; border: none; }
+            .modal-nav-tabs { display: flex; }
+            .modal-left { border-right: none; display: none; }
+            .modal-right { display: none; }
+            
+            /* アクティブなタブだけ表示 */
+            .modal-body.show-info .modal-left { display: flex; width: 100%; }
+            .modal-body.show-chat .modal-right { display: flex; width: 100%; }
+        }
+
         /* トースト */
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { background: rgba(30,30,30,0.95); border-left: 4px solid var(--gold); padding: 12px 20px; border-radius: 6px; color: #fff; animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
@@ -143,42 +164,53 @@
 <!-- 特設ライブチャット モーダル -->
 <div id="auction-modal">
     <div class="modal-content">
-        <!-- 左カラム: 情報と入札 (スクロール＋固定アクション) -->
-        <div class="modal-left" id="modal-left-content">
-            <div class="modal-left-scroll">
-                <button class="btn-sub" style="margin-bottom:15px;" onclick="closeAuction()">✖ 閉じる</button>
-                <div id="detail-badges" style="margin-bottom:8px;"></div>
-                <h2 id="detail-title" style="margin: 0 0 10px 0;"></h2>
-                <div id="detail-seller" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px;"></div>
-                <div id="detail-desc" style="background: #0f1115; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; white-space: pre-wrap;"></div>
-                
-                <div style="text-align: center; background: #1c1e24; border: 1px solid var(--border); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-                    <div style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 4px;">残り時間</div>
-                    <div id="detail-timer" class="timer-text" style="font-size: 2rem;">00:00:00</div>
-                </div>
-
-                <div style="background: rgba(212,175,55,0.05); border: 1px solid var(--gold); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="color: var(--gold); font-size: 0.9rem;">現在価格</span>
-                        <span id="detail-current-price" class="price-text" style="font-size: 2.2rem;">0 G</span>
-                    </div>
-                    <div id="detail-buyout-area" style="text-align: right; font-size: 0.85rem; color: var(--purple); margin-top: 4px;"></div>
-                </div>
-            </div>
-            
-            <!-- 動的アクションエリア (常に下に固定) -->
-            <div id="detail-action-area" class="modal-left-action"></div>
+        <!-- 上部ヘッダー -->
+        <div class="modal-header">
+            <span id="detail-badges"></span>
+            <button class="btn-sub" style="width:auto; margin:0; padding:6px 14px; font-size:0.8rem;" onclick="closeAuction()">✖ 閉じる</button>
         </div>
 
-        <!-- 右カラム: ライブチャット -->
-        <div class="modal-right">
-            <div class="chat-header">🔴 特設ライブチャット <span id="chat-mode-badge"></span></div>
-            <div id="chat-messages" class="chat-messages"></div>
-            <div class="chat-input-area">
-                <div style="display:flex; gap:8px;">
-                    <!-- Enterキーで送信できるように onkeypress 追加 -->
-                    <input type="text" id="chat-input" placeholder="メッセージを入力..." style="margin:0; flex:1;" onkeypress="if(event.key==='Enter') sendComment()">
-                    <button class="btn-action" style="width:auto; margin:0; padding:10px 20px;" onclick="sendComment()">送信</button>
+        <!-- スマホ用切替ナビゲーション -->
+        <div class="modal-nav-tabs">
+            <button class="modal-nav-btn active" id="btn-modal-info" onclick="switchModalTab('info')">📜 商品・入札</button>
+            <button class="modal-nav-btn" id="btn-modal-chat" onclick="switchModalTab('chat')">💬 ライブチャット</button>
+        </div>
+
+        <div class="modal-body show-info" id="modal-body">
+            <!-- 左カラム: 情報と入札 (スクロール＋固定アクション) -->
+            <div class="modal-left" id="modal-left-content">
+                <div class="modal-left-scroll">
+                    <h2 id="detail-title" style="margin: 0 0 10px 0; font-size: 1.2rem;"></h2>
+                    <div id="detail-seller" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px;"></div>
+                    <div id="detail-desc" style="background: #0f1115; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; white-space: pre-wrap;"></div>
+                    
+                    <div style="text-align: center; background: #1c1e24; border: 1px solid var(--border); padding: 12px; border-radius: 12px; margin-bottom: 15px;">
+                        <div style="color: #94a3b8; font-size: 0.75rem; margin-bottom: 2px;">残り時間</div>
+                        <div id="detail-timer" class="timer-text" style="font-size: 1.6rem;">00:00:00</div>
+                    </div>
+
+                    <div style="background: rgba(212,175,55,0.05); border: 1px solid var(--gold); padding: 12px; border-radius: 12px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                            <span style="color: var(--gold); font-size: 0.85rem;">現在価格</span>
+                            <span id="detail-current-price" class="price-text" style="font-size: 1.8rem;">0 G</span>
+                        </div>
+                        <div id="detail-buyout-area" style="text-align: right; font-size: 0.85rem; color: var(--purple); margin-top: 4px;"></div>
+                    </div>
+                </div>
+                
+                <!-- 動的アクションエリア (常に下に固定) -->
+                <div id="detail-action-area" class="modal-left-action"></div>
+            </div>
+
+            <!-- 右カラム: ライブチャット -->
+            <div class="modal-right">
+                <div class="chat-header">🔴 特設ライブチャット <span id="chat-mode-badge"></span></div>
+                <div id="chat-messages" class="chat-messages"></div>
+                <div class="chat-input-area">
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="chat-input" placeholder="メッセージを入力..." style="margin:0; flex:1;" onkeypress="if(event.key==='Enter') sendComment()">
+                        <button class="btn-action" style="width:auto; margin:0; padding:10px 16px; white-space:nowrap;" onclick="sendComment()">送信</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -236,6 +268,25 @@
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(`tab-${tabId}`).classList.add('active');
+    }
+
+    // スマホ用モーダルタブ切替
+    function switchModalTab(tab) {
+        const body = document.getElementById('modal-body');
+        const btnInfo = document.getElementById('btn-modal-info');
+        const btnChat = document.getElementById('btn-modal-chat');
+        
+        if (tab === 'info') {
+            body.classList.add('show-info');
+            body.classList.remove('show-chat');
+            btnInfo.classList.add('active');
+            btnChat.classList.remove('active');
+        } else {
+            body.classList.remove('show-info');
+            body.classList.add('show-chat');
+            btnInfo.classList.remove('active');
+            btnChat.classList.add('active');
+        }
     }
 
     // データ読み込み系
@@ -444,13 +495,14 @@
     async function openAuction(id) {
         currentAuctionId = id;
         lastCommentCount = 0; // チャット履歴リセット
+        switchModalTab('info'); // 初期タブは商品情報
         document.getElementById('auction-modal').style.display = 'flex';
         
         // 初回データ取得
         await fetchAuctionLive(id);
         await fetchAuctionComments(id);
         
-        // ポーリング開始 (価格・情報の更新 ＆ チャットの更新)
+        // ポーリング開始
         if(currentPollingInterval) clearInterval(currentPollingInterval);
         currentPollingInterval = setInterval(() => {
             fetchAuctionLive(id, true);
@@ -466,7 +518,6 @@
         document.getElementById('detail-timer').classList.remove('ended');
     }
 
-    // ★ チャット情報取得処理 (新規追加)
     async function fetchAuctionComments(id) {
         try {
             const res = await fetch(`/api/auctions/${id}/comments`, { headers: { "Authorization": `Bearer ${token}` } });
@@ -490,7 +541,6 @@
             });
             chatBox.innerHTML = html || '<div style="text-align:center; color:#888; font-size:0.85rem; margin-top:20px;">まだメッセージはありません</div>';
             
-            // 新しいコメントが増えた時だけ下までスクロール
             if (comments.length > lastCommentCount) {
                 chatBox.scrollTop = chatBox.scrollHeight;
                 lastCommentCount = comments.length;
@@ -538,13 +588,13 @@
         const isEnded = new Date(a.end_at).getTime() <= Date.now();
 
         if(isEnded) {
-            area.innerHTML = `<div style="text-align:center; padding:15px; color:var(--danger); font-weight:bold;">このオークションは終了しました</div>`;
+            area.innerHTML = `<div style="text-align:center; padding:10px; color:var(--danger); font-weight:bold;">このオークションは終了しました</div>`;
             return;
         }
 
         if(isMine) {
             if(!a.highest_bidder_id) {
-                area.innerHTML = `<button class="btn-danger" onclick="executeCancel(${a.id})">出品を取り下げる</button>`;
+                area.innerHTML = `<button class="btn-danger" style="margin:0;" onclick="executeCancel(${a.id})">出品を取り下げる</button>`;
             } else {
                 area.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:0.85rem;">入札者がいるため取り下げできません</div>`;
             }
@@ -559,11 +609,13 @@
 
         if(isHighest) {
             area.innerHTML = `
-                <div style="background:rgba(59,130,246,0.1); border:1px solid var(--blue); padding:12px; border-radius:8px; margin-bottom:15px;">
-                    <div style="color:var(--blue); font-weight:bold; margin-bottom:8px; text-align:center;">👑 あなたが最高入札者です</div>
+                <div style="background:rgba(59,130,246,0.1); border:1px solid var(--blue); padding:10px; border-radius:8px;">
+                    <div style="color:var(--blue); font-weight:bold; margin-bottom:6px; text-align:center; font-size:0.85rem;">👑 あなたが最高入札者です</div>
                     ${walletSelect}
-                    <input type="number" id="bid-amount" placeholder="新しく提示する総額" min="${a.current_price + 1}">
-                    <button class="btn-action" onclick="executeBid(${a.id}, true)">差額を払って増額する</button>
+                    <div style="display:flex; gap:8px;">
+                        <input type="number" id="bid-amount" placeholder="新しく提示する総額" min="${a.current_price + 1}" style="margin:0;">
+                        <button class="btn-action" style="width:110px; margin:0;" onclick="executeBid(${a.id}, true)">増額</button>
+                    </div>
                 </div>
             `;
         } else {
@@ -572,14 +624,14 @@
                 ${itemAccSelect}
                 <div style="display:flex; gap:8px;">
                     <input type="number" id="bid-amount" placeholder="${a.current_price + 1}G 以上を入力" style="margin:0;">
-                    <button class="btn-action" style="width:120px; margin:0;" onclick="executeBid(${a.id}, false)">入札</button>
+                    <button class="btn-action" style="width:100px; margin:0; white-space:nowrap;" onclick="executeBid(${a.id}, false)">入札</button>
                 </div>
                 ${a.buyout_price ? `<button class="btn-action" style="background:var(--purple); color:#fff; margin-top:8px;" onclick="document.getElementById('bid-amount').value=${a.buyout_price}; executeBid(${a.id}, false)">🛒 ${a.buyout_price}G で即決購入</button>` : ''}
             `;
         }
 
         if(isKingUser) {
-            area.innerHTML += `<div style="margin-top:20px; padding-top:10px; border-top:1px dashed var(--danger);"><button class="btn-danger" onclick="executeCancel(${a.id})">👑 王命強制キャンセル</button></div>`;
+            area.innerHTML += `<div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--danger);"><button class="btn-danger" style="margin:0;" onclick="executeCancel(${a.id})">👑 王命強制キャンセル</button></div>`;
         }
     }
 
@@ -627,7 +679,7 @@
             });
             if(res.ok) {
                 input.value = "";
-                await fetchAuctionComments(currentAuctionId); // 送信後即時反映
+                await fetchAuctionComments(currentAuctionId);
             } else {
                 const d = await res.json();
                 showToast(d.detail || "エラー", true);
