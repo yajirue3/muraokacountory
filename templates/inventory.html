@@ -46,8 +46,11 @@
     if (!token) {
         window.location.href = "/";
     } else {
-        loadWallets();
-        loadInventory();
+        // ウォレットを読み込んでからインベントリを描画する
+        (async () => {
+            await loadWallets();
+            await loadInventory();
+        })();
     }
 
     let myWalletsList = [];
@@ -76,9 +79,10 @@
                 return;
             }
 
-            const items = await res.json();
+            const data = await res.json();
+            const items = data.inventory || []; // バックエンドが返した { inventory: [...] } から配列を取り出す
 
-            if (!items || items.length === 0) {
+            if (items.length === 0) {
                 container.innerText = "所持しているアイテムはありません";
                 return;
             }
@@ -151,8 +155,9 @@
             const data = await res.json();
             if (res.ok) {
                 alert(data.message);
-                loadInventory();
-                loadWallets();
+                // 売却後に画面を更新
+                await loadWallets();
+                await loadInventory();
             } else {
                 alert("エラー: " + (data.detail || data.message));
             }
@@ -184,7 +189,8 @@
             const data = await res.json();
             if (res.ok) {
                 alert(data.message);
-                loadInventory();
+                // 譲渡後に画面を更新
+                await loadInventory();
             } else {
                 alert("エラー: " + (data.detail || data.message));
             }
