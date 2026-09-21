@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import traceback
 from datetime import datetime
 from fastapi import APIRouter, Header, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -31,13 +32,15 @@ class PushSubscription(BaseModel):
 # --- Helpers ---
 async def get_user_auth(authorization: str):
     if not authorization or not authorization.startswith("Bearer "):
+        print("[Auth Error] Authorizationヘッダーがないか、Formatが不正です。")
         raise HTTPException(status_code=401, detail="認証トークンがありません")
     token = authorization.split(" ")[1]
     client = await get_supabase()
     try:
         res = await client.auth.get_user(token)
         return res.user
-    except Exception:
+    except Exception as e:
+        print(f"[Auth Error] get_user 認証失敗: {e}")
         raise HTTPException(status_code=401, detail="無効なトークンです")
 
 async def is_king_user(user_id: str) -> bool:
@@ -45,21 +48,34 @@ async def is_king_user(user_id: str) -> bool:
         client = await get_supabase()
         res = await client.table("profiles").select("role").eq("id", user_id).execute()
         return bool(res.data and res.data[0].get("role") == "king")
-    except Exception:
+    except Exception as e:
+        print(f"[Role Check Error] 国王権限確認エラー: {e}")
         return False
 
-# --- Background Task: 通知送信 ---
+# --- Background Task: 通知送信 (デバッグログ強化版) ---
 async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
+    print(f"\n================ [WebPush Task Start] ================")
+    print(f"[WebPush] Receiver User ID: {receiver_id}")
+    print(f"[WebPush] Sender Name: {sender_name}")
+    print(f"[WebPush] Message Preview: {message_text[:20]}")
+
     if VAPID_PRIVATE_KEY in ["YOUR_PRIVATE_KEY_HERE", "YOUR_PUBLIC_KEY_HERE", ""]:
+        print("[WebPush ERROR] VAPID_PRIVATE_KEY が環境変数に設定されていないかデフォルト値のままです。")
+        print("======================================================\n")
         return
 
     try:
         client = await get_supabase()
+        print(f"[WebPush] DBから receiver_id ({receiver_id}) の購読情報を検索中...")
         subs_res = await client.table("push_subscriptions").select("*").eq("user_id", receiver_id).execute()
         
         if not subs_res.data:
+            print(f"[WebPush ERROR] 受信者 ({receiver_id}) の通知購読データ (push_subscriptions) がDBに存在しません。")
+            print("======================================================\n")
             return 
             
+        print(f"[WebPush] 取得された購読データ件数: {len(subs_res.data)}件")
+
         payload = {
             "title": f"村岡王国: {sender_name} からの密書",
             "body": message_text[:50] + ("..." if len(message_text) > 50 else ""),
@@ -67,7 +83,12 @@ async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
             "url": "/dm" 
         }
 
-        for sub in subs_res.data:
+        for idx, sub in enumerate(subs_res.data):
+            print(f"\n[WebPush Send Target #{idx+1}] ID: {sub.get('id')}")
+            print(f"  Endpoint: {sub['endpoint'][:40]}...")
+            print(f"  p256dh  : {sub['p256dh'][:20]}...")
+            print(f"  auth    : {sub['auth'][:10]}...")
+
             try:
                 webpush(
                     subscription_info={
@@ -78,13 +99,28 @@ async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
                     vapid_private_key=VAPID_PRIVATE_KEY,
                     vapid_claims=VAPID_CLAIMS
                 )
+                print(f"[WebPush SUCCESS] Target #{idx+1} への通知送信が完了しました！")
+
             except WebPushException as e:
-                if e.response is not None and e.response.status_code in [404, 410]:
-                    await client.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
-            except Exception:
-                pass
+                print(f"[WebPush EXCEPTION] WebPushException 発生 (Target #{idx+1}): {e}")
+                if e.response is not None:
+                    print(f"  HTTP Status Code: {e.response.status_code}")
+                    print(f"  Response Text   : {e.response.text}")
+                    if e.response.status_code in [404, 410]:
+                        print(f"  -> 無効なEndpointのためDBから削除します (ID: {sub['id']})")
+                        await client.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
+                else:
+                    print("  e.response は None です")
+
+            except Exception as e:
+                print(f"[WebPush EXCEPTION] 想定外のエラー (Target #{idx+1}): {e}")
+                print(traceback.format_exc())
+
     except Exception as e:
-        print(f"WebPush Send Error: {e}")
+        print(f"[WebPush CRITICAL ERROR] send_web_push 全体エラー: {e}")
+        print(traceback.format_exc())
+        
+    print("================ [WebPush Task End] ==================\n")
 
 # =====================================================================
 # API: ユーザー情報・通知設定
@@ -94,11 +130,12 @@ async def get_my_dm_info(authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
     try:
-        res = await client.table("profiles").select("dm_id, role").eq("id", user.id).execute()
+        res = await client.table("profiles").select("id, dm_id, role").eq("id", user.id).execute()
         if res.data:
-            return {"dm_id": res.data[0].get("dm_id"), "role": res.data[0].get("role")}
-        return {"dm_id": None, "role": "user"}
+            return {"id": res.data[0].get("id"), "dm_id": res.data[0].get("dm_id"), "role": res.data[0].get("role")}
+        return {"id": user.id, "dm_id": None, "role": "user"}
     except APIError as e:
+        print(f"[API Error /me]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
 
 @router.post("/set-id")
@@ -117,10 +154,12 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
         await client.table("profiles").update({"dm_id": data.dm_id}).eq("id", user.id).execute()
         return {"message": f"DM IDを @{data.dm_id} に設定しました！"}
     except APIError as e:
+        print(f"[API Error /set-id]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
 
 @router.get("/vapid-public-key")
 async def get_vapid_public_key():
+    print(f"[VAPID Key Request] Public Key: {VAPID_PUBLIC_KEY[:15]}...")
     return {"public_key": VAPID_PUBLIC_KEY}
 
 @router.post("/push-subscribe")
@@ -128,20 +167,30 @@ async def subscribe_push(sub: PushSubscription, authorization: str = Header(None
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
+    print(f"[Push Subscribe Request] User ID: {user.id}")
+    print(f"  Endpoint: {sub.endpoint[:40]}...")
+
     try:
         exist = await client.table("push_subscriptions").select("id").eq("endpoint", sub.endpoint).execute()
         if exist.data:
+            print(f"  既存のEndpointが見つかりました(ID: {exist.data[0]['id']})。情報を更新します。")
             await client.table("push_subscriptions").update({
                 "user_id": user.id, "p256dh": sub.p256dh, "auth": sub.auth
             }).eq("id", exist.data[0]["id"]).execute()
         else:
+            print("  新規のEndpointです。新規保存します。")
             await client.table("push_subscriptions").insert({
                 "user_id": user.id, "endpoint": sub.endpoint, "p256dh": sub.p256dh, "auth": sub.auth
             }).execute()
             
         return {"message": "通知設定を有効化しました。"}
     except APIError as e:
+        print(f"[API Error /push-subscribe]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
+    except Exception as e:
+        print(f"[Unexpected Error /push-subscribe]: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"サーバーエラー: {str(e)}")
 
 # =====================================================================
 # API: メッセージ操作（一般）
@@ -151,24 +200,32 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
+    print(f"[DM Send Request] Sender User ID: {user.id} -> Target DM ID: @{data.target_dm_id}")
+
     try:
         target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
         if not target_res.data:
+            print(f"  送信失敗: 対象の DM ID (@{data.target_dm_id}) が見つかりません。")
             raise HTTPException(status_code=404, detail="指定されたDM IDのユーザーは見つかりません。")
             
         target_id = target_res.data[0]["id"]
         if str(user.id) == str(target_id):
+            print("  送信失敗: 自分自身への送信です。")
             raise HTTPException(status_code=400, detail="自分自身には送信できません。")
 
+        # メッセージのDB保存
         await client.table("direct_messages").insert({
             "sender_id": user.id,
             "receiver_id": target_id,
             "content": data.content.strip()
         }).execute()
-        
+        print("  Direct Message DB保存成功！")
+
         prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-        sender_name = prof.data[0]["nickname"] if prof.data else "不明な国民"
+        sender_name = prof.data[0]["nickname"] if (prof.data and prof.data[0].get("nickname")) else "不明な国民"
         
+        # バックグラウンドタスク追加
+        print("  WebPush 送信タスクを BackgroundTasks に追加します...")
         background_tasks.add_task(send_web_push, target_id, sender_name, data.content.strip())
         
         return {"message": "送信完了しました。"}
@@ -179,16 +236,15 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
         raise
     except Exception as e:
         print(f"Unexpected Error in /send: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"サーバー内部エラー: {str(e)}")
 
 @router.get("/conversations")
 async def get_conversations(authorization: str = Header(None)):
-    """会話相手ごとに最新メッセージと未読件数を集計（安全な2フェッチ方式）"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
     try:
-        # 1. 自分が関与している全メッセージを取得
         filter_str = f"sender_id.eq.{user.id},receiver_id.eq.{user.id}"
         msgs = await client.table("direct_messages").select(
             "id, sender_id, receiver_id, content, is_read, created_at"
@@ -197,7 +253,6 @@ async def get_conversations(authorization: str = Header(None)):
         if not msgs.data:
             return {"conversations": []}
 
-        # 相手のユーザーIDを抽出
         partner_ids = set()
         for m in msgs.data:
             p_id = m["receiver_id"] if m["sender_id"] == user.id else m["sender_id"]
@@ -206,11 +261,9 @@ async def get_conversations(authorization: str = Header(None)):
         if not partner_ids:
             return {"conversations": []}
 
-        # 2. 相手全員のプロファイル（dm_id, nickname）を取得
         profiles_res = await client.table("profiles").select("id, nickname, dm_id").in_("id", list(partner_ids)).execute()
         prof_map = {p["id"]: p for p in (profiles_res.data or [])}
 
-        # 3. 会話一覧の組み立て
         convs = {}
         for msg in msgs.data:
             is_sender = (msg["sender_id"] == user.id)
@@ -218,7 +271,7 @@ async def get_conversations(authorization: str = Header(None)):
             
             p_info = prof_map.get(partner_id)
             if not p_info or not p_info.get("dm_id"):
-                continue  # DM ID未設定のユーザーは表示からスキップ
+                continue
 
             if partner_id not in convs:
                 convs[partner_id] = {
@@ -234,24 +287,23 @@ async def get_conversations(authorization: str = Header(None)):
 
         return {"conversations": list(convs.values())}
     except APIError as e:
+        print(f"[API Error /conversations]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
 
 @router.get("/messages/{partner_dm_id}")
 async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
-    """特定の相手とのメッセージ履歴を取得"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
     try:
         target_res = await client.table("profiles").select("id").eq("dm_id", partner_dm_id).execute()
         if not target_res.data:
-            return {"messages": []}
+            return {"messages": [], "partner_user_id": None}
         partner_id = target_res.data[0]["id"]
         
         # 未読メッセージを既読に更新
         await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).eq("is_read", False).execute()
 
-        # チャット履歴取得（Supabase PostgREST の and/or 構文）
         cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
         
         res = await client.table("direct_messages").select(
@@ -260,6 +312,7 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
         
         return {"messages": res.data or [], "partner_user_id": partner_id}
     except APIError as e:
+        print(f"[API Error /messages/{partner_dm_id}]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
 
 # =====================================================================
@@ -280,7 +333,6 @@ async def admin_get_all_threads(authorization: str = Header(None)):
         if not msgs.data:
             return {"threads": []}
 
-        # 全ユーザーIDの抽出とプロファイル一括取得
         u_ids = set()
         for m in msgs.data:
             u_ids.add(m["sender_id"])
@@ -314,6 +366,7 @@ async def admin_get_all_threads(authorization: str = Header(None)):
 
         return {"threads": list(threads.values())}
     except APIError as e:
+        print(f"[API Error /admin/threads]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
 
 @router.get("/admin/messages/{user_a_id}/{user_b_id}")
@@ -340,4 +393,5 @@ async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorizatio
 
         return {"messages": msgs}
     except APIError as e:
+        print(f"[API Error /admin/messages]: {e.message}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {e.message}")
