@@ -3,58 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - 貸金庫・アイテム口座</title>
+    <title>村岡王国 - アイテム貸金庫</title>
+    <!-- QRコード読み取り用ライブラリ -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: sans-serif; background-color: #1a1a1a; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 0; margin: 0; }
-        .container { width: 420px; display: flex; flex-direction: column; gap: 16px; }
+        .container { width: 360px; display: flex; flex-direction: column; gap: 16px; }
         .card { background: #2a2a2a; border: 2px solid #555; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-        .header { font-size: 1.2rem; font-weight: bold; color: #d35400; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 12px; }
-        .label { color: #888; font-size: 0.75rem; margin-top: 6px; }
+        .header { font-size: 1.1rem; font-weight: bold; color: #d4af37; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 12px; }
         input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #333; color: #fff; box-sizing: border-box; margin-top: 4px; margin-bottom: 10px; font-size: 0.85rem; }
-        button { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; background: #d35400; color: #fff; font-size: 0.85rem; margin-top: 4px; }
-        button:hover { background: #e67e22; }
-        .btn-sell { background: #27ae60; }
-        .btn-sell:hover { background: #2ecc71; }
-        .btn-transfer { background: #2980b9; }
-        .btn-transfer:hover { background: #3498db; }
-        .btn-move { background: #8e44ad; }
-        .btn-move:hover { background: #9b59b6; }
+        button { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; background: #27ae60; color: #fff; font-size: 0.85rem; }
+        button:hover { background: #2ecc71; }
         .btn-back { background: #444; color: #ccc; margin-top: 8px; }
         .btn-back:hover { background: #555; }
-        
-        .account-section { background: #222; border: 1px solid #d35400; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-        .account-title { font-size: 1rem; color: #f39c12; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px;}
-        
-        .item-card { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
-        .i-title { color: #fff; font-weight: bold; font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; }
-        .i-qty { color: #2ecc71; font-weight: bold; }
-        .i-desc { color: #aaa; font-size: 0.8rem; margin-bottom: 8px; background: #111; padding: 6px; border-radius: 4px; }
-        .action-box { border-top: 1px dashed #444; margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
-        .action-row { display: flex; gap: 6px; }
-        .action-row input { flex: 1; margin: 0; }
-        .action-row button { flex: 1; margin: 0; }
+        .label { color: #888; font-size: 0.75rem; }
+
+        /* アイテム一覧用スタイル */
+        .acc-section { background: #222; border: 1px solid #444; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .acc-title { color: #d4af37; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; border-bottom: 1px dashed #555; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .acc-id { font-size: 0.65rem; color: #666; font-family: monospace; }
+        .item-row { display: flex; flex-direction: column; background: #1a1a1a; padding: 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #333; }
+        .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .item-name { font-weight: bold; color: #fff; font-size: 0.85rem; }
+        .item-qty { color: #2ecc71; font-weight: bold; font-size: 0.9rem; }
+        .item-desc { font-size: 0.7rem; color: #aaa; margin-bottom: 4px; }
+        .item-price { font-size: 0.7rem; color: #f39c12; }
+
+        /* アクション切り替えパネル */
+        .action-group { display: none; background: #1a1a1a; padding: 10px; border-radius: 6px; border: 1px solid #444; margin-bottom: 10px; }
+        .action-group.active { display: block; }
+
+        /* QR用ボタン・モーダル */
+        .btn-qr-scan { width: auto; margin: 0; padding: 0 14px; background: #3498db; border-radius: 6px; font-size: 0.8rem; }
+        .btn-qr-scan:hover { background: #2980b9; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-content { background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 360px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 新規口座開設 -->
-    <div class="card">
-        <div class="header">🏦 新しいアイテム口座（保管庫）の開設</div>
-        <div class="label">口座名 (例: 裏帳簿用金庫)</div>
-        <div style="display: flex; gap: 8px;">
-            <input type="text" id="new-account-name" placeholder="新しい口座名を入力" style="margin: 0;">
-            <button onclick="createItemAccount()" style="width: 80px; margin: 0;">開設</button>
-        </div>
-    </div>
-
     <!-- アイテム口座一覧 -->
     <div class="card">
-        <div class="header">🎒 あなたのアイテム口座一覧</div>
-        <div id="inventory-container">読み込み中...</div>
+        <div class="header">🧳 所持アイテム一覧</div>
+        <div id="accounts-list">読み込み中...</div>
+    </div>
+
+    <!-- 新規アイテム口座開設 -->
+    <div class="card">
+        <div class="header">➕ 新規アイテム口座開設</div>
+        <div class="label">口座名 (例: 裏帳簿用金庫)</div>
+        <input type="text" id="new-account-name" placeholder="新しい口座名を入力">
+        <button onclick="createItemAccount()">口座を開設する</button>
+    </div>
+
+    <!-- 統合アイテム操作パネル -->
+    <div class="card">
+        <div class="header">🔄 アイテム操作 (売却・移動・譲渡)</div>
+        
+        <div class="label">対象アイテム</div>
+        <select id="action-inv-id">
+            <option value="">読込中...</option>
+        </select>
+
+        <div class="label">操作内容</div>
+        <select id="action-type" onchange="toggleActionGroup()">
+            <option value="sell">💰 売却 (Goldに換金)</option>
+            <option value="move">🧳 自口座へ移動</option>
+            <option value="transfer">🎁 他国民へ譲渡</option>
+        </select>
+
+        <div class="label">数量</div>
+        <input type="number" id="action-qty" value="1" min="1" placeholder="例: 5">
+
+        <!-- ▼ 売却用パネル -->
+        <div id="group-sell" class="action-group active">
+            <div class="label">入金先Gold口座</div>
+            <select id="sell-wallet"></select>
+        </div>
+
+        <!-- ▼ 移動用パネル -->
+        <div id="group-move" class="action-group">
+            <div class="label">移動先のアイテム口座</div>
+            <select id="move-account"></select>
+        </div>
+
+        <!-- ▼ 譲渡用パネル -->
+        <div id="group-transfer" class="action-group">
+            <div class="label">受取人のメールアドレス</div>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <input type="email" id="transfer-email" placeholder="例: user@example.com" style="margin: 0; flex: 1;">
+                <button class="btn-qr-scan" onclick="startQRScanner()">📷 読取</button>
+            </div>
+        </div>
+
+        <button onclick="executeAction()">実行する</button>
     </div>
 
     <button class="btn-back" onclick="location.href='/dashboard'">◀ 国民証に戻る</button>
+</div>
+
+<!-- ================= QRスキャンモーダル ================= -->
+<div id="qr-scan-modal" class="modal-overlay">
+    <div class="modal-content" style="border-color: #3498db;">
+        <h3 style="color: #3498db; margin-top: 0;">📷 スキャン</h3>
+        <p style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;">相手のメールアドレスQRを読み取ってください</p>
+        
+        <div id="qr-reader" style="width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; background: #000;"></div>
+        
+        <button onclick="stopQRScanner()" style="background: #e74c3c;">キャンセル</button>
+    </div>
 </div>
 
 <script>
@@ -71,82 +129,94 @@
 
     function escapeHtml(str) { return str ? String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; }
 
+    // アクションパネルの切り替え
+    function toggleActionGroup() {
+        const type = document.getElementById("action-type").value;
+        document.getElementById("group-sell").classList.remove("active");
+        document.getElementById("group-move").classList.remove("active");
+        document.getElementById("group-transfer").classList.remove("active");
+        document.getElementById(`group-${type}`).classList.add("active");
+    }
+
     async function loadWallets() {
         try {
             const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) myWalletsList = await res.json();
+            if (res.ok) {
+                myWalletsList = await res.json();
+                document.getElementById("sell-wallet").innerHTML = myWalletsList.map(w => 
+                    `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残高:${w.balance}G)</option>`
+                ).join('');
+            }
         } catch (e) { console.error(e); }
     }
 
     async function loadInventory() {
         try {
             const res = await fetch("/api/inventory", { headers: { "Authorization": `Bearer ${token}` } });
-            const container = document.getElementById("inventory-container");
+            const listContainer = document.getElementById("accounts-list");
+            const selectInv = document.getElementById("action-inv-id");
+            const selectMove = document.getElementById("move-account");
 
             if (!res.ok) {
-                container.innerText = "データ取得エラー";
+                listContainer.innerText = "データ取得エラー";
                 return;
             }
+            
             const data = await res.json();
             myItemAccounts = data.accounts || [];
 
             if (myItemAccounts.length === 0) {
-                container.innerText = "アイテム口座がありません。上で新しく開設してください。";
+                listContainer.innerText = "口座が存在しません";
+                selectInv.innerHTML = '<option value="">アイテムがありません</option>';
+                selectMove.innerHTML = '<option value="">口座がありません</option>';
                 return;
             }
 
-            // 売却先Goldウォレットの選択肢
-            const walletOptions = myWalletsList.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (${w.balance}G)</option>`).join('');
-            
-            // アイテム移動先の口座選択肢
-            const accountOptions = myItemAccounts.map(a => `<option value="${a.account_id}">${escapeHtml(a.account_name)}</option>`).join('');
-
-            container.innerHTML = myItemAccounts.map(acc => {
+            // 1. 口座一覧の描画
+            listContainer.innerHTML = myItemAccounts.map(acc => {
                 const items = (acc.user_inventories || []).filter(inv => inv.quantity > 0);
                 
-                let itemsHtml = items.length === 0 ? `<div style="color:#777; font-size:0.85rem; text-align:center;">空っぽです</div>` : items.map(inv => {
+                let itemsHtml = items.length === 0 ? `<div style="color:#777; font-size:0.8rem; text-align:center;">空っぽです</div>` : items.map(inv => {
                     const item = inv.items || {};
-                    const iId = inv.id; // user_inventories の主キー
-
                     return `
-                        <div class="item-card">
-                            <div class="i-title">
-                                <span>📦 ${escapeHtml(item.name)}</span>
-                                <span class="i-qty">x${inv.quantity}</span>
+                        <div class="item-row">
+                            <div class="item-header">
+                                <span class="item-name">📦 ${escapeHtml(item.name)}</span>
+                                <span class="item-qty">x${inv.quantity}</span>
                             </div>
-                            <div class="i-desc">${escapeHtml(item.description)} | 基準価格: ${item.base_price ?? 0}G</div>
-
-                            <div class="action-box">
-                                <!-- 売却 -->
-                                <div class="action-row">
-                                    <input type="number" id="sell-qty-${iId}" value="1" min="1" max="${inv.quantity}">
-                                    <select id="sell-wallet-${iId}">${walletOptions || '<option value="">口座なし</option>'}</select>
-                                    <button class="btn-sell" onclick="sellItem(${iId})">売却</button>
-                                </div>
-                                <!-- 自口座間移動 -->
-                                <div class="action-row" style="margin-top:4px;">
-                                    <input type="number" id="move-qty-${iId}" value="1" min="1" max="${inv.quantity}">
-                                    <select id="move-target-${iId}">${accountOptions}</select>
-                                    <button class="btn-move" onclick="moveItem(${iId})">口座移動</button>
-                                </div>
-                                <!-- 他人へ譲渡 -->
-                                <div class="action-row" style="margin-top:4px;">
-                                    <input type="number" id="trans-qty-${iId}" value="1" min="1" max="${inv.quantity}">
-                                    <input type="email" id="trans-email-${iId}" placeholder="相手のEmail">
-                                    <button class="btn-transfer" onclick="transferItem(${iId})">譲渡</button>
-                                </div>
-                            </div>
+                            <div class="item-desc">${escapeHtml(item.description)}</div>
+                            <div class="item-price">基準価格: ${item.base_price ?? 0}G</div>
                         </div>
                     `;
                 }).join('');
 
                 return `
-                    <div class="account-section">
-                        <div class="account-title">🧳 ${escapeHtml(acc.account_name)}</div>
+                    <div class="acc-section">
+                        <div class="acc-title">
+                            <span>${escapeHtml(acc.account_name)}</span>
+                            <span class="acc-id">ID: ${acc.account_id.substring(0,8)}...</span>
+                        </div>
                         ${itemsHtml}
                     </div>
                 `;
             }).join('');
+
+            // 2. セレクトボックスの動的生成（全アイテムをフラットに一覧化）
+            let invOptions = [];
+            let accOptions = [];
+            
+            myItemAccounts.forEach(acc => {
+                accOptions.push(`<option value="${acc.account_id}">${escapeHtml(acc.account_name)}</option>`);
+                
+                (acc.user_inventories || []).filter(i => i.quantity > 0).forEach(inv => {
+                    const item = inv.items || {};
+                    invOptions.push(`<option value="${inv.id}">[${escapeHtml(acc.account_name)}] ${escapeHtml(item.name)} (所持:${inv.quantity})</option>`);
+                });
+            });
+
+            selectInv.innerHTML = invOptions.length > 0 ? invOptions.join('') : '<option value="">操作可能なアイテムがありません</option>';
+            selectMove.innerHTML = accOptions.join('');
+
         } catch (e) {
             console.error(e);
         }
@@ -162,50 +232,100 @@
             });
             const data = await res.json();
             alert(data.message || data.detail);
-            if(res.ok) { document.getElementById("new-account-name").value = ""; loadInventory(); }
+            if(res.ok) { 
+                document.getElementById("new-account-name").value = ""; 
+                loadInventory(); 
+            }
         } catch(e) { alert("作成に失敗しました"); }
     }
 
-    async function sellItem(invId) {
-        const qty = parseInt(document.getElementById(`sell-qty-${invId}`).value, 10);
-        const walletId = document.getElementById(`sell-wallet-${invId}`).value;
-        if (!walletId) return alert("入金先Gold口座を選択してください");
-        
-        const res = await fetch("/api/sell-item", {
-            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ inventory_id: invId, quantity: qty, wallet_id: walletId })
-        });
-        const data = await res.json();
-        alert(data.message || data.detail);
-        if(res.ok) { loadWallets(); loadInventory(); }
+    // 統合アクション実行処理
+    async function executeAction() {
+        const invId = document.getElementById("action-inv-id").value;
+        const type = document.getElementById("action-type").value;
+        const qty = parseInt(document.getElementById("action-qty").value, 10);
+
+        if (!invId) return alert("対象アイテムを選択してください");
+        if (!qty || qty <= 0) return alert("正しい数量を入力してください");
+
+        let endpoint = "";
+        let payload = { inventory_id: parseInt(invId, 10), quantity: qty };
+
+        if (type === "sell") {
+            const walletId = document.getElementById("sell-wallet").value;
+            if (!walletId) return alert("入金先Gold口座を選択してください");
+            endpoint = "/api/sell-item";
+            payload.wallet_id = walletId;
+        } else if (type === "move") {
+            const targetAcc = document.getElementById("move-account").value;
+            if (!targetAcc) return alert("移動先口座を選択してください");
+            endpoint = "/api/move-item";
+            payload.target_account_id = targetAcc;
+        } else if (type === "transfer") {
+            const email = document.getElementById("transfer-email").value.trim();
+            if (!email) return alert("譲渡先のEmailを入力してください");
+            endpoint = "/api/transfer-item";
+            payload.target_email = email;
+        }
+
+        try {
+            const res = await fetch(endpoint, {
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if(res.ok) {
+                alert(data.message);
+                // 売却時はウォレット残高も変わるため再読み込み
+                if (type === "sell") await loadWallets();
+                await loadInventory();
+            } else {
+                alert("エラー: " + (data.detail || data.message));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("処理に失敗しました");
+        }
     }
 
-    async function moveItem(invId) {
-        const qty = parseInt(document.getElementById(`move-qty-${invId}`).value, 10);
-        const targetAcc = document.getElementById(`move-target-${invId}`).value;
-        
-        const res = await fetch("/api/move-item", {
-            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ inventory_id: invId, quantity: qty, target_account_id: targetAcc })
+    /* ================= QRコード読取機能 ================= */
+    let html5QrCode;
+
+    function startQRScanner() {
+        document.getElementById("qr-scan-modal").style.display = "flex";
+        if (html5QrCode) html5QrCode.clear();
+
+        html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 200, height: 200 } },
+            (decodedText) => {
+                // スキャン成功時、メールアドレス入力欄へセット
+                document.getElementById("transfer-email").value = decodedText;
+                stopQRScanner();
+            },
+            (err) => {} // ノイズ無視
+        ).catch((err) => {
+            alert("カメラの起動に失敗しました。権限が許可されているか確認してください。\n" + err);
+            stopQRScanner();
         });
-        const data = await res.json();
-        alert(data.message || data.detail);
-        if(res.ok) loadInventory();
     }
 
-    async function transferItem(invId) {
-        const qty = parseInt(document.getElementById(`trans-qty-${invId}`).value, 10);
-        const email = document.getElementById(`trans-email-${invId}`).value.trim();
-        if (!email) return alert("譲渡先のEmailを入力してください");
-
-        const res = await fetch("/api/transfer-item", {
-            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ inventory_id: invId, quantity: qty, target_email: email })
-        });
-        const data = await res.json();
-        alert(data.message || data.detail);
-        if(res.ok) loadInventory();
+    function stopQRScanner() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                document.getElementById("qr-scan-modal").style.display = "none";
+            }).catch(() => {
+                document.getElementById("qr-scan-modal").style.display = "none";
+            });
+        } else {
+            document.getElementById("qr-scan-modal").style.display = "none";
+        }
     }
 </script>
+
 </body>
 </html>
