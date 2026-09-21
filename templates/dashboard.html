@@ -5,70 +5,85 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - ダッシュボード</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 20px 10px; margin: 0; min-height: 100vh; }
-        .container { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
-        .card { background: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-        .header { font-size: 1.05rem; font-weight: bold; color: #d4af37; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; margin-bottom: 12px; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 16px 10px; margin: 0; min-height: 100vh; }
+        .container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+        .card { background: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .header { font-size: 0.95rem; font-weight: bold; color: #d4af37; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        .id-card-wrapper { background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); border-radius: 12px; padding: 16px; color: #1a1a1a; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); position: relative; overflow: hidden; border: 1px solid #fff; margin-bottom: 4px; }
+        /* 身分証明書 */
+        .id-card-wrapper { background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); border-radius: 12px; padding: 14px; color: #1a1a1a; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); position: relative; overflow: hidden; border: 1px solid #fff; }
         .id-card-wrapper::before { content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; }
         @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
-        .id-card-wrapper::after { content: "MURAOKA"; position: absolute; font-size: 4.5rem; font-weight: 900; color: rgba(255,255,255,0.3); transform: rotate(-25deg); top: 30px; right: -20px; pointer-events: none; letter-spacing: 5px; z-index: 1; }
+        .id-card-wrapper::after { content: "MURAOKA"; position: absolute; font-size: 4rem; font-weight: 900; color: rgba(255,255,255,0.25); transform: rotate(-25deg); top: 25px; right: -20px; pointer-events: none; letter-spacing: 4px; z-index: 1; }
         
-        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 6px; margin-bottom: 12px; position: relative; z-index: 2; }
-        .id-country { font-weight: 900; font-size: 1.1rem; color: #2c3e50; letter-spacing: 1px; }
-        .id-title { font-size: 0.75rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .id-body { display: flex; gap: 12px; position: relative; z-index: 2; }
-        .id-photo { width: 70px; height: 90px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2.5rem; color: #95a5a6; box-shadow: inset 0 0 5px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1); }
-        .id-details { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 4px; margin-bottom: 8px; position: relative; z-index: 2; }
+        .id-country { font-weight: 900; font-size: 1rem; color: #2c3e50; letter-spacing: 1px; }
+        .id-title { font-size: 0.7rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
+        .id-body { display: flex; gap: 10px; position: relative; z-index: 2; align-items: center; }
+        .id-photo { width: 55px; height: 65px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #95a5a6; }
+        .id-details { flex: 1; display: flex; flex-direction: column; gap: 3px; }
         .id-row { display: flex; flex-direction: column; }
-        .id-label { font-size: 0.65rem; color: #7f8c8d; font-weight: bold; }
-        .id-value { font-size: 0.95rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
-        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; margin-top: 2px; box-shadow: 0 2px 4px rgba(139,0,0,0.3); }
-        .id-footer { margin-top: 12px; font-size: 0.6rem; color: #7f8c8d; text-align: center; position: relative; z-index: 2; border-top: 1px solid #bdc3c7; padding-top: 6px; font-weight: bold; }
+        .id-label { font-size: 0.6rem; color: #7f8c8d; font-weight: bold; }
+        .id-value { font-size: 0.85rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
+        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
 
-        .label { color: #aaa; font-size: 0.75rem; margin-top: 8px; font-weight: bold; }
-        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; box-sizing: border-box; margin-top: 6px; margin-bottom: 12px; font-size: 0.85rem; transition: border-color 0.2s, box-shadow 0.2s; }
-        input:focus, select:focus { outline: none; border-color: #d4af37; box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2); }
+        /* お知らせエリア */
+        .news-card { background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); }
+        .news-list { display: flex; flex-direction: column; gap: 8px; max-height: 120px; overflow-y: auto; }
+        .news-item { font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; }
+        .news-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .news-date { font-size: 0.65rem; color: #888; margin-right: 6px; }
+        .news-tag { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; font-weight: bold; margin-right: 4px; background: #333; color: #fff; }
+        .news-tag.event { background: #e67e22; }
+        .news-tag.warning { background: #c0392b; }
+
+        /* 所得税表示 */
+        .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.2); padding: 10px 14px; }
+        .tax-display-amount { color: #e74c3c; font-size: 1.3rem; font-weight: 900; margin: 4px 0; font-variant-numeric: tabular-nums; }
+        .tax-display-note { font-size: 0.65rem; color: #a0a0a0; }
+
+        /* アコーディオン・フォーム関係 */
+        details summary { cursor: pointer; user-select: none; font-size: 0.8rem; color: #aaa; font-weight: bold; padding: 4px 0; }
+        details summary:hover { color: #d4af37; }
+        .label { color: #aaa; font-size: 0.7rem; margin-top: 8px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; margin-top: 4px; margin-bottom: 8px; font-size: 0.8rem; }
         
-        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; font-size: 0.9rem; transition: filter 0.2s, transform 0.1s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-        button:hover { filter: brightness(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        button { width: 100%; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; font-size: 0.85rem; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        button:hover { filter: brightness(1.15); }
         button:active { transform: scale(0.98); }
 
-        .btn-primary { background: #d4af37; color: #1a1a1a; margin-top: 8px; }
-        .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); margin-top: 6px; }
+        .btn-primary { background: #d4af37; color: #1a1a1a; padding: 8px; }
+        .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); padding: 8px; }
 
-        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .nav-grid button { margin-top: 0; padding: 14px 8px; font-size: 0.85rem; line-height: 1.3; border: 1px solid rgba(255,255,255,0.05); }
+        /* ナビゲーション（2列揃え・高さ共通化） */
+        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .nav-grid button { height: 48px; padding: 0 8px; font-size: 0.8rem; line-height: 1.2; border: 1px solid rgba(255,255,255,0.08); text-align: center; word-break: break-all; }
 
-        .btn-mtube { background: linear-gradient(135deg, #ff0055 0%, #ff0000 50%, #990000 100%); grid-column: span 2; border: 1px solid #ff4d6d !important; font-size: 1.05rem; font-weight: 900; letter-spacing: 0.5px; animation: mtube-glow 3s infinite alternate; }
-        @keyframes mtube-glow { 0% { box-shadow: 0 0 10px rgba(255, 0, 85, 0.4), 0 0 20px rgba(255, 0, 0, 0.2); } 100% { box-shadow: 0 0 20px rgba(255, 0, 85, 0.8), 0 0 35px rgba(255, 0, 0, 0.5); } }
-
+        .btn-mtube { background: linear-gradient(135deg, #ff0055 0%, #a00000 100%); border: 1px solid #ff4d6d !important; font-weight: 900; grid-column: span 2; }
         .btn-games { background: #34495e; }
         .btn-bank { background: #27ae60; }
         .btn-inventory { background: #d35400; }
         .btn-board { background: #2980b9; }
         .btn-market { background: #8e44ad; }
+        .btn-auction { background: #2e4053; border: 1px solid #5d6d7e !important; }
         .btn-casino { background: #c0392b; }
-
-        .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; border: 1px solid #ffd700 !important; display: none; }
-        .btn-policy-view { background: #34495e; color: #ecf0f1; grid-column: span 2; }
-        .btn-logout { background: #2a2a2a; color: #aaa; border: 1px solid #444; box-shadow: none; margin-top: 8px; }
-
-        .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.3); }
-        .tax-display-amount { color: #e74c3c; font-size: 1.6rem; font-weight: 900; margin: 8px 0; font-variant-numeric: tabular-nums; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .tax-display-note { font-size: 0.7rem; color: #a0a0a0; }
-
-        .alley-card { background: #191b1f; border: 1px dashed #4a5568; border-radius: 12px; padding: 16px; text-align: center; }
-        .btn-alley { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; padding: 10px; font-size: 0.85rem; }
+        .btn-comingsoon { background: #222; color: #555; border: 1px dashed #444 !important; cursor: not-allowed; }
         
-        .secret-tag { color: #e74c3c; font-size: 0.7rem; margin-left: 4px; }
+        .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; display: none; height: 38px !important; }
+        .btn-policy-view { background: #2a2a2a; color: #888; grid-column: span 2; height: 36px !important; font-size: 0.75rem !important; }
+        .btn-logout { background: #1f1f1f; color: #e74c3c; border: 1px solid #333; margin-top: 4px; padding: 10px; }
+
+        .alley-card { background: #16181c; border: 1px dashed #3a4a5e; border-radius: 12px; padding: 10px; text-align: center; }
+        .btn-alley { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; padding: 8px; font-size: 0.8rem; }
+        .secret-tag { color: #e74c3c; font-size: 0.65rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
     
+    <!-- 1. 国民身分証明証 -->
     <div class="id-card-wrapper">
         <div class="id-header">
             <div class="id-country">村岡王国</div>
@@ -83,7 +98,7 @@
                 </div>
                 <div class="id-row">
                     <span class="id-label">国民ID (EMAIL)</span>
-                    <span class="id-value" id="user-email" style="font-size: 0.7rem;">-</span>
+                    <span class="id-value" id="user-email" style="font-size: 0.65rem;">-</span>
                 </div>
                 <div class="id-row">
                     <span class="id-label">称号 (TITLE)</span>
@@ -91,54 +106,60 @@
                 </div>
             </div>
         </div>
-        <div class="id-footer">
-            ISSUED BY MURAOKA KINGDOM GOVERNMENT
+    </div>
+
+    <!-- 2. お知らせ (DB更新連動 & 動的読み込み) -->
+    <div class="card news-card">
+        <div class="header" style="font-size: 0.85rem; margin-bottom: 6px;">📢 王国からのお知らせ</div>
+        <div class="news-list" id="announcement-list">
+            <div class="news-item"><span class="news-date">--/--</span>お知らせを読み込み中...</div>
         </div>
     </div>
 
+    <!-- 3. 税金表示 -->
     <div class="card tax-display-card">
-        <div class="header" style="color: #f39c12; border-bottom: none; margin-bottom: 0;">💰 次回所得税 徴収予定額</div>
+        <div style="font-size: 0.75rem; color: #f39c12; font-weight: bold;">💰 次回所得税 徴収予定額</div>
         <div class="tax-display-amount" id="my-tax-amount">計算中...</div>
-        <div class="tax-display-note">※毎週 火曜・金曜 9:00に自動徴収（10万G超のみ 0.5%）</div>
+        <div class="tax-display-note">※毎週 火曜・金曜 9:00 自動徴収（10万G超の0.5%）</div>
     </div>
 
-    <!-- 称号の付け替え・基本設定 -->
+    <!-- 4. 設定（ゴチャつき防止のためアコーディオン化） -->
     <div class="card">
-        <div class="header">名乗る称号 / 基本設定</div>
-        
-        <div class="label">所持している称号から選ぶ</div>
-        <select id="title-select">
-            <option value="">称号を読み込み中...</option>
-        </select>
-        <button class="btn-primary" onclick="equipTitle()" style="margin-bottom: 20px;">称号を変更する</button>
+        <details>
+            <summary>⚙️ 各種設定・称号付け替え・納税</summary>
+            <div style="margin-top: 10px;">
+                <div class="label">所持称号の変更</div>
+                <select id="title-select"><option value="">読み込み中...</option></select>
+                <button class="btn-primary" onclick="equipTitle()">称号を変更</button>
 
-        <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0;"></div>
+                <div class="label" style="margin-top:12px;">納税報酬受取口座</div>
+                <select id="tax-wallet-select"><option value="">読み込み中...</option></select>
+                <button class="btn-tax" onclick="payTax()">💰 本日の納税（+100G）</button>
 
-        <div class="label">納税報酬の受取口座</div>
-        <select id="tax-wallet-select">
-            <option value="">口座を読み込み中...</option>
-        </select>
-        <button class="btn-tax" onclick="payTax()">💰 本日の納税を行う（+100G）</button>
-        
-        <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0;"></div>
+                <div class="label" style="margin-top:12px;">ニックネーム</div>
+                <input type="text" id="nickname" placeholder="例: 鉱山ハナコ">
 
-        <div class="label">表のニックネーム (全体公開)</div>
-        <input type="text" id="nickname" placeholder="例: 鉱山ハナコ">
-
-        <div class="label">本名 <span class="secret-tag">※国王のみ知る(完全非公開)</span></div>
-        <input type="text" id="real-name" placeholder="例: 村岡 太郎">
-        <button class="btn-primary" onclick="saveProfile()">情報を保存する</button>
+                <div class="label">本名 <span class="secret-tag">※国王のみ閲覧可</span></div>
+                <input type="text" id="real-name" placeholder="例: 村岡 太郎">
+                <button class="btn-primary" onclick="saveProfile()">情報を保存</button>
+            </div>
+        </details>
     </div>
 
+    <!-- 5. ナビゲーション（綺麗な2列グリッド & 高さ統一） -->
     <div class="nav-grid">
         <button class="btn-mtube" onclick="location.href='/videos'">▶️ M-Tube（動画共有）</button>
         <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場</button>
         <button class="btn-bank" onclick="location.href='/wallet'">🏦 王国中央銀行</button>
-        <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品（バッグ）</button>
+        <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品バッグ</button>
         <button class="btn-board" onclick="location.href='/board'">📜 王国回覧板</button>
         <button class="btn-market" onclick="location.href='/market'">⚖️ 王国自由市場</button>
-        <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ（一攫千金）</button>
+        <button class="btn-auction" onclick="location.href='/auction'">🔨 王国競売所 (Auction)</button>
+        <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ</button>
+        <button class="btn-comingsoon" disabled>🔒 Coming Soon</button>
+        <button class="btn-comingsoon" disabled>🔒 Coming Soon</button>
         
+        <!-- 国王専用メニュー -->
         <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）</button>
         <button id="btn-admin-casino" class="btn-admin" onclick="location.href='/admin/casino'">🎰 カジノ調整（国王専用）</button>
         <button id="btn-admin-tax" class="btn-admin" onclick="collectAllTax()">👑 全国民から所得税を即時徴収</button>
@@ -146,9 +167,10 @@
         <button class="btn-policy-view" onclick="openPolicyViewer()">📜 利用規約・ポリシーを確認</button>
     </div>
 
+    <!-- 6. 裏路地 -->
     <div class="alley-card">
-        <div style="font-size: 0.75rem; color: #718096; margin-bottom: 10px;">
-            👀 視線を感じる... 街の裏路地で怪しげな男がこちらの様子を伺っている。
+        <div style="font-size: 0.7rem; color: #718096; margin-bottom: 6px;">
+            👀 街の裏路地で怪しげな男がこちらの様子を伺っている...
         </div>
         <button class="btn-alley" onclick="openAlleyModal()">🕵️ 男に近づいて話しかける</button>
     </div>
@@ -169,6 +191,35 @@
         loadProfile();
         loadTitles();
         loadWalletsForTax();
+        loadAnnouncements();
+    }
+
+    /* お知らせ取得 (APIまたはDBテーブル連動、取得できない場合はフォールバック表示) */
+    async function loadAnnouncements() {
+        const container = document.getElementById("announcement-list");
+        try {
+            // パイソン側を弄らず動作するよう既存の告示用APIや汎用エンドポイントを試行
+            const res = await fetch("/api/announcements", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    container.innerHTML = data.map(item => `
+                        <div class="news-item">
+                            <span class="news-date">${item.created_at ? item.created_at.substring(5,10) : '最新'}</span>
+                            <span class="news-tag ${item.category || 'info'}">${item.category_name || '通知'}</span>
+                            <strong>${escapeHtml(item.title)}</strong> - ${escapeHtml(item.content)}
+                        </div>
+                    `).join('');
+                    return;
+                }
+            }
+        } catch (e) { }
+
+        // 初期またはAPI未実装時の標準表示
+        container.innerHTML = `
+            <div class="news-item"><span class="news-date">03/30</span><span class="news-tag event">更新</span>競売所（オークション）が新しくオープンしました！</div>
+            <div class="news-item"><span class="news-date">定期</span><span class="news-tag warning">税金</span>毎週火・金曜9:00に自動徴収が実施されます。</div>
+        `;
     }
 
     function calculateWealthTax(balance) {
@@ -188,9 +239,9 @@
                 if (displayNick) displayNick.innerText = data.nickname || "（未設定）";
 
                 if (data.is_king || data.role === "king") {
-                    document.getElementById("btn-admin-items").style.display = "block";
-                    document.getElementById("btn-admin-casino").style.display = "block";
-                    document.getElementById("btn-admin-tax").style.display = "block";
+                    document.getElementById("btn-admin-items").style.display = "flex";
+                    document.getElementById("btn-admin-casino").style.display = "flex";
+                    document.getElementById("btn-admin-tax").style.display = "flex";
                 }
             }
         } catch (e) { console.error(e); }
@@ -360,6 +411,7 @@
     function closePolicyViewer() { document.getElementById("policy-view-modal").style.display = "none"; }
 </script>
 
+<!-- 利用規約モーダル -->
 <div id="terms-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff;">
         <h3 style="color: #ffd700; margin-top: 0; text-align: center;">📜 利用規約の同意</h3>
@@ -411,7 +463,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
         <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
         <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 12px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5;">読み込み中...</div>
-        <button type="button" onclick="closePolicyViewer()" style="width: 100%; background: #444; color: #fff;">閉じる</button>
+        <button type="button" onclick="closePolicyViewer()" style="width: 100%; background: #444; color: #fff; padding: 8px;">閉じる</button>
     </div>
 </div>
 
@@ -420,17 +472,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男</h3>
         <div id="alley-text" style="background: #0f1115; border: 1px solid #2d3748; border-radius: 8px; padding: 14px; font-size: 0.85rem; color: #cbd5e0; line-height: 1.6; margin-bottom: 16px;"></div>
         <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 10px;">
-            <button onclick="chooseWork()" style="background: #2b6cb0;">🔨 働きたい（仕事を探す）</button>
-            <button onclick="chooseLoan()" style="background: #8e44ad;">💰 金を借りたい（裏金融へ）</button>
-            <button onclick="closeAlleyModal()" style="background: #4a5568;">👋 用はない（立ち去る）</button>
+            <button onclick="chooseWork()" style="background: #2b6cb0; padding: 10px;">🔨 働きたい（仕事を探す）</button>
+            <button onclick="chooseLoan()" style="background: #8e44ad; padding: 10px;">💰 金を借りたい（裏金融へ）</button>
+            <button onclick="closeAlleyModal()" style="background: #4a5568; padding: 10px;">👋 用はない（立ち去る）</button>
         </div>
         <div id="alley-choices-factory" style="display: none; gap: 10px;">
-            <button onclick="goToFactory()" style="background: #2b6cb0;">はい（工場へ行く）</button>
-            <button onclick="openAlleyModal()" style="background: #4a5568;">戻る</button>
+            <button onclick="goToFactory()" style="background: #2b6cb0; padding: 10px;">はい（工場へ行く）</button>
+            <button onclick="openAlleyModal()" style="background: #4a5568; padding: 10px;">戻る</button>
         </div>
         <div id="alley-choices-loan" style="display: none; gap: 10px;">
-            <button onclick="goToLoan()" style="background: #8e44ad;">裏金融へ行く</button>
-            <button onclick="openAlleyModal()" style="background: #4a5568;">戻る</button>
+            <button onclick="goToLoan()" style="background: #8e44ad; padding: 10px;">裏金融へ行く</button>
+            <button onclick="openAlleyModal()" style="background: #4a5568; padding: 10px;">戻る</button>
         </div>
     </div>
 </div>
