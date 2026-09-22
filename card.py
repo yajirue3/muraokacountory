@@ -102,7 +102,6 @@ async def get_rooms():
     return {"rooms": [{"room_id": s.room_id, "host_name": s.players[s.host_id]["name"], "bet_amount": s.bet_amount, "max_players": s.max_players, "current_players": len(s.players)} 
                       for s in CARD_SESSIONS.values() if s.status == "WAITING"]}
 
-# カード一覧（図鑑）取得用API
 @router.get("/api/card/database")
 async def get_card_database():
     return {"cards": list(CARD_DATABASE.values())}
@@ -112,18 +111,18 @@ async def create_room(data: CreateRoomRequest, authorization: str = Header(None)
     user = await get_user_from_token_async(authorization)
     supabase = await get_supabase()
 
-    if supabase:
-        w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-        if not w_res.data or w_res.data[0]["balance"] < data.amount:
-            raise HTTPException(status_code=400, detail="残高が不足しています")
-        
-        new_bal = w_res.data[0]["balance"] - data.amount
-        await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="データベース接続エラーによりルームを作成できません")
 
-        p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
-        name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
-    else:
-        name = f"Player-{str(user.id)[:4]}"
+    w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+    if not w_res.data or w_res.data[0]["balance"] < data.amount:
+        raise HTTPException(status_code=400, detail="残高が不足しています")
+    
+    new_bal = w_res.data[0]["balance"] - data.amount
+    await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+
+    p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
 
     room_id = str(uuid.uuid4())[:8]
     session = CardGameSession(room_id, str(user.id), name, data.wallet_id, data.amount, data.max_players)
@@ -160,22 +159,23 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
                     return
 
                 supabase = await get_supabase()
-                if supabase:
-                    w_res = await supabase.table("wallets").select("*").eq("user_id", user.id).gte("balance", session.bet_amount).execute()
-                    if not w_res or not w_res.data:
-                        await websocket.send_json({"type": "ERROR", "message": "参加資金が不足しています"})
-                        await websocket.close()
-                        return
-                    
-                    guest_w = w_res.data[0]
-                    await supabase.table("wallets").update({"balance": guest_w["balance"] - session.bet_amount}).eq("wallet_id", guest_w["wallet_id"]).execute()
+                if not supabase:
+                    await websocket.send_json({"type": "ERROR", "message": "DB接続エラー: 参加資金を確認できません"})
+                    await websocket.close()
+                    return
 
-                    p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
-                    guest_name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{user_id[:4]}"
-                    guest_wallet_id = guest_w["wallet_id"]
-                else:
-                    guest_name = f"Player-{user_id[:4]}"
-                    guest_wallet_id = f"w_{user_id[:4]}"
+                w_res = await supabase.table("wallets").select("*").eq("user_id", user.id).gte("balance", session.bet_amount).execute()
+                if not w_res or not w_res.data:
+                    await websocket.send_json({"type": "ERROR", "message": "参加資金が不足しています"})
+                    await websocket.close()
+                    return
+                
+                guest_w = w_res.data[0]
+                await supabase.table("wallets").update({"balance": guest_w["balance"] - session.bet_amount}).eq("wallet_id", guest_w["wallet_id"]).execute()
+
+                p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+                guest_name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{user_id[:4]}"
+                guest_wallet_id = guest_w["wallet_id"]
 
                 session.players[user_id] = {"name": guest_name, "wallet_id": guest_wallet_id}
                 session.player_order.append(user_id)
@@ -241,9 +241,8 @@ async def handle_disconnect(room_id: str, user_id: str):
                     await refund_wallet(pinfo["wallet_id"], session.bet_amount)
                     session.message = f"参加者を待っています... ({len(session.players)}/{session.max_players})"
         elif session.status in ["DRAFT", "BATTLE"]:
-            session.message = f"{session.players.get(user_id, {}).get('name', 'プレイヤー')} が通信を切断しました。"
-            if user_id in session.hp:
-                session.hp[user_id] = 0 # 切断者はHP0（敗北）扱い
+            session.message = f"{session.players.get(user_id, {}).get('name', 'プレイヤー')} が通信を切断しました。復帰を待機します。"
+            # 以前はここで HP=0 にして即敗北させていた処理を削除し、再接続を可能にしました。
             await check_battle_state(session)
     
     await broadcast_state(room_id)
@@ -321,7 +320,6 @@ def generate_draft_candidates(session: CardGameSession):
     if len(session.draft_pool) >= 5:
         session.draft_options[session.turn_user_id] = [session.draft_pool.pop() for _ in range(5)]
     else:
-        # 万が一プールが尽きた場合全データベースから補充
         pool = list(CARD_DATABASE.keys())
         random.shuffle(pool)
         session.draft_options[session.turn_user_id] = pool[:5]
@@ -334,8 +332,8 @@ def auto_draft(session: CardGameSession):
     advance_draft(session)
 
 def advance_draft(session: CardGameSession):
-    # ピック上限を6枚から12枚に変更してデッキ枚数を確保
-    if all(len(session.decks[uid]) == 12 for uid in session.player_order):
+    # ピック上限を元の仕様である6枚に修正
+    if all(len(session.decks[uid]) == 6 for uid in session.player_order):
         start_battle_phase(session)
     else:
         session.turn_idx = (session.turn_idx + 1) % session.max_players
@@ -371,7 +369,6 @@ def get_unit_owner(session: CardGameSession, target_id: str):
                 return uid, u
     return None, None
 
-# ドローヘルパー関数（山札が切れていたらランダム生成）
 def draw_card_or_generate(session: CardGameSession, user_id: str):
     if len(session.hands[user_id]) >= 7:
         return
@@ -402,10 +399,28 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
             hand = session.hands[user_id]
             idx = next((i for i, c in enumerate(hand) if c.get("instance_id") == instance_id), None)
             if idx is None: return
-
+            
             card = hand[idx]
             if session.mp[user_id] < card["cost"]: return
 
+            # スペルのターゲット事前検証処理を追加（無効な対象ならMPを消費せず不発にする）
+            if card["type"] == "spell":
+                if card.get("need_target"):
+                    if not target: return
+                    if card["effect"] in ["freeze", "burn", "wall", "assassinate"]:
+                        if target.get("type") != "unit": return
+                        t_opp_id, t_unit = get_unit_owner(session, target.get("id"))
+                        if not t_unit: return
+                    elif card["effect"] == "damage":
+                        if target.get("type") == "unit":
+                            t_opp_id, t_unit = get_unit_owner(session, target.get("id"))
+                            if not t_unit: return
+                        elif target.get("type") == "hero":
+                            if target.get("id") not in session.player_order: return
+                        else:
+                            return
+
+            # 検証通過後にはじめてMP消費・手札から除外
             session.mp[user_id] -= card["cost"]
             played = hand.pop(idx)
             session.message = f"{session.players[user_id]['name']} が {played['name']} を使用！"
@@ -415,7 +430,6 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                 hp_val = played.get("hp", 1)
                 name_val = played["name"]
 
-                # 奇術師のランダムステータス生成
                 if played.get("random_stat"):
                     atk_val = random.randint(1, 5)
                     hp_val = random.randint(1, 6)
@@ -463,7 +477,8 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
             if opp_id == user_id or opp_id not in session.player_order or session.hp.get(opp_id, 0) <= 0:
                 return
 
-            taunts = [u for u in session.boards[opp_id] if u.get("taunt")]
+            # 死んでいる挑発ユニットを対象から外す処理を強化
+            taunts = [u for u in session.boards[opp_id] if u.get("taunt") and u["curr_hp"] > 0]
             if taunts:
                 if target.get("type") != "unit" or target_id not in [u["instance_id"] for u in taunts]:
                     return
@@ -477,18 +492,15 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                 session.hp[opp_id] -= atk_val
                 if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + atk_val)
             elif target.get("type") == "unit" and defender:
-                # 攻撃時の城壁（ダメージ軽減）適用
                 dmg_to_def = max(0, atk_val - 1) if defender.get("wall_turns", 0) > 0 else atk_val
                 defender["curr_hp"] -= dmg_to_def
                 
-                # 遠距離（ranged）でなければ反撃を受ける
                 if not attacker.get("ranged", False):
                     dmg_to_atk = max(0, def_atk - 1) if attacker.get("wall_turns", 0) > 0 else def_atk
                     attacker["curr_hp"] -= dmg_to_atk
                 
                 if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + dmg_to_def)
 
-            # 攻撃回数の消費
             attacker["attacks_left"] = attacker.get("attacks_left", 1) - 1
             if attacker["attacks_left"] <= 0:
                 attacker["can_attack"] = False
@@ -506,7 +518,6 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
             session.hp[target.get("id")] -= val
         elif target.get("type") == "unit":
             opp_id, unit = get_unit_owner(session, target.get("id"))
-            # ダメージスペルにも城壁軽減を適用
             if unit: unit["curr_hp"] -= max(0, val - 1) if unit.get("wall_turns", 0) > 0 else val
     elif eff == "aoe_damage":
         for pid in session.player_order:
@@ -516,7 +527,6 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
     elif eff == "heal":
         session.hp[user_id] = min(20, session.hp[user_id] + val)
     elif eff == "draw":
-        # 山札が空でも確実に引ける（ランダム生成）よう改善
         for _ in range(val):
             draw_card_or_generate(session, user_id)
     elif eff == "assassinate" and target and target.get("type") == "unit":
@@ -525,11 +535,9 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
             unit["curr_hp"] = 0
             session.message = f"{session.players[user_id]['name']} の暗殺者が対象を仕留めた！"
     elif eff == "reshape":
-        # 手札をランダムに1枚捨てる
         if session.hands[user_id]:
             discard_idx = random.randrange(len(session.hands[user_id]))
             session.hands[user_id].pop(discard_idx)
-        # 確実に1枚引く（山札がなければ生成）
         draw_card_or_generate(session, user_id)
     elif eff == "freeze" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
@@ -548,14 +556,14 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
             session.message = f"{unit['name']} に城壁が付与された！"
 
 def switch_turn(session: CardGameSession):
-    # ターン終了時の処理（火傷ダメージの適用など）
-    if session.turn_user_id:
-        for u in session.boards[session.turn_user_id]:
+    # 全プレイヤーの盤面に対して火傷ダメージを適用する（毎ターン終了時に確実にダメージを与える）
+    for uid in session.player_order:
+        for u in session.boards[uid]:
             if u.get("burn_turns", 0) > 0:
                 u["curr_hp"] -= 1
                 u["burn_turns"] -= 1
         # 死亡判定の整理
-        session.boards[session.turn_user_id] = [u for u in session.boards[session.turn_user_id] if u["curr_hp"] > 0]
+        session.boards[uid] = [u for u in session.boards[uid] if u["curr_hp"] > 0]
 
     for _ in range(session.max_players):
         session.turn_idx = (session.turn_idx + 1) % session.max_players
@@ -569,7 +577,6 @@ def switch_turn(session: CardGameSession):
     session.max_mp[nxt] = min(10, session.max_mp[nxt] + 1)
     session.mp[nxt] = session.max_mp[nxt]
 
-    # 次ターンプレイヤーのユニット状態更新
     for u in session.boards[nxt]:
         if u.get("frozen_turns", 0) > 0:
             u["can_attack"] = False
@@ -582,9 +589,7 @@ def switch_turn(session: CardGameSession):
 
         u["attacks_left"] = u.get("max_attacks", 1)
 
-    # 通常ドロー（山札切れ時は生成）
     draw_card_or_generate(session, nxt)
-
     set_timer(session, 45)
 
 async def check_battle_state(session: CardGameSession):
