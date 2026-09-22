@@ -828,11 +828,16 @@
         } else {
             isTargetingMode = true;
             document.getElementById("battle-screen").classList.add("target-mode");
-            updateActionBanner("⚡ 魔法のターゲット（敵ユニットか敵顔）を選択してください！", true);
+            updateActionBanner("⚡ 魔法のターゲット（味方/敵ユニットか敵顔）を選択してください！", true);
         }
     }
 
     function handleBoardClick(instanceId, isMine) {
+        if (isTargetingMode && selectedHandCard) {
+            handleTargetClick('unit', instanceId);
+            return;
+        }
+
         if (isMine) {
             if (gameState.turn_user_id !== myUserId) return;
             const unit = gameState.boards[myUserId].find(u => u.instance_id === instanceId);
