@@ -190,6 +190,10 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
                     await websocket.send_json({"type": "PONG"})
                     continue
 
+                if payload.get("action") == "SYNC":
+                    await broadcast_state(room_id)
+                    continue
+
                 async with session.lock:
                     await process_action(session, user_id, payload)
                 await broadcast_state(room_id)
