@@ -8,7 +8,7 @@ logger = logging.getLogger("CardBot")
 # BOT基本設定
 # ====================================================
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "雑魚EX"
+BOT_USER_NAME = "真・究極生命体AI"
 
 BOT_CARD_TIER = {
     "s_05": 100, "u_06": 98, "s_02": 95, "s_01": 90,
@@ -20,7 +20,7 @@ BOT_CARD_TIER = {
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 # ====================================================
-# 高速シミュレータ（状態ハッシュによる重複計算の完全排除）
+# 高速シミュレータ（状態ハッシュによる重複計算の完全排除とクラッシュ対策）
 # ====================================================
 class SimState:
     def __init__(self):
@@ -51,11 +51,11 @@ class SimState:
         new_s.opp_hand_ids = list(self.opp_hand_ids)
         return new_s
 
-    # 後半の組み合わせ爆発を防ぐための状態識別キー生成
+    # 重複計算を防ぐハッシュ（ダミーカード対策として get() を使用）
     def get_hash(self) -> str:
-        mb = ",".join(f"{u['instance_id']}:{u['curr_hp']}:{u['attacks_left']}:{u['wall_turns']}" for u in self.my_board)
-        ob = ",".join(f"{u['instance_id']}:{u['curr_hp']}:{u['frozen_turns']}:{u['burn_turns']}:{u['wall_turns']}" for u in self.opp_board)
-        mh = ",".join(c['instance_id'] for c in self.my_hand)
+        mb = ",".join(f"{u.get('instance_id', 'new')}:{u.get('curr_hp', 0)}:{u.get('attacks_left', 0)}:{u.get('wall_turns', 0)}" for u in self.my_board)
+        ob = ",".join(f"{u.get('instance_id', 'new')}:{u.get('curr_hp', 0)}:{u.get('frozen_turns', 0)}:{u.get('burn_turns', 0)}:{u.get('wall_turns', 0)}" for u in self.opp_board)
+        mh = ",".join(c.get('instance_id', 'dummy') for c in self.my_hand)
         return f"{self.my_hp}|{self.opp_hp}|{self.my_mp}|{mb}|{ob}|{mh}"
 
     def evaluate(self) -> float:
@@ -73,21 +73,21 @@ class SimState:
         my_board_atk = 0
         has_lifesteal = False
         for u in self.my_board:
-            score += u["atk"] * 4.0 + u["curr_hp"] * 3.0
+            score += u.get("atk", 0) * 4.0 + u.get("curr_hp", 0) * 3.0
             if u.get("taunt"): score += 18.0
             if u.get("wall_turns", 0) > 0: score += 12.0
             if u.get("lifesteal"): has_lifesteal = True
-            my_board_atk += u["atk"]
+            my_board_atk += u.get("atk", 0)
             
         opp_trash_count = 0
         for u in self.opp_board:
-            score -= u["atk"] * 4.5 + u["curr_hp"] * 2.5
+            score -= u.get("atk", 0) * 4.5 + u.get("curr_hp", 0) * 2.5
             if u.get("taunt"): score -= 18.0
-            if u.get("frozen_turns", 0) > 0: score += u["atk"] * 3.5 # 無力化ボーナス
-            if u.get("burn_turns", 0) > 0: score += min(u["curr_hp"], 3) * 2.5
+            if u.get("frozen_turns", 0) > 0: score += u.get("atk", 0) * 3.5 # 無力化ボーナス
+            if u.get("burn_turns", 0) > 0: score += min(u.get("curr_hp", 0), 3) * 2.5
             
             # 盤面ロック＆吸血鬼バッテリーの評価
-            if u["atk"] <= 1 and not u.get("taunt"):
+            if u.get("atk", 0) <= 1 and not u.get("taunt"):
                 opp_trash_count += 1
                 if has_lifesteal: score += 10.0
 
@@ -112,7 +112,7 @@ class SimState:
                     dp[w] = max(dp[w], dp[w - cost] + val)
         max_opp_spell_dmg = max(dp) if dp else 0
         
-        active_opp_board_atk = sum(u["atk"] for u in self.opp_board if u.get("frozen_turns", 0) == 0)
+        active_opp_board_atk = sum(u.get("atk", 0) for u in self.opp_board if u.get("frozen_turns", 0) == 0)
         potential_opp_dmg = active_opp_board_atk + max_opp_spell_dmg
         
         score -= potential_opp_dmg * 2.5
@@ -122,7 +122,7 @@ class SimState:
             
         if self.opp_deck_count == 0 and len(self.opp_hand_ids) <= 2:
             score += self.my_hp * 6.0
-            score += sum(u["curr_hp"] * 4 for u in self.my_board if u.get("taunt"))
+            score += sum(u.get("curr_hp", 0) * 4 for u in self.my_board if u.get("taunt"))
 
         if my_board_atk >= self.opp_hp:
             score += 1500.0 # 次ターン確定リーサルのセットアップ
@@ -136,38 +136,41 @@ class SimState:
         if act_type == "PLAY":
             card = self.my_hand[action["h_idx"]]
             val += card.get("cost", 0) * 10 # 高コスト優先
-            if card.get("effect") == "draw": val += 50 # ドロー優先
-            if card.get("effect") == "aoe_damage": val += len(self.opp_board) * 15
+            eff = card.get("effect")
+            if eff == "draw": val += 50 # ドロー優先
+            if eff == "aoe_damage": val += len(self.opp_board) * 15
         elif act_type == "ATTACK":
             if action["t_type"] == "hero": val += 20
             else:
-                tgt = self.opp_board[action["t_idx"]]
-                if tgt.get("taunt"): val += 40
-                val += tgt.get("atk", 0) * 5
+                tgt = next((u for u in self.opp_board if u.get("instance_id") == action["t_id"]), None)
+                if tgt:
+                    if tgt.get("taunt"): val += 40
+                    val += tgt.get("atk", 0) * 5
         return val
 
     def get_legal_actions(self) -> List[dict]:
         actions = []
         opp_taunts = [u for u in self.opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
         
-        for i, u in enumerate(self.my_board):
+        for u in self.my_board:
             if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                 if opp_taunts:
-                    for j, t in enumerate(self.opp_board):
+                    for t in self.opp_board:
                         if t.get("taunt") and t.get("curr_hp", 0) > 0:
+                            # 削除ズレを防ぐため、インデックス(t_idx)ではなくID(t_id)で追跡
                             actions.append({
-                                "type": "ATTACK", "a_idx": i, "t_type": "unit", "t_idx": j,
+                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"],
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
                 else:
                     actions.append({
-                        "type": "ATTACK", "a_idx": i, "t_type": "hero", "t_idx": None,
+                        "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None,
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": self.opp_id}}
                     })
-                    for j, t in enumerate(self.opp_board):
+                    for t in self.opp_board:
                         if t.get("curr_hp", 0) > 0:
                             actions.append({
-                                "type": "ATTACK", "a_idx": i, "t_type": "unit", "t_idx": j,
+                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"],
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
                             
@@ -176,45 +179,45 @@ class SimState:
             
             c_type = c.get("type")
             eff = c.get("effect")
-            cid = c["instance_id"]
+            cid = c.get("instance_id", f"dummy_{i}")
             
             if c_type == "unit":
                 if len(self.my_board) < 7:
                     actions.append({
-                        "type": "PLAY", "h_idx": i, "t_type": None, "t_idx": None,
+                        "type": "PLAY", "h_idx": i, "t_type": None, "t_id": None,
                         "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}
                     })
             elif c_type == "spell":
                 if eff == "damage":
                     actions.append({
-                        "type": "PLAY", "h_idx": i, "t_type": "hero", "t_idx": None,
+                        "type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None,
                         "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": self.opp_id}}
                     })
-                    for j, t in enumerate(self.opp_board):
+                    for t in self.opp_board:
                         actions.append({
-                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_idx": j,
+                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"],
                             "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}
                         })
                 elif eff in ["assassinate", "freeze", "burn"]:
-                    for j, t in enumerate(self.opp_board):
+                    for t in self.opp_board:
                         if eff == "assassinate" and t.get("cost", 0) < 3 and t.get("max_hp", 0) < 4: continue # 無駄撃ち防止
                         actions.append({
-                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_idx": j,
+                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"],
                             "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}
                         })
                 elif eff == "wall":
-                    for j, u in enumerate(self.my_board):
+                    for u in self.my_board:
                         actions.append({
-                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_idx": j,
+                            "type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": u["instance_id"],
                             "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": u["instance_id"]}}
                         })
                 else: 
                     actions.append({
-                        "type": "PLAY", "h_idx": i, "t_type": None, "t_idx": None,
+                        "type": "PLAY", "h_idx": i, "t_type": None, "t_id": None,
                         "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}
                     })
                     
-        # ビームサーチ：無数にある行動の中から「賢い行動」上位8手に絞り込む（後半の爆発的遅延を完全消滅させる）
+        # ビームサーチ：無数にある行動の中から「賢い行動」上位8手に絞り込む
         actions.sort(key=lambda a: self.quick_eval_action(a), reverse=True)
         return actions[:8]
 
@@ -222,12 +225,14 @@ class SimState:
         act_type = action["type"]
         
         if act_type == "ATTACK":
-            a_idx = action["a_idx"]
+            a_id = action["a_id"]
             t_type = action["t_type"]
-            t_idx = action["t_idx"]
+            t_id = action["t_id"]
             
-            attacker = self.my_board[a_idx]
-            attacker["attacks_left"] -= 1
+            attacker = next((u for u in self.my_board if u.get("instance_id") == a_id), None)
+            if not attacker: return
+            
+            attacker["attacks_left"] = attacker.get("attacks_left", 1) - 1
             if attacker["attacks_left"] <= 0:
                 attacker["can_attack"] = False
                 
@@ -237,7 +242,9 @@ class SimState:
                 self.opp_hp -= atk_val
                 if attacker.get("lifesteal"): self.my_hp = min(20, self.my_hp + atk_val)
             elif t_type == "unit":
-                defender = self.opp_board[t_idx]
+                defender = next((u for u in self.opp_board if u.get("instance_id") == t_id), None)
+                if not defender: return
+                
                 def_atk = defender.get("atk", 0) if not attacker.get("ranged") else 0
                 
                 dmg_to_def = max(0, atk_val - 1) if defender.get("wall_turns", 0) > 0 else atk_val
@@ -249,8 +256,9 @@ class SimState:
                 
         elif act_type == "PLAY":
             h_idx = action["h_idx"]
+            if h_idx >= len(self.my_hand): return
             card = self.my_hand.pop(h_idx)
-            self.my_mp -= card["cost"]
+            self.my_mp -= card.get("cost", 0)
             
             c_type = card.get("type")
             if c_type == "unit":
@@ -258,7 +266,7 @@ class SimState:
                 hp = card.get("hp", 1)
                 if card.get("random_stat"): atk, hp = 3, 3
                 self.my_board.append({
-                    "instance_id": card["instance_id"],
+                    "instance_id": card.get("instance_id", "new_summon"),
                     "atk": atk, "curr_hp": hp, "max_hp": hp,
                     "can_attack": card.get("haste", False),
                     "taunt": card.get("taunt", False),
@@ -271,13 +279,13 @@ class SimState:
                 eff = card.get("effect")
                 val = card.get("val", 0)
                 t_type = action.get("t_type")
-                t_idx = action.get("t_idx")
+                t_id = action.get("t_id")
                 
                 if eff == "damage":
                     if t_type == "hero": self.opp_hp -= val
                     elif t_type == "unit":
-                        tgt = self.opp_board[t_idx]
-                        tgt["curr_hp"] -= max(0, val - 1) if tgt.get("wall_turns", 0) > 0 else val
+                        tgt = next((u for u in self.opp_board if u.get("instance_id") == t_id), None)
+                        if tgt: tgt["curr_hp"] -= max(0, val - 1) if tgt.get("wall_turns", 0) > 0 else val
                 elif eff == "aoe_damage":
                     for u in self.opp_board:
                         u["curr_hp"] -= max(0, val - 1) if u.get("wall_turns", 0) > 0 else val
@@ -286,19 +294,23 @@ class SimState:
                 elif eff == "draw":
                     for _ in range(val): self.my_hand.append({"type": "dummy", "cost": 99})
                 elif eff == "assassinate":
-                    self.opp_board[t_idx]["curr_hp"] = 0
+                    tgt = next((u for u in self.opp_board if u.get("instance_id") == t_id), None)
+                    if tgt: tgt["curr_hp"] = 0
                 elif eff == "reshape":
                     if self.my_hand: self.my_hand.pop(0)
                     self.my_hand.append({"type": "dummy", "cost": 99})
                 elif eff == "freeze":
-                    self.opp_board[t_idx]["frozen_turns"] = 1
+                    tgt = next((u for u in self.opp_board if u.get("instance_id") == t_id), None)
+                    if tgt: tgt["frozen_turns"] = 1
                 elif eff == "burn":
-                    self.opp_board[t_idx]["burn_turns"] = 3
+                    tgt = next((u for u in self.opp_board if u.get("instance_id") == t_id), None)
+                    if tgt: tgt["burn_turns"] = 3
                 elif eff == "wall":
-                    self.my_board[t_idx]["wall_turns"] = 3
+                    tgt = next((u for u in self.my_board if u.get("instance_id") == t_id), None)
+                    if tgt: tgt["wall_turns"] = 3
 
-        self.my_board = [u for u in self.my_board if u["curr_hp"] > 0]
-        self.opp_board = [u for u in self.opp_board if u["curr_hp"] > 0]
+        self.my_board = [u for u in self.my_board if u.get("curr_hp", 0) > 0]
+        self.opp_board = [u for u in self.opp_board if u.get("curr_hp", 0) > 0]
 
 
 # ====================================================
@@ -306,14 +318,13 @@ class SimState:
 # ====================================================
 class DFSSolver:
     def __init__(self):
-        self.max_nodes = 800 # ビームサーチ＋メモ化により、上限800でも深さ限界まで瞬時に到達可能
+        self.max_nodes = 800
         self.nodes_visited = 0
         self.visited_states = set()
         
     def search(self, state: SimState, depth: int) -> Tuple[float, List[dict]]:
         self.nodes_visited += 1
         
-        # 状態のハッシュ化による順序違いの重複計算カット（劇的な高速化）
         state_hash = state.get_hash()
         if state_hash in self.visited_states:
             return -999999.0, []
@@ -346,29 +357,45 @@ class SuperBotEngine:
         self.bot_id = BOT_USER_ID
 
     def plan_turn(self) -> List[dict]:
-        opp_id = next((uid for uid in self.session.player_order if uid != self.bot_id), None)
-        if not opp_id: return []
+        try:
+            opp_id = next((uid for uid in self.session.player_order if uid != self.bot_id), None)
+            if not opp_id: return []
 
-        state = SimState()
-        state.my_hp = self.session.hp.get(self.bot_id, 0)
-        state.opp_hp = self.session.hp.get(opp_id, 0)
-        state.my_mp = self.session.mp.get(self.bot_id, 0)
-        state.next_opp_mp = min(10, self.session.max_mp.get(opp_id, 1) + 1)
-        state.my_id = self.bot_id
-        state.opp_id = opp_id
-        
-        opp_deck = self.session.decks.get(opp_id, [])
-        state.opp_deck_count = len(opp_deck)
+            state = SimState()
+            state.my_hp = self.session.hp.get(self.bot_id, 0)
+            state.opp_hp = self.session.hp.get(opp_id, 0)
+            state.my_mp = self.session.mp.get(self.bot_id, 0)
+            state.next_opp_mp = min(10, self.session.max_mp.get(opp_id, 1) + 1)
+            state.my_id = self.bot_id
+            state.opp_id = opp_id
+            
+            opp_deck = self.session.decks.get(opp_id, [])
+            state.opp_deck_count = len(opp_deck)
 
-        state.my_board = [dict(u) for u in self.session.boards.get(self.bot_id, [])]
-        state.opp_board = [dict(u) for u in self.session.boards.get(opp_id, [])]
-        state.my_hand = [dict(c) for c in self.session.hands.get(self.bot_id, [])]
-        state.opp_hand_ids = [c.get("id") for c in self.session.hands.get(opp_id, [])]
+            state.my_board = [dict(u) for u in self.session.boards.get(self.bot_id, [])]
+            state.opp_board = [dict(u) for u in self.session.boards.get(opp_id, [])]
+            state.my_hand = [dict(c) for c in self.session.hands.get(self.bot_id, [])]
+            state.opp_hand_ids = [c.get("id") for c in self.session.hands.get(opp_id, [])]
 
-        solver = DFSSolver()
-        _, best_seq = solver.search(state, 0)
+            solver = DFSSolver()
+            _, best_seq = solver.search(state, 0)
 
-        return [act["api"] for act in best_seq]
+            return [act["api"] for act in best_seq]
+            
+        except Exception as e:
+            logger.error(f"[BOT DFS ERROR] {e}")
+            
+            # 絶対に止まらせないための最終防衛ライン（フォールバック行動）
+            fallback_actions = []
+            opp_id = next((uid for uid in self.session.player_order if uid != self.bot_id), None)
+            for u in self.session.boards.get(self.bot_id, []):
+                if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+                    fallback_actions.append({
+                        "action": "DECLARE_ATTACK",
+                        "attacker_id": u["instance_id"],
+                        "target": {"type": "hero", "id": opp_id}
+                    })
+            return fallback_actions
 
 
 # ====================================================
@@ -415,12 +442,12 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 # --- シナジー ---
                 if cid == "s_09" and any(c.get("taunt") for c in my_deck): score += 35
                 if cid == "u_06" and "u_02" in my_deck_ids: score += 20
-                if cid == "u_05" and "s_09" in my_deck_ids: score += 25 # 無敵要塞コンボ
+                if cid == "u_05" and "s_09" in my_deck_ids: score += 25 
                 
                 # --- ヘイトピック（カット戦術） ---
-                if cid == "s_02": score += 25 # 嵐は渡さない
-                if cid == "s_09" and "u_02" in opp_deck_ids: score += 50 # 相手の鉄壁を阻止
-                if cid == "u_04" and "s_05" not in my_deck_ids: score += 20 # 自分が暗殺できない大型はカット
+                if cid == "s_02": score += 25 
+                if cid == "s_09" and "u_02" in opp_deck_ids: score += 50 
+                if cid == "u_04" and "s_05" not in my_deck_ids: score += 20 
                 
                 if score > best_score:
                     best_score = score
@@ -437,7 +464,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
     # バトルフェーズ
     # -------------------------
     if session.status == "BATTLE":
-        # 思考時間(0.01秒)でターン内の完全な順序最適化を一括計算
         actions_to_execute = bot_engine.plan_turn()
 
         # 算出したコンボを0.15秒のウェイト付きで流麗に実行
