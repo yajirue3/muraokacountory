@@ -6,17 +6,17 @@ from typing import Dict, List, Optional, Any, Tuple
 logger = logging.getLogger("CardBot")
 
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "村岡国王（絶対不可侵）"
+BOT_USER_NAME = "村岡国王（影武者）"
 
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 CARD_SYNERGY_MATRIX = {
-    "u_01": {"score": 100, "counters": ["u_03", "u_06", "u_07"]}, # 速攻
+    "u_01": {"score": 150, "counters": ["u_03", "u_06", "u_07"]}, # 速攻（数で押すため評価UP）
     "s_02": {"score": 110, "counters": ["u_06", "u_01", "u_07"]}, # 全体2点
-    "s_05": {"score": 130, "counters": ["u_04", "u_05", "u_02"]}, # 暗殺（即死除去）
-    "s_09": {"score": 120, "counters": ["u_01", "s_01"]},         # 城壁
-    "s_01": {"score": 50,  "counters": ["u_03", "u_07"]},         # 雷撃（電撃）：優先度ダウン
-    "u_02": {"score": 100, "counters": ["u_01"]},                 # 挑発（壁）
+    "s_05": {"score": 130, "counters": ["u_04", "u_05", "u_02"]}, # 暗殺
+    "s_09": {"score": 100, "counters": ["u_01", "s_01"]},         # 城壁
+    "s_01": {"score": 40,  "counters": ["u_03", "u_07"]},         # 電撃（優先度低）
+    "u_02": {"score": 120, "counters": ["u_01"]},                 # 挑発（壁）
 }
 
 class SimState:
@@ -83,21 +83,21 @@ class SimState:
         if opp_threat >= self.my_hp and not has_taunt:
             score -= 200000.0
 
-        if len(self.opp_board) == 0:
-            score += 300.0
+        # --- 盤面の「数」を強力に評価 ---
+        score += len(self.my_board) * 40.0 # 数で押すボーナス
 
         for u in self.my_board:
-            score += u.get("atk", 0) * 25.0 + u.get("curr_hp", 0) * 15.0
-            if u.get("taunt"): score += 80.0
-            if u.get("wall_turns", 0) > 0: score += 50.0
+            score += u.get("atk", 0) * 20.0 + u.get("curr_hp", 0) * 10.0
+            if u.get("taunt"): score += 60.0
+            if u.get("wall_turns", 0) > 0: score += 40.0
 
         for u in self.opp_board:
-            score -= u.get("atk", 0) * 35.0 + u.get("curr_hp", 0) * 20.0
-            if u.get("taunt"): score -= 90.0
+            score -= u.get("atk", 0) * 30.0 + u.get("curr_hp", 0) * 15.0
+            if u.get("taunt"): score -= 80.0
 
-        score += (20 - self.opp_hp) * 30.0
-        score += self.my_hp * 15.0
-        score += len(self.my_hand) * 20.0
+        score += (20 - self.opp_hp) * 35.0
+        score += self.my_hp * 10.0
+        score += len(self.my_hand) * 15.0
 
         return score if is_my_turn_eval else -score
 
@@ -125,15 +125,15 @@ class SimState:
                         if t.get("curr_hp", 0) > 0:
                             trade_score = t.get("atk", 0) * 20 - u.get("atk", 0) * 2
                             actions.append({
-                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 250 + trade_score,
+                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 220 + trade_score,
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
                     actions.append({
-                        "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": 180,
+                        "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": 190,
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": enemy_id}}
                     })
 
-        # --- プレイ行動 ---
+        # --- プレイ行動（数・展開の最優先化） ---
         for i, c in enumerate(active_hand):
             if c.get("cost", 99) > active_mp: continue
             c_type = c.get("type")
@@ -141,27 +141,26 @@ class SimState:
             cid = c.get("instance_id", f"dummy_{i}")
 
             if c_type == "unit" and len(active_board) < 7:
-                # ユニット展開の優先度を高めに設定（200〜250点）
-                score_mod = 250 if c.get("taunt") else 200 - c.get("cost", 0) * 5
+                # 序盤〜中盤のミニオン展開の優先度を極大化（出せるものは即出す）
+                score_mod = 300 - (c.get("cost", 0) * 10)
+                if c.get("taunt"): score_mod += 50
                 actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": score_mod, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
             elif c_type == "spell":
                 if eff == "damage":
-                    # 【ここを修正】単体火力（電撃）の顔面使用は優先度を大幅ダウン（30点）
-                    actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 30, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
-                    # 敵ユニットの除去として使うなら優先度高め（150点）
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 20, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
                     for t in enemy_board:
-                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": 150, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
+                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": 140, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
                 elif eff in ["assassinate", "burn"]:
                     for t in enemy_board:
-                        score_boost = t.get("atk", 0) * 35 if eff == "assassinate" else 150
+                        score_boost = t.get("atk", 0) * 35 if eff == "assassinate" else 140
                         actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": score_boost, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
                 elif eff == "aoe_damage":
                     actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": len(enemy_board) * 200, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
                 elif eff == "wall":
                     for my_u in active_board:
-                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": my_u["instance_id"], "score": 160, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": my_u["instance_id"]}}})
+                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": my_u["instance_id"], "score": 150, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": my_u["instance_id"]}}})
                 elif eff == "draw":
-                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": 140, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": 130, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
 
         actions.sort(key=lambda x: x.get("score", 0), reverse=True)
         return actions
@@ -305,7 +304,7 @@ class SuperMinimaxSolver:
                     eval_val, _ = self.minimax(next_state, depth - 1, alpha, beta, True)
                 else:
                     next_state.step(act, is_bot_turn=False)
-                    eval_val, _ = self.minimax(next_state, depth, alpha, beta, False)
+                    eval_val, seq = self.minimax(next_state, depth, alpha, beta, False)
 
                 if eval_val < min_eval: min_eval = eval_val
                 beta = min(beta, eval_val)
@@ -318,7 +317,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
     if session.status == "ENDED" or session.turn_user_id != BOT_USER_ID:
         return
 
-    # ドラフト
+    # ドラフト（低コストを優先して取らせる）
     if session.status == "DRAFT":
         opts = session.draft_options.get(BOT_USER_ID, [])
         if opts:
@@ -332,11 +331,13 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 c_data = card_database.get(cid, {})
                 base_score = CARD_SYNERGY_MATRIX.get(cid, {}).get("score", 50)
                 
+                # 低コストミニオンほどドラフト評価値を高めに設定（数をそろえる）
+                c_cost = c_data.get("cost", 5)
+                base_score += (6 - c_cost) * 20
+
                 for opp_cid in opp_card_ids:
                     if opp_cid in CARD_SYNERGY_MATRIX.get(cid, {}).get("counters", []):
                         base_score += 100 
-                
-                base_score += (10 - c_data.get("cost", 0)) * 5
 
                 if base_score > best_score:
                     best_score = base_score
