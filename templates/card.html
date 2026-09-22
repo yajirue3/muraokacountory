@@ -101,16 +101,25 @@
         #action-banner {
             background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.3), transparent);
             text-align: center; font-weight: bold; padding: 5px; font-size: 0.85rem; color: #fff;
-            min-height: 30px; display: flex; align-items: center; justify-content: center;
+            min-height: 30px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
         #action-banner.alert { background: linear-gradient(90deg, transparent, rgba(255, 0, 127, 0.5), transparent); color: #fff; }
 
-        .info-bar { display: flex; justify-content: space-between; background: #000; padding: 8px; border-bottom: 1px solid var(--primary); font-size: 0.85rem; font-weight: bold; }
+        .info-bar { display: flex; justify-content: space-between; background: #000; padding: 8px; border-bottom: 1px solid var(--primary); font-size: 0.85rem; font-weight: bold; flex-shrink: 0; }
         
+        #opponents-container {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-bottom: 5px;
+        }
+
         .player-area { 
             display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; 
             background: rgba(0,243,255,0.05); border-radius: 8px; border: 1px solid rgba(0,243,255,0.2); 
-            transition: all 0.3s; position: relative;
+            transition: all 0.3s; position: relative; flex-shrink: 0;
         }
         .opponent-area { background: rgba(255,0,127,0.05); border-color: rgba(255,0,127,0.2); }
         .portrait { display: flex; flex-direction: column; }
@@ -118,45 +127,45 @@
         .hp-text { color: #ff4444; font-size: 1.2rem; text-shadow: 0 0 5px #ff0000; }
         .mp-text { color: #44aaff; }
 
-        .board { flex: 1; display: flex; gap: 8px; padding: 10px; background: rgba(255,255,255,0.02); overflow-x: auto; align-items: center; border-radius: 8px; min-height: 110px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .board { display: flex; gap: 8px; padding: 8px; background: rgba(255,255,255,0.02); overflow-x: auto; align-items: center; border-radius: 8px; min-height: 100px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); flex-shrink: 0; }
         
         .board-card {
-            min-width: 75px; height: 100px; background: var(--card-bg); border: 2px solid #555; border-radius: 8px;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 6px; font-size: 0.75rem; text-align: center; cursor: pointer;
+            min-width: 70px; height: 95px; background: var(--card-bg); border: 2px solid #555; border-radius: 8px;
+            display: flex; flex-direction: column; justify-content: space-between; padding: 6px; font-size: 0.7rem; text-align: center; cursor: pointer;
             transition: all 0.2s; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
         }
         .board-card:hover { transform: scale(1.05); }
         .board-card.taunt { border-color: var(--taunt-color); box-shadow: 0 0 10px var(--taunt-color); background: linear-gradient(180deg, #3a2a10, #1c1a29); }
         .board-card.can-attack { border-color: #00ff00; box-shadow: 0 0 10px #00ff00; animation: pulseGreen 1.5s infinite; }
-        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.9rem; }
+        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.85rem; }
         
         @keyframes pulseGreen { 0% { box-shadow: 0 0 5px #00ff00; } 50% { box-shadow: 0 0 15px #00ff00; } 100% { box-shadow: 0 0 5px #00ff00; } }
 
-        .hand-area { height: 135px; display: flex; gap: 8px; padding: 10px; overflow-x: auto; background: #050505; border-top: 2px solid var(--primary); box-shadow: 0 -5px 15px rgba(0,0,0,0.8); }
+        .hand-area { height: 120px; display: flex; gap: 8px; padding: 10px; overflow-x: auto; background: #050505; border-top: 2px solid var(--primary); box-shadow: 0 -5px 15px rgba(0,0,0,0.8); flex-shrink: 0; }
         .hand-card {
-            min-width: 85px; height: 115px; background: linear-gradient(180deg, #2a2540 0%, #151222 100%);
-            border: 2px solid #555; border-radius: 8px; padding: 6px; display: flex; flex-direction: column; font-size: 0.75rem; cursor: pointer; position: relative;
+            min-width: 80px; height: 100px; background: linear-gradient(180deg, #2a2540 0%, #151222 100%);
+            border: 2px solid #555; border-radius: 8px; padding: 6px; display: flex; flex-direction: column; font-size: 0.7rem; cursor: pointer; position: relative;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .hand-card:hover { transform: translateY(-15px) scale(1.1); z-index: 10; box-shadow: 0 10px 20px rgba(0,0,0,0.8); }
         .hand-card.playable { border-color: var(--primary); box-shadow: 0 0 8px var(--primary); }
         .hand-card.selected { transform: translateY(-20px) scale(1.15); border-color: #ff00ff; box-shadow: 0 0 20px #ff00ff; z-index: 20; }
         
-        .cost { position: absolute; top: -8px; left: -8px; background: #00f3ff; color: #000; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.5); font-size: 0.9rem;}
-        .card-title { font-weight: 900; text-align: center; margin-top: 12px; margin-bottom: auto; font-size: 0.85rem;}
-        .card-desc { font-size: 0.65rem; color: #ccc; text-align: center; line-height: 1.2; background: rgba(0,0,0,0.5); padding: 2px; border-radius: 4px;}
+        .cost { position: absolute; top: -8px; left: -8px; background: #00f3ff; color: #000; width: 22px; height: 22px; border-radius: 50%; text-align: center; line-height: 22px; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.5); font-size: 0.8rem;}
+        .card-title { font-weight: 900; text-align: center; margin-top: 10px; margin-bottom: auto; font-size: 0.8rem;}
+        .card-desc { font-size: 0.6rem; color: #ccc; text-align: center; line-height: 1.2; background: rgba(0,0,0,0.5); padding: 2px; border-radius: 4px;}
 
         #draft-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95);
             display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; gap: 20px;
         }
         .draft-options { display: flex; gap: 15px; justify-content: center; }
-        .draft-card { width: 120px; height: 160px; background: var(--card-bg); border: 3px solid var(--primary); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; cursor: pointer; font-size: 0.85rem; transition: transform 0.2s; box-shadow: var(--neon-shadow); }
+        .draft-card { width: 110px; height: 150px; background: var(--card-bg); border: 3px solid var(--primary); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; cursor: pointer; font-size: 0.8rem; transition: transform 0.2s; box-shadow: var(--neon-shadow); }
         .draft-card:hover { transform: scale(1.1); }
         
         .draft-history-container { width: 100%; padding: 0 20px; margin-top: 30px; text-align: center; }
         .draft-history { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
-        .history-card { width: 45px; height: 60px; background: #222; border: 1px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; text-align: center; font-weight: bold;}
+        .history-card { width: 40px; height: 55px; background: #222; border: 1px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; text-align: center; font-weight: bold;}
 
         .target-mode { cursor: crosshair !important; }
         .target-mode .board { box-shadow: inset 0 0 30px rgba(255, 0, 127, 0.4); }
@@ -165,13 +174,18 @@
             animation: pulseRed 1s infinite; cursor: crosshair;
         }
         .target-mode .opponent-area::after {
-            content: "🎯 ダイレクトアタック可能！"; position: absolute; right: 10px; top: -15px;
+            content: "🎯 アタック可能！"; position: absolute; right: 10px; top: -15px;
             background: #ff007f; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold;
             animation: float 2s infinite;
         }
 
         @keyframes pulseRed { 0% { box-shadow: 0 0 10px #ff007f; } 50% { box-shadow: 0 0 30px #ff007f; } 100% { box-shadow: 0 0 10px #ff007f; } }
         @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0); } }
+        
+        /* スクロールバーのカスタマイズ */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -185,8 +199,8 @@
         <div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #d4af37; padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
             <div style="font-size: 0.95rem; font-weight: bold; color: #ffd700;">🎯 勝利条件と報酬</div>
             <div style="font-size: 0.82rem; color: #fff; margin-top: 4px; line-height: 1.6;">
-                敵のヒーローを攻撃して<strong>HP(体力) 20 を先に 0 にした方の勝利</strong>！<br>
-                勝者は<strong>賭け金の総取り（2倍）</strong>を獲得します（引き分け時は全額返金）。
+                敵のヒーローを攻撃して<strong>最後まで生き残った1人</strong>の勝利！<br>
+                勝者は<strong>賭け金の総取り（参加人数分）</strong>を獲得します（引き分け時は全額返金）。
             </div>
         </div>
 
@@ -195,15 +209,15 @@
             <ol style="margin: 0; padding-left: 20px; font-size: 0.82rem; line-height: 1.8; color: #eee;">
                 <li>
                     <strong>ドラフト（編成）</strong>：<br>
-                    3枚の候補から1枚を選ぶ作業を交互に繰り返し、計6枚のデッキを作ります（制限時間各15秒・時間切れは自動選択）。
+                    3枚の候補から1枚を選ぶ作業を順番に繰り返し、計6枚のデッキを作ります。
                 </li>
                 <li>
                     <strong>初期手札とターン開始</strong>：<br>
-                    バトル開始時にデッキから3枚をドロー。ターンが回ると<strong>MPが全回復＆最大MPが+1</strong>（最大10）され、デッキから1枚引きます（制限時間45秒）。
+                    開始時に3枚ドロー。ターンが回ると<strong>MPが全回復＆最大MPが+1</strong>され、1枚引きます。
                 </li>
                 <li>
                     <strong>カードを使う（PLAY_HAND）</strong>：<br>
-                    現在のMPを消費して、手札をクリックして場に出します。
+                    MPを消費して、手札をクリックして場に出します。
                 </li>
                 <li>
                     <strong>攻撃する（DECLARE_ATTACK）</strong>：<br>
@@ -212,35 +226,24 @@
             </ol>
         </div>
 
-        <div style="background: rgba(0,0,0,0.35); padding: 12px 14px; border-radius: 8px; margin-bottom: 12px;">
-            <div style="font-weight: bold; color: #ffd700; margin-bottom: 8px; font-size: 0.9rem;">⚡ 盤面の掟・特殊能力</div>
-            <ul style="margin: 0; padding-left: 18px; font-size: 0.82rem; line-height: 1.8; color: #eee;">
-                <li><span class="highlight">🛡️ 挑発</span>：敵の場に「挑発」を持つ重装兵がいる場合、<strong>その兵を全滅させるまで他のユニットや敵ヒーローを一切攻撃できません</strong>。</li>
-                <li><span class="highlight">⚡ 速攻</span>：先鋒兵の能力。場に出した直後の最初のターンから即座に攻撃可能です。</li>
-                <li><span class="highlight">🩸 吸血</span>：吸血鬼の能力。敵に与えたダメージ分、自分のヒーローHPが回復します（最大20まで）。</li>
-                <li><span class="highlight">反撃の掟</span>：ユニット同士が戦うと、互いに自分の攻撃力分のダメージを相手のHPに同時に与え合います。</li>
-                <li><span class="highlight">手札上限・奇跡のドロー</span>：手札の上限は7枚。デッキが0枚の状態で手札が完全に尽きると、ランダムなカードが奇跡的に手札へ1枚生成されます。</li>
-            </ul>
-        </div>
-
         <div style="background: rgba(0,0,0,0.35); padding: 12px 14px; border-radius: 8px; margin-bottom: 14px;">
             <div style="font-weight: bold; color: #ffd700; margin-bottom: 8px; font-size: 0.9rem;">📜 全カード目録（9種類）</div>
             
             <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 4px; font-weight: bold;">【ユニットカード】</div>
             <ul style="margin: 0 0 8px 0; padding-left: 18px; font-size: 0.8rem; line-height: 1.7; color: #eee;">
-                <li><strong>先鋒兵</strong> (コスト1 / 攻2 / 体1) ： ⚡速攻（出した番に即攻撃）</li>
-                <li><strong>魔導士</strong> (コスト2 / 攻3 / 体2) ： 標準アタッカー</li>
-                <li><strong>重装兵</strong> (コスト3 / 攻2 / 体5) ： 🛡️挑発（身代わりの盾）</li>
-                <li><strong>吸血鬼</strong> (コスト4 / 攻3 / 体4) ： 🩸吸血（与ダメ分HP回復）</li>
-                <li><strong>巨兵</strong> (コスト6 / 攻7 / 体6) ： 圧倒的攻撃力を持つ大型ユニット</li>
+                <li><strong>先鋒兵</strong> (コスト1/攻2/体1) ： ⚡速攻（出した番に即攻撃）</li>
+                <li><strong>魔導士</strong> (コスト2/攻3/体2) ： 標準アタッカー</li>
+                <li><strong>重装兵</strong> (コスト3/攻2/体5) ： 🛡️挑発（身代わりの盾）</li>
+                <li><strong>吸血鬼</strong> (コスト4/攻3/体4) ： 🩸吸血（与ダメ分HP回復）</li>
+                <li><strong>巨兵</strong> (コスト6/攻7/体6) ： 大型ユニット</li>
             </ul>
 
             <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 4px; font-weight: bold;">【スペルカード（呪文）】</div>
             <ul style="margin: 0; padding-left: 18px; font-size: 0.8rem; line-height: 1.7; color: #eee;">
-                <li><strong>雷撃</strong> (コスト2) ： 単体の敵（ユニットまたはヒーロー）に3ダメージ</li>
-                <li><strong>治癒</strong> (コスト2) ： 自分のヒーローHPを5回復</li>
-                <li><strong>補充</strong> (コスト3) ： デッキからカードを2枚ドロー</li>
-                <li><strong>嵐</strong> (コスト4) ： 敵陣の全ユニットに2ダメージ（全体攻撃）</li>
+                <li><strong>雷撃</strong> (コスト2) ： 単体に3ダメージ</li>
+                <li><strong>治癒</strong> (コスト2) ： 自分のHPを5回復</li>
+                <li><strong>補充</strong> (コスト3) ： 2枚ドロー</li>
+                <li><strong>嵐</strong> (コスト4) ： <span style="color:#ffaa00;">自分以外の全敵ユニット</span>に2ダメージ（全体攻撃）</li>
             </ul>
         </div>
 
@@ -257,10 +260,14 @@
             <button onclick="document.getElementById('rules-modal').style.display='flex'" style="background: #333; color: #fff; padding: 5px 10px; font-size: 0.8rem;">ルール確認</button>
         </div>
         
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <select id="wallet-select" style="flex:1;"></select>
-            <input type="number" id="bet-amount" value="100" min="10" style="width:100px;" placeholder="Bet(G)">
-            <button onclick="createRoom()">部屋作成</button>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+            <select id="wallet-select" style="flex:1; min-width:0;"></select>
+            <select id="max-players-select" style="width:70px;">
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+            </select>
+            <input type="number" id="bet-amount" value="100" min="10" style="width:70px;" placeholder="Bet(G)">
+            <button onclick="createRoom()">作成</button>
         </div>
         <div class="room-list" id="room-list"></div>
         <button style="background:#333; color:#fff;" onclick="location.href='/casino'">カジノへ戻る</button>
@@ -275,21 +282,15 @@
         
         <div id="action-banner">バトル開始を待っています...</div>
         
-        <div class="player-area opponent-area" id="opp-hero" onclick="handleTargetClick('hero', opponentId)">
-            <div class="portrait">
-                <span id="opp-name">Opponent</span>
-                <span class="hp-mp" style="font-size: 0.8rem;">Deck: <span id="opp-deck">0</span></span>
-            </div>
-            <div class="hp-mp">
-                <span class="hp-text">HP: <span id="opp-hp">20</span></span> | 
-                <span class="mp-text">MP: <span id="opp-mp">0</span>/<span id="opp-max-mp">0</span></span>
-            </div>
-        </div>
+        <!-- 相手エリア（複数対応） -->
+        <div id="opponents-container"></div>
 
-        <div class="board" id="opp-board"></div>
-        <div style="text-align:center; font-size:0.75rem; color:#888; border-top:1px solid #333; border-bottom:1px solid #333; padding:2px; font-weight:900; letter-spacing: 5px;">BATTLE FIELD</div>
+        <div style="text-align:center; font-size:0.75rem; color:#888; border-top:1px solid #333; border-bottom:1px solid #333; padding:2px; font-weight:900; letter-spacing: 5px; flex-shrink: 0;">BATTLE FIELD</div>
+        
+        <!-- 自分のボード -->
         <div class="board" id="my-board"></div>
 
+        <!-- 自分のヒーロー -->
         <div class="player-area" id="my-hero" onclick="handleTargetClick('hero', myUserId)">
             <div class="portrait">
                 <span id="my-name">You</span>
@@ -299,7 +300,7 @@
                 <span class="hp-text">HP: <span id="my-hp">20</span></span> | 
                 <span class="mp-text">MP: <span id="my-mp">0</span>/<span id="my-max-mp">0</span></span>
             </div>
-            <button id="end-turn-btn" style="padding: 8px 15px; display:none; background:#ffaa00; box-shadow: 0 0 10px #ffaa00;" onclick="endTurn()">ターン終了</button>
+            <button id="end-turn-btn" style="padding: 6px 12px; display:none; background:#ffaa00; box-shadow: 0 0 10px #ffaa00; font-size: 0.8rem;" onclick="endTurn()">ターン終了</button>
         </div>
 
         <div class="hand-area" id="my-hand"></div>
@@ -309,10 +310,10 @@
     <div id="draft-overlay">
         <h2 style="color: var(--primary); text-shadow: var(--neon-shadow);">🃏 カードをピック！</h2>
         <div class="draft-options" id="draft-options"></div>
-        <div id="draft-wait" style="display:none; font-size:1.2rem; font-weight:bold;">相手の選択を待っています...</div>
+        <div id="draft-wait" style="display:none; font-size:1.1rem; font-weight:bold;">他のプレイヤーの選択を待っています...</div>
         
         <div class="draft-history-container">
-            <div style="color: #ccc; font-weight: bold;">ピック済みのカード (<span id="draft-count">0</span>/6)</div>
+            <div style="color: #ccc; font-weight: bold; font-size: 0.9rem;">ピック済みのカード (<span id="draft-count">0</span>/6)</div>
             <div class="draft-history" id="draft-history"></div>
         </div>
     </div>
@@ -328,13 +329,13 @@
     let isConnecting = false;
     let gameState = null;
     let myUserId = null;
-    let opponentId = null;
+    let opponentIds = [];
     
     // UI State / Animation trackers
     let selectedHandCard = null; 
     let selectedBoardUnit = null; 
     let isTargetingMode = false;
-    let prevHpState = { opp: 20, my: 20 };
+    let prevHpState = { my: 20, opps: {} };
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
@@ -361,7 +362,7 @@
                 <div class="room-item">
                     <div>
                         <div style="font-size:1.1rem; font-weight:bold; color:var(--primary);">${r.host_name}</div>
-                        <div style="font-size:0.8rem; color:#aaa;">Bet: ${r.bet_amount}G</div>
+                        <div style="font-size:0.8rem; color:#aaa;">Bet: ${r.bet_amount}G | ${r.current_players}/${r.max_players}人</div>
                     </div>
                     <button onclick="joinRoom('${r.room_id}')">参戦する</button>
                 </div>
@@ -372,11 +373,12 @@
     async function createRoom() {
         const walletId = document.getElementById("wallet-select").value;
         const amount = parseInt(document.getElementById("bet-amount").value);
+        const maxPlayers = parseInt(document.getElementById("max-players-select").value);
         if (!walletId || amount <= 0) return alert("入力が不正です");
 
         const res = await fetch("/api/card/create", {
             method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ wallet_id: walletId, amount })
+            body: JSON.stringify({ wallet_id: walletId, amount: amount, max_players: maxPlayers })
         });
         const data = await res.json();
         if (!res.ok) return alert(data.detail);
@@ -398,7 +400,6 @@
         
         ws.onopen = () => {
             isConnecting = false;
-            // 10秒ごとのPing送信（Wi-Fiルーターのタイムアウト防止）
             if (pingInterval) clearInterval(pingInterval);
             pingInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
@@ -417,19 +418,19 @@
         ws.onclose = () => {
             isConnecting = false;
             if (pingInterval) clearInterval(pingInterval);
-            // ゲーム中であれば自動で再接続を試みる
-            if (gameState && gameState.status !== "ENDED") {
+            // ゲーム進行中なら自動再接続を試みる
+            if (gameState && gameState.status !== "ENDED" && gameState.status !== "WAITING") {
                 updateActionBanner("通信が途切れました。再接続中...", true);
                 setTimeout(() => {
                     if (currentRoomId) connectWS(currentRoomId);
                 }, 1000);
-            } else {
-                setTimeout(() => location.reload(), 2000);
+            } else if (gameState && gameState.status === "WAITING") {
+                // 待機中の切断はロビーに戻る
+                location.reload();
             }
         };
     }
 
-    // --- アニメーション＆エフェクト管理 ---
     function spawnDamageText(elementId, amount) {
         const el = document.getElementById(elementId);
         if (!el) return;
@@ -460,13 +461,15 @@
     function renderState(state) {
         gameState = state;
         myUserId = state.your_user_id;
-        opponentId = state.host.id === myUserId ? (state.guest ? state.guest.id : null) : state.host.id;
+        
+        // 自分以外のプレイヤーIDを抽出
+        opponentIds = Object.keys(state.players).filter(id => id !== myUserId);
         
         document.getElementById("sys-message").innerText = state.message;
         document.getElementById("sys-timer").innerText = `⏳ ${state.time_limit}`;
 
         if (state.status === "WAITING") {
-            updateActionBanner("対戦相手を待っています...");
+            updateActionBanner("参加者を待っています...");
             return;
         }
         
@@ -511,25 +514,24 @@
         const isMyTurn = state.turn_user_id === myUserId;
         document.getElementById("end-turn-btn").style.display = isMyTurn ? "block" : "none";
 
-        if (opponentId && state.hp[opponentId] < prevHpState.opp) {
-            spawnDamageText("opp-hero", prevHpState.opp - state.hp[opponentId]);
-            triggerShake();
-        }
-        if (state.hp[myUserId] < prevHpState.my) {
+        // 相手のダメージ判定
+        opponentIds.forEach(oppId => {
+            if (prevHpState.opps[oppId] !== undefined && state.hp[oppId] < prevHpState.opps[oppId]) {
+                spawnDamageText(`opp-hero-${oppId}`, prevHpState.opps[oppId] - state.hp[oppId]);
+                triggerShake();
+            }
+            prevHpState.opps[oppId] = state.hp[oppId];
+        });
+
+        // 自分のダメージ判定
+        if (prevHpState.my !== undefined && state.hp[myUserId] < prevHpState.my) {
             spawnDamageText("my-hero", prevHpState.my - state.hp[myUserId]);
             triggerShake();
         }
-        if(opponentId) prevHpState.opp = state.hp[opponentId];
         prevHpState.my = state.hp[myUserId];
 
-        if (opponentId) {
-            document.getElementById("opp-name").innerText = state.host.id === opponentId ? state.host.name : state.guest.name;
-            document.getElementById("opp-hp").innerText = state.hp[opponentId];
-            document.getElementById("opp-mp").innerText = state.mp[opponentId];
-            document.getElementById("opp-max-mp").innerText = state.max_mp[opponentId];
-            document.getElementById("opp-deck").innerText = state.deck_counts[opponentId];
-        }
-        document.getElementById("my-name").innerText = state.host.id === myUserId ? state.host.name : state.guest.name;
+        // --- 自分のステータス描画 ---
+        document.getElementById("my-name").innerText = state.players[myUserId].name;
         document.getElementById("my-hp").innerText = state.hp[myUserId];
         document.getElementById("my-mp").innerText = state.mp[myUserId];
         document.getElementById("my-max-mp").innerText = state.max_mp[myUserId];
@@ -538,14 +540,50 @@
         const renderUnit = (u, isMine) => `
             <div id="unit-${u.instance_id}" class="board-card ${u.taunt ? 'taunt' : ''} ${isMine && u.can_attack && isMyTurn ? 'can-attack' : ''}" 
                  onclick="handleBoardClick('${u.instance_id}', ${isMine})">
-                <div style="font-weight:900; font-size:0.8rem; color:${isMine ? '#00f3ff' : '#ff007f'};">${u.name}</div>
-                ${u.taunt ? '<div style="font-size:0.6rem; color:#ffaa00; font-weight:bold; background:rgba(0,0,0,0.5); border-radius:3px;">🛡️挑発</div>' : ''}
+                <div style="font-weight:900; font-size:0.75rem; color:${isMine ? '#00f3ff' : '#ff007f'}; line-height: 1.1;">${u.name}</div>
+                ${u.taunt ? '<div style="font-size:0.55rem; color:#ffaa00; font-weight:bold; background:rgba(0,0,0,0.5); border-radius:3px; margin: 2px 0;">🛡️挑発</div>' : ''}
                 <div class="stats" style="margin-top:auto;"><span>⚔️${u.atk}</span><span>❤️${u.curr_hp}</span></div>
             </div>`;
-            
-        document.getElementById("opp-board").innerHTML = (state.boards[opponentId] || []).map(u => renderUnit(u, false)).join('');
+
+        // 自分のボード描画
         document.getElementById("my-board").innerHTML = (state.boards[myUserId] || []).map(u => renderUnit(u, true)).join('');
 
+        // --- 相手のエリア描画（動的生成） ---
+        let opponentsHtml = '';
+        opponentIds.forEach(oppId => {
+            const p = state.players[oppId];
+            const hp = state.hp[oppId] || 0;
+            const mp = state.mp[oppId] || 0;
+            const maxMp = state.max_mp[oppId] || 0;
+            const deck = state.deck_counts[oppId] || 0;
+            const board = (state.boards[oppId] || []).map(u => renderUnit(u, false)).join('');
+            
+            // 敗北（HP0）したプレイヤーは暗くする
+            const isDead = hp <= 0;
+            const opacity = isDead ? "0.4" : "1";
+            const deadLabel = isDead ? `<span style="color:red; font-size:0.7rem; font-weight:bold; margin-left:5px;">[DEFEATED]</span>` : '';
+
+            opponentsHtml += `
+                <div style="opacity: ${opacity}; display: flex; flex-direction: column; gap: 4px;">
+                    <div class="player-area opponent-area" id="opp-hero-${oppId}" onclick="handleTargetClick('hero', '${oppId}')">
+                        <div class="portrait">
+                            <span>${p.name} ${deadLabel}</span>
+                            <span class="hp-mp" style="font-size: 0.75rem;">Deck: <span>${deck}</span></span>
+                        </div>
+                        <div class="hp-mp">
+                            <span class="hp-text">HP: <span>${hp}</span></span> | 
+                            <span class="mp-text">MP: <span>${mp}</span>/<span>${maxMp}</span></span>
+                        </div>
+                    </div>
+                    <div class="board" style="min-height: 90px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+                        ${board}
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById("opponents-container").innerHTML = opponentsHtml;
+
+        // 自分の手札描画
         const myMp = state.mp[myUserId];
         document.getElementById("my-hand").innerHTML = (state.hands[myUserId] || []).map(c => `
             <div class="hand-card ${c.cost <= myMp && isMyTurn ? 'playable' : ''}" id="hand-${c.instance_id}" onclick="handleHandClick('${c.instance_id}', ${c.cost <= myMp && isMyTurn})">
@@ -556,15 +594,19 @@
             </div>
         `).join('');
 
-        if (!isMyTurn) {
+        if (state.hp[myUserId] <= 0) {
+            updateActionBanner("あなたは敗北しました。観戦モードです...", true);
+        } else if (!isMyTurn) {
             resetSelection();
-            updateActionBanner("相手のターンです...", false);
+            const turnPlayer = state.players[state.turn_user_id];
+            updateActionBanner(`${turnPlayer ? turnPlayer.name : '相手'}のターンです...`, false);
         } else if (!isTargetingMode) {
             updateActionBanner("あなたのターン！カードを出すか、ユニットで攻撃しよう！", false);
         }
     }
 
     function pickCard(cardId) { ws.send(JSON.stringify({ action: "PICK_CARD", card_id: cardId })); }
+    
     function endTurn() { 
         resetSelection();
         ws.send(JSON.stringify({ action: "END_TURN" })); 
@@ -574,7 +616,7 @@
         selectedHandCard = null; selectedBoardUnit = null; isTargetingMode = false;
         document.getElementById("battle-screen").classList.remove("target-mode");
         document.querySelectorAll('.hand-card').forEach(el => el.classList.remove('selected'));
-        if(gameState && gameState.turn_user_id === myUserId) {
+        if(gameState && gameState.turn_user_id === myUserId && gameState.hp[myUserId] > 0) {
             updateActionBanner("あなたのターン！カードを出すか、ユニットで攻撃しよう！", false);
         }
     }
