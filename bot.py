@@ -28,31 +28,36 @@ class SuperBotEngine:
         self.bot_id = BOT_USER_ID[span_6](start_span)[span_6](end_span)
 
     # ----------------------------------------------------
-    # 動的カード評価
+    # 動的カード評価（状況とマナカーブに応じたTier変動）
     # ----------------------------------------------------
     def get_dynamic_tier(self, card_id: str, card_cost: int, my_hp: int, my_hand_len: int, opp_board_len: int, current_turn: int) -> int:
-        base_score = BOT_CARD_TIER.get(card_id, 50)[span_7](start_span)[span_7](end_span)
+        base_score = BOT_CARD_TIER.get(card_id, 50)
         
+        # 1. 序盤（1〜3ターン目）のテンポ制御：コストの重いカードの評価を下げ、軽いユニットを最優先
         if current_turn <= 3:
             if card_cost <= current_turn:
-                base_score += 40[span_8](start_span)[span_8](end_span)
+                base_score += 40  # 出せるカードを高く評価
             else:
-                base_score -= 50[span_9](start_span)[span_9](end_span)
+                base_score -= 50  # 出せない重いカードは評価を下げる（序盤のゴミ化防止）
 
+        # 2. 自身のHPがピンチ（10以下）なら防衛・回復カードを超爆上げ
         if my_hp <= 10:
-            if card_id in ["s_03", "u_02"]:[span_10](start_span)[span_10](end_span)
-                base_score += 50[span_11](start_span)[span_11](end_span)
-            elif card_id == "s_09":[span_12](start_span)[span_12](end_span)
-                base_score += 30[span_13](start_span)[span_13](end_span)
+            if card_id in ["s_03", "u_02"]:
+                base_score += 50
+            elif card_id == "s_09":
+                base_score += 30
 
-        if opp_board_len >= 3 and card_id == "s_02":[span_14](start_span)[span_14](end_span)
-            base_score += 60[span_15](start_span)[span_15](end_span)
+        # 3. 相手の盤面が展開されているなら全体攻撃（嵐）を最優先
+        if opp_board_len >= 3 and card_id == "s_02":
+            base_score += 60
 
-        if my_hand_len <= 2 and card_id == "s_04":[span_16](start_span)[span_16](end_span)
-            base_score += 45[span_17](start_span)[span_17](end_span)
+        # 4. 手札が枯渇気味（2枚以下）ならドロー呪文を優先
+        if my_hand_len <= 2 and card_id == "s_04":
+            base_score += 45
 
-        return base_score[span_18](start_span)[span_18](end_span)
+        return base_score
 
+    
     # ----------------------------------------------------
     # 未来予測：相手の次ターン確定最大攻撃力＋直火ダメージ
     # ----------------------------------------------------
