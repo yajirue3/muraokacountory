@@ -11,17 +11,17 @@ HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 # --- カード基本情報＆単体パワーシナジー ---
 CARD_SYNERGY_MATRIX = {
-    "u_01": {"score": 450, "type": "unit", "cost": 1}, # 先鋒兵
-    "u_02": {"score": 600, "type": "unit", "cost": 3}, # 重装兵（最重要壁）
-    "u_03": {"score": 350, "type": "unit", "cost": 2}, # 魔導士
-    "u_04": {"score": 400, "type": "unit", "cost": 6}, # 巨兵
+    "u_01": {"score": 500, "type": "unit", "cost": 1}, # 先鋒兵
+    "u_02": {"score": 700, "type": "unit", "cost": 3}, # 重装兵
+    "u_03": {"score": 400, "type": "unit", "cost": 2}, # 魔導士
+    "u_04": {"score": 500, "type": "unit", "cost": 6}, # 巨兵
     "u_05": {"score": 100, "type": "unit", "cost": 4},
-    "u_06": {"score": 300, "type": "unit", "cost": 3}, # 小人
+    "u_06": {"score": 350, "type": "unit", "cost": 3}, # 小人
     "u_07": {"score": -999, "type": "unit", "cost": 1},# ゴミ排除
     
-    "s_05": {"score": 550, "type": "spell", "cost": 6}, # 暗殺者
-    "s_09": {"score": 550, "type": "spell", "cost": 2}, # 城壁
-    "s_02": {"score": 300, "type": "spell", "cost": 4}, # 嵐
+    "s_05": {"score": 600, "type": "spell", "cost": 6}, # 暗殺者
+    "s_09": {"score": 600, "type": "spell", "cost": 2}, # 城壁
+    "s_02": {"score": 350, "type": "spell", "cost": 4}, # 嵐
     "s_01": {"score": 10,  "type": "spell", "cost": 1},
     "s_03": {"score": 5,   "type": "spell", "cost": 1},
     "s_04": {"score": 10,  "type": "spell", "cost": 1},
@@ -90,34 +90,39 @@ class SimState:
         if len(self.opp_board) == 0 and my_total_atk >= self.opp_hp:
             return 900000.0 if is_my_turn_eval else -900000.0
 
-        # 2. 生存性チェック
+        # 2. 残りMPに対する評価（毎ターンMP全使い切りを圧倒的推奨）
+        # MPを残した状態でターン終了した場合に強烈なマイナス評価を付与
+        if is_my_turn_eval:
+            playable_cards = [c for c in self.my_hand if c.get("cost", 99) <= self.my_mp and c.get("id") != "s_07"]
+            if playable_cards and self.my_mp > 0 and len(self.my_board) < 7:
+                score -= 50000.0  # MPを残して温存する行為を絶対NGにする
+
+        # 3. 生存性チェック
         opp_max_dmg = self.predict_opp_max_damage()
         has_taunt = any(u.get("taunt") for u in self.my_board)
         if opp_max_dmg >= self.my_hp:
             score -= 600000.0 if not has_taunt else 100000.0
 
-        # 3. 暗殺者（s_05）リスク厳格評価
+        # 4. 暗殺者（s_05）リスク評価
         if self.opp_mp >= 6 and len(self.opp_hand) >= 1:
             for u in self.my_board:
-                # 裸の大型（u_04）は即死リスクが高すぎるため超厳重ペナルティ
                 if u.get("card_id") == "u_04" and not u.get("taunt") and u.get("wall_turns", 0) == 0:
-                    score -= 800.0
+                    score -= 1000.0
 
-        # 4. 盤面アドバンテージ（相手の盤面徹底破壊評価）
-        my_board_val = sum(u.get("atk", 0) * 30 + u.get("curr_hp", 0) * 20 for u in self.my_board)
-        opp_board_val = sum(u.get("atk", 0) * 70 + u.get("curr_hp", 0) * 50 for u in self.opp_board) # 敵の脅威度をより重く計算
+        # 5. 盤面支配率＆アドバンテージ
+        my_board_val = sum(u.get("atk", 0) * 40 + u.get("curr_hp", 0) * 30 for u in self.my_board)
+        opp_board_val = sum(u.get("atk", 0) * 80 + u.get("curr_hp", 0) * 60 for u in self.opp_board)
 
         score += (my_board_val - opp_board_val)
-        score += (len(self.my_board) - len(self.opp_board)) * 400.0
+        score += (len(self.my_board) - len(self.opp_board)) * 500.0
 
-        # 守りの要塞化加点
         for u in self.my_board:
-            if u.get("card_id") == "u_02": score += 400.0
-            if u.get("wall_turns", 0) > 0: score += 350.0
+            if u.get("card_id") == "u_02": score += 500.0
+            if u.get("wall_turns", 0) > 0: score += 400.0
 
         score += self.my_hp * 10.0
         score -= self.opp_hp * 5.0
-        score += len(self.my_hand) * 15.0
+        score += len(self.my_hand) * 10.0
 
         return score if is_my_turn_eval else -score
 
@@ -131,7 +136,7 @@ class SimState:
 
         opp_taunts = [u for u in enemy_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
 
-        # 1. 攻撃行動（徹底トレード最優先）
+        # 1. 攻撃行動（トレード最優先）
         for u in active_board:
             if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                 u_atk = u.get("atk", 0)
@@ -140,7 +145,7 @@ class SimState:
                 if opp_taunts:
                     for t in opp_taunts:
                         actions.append({
-                            "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 2000,
+                            "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 3000,
                             "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                         })
                 else:
@@ -148,31 +153,24 @@ class SimState:
                         if t.get("curr_hp", 0) > 0:
                             t_atk = t.get("atk", 0)
                             t_hp = t.get("curr_hp", 0)
-                            
-                            trade_score = 600
+                            trade_score = 1000
 
-                            # 一方的に倒せる
-                            if u_atk >= t_hp and u_hp > t_atk:
-                                trade_score += 2000
-                            # 相討ちだが相手の脅威が高い
-                            elif u_atk >= t_hp:
-                                trade_score += 1000 + (t_atk * 50)
-                            else:
-                                trade_score += 500
+                            if u_atk >= t_hp and u_hp > t_atk: trade_score += 3000
+                            elif u_atk >= t_hp: trade_score += 1500 + (t_atk * 50)
+                            else: trade_score += 800
 
                             actions.append({
                                 "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": trade_score,
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
 
-                    # 敵盤面が空の場合のみ安全に顔を殴る
-                    hero_punch_score = 100 if len(enemy_board) > 0 else 800
+                    hero_punch_score = 100 if len(enemy_board) > 0 else 1200
                     actions.append({
                         "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": hero_punch_score,
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": enemy_id}}
                     })
 
-        # 2. 手札プレイ行動
+        # 2. 手札プレイ行動（マナの使い切り・全力展開を極限まで最優先）
         for i, c in enumerate(active_hand):
             c_cost = c.get("cost", 99)
             if c_cost > active_mp: continue
@@ -185,19 +183,19 @@ class SimState:
             if cid_type == "s_07": continue
 
             if c_type == "unit" and len(active_board) < 7:
-                score_mod = 500
-                if active_mp <= 3:
-                    if cid_type == "u_01": score_mod = 3000  # 1マナ速攻最優先
-                    elif cid_type == "u_02": score_mod = 2500 # 3マナ壁最優先
-                    elif cid_type == "u_03": score_mod = 2000
-                else:
-                    # 暗殺者警戒：相手が6マナ以上ある時の裸のu_04（巨兵）展開は自重
-                    if cid_type == "u_04":
-                        has_wall_or_taunt = any(u.get("taunt") or u.get("wall_turns",0)>0 for u in active_board)
-                        score_mod = 800 if (active_mp >= 6 and not has_wall_or_taunt) else 1800
-                    elif cid_type == "u_02": score_mod = 1800
+                score_mod = 2000
+                
+                # MP全使い切り（ピッタリ消費）に絶大なスコア補正
+                if active_mp - c_cost == 0:
+                    score_mod += 5000
 
-                if active_mp - c_cost == 0: score_mod += 300
+                # 1〜2ターン目でも手札のユニットを出し惜しみせず展開
+                if cid_type == "u_01": score_mod += 3000
+                elif cid_type == "u_02": score_mod += 2800
+                elif cid_type == "u_03": score_mod += 2500
+                elif cid_type == "u_04":
+                    has_wall_or_taunt = any(u.get("taunt") or u.get("wall_turns",0)>0 for u in active_board)
+                    score_mod += 1000 if (active_mp >= 6 and not has_wall_or_taunt) else 2000
 
                 actions.append({
                     "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": score_mod,
@@ -208,9 +206,9 @@ class SimState:
                 if eff == "assassinate" or cid_type == "s_05":
                     for t in enemy_board:
                         t_cid = t.get("card_id")
-                        ass_score = 1500
-                        if t_cid == "u_04": ass_score = 5000  # 敵の巨兵を絶対排除
-                        elif t_cid == "u_02": ass_score = 3500
+                        ass_score = 2000
+                        if t_cid == "u_04": ass_score = 6000
+                        elif t_cid == "u_02": ass_score = 4500
 
                         actions.append({
                             "type": "PLAY", "c_inst_id": inst_id, "t_type": "unit", "t_id": t["instance_id"], "score": ass_score,
@@ -220,7 +218,7 @@ class SimState:
                 elif eff == "wall" or cid_type == "s_09":
                     for my_u in active_board:
                         if my_u.get("wall_turns", 0) == 0:
-                            score_wall = 4000 if my_u.get("card_id") == "u_02" else 1200
+                            score_wall = 5000 if my_u.get("card_id") == "u_02" else 1500
                             actions.append({
                                 "type": "PLAY", "c_inst_id": inst_id, "t_type": "unit", "t_id": my_u["instance_id"], "score": score_wall,
                                 "api": {"action": "PLAY_HAND", "card_instance_id": inst_id, "target": {"type": "unit", "id": my_u["instance_id"]}}
@@ -229,7 +227,7 @@ class SimState:
                 elif eff == "aoe_damage" or cid_type == "s_02":
                     if len(enemy_board) >= 2:
                         actions.append({
-                            "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": 2500,
+                            "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": 3000,
                             "api": {"action": "PLAY_HAND", "card_instance_id": inst_id, "target": None}
                         })
 
@@ -309,7 +307,7 @@ class SimState:
         self.opp_board = [u for u in self.opp_board if u.get("curr_hp", 0) > 0]
 
 class SuperMinimaxSolver:
-    def __init__(self, max_time_nodes=10000):
+    def __init__(self, max_time_nodes=12000):
         self.max_nodes = max_time_nodes
         self.nodes_visited = 0
         self.transposition_table = {}
@@ -379,7 +377,7 @@ class SuperMinimaxSolver:
 async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], process_action_func: Any):
     while session.status != "ENDED" and session.turn_user_id == BOT_USER_ID:
         
-        # --- 戦略的ドラフトフェーズ（デッキ評価ロジック全改修） ---
+        # --- 戦略的ドラフトフェーズ ---
         if session.status == "DRAFT":
             opts = session.draft_options.get(BOT_USER_ID, [])
             if not opts: break
@@ -391,7 +389,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             opp_deck = session.decks.get(opp_id, []) if opp_id else []
             opp_card_ids = [c.get("id") for c in opp_deck]
 
-            # 既存デッキのコスト分布計算
             low_cost_count = sum(1 for cid in my_card_ids if CARD_SYNERGY_MATRIX.get(cid, {}).get("cost", 5) <= 2)
             has_u02 = "u_02" in my_card_ids
 
@@ -405,20 +402,13 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 if cid == "s_07" or cid == "u_07":
                     base_score = -999999
                 else:
-                    # 1. コンボシナジー補正
-                    if cid == "s_09" and has_u02:
-                        base_score += 400  # 重装兵を持っていれば城壁の優先度を最大化
-                    if cid == "u_02" and "s_09" in my_card_ids:
-                        base_score += 300
+                    if cid == "s_09" and has_u02: base_score += 400
+                    if cid == "u_02" and "s_09" in my_card_ids: base_score += 300
+                    if low_cost_count < 4 and c_cost <= 2 and c_info.get("type") == "unit": base_score += 400
 
-                    # 2. アグロ・テンポ事故防止（低コスト補正）
-                    if low_cost_count < 4 and c_cost <= 2 and c_info.get("type") == "unit":
-                        base_score += 350
-
-                    # 3. 相手のドラフトに対するアンチピック（メタ構築）
                     for opp_cid in opp_card_ids:
-                        if opp_cid == "u_04" and cid == "s_05": base_score += 300 # 相手の巨兵に暗殺者をぶつける
-                        if opp_cid == "u_01" and cid == "u_02": base_score += 250 # 相手の先鋒兵を重装兵で止める
+                        if opp_cid == "u_04" and cid == "s_05": base_score += 300
+                        if opp_cid == "u_01" and cid == "u_02": base_score += 250
 
                 if base_score > best_score:
                     best_score = base_score
