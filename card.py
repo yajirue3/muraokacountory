@@ -805,4 +805,209 @@ def evaluate_future_and_find_action(session: CardGameSession, bot_id: str) -> Op
 
         # 【手札完全把握】相手の現在手札データを取得
         opp_hand = session.hands.get(opp_id, [])
-        opp_hand_ids = [c.get("id") for c in opp_hand if "id" in
+        opp_hand_ids = [c.get("id") for c in opp_hand if "id" in c]
+        
+        # 相手盤面の生きている挑発ユニット
+        opp_taunts = [u for u in session.boards.get(opp_id, []) if u.get("taunt") and u.get("curr_hp", 0) > 0]
+
+        # ----------------------------------------------------
+        # 1. 奇術師・未知カードの「不意打ちリスク計算」
+        # ----------------------------------------------------
+        human_memories = HUMAN_DRAFT_MEMORIES.get(session.room_id, [])
+        unknown_cards_count = max(0, len(opp_hand) - len(human_memories))
+        
+        # 未知カード1枚につき3点の安全バッファーを設けて防衛ラインを引き上げ
+        safety_buffer = unknown_cards_count * 3
+
+        # 相手の次ターン盤面攻撃力
+        next_turn_opp_atk_sum = sum(
+            u.get("atk", 0) * u.get("max_attacks", 1)
+            for u in session.boards.get(opp_id, [])
+            if u.get("frozen_turns", 0) <= 1
+        )
+        # 相手の手札からの確定直接ダメージ
+        opp_spells_damage = sum(
+            c.get("val", 0) for c in opp_hand 
+            if c.get("type") == "spell" and c.get("effect") == "damage" and c.get("cost", 99) <= next_opp_mp
+        )
+
+        total_potential_enemy_damage = next_turn_opp_atk_sum + opp_spells_damage + safety_buffer
+        is_in_desperate_danger = (bot_hp <= total_potential_enemy_damage)
+
+        # ----------------------------------------------------
+        # 2. 確定リーサル (1ターン勝ち)
+        # ----------------------------------------------------
+        board_atk_sum = sum(
+            u.get("atk", 0) * u.get("attacks_left", 1)
+            for u in session.boards.get(bot_id, [])
+            if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0
+        )
+        playable_spells = [c for c in session.hands.get(bot_id, []) if c.get("type") == "spell" and c.get("cost", 99) <= bot_mp]
+        direct_dmg_spells = [c for c in playable_spells if c.get("effect") == "damage"]
+        hand_dmg_sum = sum(c.get("val", 0) for c in direct_dmg_spells)
+
+        # 直火リーサル
+        for spell in direct_dmg_spells:
+            if spell.get("val", 0) >= opp_hp:
+                return {"action": "PLAY_HAND", "card_instance_id": spell["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+        # 挑発排除 ➔ リーサル
+        if opp_taunts and (board_atk_sum + hand_dmg_sum >= opp_hp):
+            assassinate = next((c for c in playable_spells if c.get("id") == "s_05"), None)
+            if assassinate:
+                return {"action": "PLAY_HAND", "card_instance_id": assassinate["instance_id"], "target": {"type": "unit", "id": opp_taunts[0]["instance_id"]}}
+
+        # 挑発なし総攻撃リーサル
+        if not opp_taunts and (board_atk_sum >= opp_hp or board_atk_sum + hand_dmg_sum >= opp_hp):
+            for u in session.boards.get(bot_id, []):
+                if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+                    return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+        # ----------------------------------------------------
+        # 3. 「奇術師(s_03)」絶対優先破壊ロジック
+        # ----------------------------------------------------
+        target_mages = [u for u in session.boards.get(opp_id, []) if u.get("card_id") == "s_03"]
+        if target_mages:
+            mage = target_mages[0]
+            for attacker in session.boards.get(bot_id, []):
+                if attacker.get("can_attack") and attacker.get("frozen_turns", 0) == 0 and attacker.get("attacks_left", 0) > 0:
+                    return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": mage["instance_id"]}}
+
+        # ----------------------------------------------------
+        # 4. 防衛（ピンチ時の危険敵除去）
+        # ----------------------------------------------------
+        if is_in_desperate_danger and session.boards.get(opp_id, []):
+            highest_atk_enemy = max(session.boards[opp_id], key=lambda x: x.get("atk", 0))
+            assassinate = next((c for c in playable_spells if c.get("id") == "s_05"), None)
+            if assassinate:
+                return {"action": "PLAY_HAND", "card_instance_id": assassinate["instance_id"], "target": {"type": "unit", "id": highest_atk_enemy["instance_id"]}}
+
+        # ----------------------------------------------------
+        # 5. 小人(u_06) 精密反撃不能攻撃
+        # ----------------------------------------------------
+        dwarfs = [u for u in session.boards.get(bot_id, []) if u.get("card_id") == "u_06" and u.get("can_attack") and u.get("attacks_left", 0) > 0 and u.get("frozen_turns", 0) == 0]
+        if dwarfs:
+            dwarf = dwarfs[0]
+            if opp_taunts:
+                target_t = next((u for u in opp_taunts if u.get("wall_turns", 0) == 0), opp_taunts[0])
+                return {"action": "DECLARE_ATTACK", "attacker_id": dwarf["instance_id"], "target": {"type": "unit", "id": target_t["instance_id"]}}
+            else:
+                dangerous_enemies = [u for u in session.boards.get(opp_id, []) if u.get("atk", 0) >= 3]
+                if dangerous_enemies:
+                    target_e = max(dangerous_enemies, key=lambda x: x.get("atk", 0))
+                    return {"action": "DECLARE_ATTACK", "attacker_id": dwarf["instance_id"], "target": {"type": "unit", "id": target_e["instance_id"]}}
+                return {"action": "DECLARE_ATTACK", "attacker_id": dwarf["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+        # ----------------------------------------------------
+        # 6. 盤面有利トレード
+        # ----------------------------------------------------
+        for attacker in session.boards.get(bot_id, []):
+            if attacker.get("can_attack") and attacker.get("frozen_turns", 0) == 0 and attacker.get("attacks_left", 0) > 0:
+                atk_val = attacker.get("atk", 0)
+
+                if opp_taunts:
+                    for taunt in opp_taunts:
+                        dmg = max(0, atk_val - 1) if taunt.get("wall_turns", 0) > 0 else atk_val
+                        if dmg > 0:
+                            return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": taunt["instance_id"]}}
+                else:
+                    for defender in session.boards.get(opp_id, []):
+                        dmg_to_def = max(0, atk_val - 1) if defender.get("wall_turns", 0) > 0 else atk_val
+                        dmg_to_atk = max(0, defender.get("atk", 0) - 1) if attacker.get("wall_turns", 0) > 0 else defender.get("atk", 0)
+                        
+                        if (dmg_to_def >= defender.get("curr_hp", 0) and dmg_to_atk < attacker.get("curr_hp", 0)) or (is_in_desperate_danger and dmg_to_def >= defender.get("curr_hp", 0)):
+                            return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": defender["instance_id"]}}
+
+        # ----------------------------------------------------
+        # 7. ナップサック最適化 ＆ メタプレイ手札展開
+        # ----------------------------------------------------
+        playable = [c for c in session.hands.get(bot_id, []) if c.get("cost", 99) <= bot_mp]
+
+        # 相手の手札「嵐(s_02)」ケア
+        if "s_02" in opp_hand_ids and next_opp_mp >= 4:
+            playable = [c for c in playable if not (c.get("type") == "unit" and c.get("hp", 0) <= 2 and not c.get("haste"))]
+
+        # 相手の手札「暗殺者(s_05)」ケア（囮誘発）
+        if "s_05" in opp_hand_ids and next_opp_mp >= 6:
+            has_bait = any(c.get("type") == "unit" and c.get("cost", 99) <= 3 for c in playable)
+            if has_bait:
+                playable = [c for c in playable if c.get("id") != "u_04"]
+
+        if playable:
+            best_combo = None
+            max_mana_used = -1
+            max_combo_score = -1
+
+            for r in range(1, len(playable) + 1):
+                for combo in itertools.combinations(playable, r):
+                    cost_sum = sum(c.get("cost", 0) for c in combo)
+                    if cost_sum <= bot_mp:
+                        combo_score = sum(BOT_CARD_TIER.get(c.get("id"), 50) for c in combo)
+                        if cost_sum > max_mana_used or (cost_sum == max_mana_used and combo_score > max_combo_score):
+                            max_mana_used = cost_sum
+                            max_combo_score = combo_score
+                            best_combo = combo
+
+            if best_combo:
+                card_to_play = best_combo[0]
+                eff = card_to_play.get("effect")
+                c_type = card_to_play.get("type")
+
+                # 挑発 ➔ 城壁コンボ
+                taunt_units = [u for u in session.boards.get(bot_id, []) if u.get("taunt") and u.get("wall_turns", 0) == 0]
+                if card_to_play.get("id") == "s_09" and taunt_units:
+                    return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "unit", "id": taunt_units[0]["instance_id"]}}
+
+                if c_type == "unit":
+                    if len(session.boards.get(bot_id, [])) < 7:
+                        return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": None}
+
+                elif c_type == "spell":
+                    if eff == "assassinate":
+                        targets = [u for u in session.boards.get(opp_id, []) if u.get("curr_hp", 0) >= 4 or u.get("atk", 0) >= 3]
+                        if targets:
+                            best_t = max(targets, key=lambda x: x.get("atk", 0) + x.get("curr_hp", 0))
+                            return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+                    elif eff == "aoe_damage":
+                        if len(session.boards.get(opp_id, [])) >= 2 or any(u.get("curr_hp", 0) <= 2 for u in session.boards.get(opp_id, [])):
+                            return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": None}
+
+                    elif eff == "draw" and len(session.hands.get(bot_id, [])) <= 5:
+                        return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": None}
+
+                    elif eff == "heal" and bot_hp <= 15:
+                        return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": None}
+
+                    elif eff == "damage":
+                        targets = [u for u in session.boards.get(opp_id, []) if u.get("curr_hp", 0) <= 3]
+                        if targets:
+                            best_t = max(targets, key=lambda x: x.get("atk", 0))
+                            return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+                        return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+                    elif eff == "freeze":
+                        targets = [u for u in session.boards.get(opp_id, []) if u.get("frozen_turns", 0) == 0 and u.get("atk", 0) >= 2]
+                        if targets:
+                            best_t = max(targets, key=lambda x: x.get("atk", 0))
+                            return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+                    elif eff == "wall":
+                        targets = [u for u in session.boards.get(bot_id, []) if u.get("wall_turns", 0) == 0]
+                        if targets:
+                            best_t = max(targets, key=lambda x: x.get("curr_hp", 0))
+                            return {"action": "PLAY_HAND", "card_instance_id": card_to_play["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+        # ----------------------------------------------------
+        # 8. 残りユニットの無条件顔面攻撃
+        # ----------------------------------------------------
+        for attacker in session.boards.get(bot_id, []):
+            if attacker.get("can_attack") and attacker.get("frozen_turns", 0) == 0 and attacker.get("attacks_left", 0) > 0:
+                if not opp_taunts:
+                    return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+    except Exception as e:
+        # 万が一の予期せぬ例外時もログを吐いて安全にターンエンドへ回避
+        print(f"[AI Emergency Guard] Error handling action: {e}")
+
+    return None
