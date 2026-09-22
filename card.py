@@ -23,21 +23,21 @@ BOT_CARD_DB = {
     "s_04": {"id": "s_04", "name": "補充", "type": "spell", "cost": 3, "effect": "draw", "val": 2, "need_target": False},
     "s_05": {"id": "s_05", "name": "暗殺者", "type": "spell", "cost": 6, "effect": "assassinate", "need_target": True},
     "s_06": {"id": "s_06", "name": "再編", "type": "spell", "cost": 1, "effect": "reshape", "need_target": False},
-    "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True}, # ★解禁！
+    "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True},
     "s_08": {"id": "s_08", "name": "火傷", "type": "spell", "cost": 1, "effect": "burn", "need_target": True},
     "s_09": {"id": "s_09", "name": "城壁", "type": "spell", "cost": 2, "effect": "wall", "need_target": True},
 }
 
 async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], process_action_func: Any):
     """
-    【完全体】凍結解禁・全アンチメタ・アグレッシブ貪欲法AI
+    【完全体】全ステータス・特殊効果対応型 アサルト貪欲法AI
     """
     try:
         if session.status == "ENDED" or session.turn_user_id != BOT_USER_ID:
             return
 
         # ==========================================
-        # 1. ドラフトフェーズ（凍結の評価を引き上げ）
+        # 1. ドラフトフェーズ
         # ==========================================
         if session.status == "DRAFT":
             opts = session.draft_options.get(BOT_USER_ID, [])
@@ -51,23 +51,28 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 for cid in opts:
                     c = BOT_CARD_DB.get(cid, {})
                     score = 0
-                    
-                    # 凍結(s_07)は1コスト優秀スペルとして高評価
-                    if cid == "s_07": 
-                        score += 3500
+
+                    # 呪文評価（凍結・暗殺・城壁・全体攻撃の優先度向上）
+                    if cid in ["s_07", "s_05", "s_02"]: 
+                        score += 4000
+                    elif cid in ["s_01", "s_08", "s_09"]:
+                        score += 3000
 
                     if c.get("type") == "unit":
-                        score += 5000 + (c.get("atk", 0) * 100) + (c.get("hp", 0) * 80)
-                        if c.get("haste"): score += 500
-                        if c.get("taunt"): score += 400
+                        score += 5000 + (c.get("atk", 0) * 120) + (c.get("hp", 0) * 80)
+                        if c.get("haste"): score += 600
+                        if c.get("taunt"): score += 500
+                        if c.get("id") == "u_06": score += 2000 # 小人は強力
                     else:
                         score += 1000
                         
+                    # 呪文の取りすぎ防止（最大3枚程度）
                     if c.get("type") == "spell" and spell_count >= 3:
-                        score -= 8000
+                        score -= 7000
 
+                    # 「小人」と「城壁」のシナジー評価
                     if cid == "s_09" and "u_06" in my_card_ids:
-                        score += 10000
+                        score += 8000
 
                     if score > max_score:
                         max_score = score
@@ -81,14 +86,14 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             return
 
         # ==========================================
-        # 2. バトルフェーズ（凍結コンボ組み込み）
+        # 2. バトルフェーズ
         # ==========================================
         if session.status == "BATTLE":
             opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)
             if not opp_id: return
 
             action_loop_count = 0
-            max_loop_limit = 25
+            max_loop_limit = 30
 
             while session.status == "BATTLE" and session.turn_user_id == BOT_USER_ID and action_loop_count < max_loop_limit:
                 action_loop_count += 1
@@ -98,21 +103,22 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 opp_board = session.boards.get(opp_id, [])
                 my_hand = session.hands.get(BOT_USER_ID, [])
                 opp_hp = session.hp.get(opp_id, 20)
+                my_hp = session.hp.get(BOT_USER_ID, 20)
 
                 opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
                 possible_candidates = []
 
-                # リーサル（確定即死）計算
+                # --- リーサル判定 ---
                 board_atk_total = sum(
-                    u.get("atk", 0) for u in my_board 
+                    u.get("atk", 0) * u.get("attacks_left", 1) for u in my_board 
                     if u.get("can_attack") and u.get("frozen_turns", 0) <= 0 and u.get("attacks_left", 0) > 0
                 )
                 hand_damage_total = sum(3 for c in my_hand if c.get("id") == "s_01" and c.get("cost", 99) <= my_mp)
                 is_lethal = (not opp_taunts) and ((board_atk_total + hand_damage_total) >= opp_hp)
 
-                # ------------------------------------------
-                # A. 手札プレイ評価（凍結・妨害・展開）
-                # ------------------------------------------
+                # ==========================================
+                # A. 手札プレイ評価
+                # ==========================================
                 for c in my_hand:
                     cost = c.get("cost", 99)
                     if cost > my_mp: continue
@@ -121,128 +127,156 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     c_type = c.get("type")
                     c_inst = c.get("instance_id")
 
-                    # 1. 補充（ドロー）最優先
+                    # ドロー（手札補給）
                     if c_type == "spell" and c.get("effect") == "draw":
                         possible_candidates.append({
                             "score": 10000,
                             "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
                         })
 
-                    # 2. 確定除去・【凍結（s_07）】による最強無力化
+                    # 単体妨害・除去スペル（凍結 / 火傷 / 暗殺 / 雷撃）
                     elif c_type == "spell" and c.get("effect") in ["assassinate", "damage", "burn", "freeze"]:
+                        # ヒーロー対象（雷撃でリーサルまたは顔詰め）
+                        if c.get("effect") == "damage":
+                            h_score = 999999 if (3 >= opp_hp) else 3000
+                            possible_candidates.append({
+                                "score": h_score,
+                                "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "hero", "id": opp_id}}
+                            })
+
+                        # 敵ユニット対象
                         if opp_board:
                             for t in opp_board:
-                                base_score = 6000
                                 eff = c.get("effect")
+                                t_atk = t.get("atk", 0)
+                                t_hp = t.get("curr_hp", 0)
+                                is_frozen = t.get("frozen_turns", 0) > 0
+                                is_walled = t.get("wall_turns", 0) > 0
 
-                                # ★凍結のロジック：未凍結かつ高攻撃力の敵（巨兵など）を1マナで完全無効化する
+                                score = 0
+
+                                # 【凍結】攻撃力が一番高い未凍結の敵を止める
                                 if eff == "freeze":
-                                    if t.get("frozen_turns", 0) == 0:
-                                        score = 7000 + (t.get("atk", 0) * 300) # 攻撃力が高い敵ほど優先凍結！
+                                    if not is_frozen and t_atk >= 2:
+                                        score = 8000 + (t_atk * 500)
                                         possible_candidates.append({
                                             "score": score,
                                             "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
                                         })
-                                    continue # 既に凍結中の敵には重ね掛けしない
+                                    continue
 
-                                # 城壁＋挑発の優先破壊
-                                if t.get("taunt") and t.get("wall_turns", 0) > 0:
-                                    base_score = 15000
-                                elif t.get("taunt"):
-                                    base_score = 8000
-                                
-                                score = base_score + (t.get("atk", 0) * 100)
+                                # 【火傷】高HPまたは挑発持ちにスリップダメージ
+                                elif eff == "burn":
+                                    if t.get("burn_turns", 0) == 0:
+                                        score = 5500 + (t_hp * 200) + (1000 if t.get("taunt") else 0)
+                                        possible_candidates.append({
+                                            "score": score,
+                                            "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
+                                        })
+                                    continue
+
+                                # 【暗殺者】大型ユニット・挑発を即死
+                                elif eff == "assassinate":
+                                    score = 9000 + (t_atk * 400) + (t_hp * 200)
+                                    if is_walled: score += 5000 # 城壁持ちは優先除去
+                                    possible_candidates.append({
+                                        "score": score,
+                                        "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
+                                    })
+                                    continue
+
+                                # 【雷撃】ダメージスペル
+                                elif eff == "damage":
+                                    real_dmg = 2 if is_walled else 3
+                                    score = 6000 + (t_atk * 200)
+                                    if real_dmg >= t_hp: score += 4000 # 撃破できるなら超高評価
+                                    possible_candidates.append({
+                                        "score": score,
+                                        "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
+                                    })
+
+                    # 【城壁】自ユニット強化（小人または高火力ユニットに付与）
+                    elif c_type == "spell" and c.get("effect") == "wall":
+                        for my_u in my_board:
+                            if my_u.get("wall_turns", 0) == 0:
+                                b_score = 15000 if my_u.get("card_id") == "u_06" else (4000 + my_u.get("atk", 0) * 300)
                                 possible_candidates.append({
-                                    "score": score,
-                                    "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
+                                    "score": b_score,
+                                    "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": my_u["instance_id"]}}
                                 })
 
-                    # 3. ユニット展開（「嵐」対策＆「小人」保護）
-                    elif c_type == "unit" and len(my_board) < 7:
-                        if len(my_board) >= 3 and not is_lethal:
-                            score = 1000
-                        else:
-                            score = 4000 + (cost * 100)
-                            
-                        if cid == "u_06":
-                            has_wall_in_hand = any(hc.get("id") == "s_09" for hc in my_hand)
-                            has_taunt_on_board = any(bu.get("taunt") for bu in my_board)
-                            if (has_wall_in_hand and my_mp >= 7) or has_taunt_on_board:
-                                score += 3000
-                            else:
-                                score -= 2000
+                    # 【全体攻撃（嵐）】
+                    elif c_type == "spell" and c.get("effect") == "aoe_damage":
+                        if len(opp_board) >= 2 or any(u.get("curr_hp", 0) <= 2 for u in opp_board):
+                            possible_candidates.append({
+                                "score": 7000 + (len(opp_board) * 1500),
+                                "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
+                            })
 
+                    # 【回復・手札再編】
+                    elif c_type == "spell" and c.get("effect") in ["heal", "reshape"]:
+                        h_score = 6000 if (c.get("effect") == "heal" and my_hp <= 12) else 1500
+                        possible_candidates.append({
+                            "score": h_score,
+                            "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
+                        })
+
+                    # 【ユニット召喚】
+                    elif c_type == "unit" and len(my_board) < 7:
+                        score = 4000 + (cost * 150)
+                        if cid == "u_06": score += 3000 # 小人は優先召喚
                         possible_candidates.append({
                             "score": score,
                             "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
                         })
 
-                    # その他スペル
-                    elif c_type == "spell":
-                        eff = c.get("effect")
-                        if eff == "aoe_damage" and len(opp_board) >= 2:
-                            possible_candidates.append({
-                                "score": 5000,
-                                "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
-                            })
-                        elif eff == "wall" and my_board:
-                            for my_u in my_board:
-                                b_score = 12000 if my_u.get("card_id") == "u_06" else 3000
-                                possible_candidates.append({
-                                    "score": b_score,
-                                    "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": my_u["instance_id"]}}
-                                })
-                        elif eff in ["heal", "reshape"]:
-                            possible_candidates.append({
-                                "score": 2000,
-                                "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
-                            })
-
-                # ------------------------------------------
+                # ==========================================
                 # B. 盤面ユニット攻撃評価
-                # ------------------------------------------
+                # ==========================================
                 for u in my_board:
+                    # 凍結中・攻撃不可能・攻撃権消費済みはスキップ
                     if not u.get("can_attack") or u.get("frozen_turns", 0) > 0 or u.get("attacks_left", 0) <= 0:
                         continue
                     
                     u_atk = u.get("atk", 0)
-                    u_cid = u.get("card_id", "")
                     u_inst = u.get("instance_id")
-
-                    if u_cid == "u_02" and opp_board and not opp_taunts:
-                        continue
 
                     targets = opp_taunts if opp_taunts else opp_board
 
+                    # 1. 敵ユニット攻撃計算
                     if not is_lethal:
                         for t in targets:
                             t_hp = t.get("curr_hp", 0)
                             if t_hp <= 0: continue
+
+                            # 城壁持ちへのダメージ減衰計算
+                            eff_dmg = max(0, u_atk - 1) if t.get("wall_turns", 0) > 0 else u_atk
                             
-                            if t.get("wall_turns", 0) > 0 and u_atk <= 1:
+                            # ダメージが通らない場合は無駄打ちしない
+                            if eff_dmg <= 0 and not u.get("ranged"):
                                 continue
 
-                            score = 1500
-                            eff_dmg = u_atk - 1 if t.get("wall_turns", 0) > 0 else u_atk
-                            
-                            if eff_dmg >= t_hp: score += 1000
-                            if t.get("card_id") in ["u_03", "u_06", "u_05"]: score += 800
+                            score = 2000
+                            if eff_dmg >= t_hp: score += 3000 # 一撃撃破
+                            if t.get("card_id") in ["u_03", "u_06", "u_05"]: score += 1000 # 危険な敵を優先
+                            if u.get("ranged"): score += 1500 # 遠距離（反撃なし）は積極的に盤面処理
 
                             possible_candidates.append({
                                 "score": score,
                                 "act": {"action": "DECLARE_ATTACK", "attacker_id": u_inst, "target": {"type": "unit", "id": t["instance_id"]}}
                             })
 
+                    # 2. 敵ヒーロー直接攻撃
                     if not opp_taunts:
-                        score = 999999 if is_lethal or (u_atk >= opp_hp) else 3500
+                        score = 999999 if (is_lethal or u_atk >= opp_hp) else 3500
                         possible_candidates.append({
                             "score": score,
                             "act": {"action": "DECLARE_ATTACK", "attacker_id": u_inst, "target": {"type": "hero", "id": opp_id}}
                         })
 
-                # ------------------------------------------
-                # C. アクション決定＆安全終了
-                # ------------------------------------------
+                # ==========================================
+                # C. 最善手のアクション実行
+                # ==========================================
                 if not possible_candidates:
                     await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})
                     break
