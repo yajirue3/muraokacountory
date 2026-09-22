@@ -36,7 +36,6 @@
             overflow: hidden; 
         }
 
-        /* 画面が横に太るのを防ぎ、スマホアプリらしい縦長比率を維持 */
         .container {
             width: 100%;
             max-width: 430px;
@@ -78,6 +77,8 @@
         button:active { transform: translateY(1px); }
         button.btn-dark { background: #333; color: #fff; box-shadow: none; border: 1px solid #555; }
         button.btn-dark:hover { background: #444; }
+        button.btn-bot { background: var(--secondary); color: #fff; box-shadow: 0 0 10px rgba(255, 0, 127, 0.5); }
+        button.btn-bot:hover { background: #ff3399; }
 
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
@@ -103,7 +104,6 @@
             100% { opacity: 0; transform: translateY(-60px) scale(1); }
         }
 
-        /* 統合されたルール・用語・図鑑モーダル */
         .modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); backdrop-filter: blur(5px);
@@ -139,7 +139,6 @@
         .rule-section h4 { color: var(--primary); margin-bottom: 5px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;}
         .highlight { color: var(--secondary); font-weight: bold; }
 
-        /* カード図鑑のスタイル */
         .db-card {
             background: #111; border: 1px solid #444; border-radius: 6px; padding: 8px; margin-bottom: 8px;
             display: flex; flex-direction: column; gap: 4px;
@@ -164,7 +163,6 @@
         .room-host { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
         .room-info { font-size: 0.85rem; color: #aaa; margin-top: 4px; }
 
-        /* バトル画面レスポンシブ最適化 */
         #battle-screen { display: none; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
         .top-fixed-area { flex-shrink: 0; z-index: 10; }
         .info-bar { 
@@ -295,7 +293,6 @@
 <body>
 <div class="container" id="main-container">
 
-    <!-- 統合されたヘルプモーダル -->
     <div id="rules-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-tabs">
@@ -337,7 +334,6 @@
 
             <div id="tab-card" class="modal-body">
                 <div id="card-database-list">
-                    <!-- JSでPythonのAPIから取得して展開 -->
                     <p style="text-align:center;">読み込み中...</p>
                 </div>
             </div>
@@ -362,7 +358,11 @@
                 </select>
                 <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="flex:1;">
             </div>
-            <button style="width:100%;" onclick="createRoom()">部屋作成</button>
+            <!-- ▼ クソザコBOT対戦用のボタンを追加 ▼ -->
+            <div style="display:flex; gap:10px; width:100%;">
+                <button style="flex:1;" onclick="createRoom()">部屋作成</button>
+                <button class="btn-bot" style="flex:1;" onclick="createBotRoom()">BOTと対戦</button>
+            </div>
         </div>
         
         <div class="room-list" id="room-list"></div>
@@ -440,11 +440,10 @@
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
         fetchRooms();
-        fetchCardDatabase(); // PythonのAPIからカードデータを取得
+        fetchCardDatabase(); 
         setInterval(fetchRooms, 3000);
     });
 
-    // モーダルのタブ切り替え
     function switchTab(tabId) {
         ['rule', 'term', 'card'].forEach(id => {
             document.getElementById(`tab-btn-${id}`).classList.remove('active');
@@ -459,7 +458,6 @@
         switchTab(defaultTab);
     }
 
-    // バックエンドからカード情報を取得して図鑑に反映
     async function fetchCardDatabase() {
         try {
             const res = await fetch("/api/card/database");
@@ -518,6 +516,21 @@
         const res = await fetch("/api/card/create", {
             method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
             body: JSON.stringify({ wallet_id: walletId, amount: amount, max_players: maxPlayers })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.detail);
+        connectWS(data.room_id);
+    }
+
+    // ▼ クソザコBOTと対戦するための新規関数 ▼
+    async function createBotRoom() {
+        const walletId = document.getElementById("wallet-select").value;
+        const amount = parseInt(document.getElementById("bet-amount").value);
+        if (!walletId || amount <= 0) return alert("入力が不正です");
+
+        const res = await fetch("/api/card/create_bot_room", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ wallet_id: walletId, amount: amount, max_players: 2 })
         });
         const data = await res.json();
         if (!res.ok) return alert(data.detail);
