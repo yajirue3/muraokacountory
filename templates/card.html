@@ -16,6 +16,8 @@
             --panel-bg: rgba(26, 21, 37, 0.85);
             --card-bg: linear-gradient(145deg, #1f1b2e, #14111d);
             --taunt-color: #ffaa00;
+            --burn-color: #ff4500;
+            --freeze-color: #00ffff;
             --neon-shadow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.3);
             --glass-border: 1px solid rgba(255, 255, 255, 0.1);
             --text-light: #e0e0e0;
@@ -55,7 +57,6 @@
             }
         }
 
-        /* 共通コンポーネント */
         input, select, button { 
             padding: 10px; 
             border-radius: 8px; 
@@ -81,7 +82,6 @@
         ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
 
-        /* エフェクト */
         .shake { animation: shake 0.4s; }
         @keyframes shake {
             0%, 100% { transform: translate(0, 0); }
@@ -92,7 +92,7 @@
         }
 
         .damage-popup {
-            position: absolute; color: #ff3333; font-size: 2.5rem; font-weight: 900;
+            position: absolute; color: #ff3333; font-size: 2.2rem; font-weight: 900;
             text-shadow: 0 0 10px #000, 0 0 20px #ff0000; pointer-events: none; z-index: 1000;
             animation: floatUp 1s forwards ease-out;
         }
@@ -102,9 +102,6 @@
             100% { opacity: 0; transform: translateY(-60px) scale(1); }
         }
 
-        /* -------------------------------------
-           ルールモーダル・UI設計
-        ------------------------------------- */
         .modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
@@ -124,9 +121,7 @@
             background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; margin-bottom: 15px; 
             border: 1px solid rgba(255,255,255,0.05);
         }
-        .rule-section.gold { 
-            background: rgba(212, 175, 55, 0.1); border-color: #d4af37; 
-        }
+        .rule-section.gold { background: rgba(212, 175, 55, 0.1); border-color: #d4af37; }
         .rule-section h4 { 
             color: var(--primary); border-bottom: 1px solid rgba(255,255,255,0.1); 
             padding-bottom: 5px; margin-bottom: 10px; font-size: 1.05rem; 
@@ -139,7 +134,6 @@
         .highlight { color: var(--secondary); font-weight: bold; }
         .text-center { text-align: center; }
 
-        /* ロビー・バトル画面レイアウトは前回から継承 */
         #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
         .lobby-header { display: flex; justify-content: space-between; align-items: center; }
         .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; }
@@ -156,171 +150,155 @@
         .room-host { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
         .room-info { font-size: 0.85rem; color: #aaa; margin-top: 4px; }
 
-        #battle-screen { display: none; flex-direction: column; height: 100%; position: relative; }
+        /* バトル画面レスポンシブ最適化 */
+        #battle-screen { display: none; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
         .top-fixed-area { flex-shrink: 0; z-index: 10; }
         .info-bar { 
             display: flex; justify-content: space-between; background: rgba(0,0,0,0.8); 
-            padding: 10px 15px; border-bottom: 1px solid var(--primary-dim); font-size: 0.9rem; font-weight: bold; 
+            padding: 8px 12px; border-bottom: 1px solid var(--primary-dim); font-size: 0.85rem; font-weight: bold; 
         }
         .timer-text { color: var(--primary); text-shadow: 0 0 5px var(--primary); }
         
         #action-banner {
             background: linear-gradient(90deg, transparent, var(--primary-dim), transparent);
-            text-align: center; font-weight: bold; padding: 8px; font-size: 0.85rem; color: #fff;
-            min-height: 36px; display: flex; align-items: center; justify-content: center;
+            text-align: center; font-weight: bold; padding: 6px; font-size: 0.8rem; color: #fff;
+            min-height: 32px; display: flex; align-items: center; justify-content: center;
         }
         #action-banner.alert { background: linear-gradient(90deg, transparent, var(--secondary-dim), transparent); color: #fff; text-shadow: 0 0 5px var(--secondary); }
 
         .battle-scroll-area {
             flex: 1; overflow-y: auto; overflow-x: hidden;
-            display: flex; flex-direction: column; gap: 15px; padding: 15px;
+            display: flex; flex-direction: column; gap: 8px; padding: 10px;
         }
 
-        #opponents-container { display: flex; flex-direction: column; gap: 15px; }
-        .opponent-wrap { display: flex; flex-direction: column; gap: 8px; transition: opacity 0.3s; }
+        #opponents-container { display: flex; flex-direction: column; gap: 8px; }
+        .opponent-wrap { display: flex; flex-direction: column; gap: 6px; transition: opacity 0.3s; }
         
         .player-area { 
-            display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; 
-            background: var(--panel-bg); border-radius: 10px; border: 1px solid var(--primary-dim); 
+            display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; 
+            background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--primary-dim); 
             box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.3s; position: relative;
         }
         .opponent-area { border-color: var(--secondary-dim); }
         
-        .portrait { display: flex; flex-direction: column; gap: 4px; }
-        .player-name { font-weight: bold; font-size: 1.1rem; }
+        .portrait { display: flex; flex-direction: column; gap: 2px; }
+        .player-name { font-weight: bold; font-size: 1rem; }
         .player-name.mine { color: var(--primary); }
         .player-name.enemy { color: var(--secondary); }
-        .deck-info { font-size: 0.8rem; color: #aaa; }
+        .deck-info { font-size: 0.75rem; color: #aaa; }
         
-        .status-gauges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-weight: 900; }
-        .hp-text { color: #ff4d4d; font-size: 1.2rem; text-shadow: 0 0 5px rgba(255,77,77,0.5); }
-        .mp-text { color: #4da6ff; font-size: 0.95rem; }
-        .dead-label { color: red; font-size: 0.75rem; border: 1px solid red; padding: 2px 4px; border-radius: 4px; margin-left: 5px; }
+        .status-gauges { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-weight: 900; }
+        .hp-text { color: #ff4d4d; font-size: 1.1rem; text-shadow: 0 0 5px rgba(255,77,77,0.5); }
+        .mp-text { color: #4da6ff; font-size: 0.85rem; }
+        .dead-label { color: red; font-size: 0.7rem; border: 1px solid red; padding: 1px 3px; border-radius: 4px; margin-left: 4px; }
 
-        .end-turn-btn { padding: 6px 12px; background: #ffaa00; box-shadow: 0 0 10px #ffaa00; font-size: 0.85rem; display: none; }
+        .end-turn-btn { padding: 5px 10px; background: #ffaa00; box-shadow: 0 0 10px #ffaa00; font-size: 0.8rem; display: none; }
 
         .board { 
-            display: flex; gap: 10px; padding: 10px; background: rgba(0,0,0,0.3); 
-            overflow-x: auto; overflow-y: hidden; align-items: center; border-radius: 10px; 
-            min-height: 110px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
+            display: flex; gap: 8px; padding: 8px; background: rgba(0,0,0,0.3); 
+            overflow-x: auto; overflow-y: hidden; align-items: center; border-radius: 8px; 
+            min-height: 95px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
         }
 
+        /* 戦闘ログ表示 */
         .battle-divider {
-            text-align: center; font-size: 0.8rem; color: #666; 
-            border-top: 1px dashed #333; border-bottom: 1px dashed #333; 
-            padding: 6px; font-weight: 900; letter-spacing: 4px; margin: 5px 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 4px;
+        }
+        .battle-log {
+            font-size: 0.7rem; color: #00ffcc; text-align: center; max-height: 24px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; font-weight: bold;
         }
 
+        /* ユニットカードと状態異常スタイル強調 */
         .board-card {
-            min-width: 80px; height: 100px; background: var(--card-bg); 
+            width: 75px; min-width: 75px; height: 90px; background: var(--card-bg); 
             border: 2px solid #444; border-radius: 8px; display: flex; flex-direction: column; 
-            justify-content: space-between; padding: 6px; font-size: 0.75rem; text-align: center; 
+            justify-content: space-between; padding: 4px; font-size: 0.7rem; text-align: center; 
             cursor: pointer; transition: all 0.2s; position: relative; flex-shrink: 0; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
         }
-        .board-card:hover { transform: translateY(-3px); border-color: #777; }
-        .board-card.taunt { border-color: var(--taunt-color); box-shadow: 0 0 10px var(--taunt-color); background: linear-gradient(145deg, #3a2a10, #14111d); }
-        .board-card.can-attack { border-color: #00ff00; box-shadow: 0 0 10px #00ff00; animation: pulseGreen 2s infinite; }
-        
-        .unit-name { font-weight: 900; font-size: 0.8rem; line-height: 1.2; word-break: break-all; }
-        .unit-name.mine { color: var(--primary); }
-        .unit-name.enemy { color: var(--secondary); }
-        .unit-status { font-size: 0.6rem; color: #fff; background: rgba(0,0,0,0.6); border-radius: 4px; padding: 2px; margin-top: 4px; display: inline-block;}
-        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.95rem; margin-top: auto; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
-        .multi-atk { color: #ffd700; font-size: 0.65rem; }
+        .board-card:hover { transform: translateY(-2px); border-color: #777; }
+        .board-card.taunt { border-color: var(--taunt-color) !important; box-shadow: 0 0 10px var(--taunt-color); }
+        .board-card.burned { border-color: var(--burn-color) !important; box-shadow: 0 0 12px var(--burn-color); animation: burnPulse 1.5s infinite; }
+        .board-card.frozen { border-color: var(--freeze-color) !important; box-shadow: 0 0 12px var(--freeze-color); filter: opacity(0.8); }
+        .board-card.can-attack { border-color: #00ff00 !important; box-shadow: 0 0 10px #00ff00; animation: pulseGreen 2s infinite; }
 
-        .opponent-wrap.multi .board-card { min-width: 70px; height: 90px; padding: 4px; }
-        .opponent-wrap.multi .unit-name { font-size: 0.7rem; }
-        .opponent-wrap.multi .stats { font-size: 0.85rem; }
-
+        @keyframes burnPulse { 0%, 100% { box-shadow: 0 0 5px #ff4500; } 50% { box-shadow: 0 0 15px #ff4500; } }
         @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 5px #00ff00; } 50% { box-shadow: 0 0 15px #00ff00; } }
 
+        .unit-name { font-weight: 900; font-size: 0.75rem; line-height: 1.1; word-break: break-all; }
+        .unit-name.mine { color: var(--primary); }
+        .unit-name.enemy { color: var(--secondary); }
+        .unit-status { font-size: 0.55rem; color: #fff; background: rgba(0,0,0,0.7); border-radius: 3px; padding: 1px 2px; margin-top: 2px; }
+        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.85rem; margin-top: auto; padding-top: 2px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .multi-atk { color: #ffd700; font-size: 0.6rem; }
+
+        /* 手札エリアの見切れ防止調整 */
         .hand-area { 
-            flex-shrink: 0; height: 140px; display: flex; gap: 12px; padding: 15px; 
+            flex-shrink: 0; min-height: 110px; max-height: 125px; display: flex; gap: 8px; padding: 8px; 
             overflow-x: auto; overflow-y: hidden; background: #050505; 
             border-top: 2px solid var(--primary); box-shadow: 0 -5px 20px rgba(0,0,0,0.8); z-index: 10;
+            align-items: center;
         }
 
         .hand-card {
-            min-width: 90px; height: 110px; background: linear-gradient(145deg, #2a2540, #151222);
-            border: 2px solid #444; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; 
+            width: 80px; min-width: 80px; height: 100px; background: linear-gradient(145deg, #2a2540, #151222);
+            border: 2px solid #444; border-radius: 8px; padding: 5px; display: flex; flex-direction: column; 
             cursor: pointer; position: relative; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-shrink: 0;
         }
-        .hand-card:hover { transform: translateY(-15px) scale(1.05); z-index: 10; border-color: #888; }
+        .hand-card:hover { transform: translateY(-8px) scale(1.05); z-index: 10; border-color: #888; }
         .hand-card.playable { border-color: var(--primary); box-shadow: 0 0 8px var(--primary); }
-        .hand-card.selected { transform: translateY(-20px) scale(1.1); border-color: #ff00ff; box-shadow: 0 0 20px #ff00ff; z-index: 20; }
+        .hand-card.selected { transform: translateY(-12px) scale(1.05); border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; z-index: 20; }
         
-        .card-cost { position: absolute; top: -10px; left: -10px; background: var(--primary); color: #000; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.8); font-size: 1rem;}
-        .card-title { font-weight: 900; text-align: center; margin-top: 8px; font-size: 0.85rem; color: #fff;}
-        .card-desc { font-size: 0.65rem; color: #ccc; text-align: center; margin-top: auto; line-height: 1.3; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px;}
+        .card-cost { position: absolute; top: -6px; left: -6px; background: var(--primary); color: #000; width: 22px; height: 22px; border-radius: 50%; text-align: center; line-height: 22px; font-weight: 900; box-shadow: 0 2px 4px rgba(0,0,0,0.8); font-size: 0.85rem;}
+        .card-title { font-weight: 900; text-align: center; margin-top: 4px; font-size: 0.75rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-desc { font-size: 0.55rem; color: #ccc; text-align: center; margin-top: auto; line-height: 1.2; background: rgba(0,0,0,0.5); padding: 2px; border-radius: 3px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-        /* ドラフトモーダル特有 */
-        .draft-options { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding: 10px; overflow-y: auto;}
-        .draft-card { width: 110px; height: 140px; border: 2px solid var(--primary); background: var(--card-bg); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; box-shadow: var(--neon-shadow); flex-shrink: 0; position: relative;}
+        .draft-options { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 10px; overflow-y: auto;}
+        .draft-card { width: 100px; height: 130px; border: 2px solid var(--primary); background: var(--card-bg); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; box-shadow: var(--neon-shadow); flex-shrink: 0; position: relative;}
         .draft-card:hover { transform: scale(1.05); }
-        .draft-wait-text { font-size: 1.1rem; font-weight: bold; display: none; text-align: center; padding: 20px;}
+        .draft-wait-text { font-size: 1rem; font-weight: bold; display: none; text-align: center; padding: 20px;}
         
-        .draft-history-container { width: 100%; margin-top: 20px; text-align: center; border-top: 1px solid #444; padding-top: 15px;}
-        .draft-history-title { color: #aaa; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;}
-        .draft-history { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-        .history-item { width: 45px; height: 60px; background: #222; border: 1px solid #555; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.55rem; text-align: center; font-weight: bold; line-height: 1.2;}
-        .history-item .cost { color: var(--primary); font-size: 0.7rem; margin-bottom: 2px;}
+        .draft-history-container { width: 100%; margin-top: 15px; text-align: center; border-top: 1px solid #444; padding-top: 10px;}
+        .draft-history-title { color: #aaa; font-size: 0.8rem; font-weight: bold; margin-bottom: 8px;}
+        .draft-history { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        .history-item { width: 40px; height: 50px; background: #222; border: 1px solid #555; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.5rem; text-align: center; font-weight: bold; line-height: 1.1;}
+        .history-item .cost { color: var(--primary); font-size: 0.65rem; }
 
-        /* ターゲットモード */
         .target-mode { cursor: crosshair !important; }
-        .target-mode .board { box-shadow: inset 0 0 30px rgba(255, 0, 127, 0.3); }
+        .target-mode .board { box-shadow: inset 0 0 20px rgba(255, 0, 127, 0.3); }
         .target-mode .opponent-area { 
-            border-color: var(--secondary); box-shadow: 0 0 20px rgba(255, 0, 127, 0.6); 
+            border-color: var(--secondary); box-shadow: 0 0 15px rgba(255, 0, 127, 0.6); 
             animation: pulseRed 1.5s infinite; cursor: crosshair;
         }
         .target-mode .opponent-area::after {
-            content: "🎯 対象を選択"; position: absolute; right: 15px; top: -12px;
-            background: var(--secondary); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;
-            animation: float 2s infinite; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            content: "🎯 対象を選択"; position: absolute; right: 10px; top: -10px;
+            background: var(--secondary); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: bold;
+            z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
 
-        @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 10px var(--secondary); } 50% { box-shadow: 0 0 25px var(--secondary); } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 8px var(--secondary); } 50% { box-shadow: 0 0 20px var(--secondary); } }
     </style>
 </head>
 <body>
 <div class="container" id="main-container">
 
-    <!-- ルールモーダル（詳細化・構造化） -->
     <div id="rules-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>📖 超究極完全体ルール＆用語ガイド</h3>
+            <h3>📖 ルール＆用語ガイド</h3>
             
             <div class="rule-section gold">
-                <h4>🎯 勝利条件と報酬</h4>
-                <p>敵のヒーロー（顔）を攻撃して、<strong>最後まで生き残った1人</strong>の勝利！<br>勝者は<strong>賭け金の総取り（参加人数分）</strong>を獲得します。</p>
+                <h4>🎯 勝利条件</h4>
+                <p>敵ヒーローを攻撃して<strong>生存を目指す</strong>！最後の一人が勝利です。</p>
             </div>
 
             <div class="rule-section">
-                <h4>🕹️ ゲームの流れ</h4>
-                <ol class="rule-list">
-                    <li><strong>ドラフト（編成）</strong>：5枚の候補から1枚を選ぶ作業を繰り返し、6枚のデッキを作ります。</li>
-                    <li><strong>ターンの開始</strong>：毎ターン開始時に<strong>MPが全回復＆最大MP+1</strong>され、カードを1枚引きます。</li>
-                    <li><strong>カードを使う</strong>：自分のターンに、水滴マーク(💧)のMPを消費して手札からカードを出します。</li>
-                    <li><strong>攻撃する</strong>：緑色に光る自分のユニットをクリック後、狙いたい敵ユニットまたは敵ヒーローをクリックします。</li>
-                </ol>
-            </div>
-
-            <div class="rule-section">
-                <h4>🔤 状態異常・キーワード解説</h4>
+                <h4>🔤 状態異常</h4>
                 <ul class="rule-list">
-                    <li><span class="highlight">🛡️ 挑発 (Taunt)</span>：この能力を持つユニットが相手の場にいる場合、あなたは他のユニットや敵ヒーローを攻撃対象に選べません。</li>
-                    <li><span class="highlight">❄️ 凍結 (Freeze)</span>：この状態のユニットは攻撃ができなくなります（1ターン経過で解除）。</li>
-                    <li><span class="highlight">🔥 火傷 (Burn)</span>：ターン終了時に自動でダメージを受けます。</li>
-                    <li><span class="highlight">🧱 城壁 (Wall)</span>：受けるダメージを軽減または無効化する防御バフです。</li>
-                    <li><span class="highlight">⚔️ 連続攻撃</span>：ステータスの横に <code>(x2)</code> などと表記され、1ターンにその回数分攻撃できます。</li>
-                </ul>
-            </div>
-
-            <div class="rule-section">
-                <h4>🃏 カードの種類</h4>
-                <ul class="rule-list">
-                    <li><strong>ユニットカード</strong>：場に出て戦うキャラクター（攻撃力⚔️と体力❤️を持つ）。HPが0になると破壊されます。<strong>場に出したターンは攻撃できません</strong>（※「速攻」持ちを除く）。</li>
-                    <li><strong>スペルカード</strong>：手札から直接使い、即座に効果を発揮する魔法。味方を強化したり、敵にダメージを与えたりします。「特定の対象を選ぶ」ものと「全体に効果がある」ものがあります。</li>
+                    <li><span class="highlight">🛡️ 挑発</span>：ターゲット指定をこのユニットに固定。</li>
+                    <li><span class="highlight">❄️ 凍結</span>：攻撃不可（1ターン）。</li>
+                    <li><span class="highlight">🔥 火傷</span>：ターン終了時に自動ダメージ。</li>
+                    <li><span class="highlight">🧱 城壁</span>：ダメージ軽減・無効化。</li>
                 </ul>
             </div>
 
@@ -351,10 +329,8 @@
         <button class="btn-dark" style="margin-top: auto;" onclick="location.href='/casino'">カジノへ戻る</button>
     </div>
 
-    <!-- バトルレイヤー -->
+    <!-- バトル領域 -->
     <div id="battle-screen">
-        
-        <!-- 上部固定領域 -->
         <div class="top-fixed-area">
             <div class="info-bar">
                 <span id="sys-message">待機中...</span>
@@ -363,10 +339,13 @@
             <div id="action-banner">バトル開始を待っています...</div>
         </div>
         
-        <!-- 中央スクロール領域 -->
         <div class="battle-scroll-area">
             <div id="opponents-container"></div>
-            <div class="battle-divider"><span>BATTLE FIELD</span></div>
+            
+            <div class="battle-divider">
+                <div class="battle-log" id="battle-log">バトルログ: ゲーム準備中...</div>
+            </div>
+            
             <div class="board" id="my-board"></div>
 
             <div class="player-area" id="my-hero" onclick="handleTargetClick('hero', myUserId)">
@@ -382,14 +361,11 @@
             </div>
         </div>
 
-        <!-- 下部固定手札領域 -->
         <div class="hand-area" id="my-hand"></div>
     </div>
 
-    <!-- ドラフトモーダル -->
     <div id="draft-overlay" class="modal-overlay">
-        <h3 style="color: var(--primary); text-shadow: var(--neon-shadow); margin-bottom:15px; font-size:1.5rem;">🃏 カードをピック！</h3>
-        
+        <h3 style="color: var(--primary); text-shadow: var(--neon-shadow); margin-bottom:10px; font-size:1.3rem;">🃏 カードをピック！</h3>
         <div class="draft-options" id="draft-options"></div>
         <div id="draft-wait" class="draft-wait-text">他のプレイヤーの選択を待っています...</div>
         
@@ -416,6 +392,7 @@
     let selectedBoardUnit = null; 
     let isTargetingMode = false;
     let prevHpState = { my: 20, opps: {} };
+    let prevBoardState = {}; // ユニットダメージ・状態検知用
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
@@ -515,6 +492,11 @@
         };
     }
 
+    function addLog(text) {
+        const logEl = document.getElementById("battle-log");
+        if(logEl) logEl.innerText = text;
+    }
+
     function spawnDamageText(elementId, amount) {
         const el = document.getElementById(elementId);
         if (!el) return;
@@ -522,8 +504,8 @@
         const popup = document.createElement("div");
         popup.className = "damage-popup";
         popup.innerText = `-${amount}`;
-        popup.style.left = `${rect.left + rect.width / 2 - 20}px`;
-        popup.style.top = `${rect.top + 10}px`;
+        popup.style.left = `${rect.left + rect.width / 2 - 15}px`;
+        popup.style.top = `${rect.top}px`;
         document.body.appendChild(popup);
         setTimeout(() => popup.remove(), 1000);
     }
@@ -552,6 +534,8 @@
         document.getElementById("sys-message").innerText = state.message || "待機中...";
         document.getElementById("sys-timer").innerText = `⏳ ${state.time_limit || 0}`;
 
+        if (state.last_event) addLog(state.last_event);
+
         if (state.status === "WAITING") {
             const currentPlayers = Object.keys(state.players).length;
             updateActionBanner(`参加者を待っています... (${currentPlayers}/${state.max_players})`);
@@ -560,7 +544,6 @@
         
         if (state.status === "DRAFT") {
             document.getElementById("draft-overlay").style.display = "flex";
-            
             const myDeck = state.my_deck || [];
             document.getElementById("draft-count").innerText = myDeck.length;
             document.getElementById("draft-history").innerHTML = myDeck.map(c => `
@@ -600,19 +583,24 @@
         const isMyTurn = state.turn_user_id === myUserId;
         document.getElementById("end-turn-btn").style.display = isMyTurn ? "block" : "none";
 
+        // HP減少検知
         opponentIds.forEach(oppId => {
             const currentHp = state.hp[oppId] !== undefined ? state.hp[oppId] : 20;
             if (prevHpState.opps[oppId] !== undefined && currentHp < prevHpState.opps[oppId]) {
-                spawnDamageText(`opp-hero-${oppId}`, prevHpState.opps[oppId] - currentHp);
+                const dmg = prevHpState.opps[oppId] - currentHp;
+                spawnDamageText(`opp-hero-${oppId}`, dmg);
                 triggerShake();
+                addLog(`💥 敵ヒーローが ${dmg} ダメージを受けた！`);
             }
             prevHpState.opps[oppId] = currentHp;
         });
 
         const myCurrentHp = state.hp[myUserId] !== undefined ? state.hp[myUserId] : 20;
         if (prevHpState.my !== undefined && myCurrentHp < prevHpState.my) {
-            spawnDamageText("my-hero", prevHpState.my - myCurrentHp);
+            const dmg = prevHpState.my - myCurrentHp;
+            spawnDamageText("my-hero", dmg);
             triggerShake();
+            addLog(`⚡ あなたが ${dmg} ダメージを受けた！`);
         }
         prevHpState.my = myCurrentHp;
 
@@ -622,19 +610,30 @@
         document.getElementById("my-max-mp").innerText = state.max_mp[myUserId] || 0;
         document.getElementById("my-deck-count").innerText = state.deck_counts[myUserId] || 0;
 
+        // ユニット描画・状態判定関数
         const renderUnit = (u, isMine) => {
             const statusIcons = [];
-            if (u.taunt) statusIcons.push("🛡️挑発");
-            if (u.frozen_turns > 0) statusIcons.push("❄️凍結");
-            if (u.burn_turns > 0) statusIcons.push("🔥火傷");
-            if (u.wall_turns > 0) statusIcons.push("🧱城壁");
+            let statusClass = '';
+
+            if (u.taunt) { statusIcons.push("🛡️挑発"); statusClass += " taunt"; }
+            if (u.frozen_turns > 0) { statusIcons.push("❄️凍結"); statusClass += " frozen"; }
+            if (u.burn_turns > 0) { statusIcons.push("🔥火傷"); statusClass += " burned"; }
+            if (u.wall_turns > 0) { statusIcons.push("🧱城壁"); }
             
+            // 火傷などのユニットへのダメージチェック
+            if (prevBoardState[u.instance_id] !== undefined && u.curr_hp < prevBoardState[u.instance_id]) {
+                const unitDmg = prevBoardState[u.instance_id] - u.curr_hp;
+                setTimeout(() => spawnDamageText(`unit-${u.instance_id}`, unitDmg), 50);
+                if (u.burn_turns > 0) addLog(`🔥 「${u.name}」は火傷で ${unitDmg} ダメージ！`);
+            }
+            prevBoardState[u.instance_id] = u.curr_hp;
+
             const statusHtml = statusIcons.length > 0 
                 ? `<div class="unit-status">${statusIcons.join(" ")}</div>` 
                 : '';
 
             return `
-            <div id="unit-${u.instance_id}" class="board-card ${u.taunt ? 'taunt' : ''} ${isMine && u.can_attack && isMyTurn ? 'can-attack' : ''}" 
+            <div id="unit-${u.instance_id}" class="board-card ${statusClass} ${isMine && u.can_attack && isMyTurn ? 'can-attack' : ''}" 
                  onclick="handleBoardClick('${u.instance_id}', ${isMine})">
                 <div class="unit-name ${isMine ? 'mine' : 'enemy'}">${u.name}</div>
                 ${statusHtml}
@@ -660,7 +659,6 @@
             const isDead = hp <= 0;
             const opacity = isDead ? "0.4" : "1";
             const deadLabel = isDead ? `<span class="dead-label">DEFEATED</span>` : '';
-            
             const wrapClass = opponentIds.length > 1 ? "opponent-wrap multi" : "opponent-wrap";
 
             opponentsHtml += `
