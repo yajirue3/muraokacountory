@@ -9,7 +9,6 @@ BOT_USER_NAME = "村岡国王（影武者）"
 
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
-# カードデータベース定義
 BOT_CARD_DB = {
     "u_01": {"id": "u_01", "name": "先鋒兵", "type": "unit", "cost": 1, "atk": 2, "hp": 1, "haste": True},
     "u_02": {"id": "u_02", "name": "重装兵", "type": "unit", "cost": 3, "atk": 2, "hp": 5, "taunt": True},
@@ -24,21 +23,21 @@ BOT_CARD_DB = {
     "s_04": {"id": "s_04", "name": "補充", "type": "spell", "cost": 3, "effect": "draw", "val": 2, "need_target": False},
     "s_05": {"id": "s_05", "name": "暗殺者", "type": "spell", "cost": 6, "effect": "assassinate", "need_target": True},
     "s_06": {"id": "s_06", "name": "再編", "type": "spell", "cost": 1, "effect": "reshape", "need_target": False},
-    "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True}, # バグカード排除対象
+    "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True},
     "s_08": {"id": "s_08", "name": "火傷", "type": "spell", "cost": 1, "effect": "burn", "need_target": True},
     "s_09": {"id": "s_09", "name": "城壁", "type": "spell", "cost": 2, "effect": "wall", "need_target": True},
 }
 
 async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], process_action_func: Any):
     """
-    順序最適化型・最強アグレッシブ貪欲法AIエンジン
+    人間メタ対策済み・完全覚醒アグレッシブAI
     """
     try:
         if session.status == "ENDED" or session.turn_user_id != BOT_USER_ID:
             return
 
         # ==========================================
-        # 1. ドラフトフェーズ（ピック優先度最適化）
+        # 1. ドラフトフェーズ
         # ==========================================
         if session.status == "DRAFT":
             opts = session.draft_options.get(BOT_USER_ID, [])
@@ -52,12 +51,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 for cid in opts:
                     c = BOT_CARD_DB.get(cid, {})
                     score = 0
+                    if cid == "s_07": score -= 999999
                     
-                    # バグカード（s_07）は絶対選ばない
-                    if cid == "s_07": 
-                        score -= 999999
-                    
-                    # ユニット最優先
                     if c.get("type") == "unit":
                         score += 5000 + (c.get("atk", 0) * 100) + (c.get("hp", 0) * 80)
                         if c.get("haste"): score += 500
@@ -65,11 +60,9 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     else:
                         score += 1000
                         
-                    # スペル過多（3枚以上）防止
                     if c.get("type") == "spell" and spell_count >= 3:
                         score -= 8000
 
-                    # シナジー：小人 + 城壁
                     if cid == "s_09" and "u_06" in my_card_ids:
                         score += 10000
 
@@ -85,14 +78,14 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             return
 
         # ==========================================
-        # 2. バトルフェーズ（順序制御・貪欲ループ）
+        # 2. バトルフェーズ（メタ対策＆順序最適化）
         # ==========================================
         if session.status == "BATTLE":
             opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)
             if not opp_id: return
 
             action_loop_count = 0
-            max_loop_limit = 25  # 無限ループ防止用の最大限界数
+            max_loop_limit = 25
 
             while session.status == "BATTLE" and session.turn_user_id == BOT_USER_ID and action_loop_count < max_loop_limit:
                 action_loop_count += 1
@@ -106,63 +99,74 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
                 possible_candidates = []
 
-                # ------------------------------------------
-                # リーサル（確定即死）判定
-                # ------------------------------------------
+                # リーサル（確定即死）計算
                 board_atk_total = sum(
                     u.get("atk", 0) for u in my_board 
                     if u.get("can_attack") and u.get("frozen_turns", 0) <= 0 and u.get("attacks_left", 0) > 0
                 )
-                hand_damage_total = 0
-                for c in my_hand:
-                    if c.get("cost", 99) <= my_mp:
-                        if c.get("id") == "s_01": hand_damage_total += 3  # 雷撃
-
+                hand_damage_total = sum(3 for c in my_hand if c.get("id") == "s_01" and c.get("cost", 99) <= my_mp)
                 is_lethal = (not opp_taunts) and ((board_atk_total + hand_damage_total) >= opp_hp)
 
                 # ------------------------------------------
-                # A. 手札プレイ候補の評価（優先順位順）
+                # A. 手札プレイ評価（メタ対策組み込み）
                 # ------------------------------------------
                 for c in my_hand:
                     cost = c.get("cost", 99)
-                    if cost > my_mp: continue  # マナ不足
+                    if cost > my_mp: continue
                     
                     cid = c.get("id")
                     c_type = c.get("type")
                     c_inst = c.get("instance_id")
 
-                    if cid == "s_07": continue  # バグカード排除
+                    if cid == "s_07": continue
 
-                    # --- 【1番目の優先度】ドロー（補充）を最優先（手札補充） ---
+                    # 1. 補充（ドロー）最優先
                     if c_type == "spell" and c.get("effect") == "draw":
                         possible_candidates.append({
                             "score": 10000,
                             "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
                         })
 
-                    # --- 【2番目の優先度】障害物・挑発・敵の除去スペル（攻撃前の道あけ） ---
+                    # 2. 確定除去（アンチメタ1: 「城壁付き」や「挑発」を最優先で破壊）
                     elif c_type == "spell" and c.get("effect") in ["assassinate", "damage", "burn"]:
                         if opp_board:
                             for t in opp_board:
-                                # 挑発持ち、または高攻撃力ユニットを優先除去
-                                base_score = 8000 if t.get("taunt") else 6000
+                                base_score = 6000
+                                # 相手が「城壁＋挑発」で足止めしてきたら特大加点で即消滅させる！
+                                if t.get("taunt") and t.get("wall_turns", 0) > 0:
+                                    base_score = 15000
+                                elif t.get("taunt"):
+                                    base_score = 8000
+                                
                                 score = base_score + (t.get("atk", 0) * 100)
                                 possible_candidates.append({
                                     "score": score,
                                     "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": t["instance_id"]}}
                                 })
 
-                    # --- 【3番目の優先度】ユニット展開（最速盤面構築） ---
+                    # 3. ユニット展開（アンチメタ2: 「嵐」対策で盤面3体以上の時は温存）
                     elif c_type == "unit" and len(my_board) < 7:
-                        score = 4000 + (cost * 100)
-                        if c.get("haste"): score += 500
-                        if c.get("taunt"): score += 300
+                        # 盤面にすでに3体以上いるなら『嵐』ケアで過剰展開を抑える
+                        if len(my_board) >= 3 and not is_lethal:
+                            score = 1000  # 優先度を下げる
+                        else:
+                            score = 4000 + (cost * 100)
+                            
+                        # アンチメタ3: 「小人(u_06)」は即死を防ぐため、城壁(s_09)とセット運用できる時か挑発がいる時に展開
+                        if cid == "u_06":
+                            has_wall_in_hand = any(hc.get("id") == "s_09" for hc in my_hand)
+                            has_taunt_on_board = any(bu.get("taunt") for bu in my_board)
+                            if (has_wall_in_hand and my_mp >= 7) or has_taunt_on_board:
+                                score += 3000
+                            else:
+                                score -= 2000 # 守りがないなら出し渋る
+
                         possible_candidates.append({
                             "score": score,
                             "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": None}
                         })
 
-                    # --- その他スペル ---
+                    # その他スペル
                     elif c_type == "spell":
                         eff = c.get("effect")
                         if eff == "aoe_damage" and len(opp_board) >= 2:
@@ -172,7 +176,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             })
                         elif eff == "wall" and my_board:
                             for my_u in my_board:
-                                b_score = 9000 if my_u.get("card_id") == "u_06" else 3000
+                                # 小人がいれば小人に城壁を付与（最強要塞化）
+                                b_score = 12000 if my_u.get("card_id") == "u_06" else 3000
                                 possible_candidates.append({
                                     "score": b_score,
                                     "act": {"action": "PLAY_HAND", "card_instance_id": c_inst, "target": {"type": "unit", "id": my_u["instance_id"]}}
@@ -184,7 +189,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             })
 
                 # ------------------------------------------
-                # B. 盤面ユニット攻撃候補の評価
+                # B. 盤面ユニット攻撃評価
                 # ------------------------------------------
                 for u in my_board:
                     if not u.get("can_attack") or u.get("frozen_turns", 0) > 0 or u.get("attacks_left", 0) <= 0:
@@ -194,28 +199,23 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     u_cid = u.get("card_id", "")
                     u_inst = u.get("instance_id")
 
-                    # 重装兵(u_02)は敵ユニットへ突撃せず顔面専念
                     if u_cid == "u_02" and opp_board and not opp_taunts:
                         continue
 
                     targets = opp_taunts if opp_taunts else opp_board
 
-                    # リーサルでない場合のみ有利トレードの攻撃を計算
                     if not is_lethal:
                         for t in targets:
                             t_hp = t.get("curr_hp", 0)
                             if t_hp <= 0: continue
                             
-                            # 城壁(軽減1)に攻撃力1以下で突撃（0ダメ無駄撃ち）を排除
                             if t.get("wall_turns", 0) > 0 and u_atk <= 1:
                                 continue
 
                             score = 1500
                             eff_dmg = u_atk - 1 if t.get("wall_turns", 0) > 0 else u_atk
                             
-                            # 一撃撃破（有利トレード）
                             if eff_dmg >= t_hp: score += 1000
-                            # 危険敵の撃滅
                             if t.get("card_id") in ["u_03", "u_06", "u_05"]: score += 800
 
                             possible_candidates.append({
@@ -223,9 +223,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 "act": {"action": "DECLARE_ATTACK", "attacker_id": u_inst, "target": {"type": "unit", "id": t["instance_id"]}}
                             })
 
-                    # 挑発がいない場合、または確定リーサル時は顔面攻撃
                     if not opp_taunts:
-                        # リーサル状態なら超絶優先度で即死させる
                         score = 999999 if is_lethal or (u_atk >= opp_hp) else 3500
                         possible_candidates.append({
                             "score": score,
@@ -233,28 +231,22 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         })
 
                 # ------------------------------------------
-                # C. 実行または安全なターン終了判定
+                # C. アクション決定＆安全終了
                 # ------------------------------------------
                 if not possible_candidates:
-                    # これ以上できる行動が無い場合は【確実にターン終了】
                     await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})
                     break
 
-                # 評価値が最高の「最強手」を実行
                 possible_candidates.sort(key=lambda x: x["score"], reverse=True)
                 best_action = possible_candidates[0]["act"]
 
                 await process_action_func(session, BOT_USER_ID, best_action)
-                
-                # サーバー通信待ち（同期ズレ防止）
                 await asyncio.sleep(0.15)
 
-            # 最大ループに達しても自身のターンの場合は安全終了
             if session.status == "BATTLE" and session.turn_user_id == BOT_USER_ID:
                 await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})
 
     except Exception as e:
         logger.error(f"Super AI Fatal Error Fallback: {e}", exc_info=True)
-        # 例外発生時もフリーズさせずにターンを終了
         if session.status == "BATTLE" and session.turn_user_id == BOT_USER_ID:
             await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})
