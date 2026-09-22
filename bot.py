@@ -18,7 +18,7 @@ BOT_CARD_TIER = {
     "u_03": 50,  "u_07": 30, "s_03": 25, "s_06": 10,
 }
 
-# card.py 側からのインポートエラー回避用（今回の最強BOTは完全公開情報を直接見るため不使用）
+# card.py 側からのインポートエラー回避用
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 class SuperBotEngine:
@@ -33,25 +33,21 @@ class SuperBotEngine:
     def get_dynamic_tier(self, card_id: str, card_cost: int, my_hp: int, my_hand_len: int, opp_board_len: int, current_turn: int) -> int:
         base_score = BOT_CARD_TIER.get(card_id, 50)
         
-        # 1. 序盤（1〜3ターン目）のテンポ制御：コストの重いカードの評価を下げ、軽いユニットを最優先
         if current_turn <= 3:
             if card_cost <= current_turn:
-                base_score += 40  # 出せるカードを高く評価
+                base_score += 40
             else:
-                base_score -= 50  # 出せない重いカードは評価を下げる（序盤のゴミ化防止）
+                base_score -= 50
 
-        # 2. 自身のHPがピンチ（10以下）なら防衛・回復カードを超爆上げ
         if my_hp <= 10:
             if card_id in ["s_03", "u_02"]:
                 base_score += 50
             elif card_id == "s_09":
                 base_score += 30
 
-        # 3. 相手の盤面が展開されているなら全体攻撃（嵐）を最優先
         if opp_board_len >= 3 and card_id == "s_02":
             base_score += 60
 
-        # 4. 手札が枯渇気味（2枚以下）ならドロー呪文を優先
         if my_hand_len <= 2 and card_id == "s_04":
             base_score += 45
 
@@ -62,7 +58,6 @@ class SuperBotEngine:
     # 未来予測：相手の次ターン確定最大攻撃力＋直火ダメージ
     # ----------------------------------------------------
     def predict_opponent_max_damage(self, opp_id: str) -> Tuple[int, int]:
-        # 相手の手札を直接覗き見て「次ターンの確定最大ダメージ」を100%の精度で計算する
         opp_board = self.session.boards.get(opp_id, [])
         opp_hand = self.session.hands.get(opp_id, [])
         next_opp_mp = min(10, self.session.max_mp.get(opp_id, 1) + 1)
@@ -77,7 +72,6 @@ class SuperBotEngine:
             if c.get("type") == "spell" and c.get("effect") == "damage" and c.get("cost", 99) <= next_opp_mp
         )
 
-        # 未知の手札に対する推測値（safety_buffer）は完全廃止し、確定ダメージのみを返す
         return board_dmg + spell_dmg, board_dmg
 
     # ----------------------------------------------------
@@ -101,7 +95,6 @@ class SuperBotEngine:
 
             opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
             
-            # 確定ダメージによるピンチ判定（完全情報）
             next_potential_dmg, _ = self.predict_opponent_max_damage(opp_id)
             is_in_desperate_danger = (bot_hp <= next_potential_dmg)
 
@@ -128,7 +121,7 @@ class SuperBotEngine:
                     if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                         return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}
 
-            # === 2. 高危険度目標の優先処理（魔導士等） ===
+            # === 2. 高危険度目標の優先処理 ===
             priority_targets = [u for u in opp_board if u.get("card_id") == "u_03" or u.get("atk", 0) >= 4]
             if priority_targets:
                 target = max(priority_targets, key=lambda x: x.get("atk", 0))
@@ -146,7 +139,6 @@ class SuperBotEngine:
                 if heal_spell:
                     return {"action": "PLAY_HAND", "card_instance_id": heal_spell["instance_id"], "target": None}
                 
-                # 追加防衛：挑発ユニットを持っていれば優先的に盾にする
                 taunt_unit = next((c for c in bot_hand if c.get("taunt") and c.get("cost", 99) <= bot_mp), None)
                 if taunt_unit:
                     return {"action": "PLAY_HAND", "card_instance_id": taunt_unit["instance_id"], "target": None}
@@ -182,7 +174,6 @@ class SuperBotEngine:
             playable = [c for c in bot_hand if c.get("cost", 99) <= bot_mp]
             opp_hand_ids = [c.get("id") for c in opp_hand]
             
-            # 相手の手札を完全に覗き見た悪魔のカウンター制御
             if "s_02" in opp_hand_ids and next_opp_mp >= 4:
                 playable = [c for c in playable if not (c.get("type") == "unit" and c.get("hp", 0) <= 2 and not c.get("haste"))]
             if "s_05" in opp_hand_ids and next_opp_mp >= 6:
@@ -207,7 +198,6 @@ class SuperBotEngine:
                             return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": None}
 
                     elif c_type == "spell":
-                        # 修正箇所：ユニットゼロで城壁を使用しようとして止まるバグの防止
                         if card.get("id") == "s_09":
                             if not bot_board:
                                 continue
@@ -305,14 +295,9 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
 
         while session.turn_user_id == BOT_USER_ID and session.status == "BATTLE" and step_count < max_steps:
             step_count += 1
-            try:
-                action = await asyncio.wait_for(
-                    asyncio.to_thread(bot_engine.decide_best_action),
-                    timeout=0.5
-                )
-            except asyncio.TimeoutError:
-                logger.warning("[CardBot] Decision timed out. Proceeding safely.")
-                break
+            
+            # スレッド化の無駄なオーバーヘッドを完全削除し、同期的に即時実行
+            action = bot_engine.decide_best_action()
 
             if not action:
                 break
