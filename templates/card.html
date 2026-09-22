@@ -36,9 +36,10 @@
             overflow: hidden; 
         }
 
+        /* 画面が横に太るのを防ぎ、スマホアプリらしい縦長比率を維持 */
         .container {
             width: 100%;
-            max-width: 550px;
+            max-width: 430px;
             height: 100dvh;
             display: flex;
             flex-direction: column;
@@ -66,7 +67,7 @@
             outline: none;
             transition: all 0.2s; 
         }
-        select, input { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #444; }
+        select, input { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #444; width: 100%; }
         select:focus, input:focus { border-color: var(--primary); }
         
         button { 
@@ -102,45 +103,58 @@
             100% { opacity: 0; transform: translateY(-60px) scale(1); }
         }
 
+        /* 統合されたルール・用語・図鑑モーダル */
         .modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(5px);
             display: none; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 999; padding: 20px;
+            z-index: 999; padding: 15px;
         }
         
         .modal-content {
             background: var(--panel-bg); border: 2px solid var(--primary); box-shadow: var(--neon-shadow);
-            border-radius: 12px; padding: 20px; width: 100%; max-width: 500px;
-            max-height: 85vh; overflow-y: auto; line-height: 1.6;
+            border-radius: 12px; padding: 15px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;
         }
 
-        .modal-content h3 { color: var(--primary); margin-bottom: 15px; text-align: center; }
-        
+        .modal-tabs {
+            display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 5px;
+        }
+        .modal-tabs button {
+            flex: 1; padding: 8px; font-size: 0.8rem; background: #222; color: #aaa; box-shadow: none;
+        }
+        .modal-tabs button.active {
+            background: var(--primary); color: #000; box-shadow: var(--neon-shadow);
+        }
+
+        .modal-body {
+            flex: 1; overflow-y: auto; padding-right: 5px; font-size: 0.85rem; line-height: 1.5; color: var(--text-light);
+            display: none;
+        }
+        .modal-body.active { display: block; }
+
         .rule-section { 
-            background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; margin-bottom: 15px; 
+            background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; margin-bottom: 10px; 
             border: 1px solid rgba(255,255,255,0.05);
         }
-        .rule-section.gold { background: rgba(212, 175, 55, 0.1); border-color: #d4af37; }
-        .rule-section h4 { 
-            color: var(--primary); border-bottom: 1px solid rgba(255,255,255,0.1); 
-            padding-bottom: 5px; margin-bottom: 10px; font-size: 1.05rem; 
-        }
-        .rule-section.gold h4 { color: #ffd700; border-color: rgba(212, 175, 55, 0.3); }
-        .rule-section p, .rule-list { font-size: 0.85rem; color: var(--text-light); }
-        .rule-list { margin: 0; padding-left: 20px; }
-        .rule-list li { margin-bottom: 8px; }
-        
+        .rule-section h4 { color: var(--primary); margin-bottom: 5px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;}
         .highlight { color: var(--secondary); font-weight: bold; }
-        .text-center { text-align: center; }
+
+        /* カード図鑑のスタイル */
+        .db-card {
+            background: #111; border: 1px solid #444; border-radius: 6px; padding: 8px; margin-bottom: 8px;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .db-card-header { display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        .db-cost { background: var(--primary); color: #000; width: 20px; height: 20px; text-align: center; border-radius: 50%; font-size: 0.8rem; line-height: 20px; }
+        .db-name { color: #fff; font-size: 0.95rem; }
+        .db-desc { font-size: 0.75rem; color: #ccc; }
+        .db-stats { font-size: 0.8rem; color: #ffaa00; font-weight: bold; }
 
         #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
         .lobby-header { display: flex; justify-content: space-between; align-items: center; }
         .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; }
         
         .create-form { display: flex; gap: 10px; flex-wrap: wrap; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: var(--glass-border); }
-        .create-form select, .create-form input { flex: 1; min-width: 80px; }
-        .create-form button { flex: 1; min-width: 100px; }
         
         .room-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; }
         .room-item { 
@@ -154,17 +168,18 @@
         #battle-screen { display: none; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
         .top-fixed-area { flex-shrink: 0; z-index: 10; }
         .info-bar { 
-            display: flex; justify-content: space-between; background: rgba(0,0,0,0.8); 
+            display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.8); 
             padding: 8px 12px; border-bottom: 1px solid var(--primary-dim); font-size: 0.85rem; font-weight: bold; 
         }
         .timer-text { color: var(--primary); text-shadow: 0 0 5px var(--primary); }
+        .help-btn { padding: 4px 8px; font-size: 0.7rem; margin-left: 10px; }
         
         #action-banner {
             background: linear-gradient(90deg, transparent, var(--primary-dim), transparent);
             text-align: center; font-weight: bold; padding: 6px; font-size: 0.8rem; color: #fff;
             min-height: 32px; display: flex; align-items: center; justify-content: center;
         }
-        #action-banner.alert { background: linear-gradient(90deg, transparent, var(--secondary-dim), transparent); color: #fff; text-shadow: 0 0 5px var(--secondary); }
+        #action-banner.alert { background: linear-gradient(90deg, transparent, var(--secondary-dim), transparent); text-shadow: 0 0 5px var(--secondary); }
 
         .battle-scroll-area {
             flex: 1; overflow-y: auto; overflow-x: hidden;
@@ -200,7 +215,6 @@
             min-height: 95px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
         }
 
-        /* 戦闘ログ表示 */
         .battle-divider {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 4px;
@@ -210,7 +224,6 @@
             text-overflow: ellipsis; white-space: nowrap; font-weight: bold;
         }
 
-        /* ユニットカードと状態異常スタイル強調 */
         .board-card {
             width: 75px; min-width: 75px; height: 90px; background: var(--card-bg); 
             border: 2px solid #444; border-radius: 8px; display: flex; flex-direction: column; 
@@ -233,7 +246,6 @@
         .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.85rem; margin-top: auto; padding-top: 2px; border-top: 1px solid rgba(255,255,255,0.1); }
         .multi-atk { color: #ffd700; font-size: 0.6rem; }
 
-        /* 手札エリアの見切れ防止調整 */
         .hand-area { 
             flex-shrink: 0; min-height: 110px; max-height: 125px; display: flex; gap: 8px; padding: 8px; 
             overflow-x: auto; overflow-y: hidden; background: #050505; 
@@ -283,46 +295,74 @@
 <body>
 <div class="container" id="main-container">
 
+    <!-- 統合されたヘルプモーダル -->
     <div id="rules-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>📖 ルール＆用語ガイド</h3>
+            <div class="modal-tabs">
+                <button id="tab-btn-rule" class="active" onclick="switchTab('rule')">ルール</button>
+                <button id="tab-btn-term" onclick="switchTab('term')">用語解説</button>
+                <button id="tab-btn-card" onclick="switchTab('card')">カード図鑑</button>
+            </div>
             
-            <div class="rule-section gold">
-                <h4>🎯 勝利条件</h4>
-                <p>敵ヒーローを攻撃して<strong>生存を目指す</strong>！最後の一人が勝利です。</p>
+            <div id="tab-rule" class="modal-body active">
+                <div class="rule-section">
+                    <h4>🎯 勝利条件</h4>
+                    <p>敵のヒーローのHP（初期20）を0にして、最後まで生き残ったプレイヤーが勝利となります。</p>
+                </div>
+                <div class="rule-section">
+                    <h4>🔄 ターンの流れ</h4>
+                    <p>1. MPが全回復し、最大値が1増えます（最大10）。<br>
+                       2. 毎ターン開始時にカードを1枚引きます。<br>
+                       3. MPを消費して手札からカード（ユニット/呪文）を使用します。<br>
+                       4. 自分の場のユニットをクリックして、敵ユニットや敵ヒーローを攻撃します。</p>
+                </div>
             </div>
 
-            <div class="rule-section">
-                <h4>🔤 状態異常</h4>
-                <ul class="rule-list">
-                    <li><span class="highlight">🛡️ 挑発</span>：ターゲット指定をこのユニットに固定。</li>
-                    <li><span class="highlight">❄️ 凍結</span>：攻撃不可（1ターン）。</li>
-                    <li><span class="highlight">🔥 火傷</span>：ターン終了時に自動ダメージ。</li>
-                    <li><span class="highlight">🧱 城壁</span>：ダメージ軽減・無効化。</li>
-                </ul>
+            <div id="tab-term" class="modal-body">
+                <div class="rule-section">
+                    <h4>🔤 状態異常</h4>
+                    <p>🛡️ <span class="highlight">挑発</span>：相手は挑発を持つユニット以外を攻撃対象に選べなくなります。<br>
+                       ❄️ <span class="highlight">凍結</span>：対象のユニットは次のターン攻撃できなくなります。<br>
+                       🔥 <span class="highlight">火傷</span>：ターン終了時に自動で1ダメージを受けます（3ターン継続）。<br>
+                       🧱 <span class="highlight">城壁</span>：受けるダメージを1軽減します（3ターン継続）。</p>
+                </div>
+                <div class="rule-section">
+                    <h4>⚔️ 特殊能力</h4>
+                    <p>⚡ <span class="highlight">速攻</span>：場に出たターンにすぐ攻撃できます。<br>
+                       🩸 <span class="highlight">吸血</span>：敵に与えたダメージ分、自分のヒーローが回復します。<br>
+                       🏹 <span class="highlight">遠距離</span>：攻撃時に敵からの反撃ダメージを受けません。<br>
+                       🎲 <span class="highlight">ステータスランダム決定</span>：召喚時にHPと攻撃力がランダムに決まります。</p>
+                </div>
             </div>
 
-            <div class="text-center">
-                <button class="btn-dark" onclick="document.getElementById('rules-modal').style.display='none'">閉じる</button>
+            <div id="tab-card" class="modal-body">
+                <div id="card-database-list">
+                    <!-- JSでPythonのAPIから取得して展開 -->
+                    <p style="text-align:center;">読み込み中...</p>
+                </div>
             </div>
+
+            <button class="btn-dark" style="margin-top: 15px;" onclick="document.getElementById('rules-modal').style.display='none'">閉じる</button>
         </div>
     </div>
 
-    <!-- ロビー -->
+    <!-- ロビー画面 -->
     <div id="lobby-screen">
         <div class="lobby-header">
             <h2 class="lobby-title">⚔️ 村岡王国 TCG</h2>
-            <button class="btn-dark" onclick="document.getElementById('rules-modal').style.display='flex'">ルール確認</button>
+            <button class="btn-dark" onclick="openHelpModal('rule')">ガイド/図鑑</button>
         </div>
         
         <div class="create-form">
-            <select id="wallet-select"></select>
-            <select id="max-players-select">
-                <option value="2">2人対戦</option>
-                <option value="3">3人対戦</option>
-            </select>
-            <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)">
-            <button onclick="createRoom()">部屋作成</button>
+            <select id="wallet-select"><option value="">ウォレット読込中...</option></select>
+            <div style="display:flex; gap:10px; width:100%;">
+                <select id="max-players-select" style="flex:1;">
+                    <option value="2">2人対戦</option>
+                    <option value="3">3人対戦</option>
+                </select>
+                <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="flex:1;">
+            </div>
+            <button style="width:100%;" onclick="createRoom()">部屋作成</button>
         </div>
         
         <div class="room-list" id="room-list"></div>
@@ -333,7 +373,10 @@
     <div id="battle-screen">
         <div class="top-fixed-area">
             <div class="info-bar">
-                <span id="sys-message">待機中...</span>
+                <div style="display:flex; align-items:center;">
+                    <span id="sys-message">待機中...</span>
+                    <button class="btn-dark help-btn" onclick="openHelpModal('card')">📖図鑑</button>
+                </div>
                 <span id="sys-timer" class="timer-text">⏳ 0</span>
             </div>
             <div id="action-banner">バトル開始を待っています...</div>
@@ -364,13 +407,13 @@
         <div class="hand-area" id="my-hand"></div>
     </div>
 
-    <div id="draft-overlay" class="modal-overlay">
+    <div id="draft-overlay" class="modal-overlay" style="background:rgba(0,0,0,0.95);">
         <h3 style="color: var(--primary); text-shadow: var(--neon-shadow); margin-bottom:10px; font-size:1.3rem;">🃏 カードをピック！</h3>
         <div class="draft-options" id="draft-options"></div>
         <div id="draft-wait" class="draft-wait-text">他のプレイヤーの選択を待っています...</div>
         
         <div class="draft-history-container">
-            <div class="draft-history-title">ピック済みのカード (<span id="draft-count">0</span>/6)</div>
+            <div class="draft-history-title">ピック済みのカード (<span id="draft-count">0</span>/12)</div>
             <div class="draft-history" id="draft-history"></div>
         </div>
     </div>
@@ -392,13 +435,52 @@
     let selectedBoardUnit = null; 
     let isTargetingMode = false;
     let prevHpState = { my: 20, opps: {} };
-    let prevBoardState = {}; // ユニットダメージ・状態検知用
+    let prevBoardState = {}; 
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
         fetchRooms();
+        fetchCardDatabase(); // PythonのAPIからカードデータを取得
         setInterval(fetchRooms, 3000);
     });
+
+    // モーダルのタブ切り替え
+    function switchTab(tabId) {
+        ['rule', 'term', 'card'].forEach(id => {
+            document.getElementById(`tab-btn-${id}`).classList.remove('active');
+            document.getElementById(`tab-${id}`).classList.remove('active');
+        });
+        document.getElementById(`tab-btn-${tabId}`).classList.add('active');
+        document.getElementById(`tab-${tabId}`).classList.add('active');
+    }
+
+    function openHelpModal(defaultTab = 'rule') {
+        document.getElementById('rules-modal').style.display = 'flex';
+        switchTab(defaultTab);
+    }
+
+    // バックエンドからカード情報を取得して図鑑に反映
+    async function fetchCardDatabase() {
+        try {
+            const res = await fetch("/api/card/database");
+            if (res.ok) {
+                const data = await res.json();
+                const container = document.getElementById("card-database-list");
+                container.innerHTML = data.cards.map(c => `
+                    <div class="db-card">
+                        <div class="db-card-header">
+                            <span class="db-cost">${c.cost}</span>
+                            <span class="db-name">${c.name}</span>
+                        </div>
+                        <div class="db-desc">${c.desc}</div>
+                        ${c.type === 'unit' ? `<div class="db-stats">⚔️${c.atk} ❤️${c.hp}</div>` : `<div style="font-size:0.75rem; color:#00f3ff; font-weight:bold;">✨ 呪文</div>`}
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            console.error("カードデータの取得に失敗しました", e);
+        }
+    }
 
     async function loadWallets() {
         try {
@@ -583,7 +665,6 @@
         const isMyTurn = state.turn_user_id === myUserId;
         document.getElementById("end-turn-btn").style.display = isMyTurn ? "block" : "none";
 
-        // HP減少検知
         opponentIds.forEach(oppId => {
             const currentHp = state.hp[oppId] !== undefined ? state.hp[oppId] : 20;
             if (prevHpState.opps[oppId] !== undefined && currentHp < prevHpState.opps[oppId]) {
@@ -610,7 +691,6 @@
         document.getElementById("my-max-mp").innerText = state.max_mp[myUserId] || 0;
         document.getElementById("my-deck-count").innerText = state.deck_counts[myUserId] || 0;
 
-        // ユニット描画・状態判定関数
         const renderUnit = (u, isMine) => {
             const statusIcons = [];
             let statusClass = '';
@@ -620,7 +700,6 @@
             if (u.burn_turns > 0) { statusIcons.push("🔥火傷"); statusClass += " burned"; }
             if (u.wall_turns > 0) { statusIcons.push("🧱城壁"); }
             
-            // 火傷などのユニットへのダメージチェック
             if (prevBoardState[u.instance_id] !== undefined && u.curr_hp < prevBoardState[u.instance_id]) {
                 const unitDmg = prevBoardState[u.instance_id] - u.curr_hp;
                 setTimeout(() => spawnDamageText(`unit-${u.instance_id}`, unitDmg), 50);
