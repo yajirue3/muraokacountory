@@ -9,15 +9,19 @@
         
         :root {
             --primary: #00f3ff;
+            --primary-dim: rgba(0, 243, 255, 0.2);
             --secondary: #ff007f;
+            --secondary-dim: rgba(255, 0, 127, 0.2);
             --bg-dark: #07030e;
-            --card-bg: #1c1a29;
+            --panel-bg: rgba(26, 21, 37, 0.85);
+            --card-bg: linear-gradient(145deg, #1f1b2e, #14111d);
             --taunt-color: #ffaa00;
             --neon-shadow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.3);
-            --neon-red: 0 0 15px rgba(255, 0, 127, 0.8);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+            --text-light: #e0e0e0;
         }
         
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         
         body {
             font-family: 'M PLUS 1p', sans-serif;
@@ -27,33 +31,69 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            /* 画面全体のスクロールは止め、内側のコンテナでスクロールさせる */
             overflow: hidden; 
         }
 
-        @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        .container {
+            width: 100%;
+            max-width: 550px;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top, #1a1528 0%, #050505 100%);
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            margin: 0 auto;
+            overflow: hidden;
         }
+
+        @media (min-width: 600px) {
+            .container {
+                height: 95dvh;
+                border-radius: 16px;
+                border: var(--glass-border);
+            }
+        }
+
+        /* 共通コンポーネント */
+        input, select, button { 
+            padding: 10px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            font-family: inherit; 
+            font-size: 0.95rem; 
+            outline: none;
+            transition: all 0.2s; 
+        }
+        select, input { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #444; }
+        select:focus, input:focus { border-color: var(--primary); }
+        
+        button { 
+            background: var(--primary); color: #000; border: none; 
+            cursor: pointer; box-shadow: var(--neon-shadow); text-transform: uppercase;
+        }
+        button:hover { transform: translateY(-2px); filter: brightness(1.2); }
+        button:active { transform: translateY(1px); }
+        button.btn-dark { background: #333; color: #fff; box-shadow: none; border: 1px solid #555; }
+        button.btn-dark:hover { background: #444; }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        /* エフェクト */
         .shake { animation: shake 0.4s; }
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-3px, 2px); }
+            40% { transform: translate(3px, -2px); }
+            60% { transform: translate(-3px, -2px); }
+            80% { transform: translate(3px, 2px); }
+        }
 
         .damage-popup {
-            position: absolute;
-            color: #ff3333;
-            font-size: 2.5rem;
-            font-weight: 900;
-            text-shadow: 0 0 10px #000, 0 0 20px #ff0000;
-            pointer-events: none;
-            z-index: 1000;
+            position: absolute; color: #ff3333; font-size: 2.5rem; font-weight: 900;
+            text-shadow: 0 0 10px #000, 0 0 20px #ff0000; pointer-events: none; z-index: 1000;
             animation: floatUp 1s forwards ease-out;
         }
         @keyframes floatUp {
@@ -63,258 +103,252 @@
         }
 
         /* -------------------------------------
-           コンテナ全体（PC・スマホ両対応の余白調整）
+           ルールモーダル・UI設計
         ------------------------------------- */
-        .container {
-            width: 100%;
-            max-width: 550px;
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            background: linear-gradient(180deg, #111 0%, #050505 100%);
-            position: relative;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
-            /* スマホ・PC共通で端に少し余白を持たせる（左右のみ） */
-            padding: 0;
-            margin: 0 auto;
-        }
-
-        @media (min-width: 600px) {
-            .container {
-                height: 95dvh; /* PC環境では上下にも少し余白を持たせる */
-                border-radius: 12px;
-                border: 1px solid #333;
-            }
-        }
-
-        input, select, button { padding: 8px; border-radius: 6px; font-weight: bold; font-family: inherit; transition: all 0.2s; font-size: 0.9rem; }
-        button { background: var(--primary); color: #000; border: none; cursor: pointer; box-shadow: var(--neon-shadow); }
-        button:hover { transform: translateY(-2px); filter: brightness(1.2); }
-        button:active { transform: translateY(1px); }
-
-        /* ルールモーダル */
-        #rules-modal {
+        .modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
             display: none; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 999; padding: 15px; text-align: left;
+            z-index: 999; padding: 20px;
         }
         
-        .rule-content {
-            background: #1a1525; border: 2px solid var(--primary); box-shadow: var(--neon-shadow);
-            border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; 
+        .modal-content {
+            background: var(--panel-bg); border: 2px solid var(--primary); box-shadow: var(--neon-shadow);
+            border-radius: 12px; padding: 20px; width: 100%; max-width: 500px;
             max-height: 85vh; overflow-y: auto; line-height: 1.6;
         }
-        .rule-content h3 { color: var(--primary); margin-bottom: 15px; text-align: center; font-size: 1.3rem; }
-        .rule-content ul { padding-left: 20px; margin-bottom: 20px; }
-        .rule-content li { margin-bottom: 10px; }
-        .rule-content .highlight { color: #ff007f; font-weight: bold; }
 
-        /* ロビー画面 */
-        #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 15px; gap: 10px; }
-        .create-form { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: space-between; }
-        .create-form select, .create-form input { flex: 1; min-width: 70px; }
-        .create-form button { flex: 1; min-width: 80px; }
-        .room-list { flex: 1; overflow-y: auto; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; }
-        .room-item { display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #333; align-items: center; background: rgba(0,0,0,0.3); margin-bottom: 8px; border-radius: 8px;}
+        .modal-content h3 { color: var(--primary); margin-bottom: 15px; text-align: center; }
         
-        /* -------------------------------------
-           バトル画面（スクロール対応）
-        ------------------------------------- */
-        #battle-screen { display: none; flex-direction: column; height: 100%; position: relative; }
-        
-        /* 上部固定エリア */
-        .top-fixed-area {
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            z-index: 10;
+        .rule-section { 
+            background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; margin-bottom: 15px; 
+            border: 1px solid rgba(255,255,255,0.05);
         }
+        .rule-section.gold { 
+            background: rgba(212, 175, 55, 0.1); border-color: #d4af37; 
+        }
+        .rule-section h4 { 
+            color: var(--primary); border-bottom: 1px solid rgba(255,255,255,0.1); 
+            padding-bottom: 5px; margin-bottom: 10px; font-size: 1.05rem; 
+        }
+        .rule-section.gold h4 { color: #ffd700; border-color: rgba(212, 175, 55, 0.3); }
+        .rule-section p, .rule-list { font-size: 0.85rem; color: var(--text-light); }
+        .rule-list { margin: 0; padding-left: 20px; }
+        .rule-list li { margin-bottom: 8px; }
+        
+        .highlight { color: var(--secondary); font-weight: bold; }
+        .text-center { text-align: center; }
 
-        .info-bar { display: flex; justify-content: space-between; background: #000; padding: 8px 15px; border-bottom: 1px solid var(--primary); font-size: 0.85rem; font-weight: bold; }
+        /* ロビー・バトル画面レイアウトは前回から継承 */
+        #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
+        .lobby-header { display: flex; justify-content: space-between; align-items: center; }
+        .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; }
+        
+        .create-form { display: flex; gap: 10px; flex-wrap: wrap; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: var(--glass-border); }
+        .create-form select, .create-form input { flex: 1; min-width: 80px; }
+        .create-form button { flex: 1; min-width: 100px; }
+        
+        .room-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; }
+        .room-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; border: var(--glass-border); 
+        }
+        .room-host { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
+        .room-info { font-size: 0.85rem; color: #aaa; margin-top: 4px; }
+
+        #battle-screen { display: none; flex-direction: column; height: 100%; position: relative; }
+        .top-fixed-area { flex-shrink: 0; z-index: 10; }
+        .info-bar { 
+            display: flex; justify-content: space-between; background: rgba(0,0,0,0.8); 
+            padding: 10px 15px; border-bottom: 1px solid var(--primary-dim); font-size: 0.9rem; font-weight: bold; 
+        }
+        .timer-text { color: var(--primary); text-shadow: 0 0 5px var(--primary); }
         
         #action-banner {
-            background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.3), transparent);
-            text-align: center; font-weight: bold; padding: 6px; font-size: 0.85rem; color: #fff;
-            min-height: 32px; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(90deg, transparent, var(--primary-dim), transparent);
+            text-align: center; font-weight: bold; padding: 8px; font-size: 0.85rem; color: #fff;
+            min-height: 36px; display: flex; align-items: center; justify-content: center;
         }
-        #action-banner.alert { background: linear-gradient(90deg, transparent, rgba(255, 0, 127, 0.5), transparent); color: #fff; }
+        #action-banner.alert { background: linear-gradient(90deg, transparent, var(--secondary-dim), transparent); color: #fff; text-shadow: 0 0 5px var(--secondary); }
 
-        /* 中央スクロールエリア（ここが伸び縮みしてスクロール可能になる） */
         .battle-scroll-area {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding: 10px 15px; /* 左右の余白をしっかり確保 */
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            display: flex; flex-direction: column; gap: 15px; padding: 15px;
         }
 
-        /* 相手エリア */
-        #opponents-container {
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-        }
-
-        .opponent-wrap { display: flex; flex-direction: column; gap: 4px; transition: all 0.3s; }
-
-        /* プレイヤー情報カード */
-        .player-area { 
-            display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; 
-            background: rgba(0,243,255,0.05); border-radius: 8px; border: 1px solid rgba(0,243,255,0.2); 
-            transition: all 0.3s; position: relative;
-        }
-        .opponent-area { background: rgba(255,0,127,0.05); border-color: rgba(255,0,127,0.2); }
-        .portrait { display: flex; flex-direction: column; gap: 2px; }
-        .hp-mp { font-size: 0.95rem; font-weight: 900; }
-        .hp-text { color: #ff4444; font-size: 1.15rem; text-shadow: 0 0 5px #ff0000; }
-        .mp-text { color: #44aaff; }
-
-        /* ボード（盤面） */
-        .board { 
-            display: flex; gap: 8px; padding: 8px; background: rgba(255,255,255,0.02); 
-            overflow-x: auto; overflow-y: hidden; align-items: center; border-radius: 8px; 
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5); min-height: 100px;
-        }
-
-        /* 盤面のカードデザイン */
-        .board-card {
-            min-width: 75px; height: 95px; background: var(--card-bg); border: 2px solid #555; border-radius: 8px;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 5px; font-size: 0.75rem; text-align: center; cursor: pointer;
-            transition: all 0.2s; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.5); flex-shrink: 0;
-        }
-        /* 相手が複数いる場合は少し小さく表示 */
-        .opponent-wrap.multi .board-card { min-width: 65px; height: 85px; font-size: 0.65rem; padding: 4px; }
-        .opponent-wrap.multi .hp-mp { font-size: 0.85rem; }
-        .opponent-wrap.multi .hp-text { font-size: 1rem; }
-
-        .board-card:hover { transform: scale(1.05); }
-        .board-card.taunt { border-color: var(--taunt-color); box-shadow: 0 0 10px var(--taunt-color); background: linear-gradient(180deg, #3a2a10, #1c1a29); }
-        .board-card.can-attack { border-color: #00ff00; box-shadow: 0 0 10px #00ff00; animation: pulseGreen 1.5s infinite; }
-        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.9rem; }
-        .opponent-wrap.multi .stats { font-size: 0.8rem; }
+        #opponents-container { display: flex; flex-direction: column; gap: 15px; }
+        .opponent-wrap { display: flex; flex-direction: column; gap: 8px; transition: opacity 0.3s; }
         
-        @keyframes pulseGreen { 0% { box-shadow: 0 0 5px #00ff00; } 50% { box-shadow: 0 0 15px #00ff00; } 100% { box-shadow: 0 0 5px #00ff00; } }
+        .player-area { 
+            display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; 
+            background: var(--panel-bg); border-radius: 10px; border: 1px solid var(--primary-dim); 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.3s; position: relative;
+        }
+        .opponent-area { border-color: var(--secondary-dim); }
+        
+        .portrait { display: flex; flex-direction: column; gap: 4px; }
+        .player-name { font-weight: bold; font-size: 1.1rem; }
+        .player-name.mine { color: var(--primary); }
+        .player-name.enemy { color: var(--secondary); }
+        .deck-info { font-size: 0.8rem; color: #aaa; }
+        
+        .status-gauges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-weight: 900; }
+        .hp-text { color: #ff4d4d; font-size: 1.2rem; text-shadow: 0 0 5px rgba(255,77,77,0.5); }
+        .mp-text { color: #4da6ff; font-size: 0.95rem; }
+        .dead-label { color: red; font-size: 0.75rem; border: 1px solid red; padding: 2px 4px; border-radius: 4px; margin-left: 5px; }
 
-        /* 中央の境界線テキスト */
-        .battle-divider {
-            text-align:center; font-size:0.75rem; color:#888; border-top:1px dashed #333; border-bottom:1px dashed #333; 
-            padding: 4px; font-weight:900; letter-spacing: 5px; flex-shrink: 0; margin: 4px 0;
+        .end-turn-btn { padding: 6px 12px; background: #ffaa00; box-shadow: 0 0 10px #ffaa00; font-size: 0.85rem; display: none; }
+
+        .board { 
+            display: flex; gap: 10px; padding: 10px; background: rgba(0,0,0,0.3); 
+            overflow-x: auto; overflow-y: hidden; align-items: center; border-radius: 10px; 
+            min-height: 110px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
         }
 
-        /* -------------------------------------
-           下部固定エリア（手札）
-        ------------------------------------- */
+        .battle-divider {
+            text-align: center; font-size: 0.8rem; color: #666; 
+            border-top: 1px dashed #333; border-bottom: 1px dashed #333; 
+            padding: 6px; font-weight: 900; letter-spacing: 4px; margin: 5px 0;
+        }
+
+        .board-card {
+            min-width: 80px; height: 100px; background: var(--card-bg); 
+            border: 2px solid #444; border-radius: 8px; display: flex; flex-direction: column; 
+            justify-content: space-between; padding: 6px; font-size: 0.75rem; text-align: center; 
+            cursor: pointer; transition: all 0.2s; position: relative; flex-shrink: 0; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .board-card:hover { transform: translateY(-3px); border-color: #777; }
+        .board-card.taunt { border-color: var(--taunt-color); box-shadow: 0 0 10px var(--taunt-color); background: linear-gradient(145deg, #3a2a10, #14111d); }
+        .board-card.can-attack { border-color: #00ff00; box-shadow: 0 0 10px #00ff00; animation: pulseGreen 2s infinite; }
+        
+        .unit-name { font-weight: 900; font-size: 0.8rem; line-height: 1.2; word-break: break-all; }
+        .unit-name.mine { color: var(--primary); }
+        .unit-name.enemy { color: var(--secondary); }
+        .unit-status { font-size: 0.6rem; color: #fff; background: rgba(0,0,0,0.6); border-radius: 4px; padding: 2px; margin-top: 4px; display: inline-block;}
+        .stats { display: flex; justify-content: space-between; font-weight: 900; font-size: 0.95rem; margin-top: auto; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .multi-atk { color: #ffd700; font-size: 0.65rem; }
+
+        .opponent-wrap.multi .board-card { min-width: 70px; height: 90px; padding: 4px; }
+        .opponent-wrap.multi .unit-name { font-size: 0.7rem; }
+        .opponent-wrap.multi .stats { font-size: 0.85rem; }
+
+        @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 5px #00ff00; } 50% { box-shadow: 0 0 15px #00ff00; } }
+
         .hand-area { 
-            flex-shrink: 0; height: 125px; display: flex; gap: 10px; padding: 10px 15px; 
-            overflow-x: auto; overflow-y: hidden; background: #050505; border-top: 2px solid var(--primary); 
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.8); z-index: 10;
+            flex-shrink: 0; height: 140px; display: flex; gap: 12px; padding: 15px; 
+            overflow-x: auto; overflow-y: hidden; background: #050505; 
+            border-top: 2px solid var(--primary); box-shadow: 0 -5px 20px rgba(0,0,0,0.8); z-index: 10;
         }
 
         .hand-card {
-            min-width: 85px; height: 105px; background: linear-gradient(180deg, #2a2540 0%, #151222 100%);
-            border: 2px solid #555; border-radius: 8px; padding: 5px; display: flex; flex-direction: column; font-size: 0.75rem; cursor: pointer; position: relative;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-shrink: 0;
+            min-width: 90px; height: 110px; background: linear-gradient(145deg, #2a2540, #151222);
+            border: 2px solid #444; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; 
+            cursor: pointer; position: relative; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-shrink: 0;
         }
-        .hand-card:hover { transform: translateY(-10px) scale(1.1); z-index: 10; box-shadow: 0 10px 20px rgba(0,0,0,0.8); }
+        .hand-card:hover { transform: translateY(-15px) scale(1.05); z-index: 10; border-color: #888; }
         .hand-card.playable { border-color: var(--primary); box-shadow: 0 0 8px var(--primary); }
-        .hand-card.selected { transform: translateY(-15px) scale(1.15); border-color: #ff00ff; box-shadow: 0 0 20px #ff00ff; z-index: 20; }
+        .hand-card.selected { transform: translateY(-20px) scale(1.1); border-color: #ff00ff; box-shadow: 0 0 20px #ff00ff; z-index: 20; }
         
-        .cost { position: absolute; top: -8px; left: -8px; background: #00f3ff; color: #000; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.5); font-size: 0.9rem;}
-        .card-title { font-weight: 900; text-align: center; margin-top: 10px; margin-bottom: auto; font-size: 0.85rem;}
-        .card-desc { font-size: 0.65rem; color: #ccc; text-align: center; line-height: 1.2; background: rgba(0,0,0,0.5); padding: 3px; border-radius: 4px;}
+        .card-cost { position: absolute; top: -10px; left: -10px; background: var(--primary); color: #000; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.8); font-size: 1rem;}
+        .card-title { font-weight: 900; text-align: center; margin-top: 8px; font-size: 0.85rem; color: #fff;}
+        .card-desc { font-size: 0.65rem; color: #ccc; text-align: center; margin-top: auto; line-height: 1.3; background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px;}
 
-        /* ドラフトモーダル（5択対応） */
-        #draft-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95);
-            display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; gap: 15px; padding: 15px;
-        }
-        .draft-options { 
-            display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; 
-            max-width: 100%; overflow-y: auto; padding: 10px;
-        }
-        .draft-card { width: 110px; height: 150px; background: var(--card-bg); border: 3px solid var(--primary); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; cursor: pointer; font-size: 0.8rem; transition: transform 0.2s; box-shadow: var(--neon-shadow); flex-shrink: 0; }
+        /* ドラフトモーダル特有 */
+        .draft-options { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding: 10px; overflow-y: auto;}
+        .draft-card { width: 110px; height: 140px; border: 2px solid var(--primary); background: var(--card-bg); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; box-shadow: var(--neon-shadow); flex-shrink: 0; position: relative;}
         .draft-card:hover { transform: scale(1.05); }
+        .draft-wait-text { font-size: 1.1rem; font-weight: bold; display: none; text-align: center; padding: 20px;}
         
-        .draft-history-container { width: 100%; padding: 0 10px; margin-top: 15px; text-align: center; max-height: 35vh; overflow-y: auto; }
-        .draft-history { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
-        .history-card { width: 45px; height: 60px; background: #222; border: 1px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; text-align: center; font-weight: bold;}
+        .draft-history-container { width: 100%; margin-top: 20px; text-align: center; border-top: 1px solid #444; padding-top: 15px;}
+        .draft-history-title { color: #aaa; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;}
+        .draft-history { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .history-item { width: 45px; height: 60px; background: #222; border: 1px solid #555; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.55rem; text-align: center; font-weight: bold; line-height: 1.2;}
+        .history-item .cost { color: var(--primary); font-size: 0.7rem; margin-bottom: 2px;}
 
         /* ターゲットモード */
         .target-mode { cursor: crosshair !important; }
-        .target-mode .board { box-shadow: inset 0 0 30px rgba(255, 0, 127, 0.4); }
+        .target-mode .board { box-shadow: inset 0 0 30px rgba(255, 0, 127, 0.3); }
         .target-mode .opponent-area { 
-            border-color: #ff007f; box-shadow: 0 0 20px rgba(255, 0, 127, 0.8); 
-            animation: pulseRed 1s infinite; cursor: crosshair;
+            border-color: var(--secondary); box-shadow: 0 0 20px rgba(255, 0, 127, 0.6); 
+            animation: pulseRed 1.5s infinite; cursor: crosshair;
         }
         .target-mode .opponent-area::after {
-            content: "🎯 アタック可能！"; position: absolute; right: 10px; top: -12px;
-            background: #ff007f; color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: bold;
-            animation: float 2s infinite; z-index: 5;
+            content: "🎯 対象を選択"; position: absolute; right: 15px; top: -12px;
+            background: var(--secondary); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;
+            animation: float 2s infinite; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
 
-        @keyframes pulseRed { 0% { box-shadow: 0 0 10px #ff007f; } 50% { box-shadow: 0 0 30px #ff007f; } 100% { box-shadow: 0 0 10px #ff007f; } }
-        @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0); } }
-        
-        /* スクロールバー装飾 */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+        @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 10px var(--secondary); } 50% { box-shadow: 0 0 25px var(--secondary); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
     </style>
 </head>
 <body>
 <div class="container" id="main-container">
 
-<!-- ルールモーダル -->
-<div id="rules-modal">
-    <div class="rule-content">
-        <h3>📖 超究極完全体ルールガイド</h3>
+    <!-- ルールモーダル（詳細化・構造化） -->
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>📖 超究極完全体ルール＆用語ガイド</h3>
+            
+            <div class="rule-section gold">
+                <h4>🎯 勝利条件と報酬</h4>
+                <p>敵のヒーロー（顔）を攻撃して、<strong>最後まで生き残った1人</strong>の勝利！<br>勝者は<strong>賭け金の総取り（参加人数分）</strong>を獲得します。</p>
+            </div>
 
-        <div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #d4af37; padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
-            <div style="font-size: 0.95rem; font-weight: bold; color: #ffd700;">🎯 勝利条件と報酬</div>
-            <div style="font-size: 0.82rem; color: #fff; margin-top: 4px; line-height: 1.6;">
-                敵のヒーローを攻撃して<strong>最後まで生き残った1人</strong>の勝利！<br>
-                勝者は<strong>賭け金の総取り（参加人数分）</strong>を獲得します。
+            <div class="rule-section">
+                <h4>🕹️ ゲームの流れ</h4>
+                <ol class="rule-list">
+                    <li><strong>ドラフト（編成）</strong>：5枚の候補から1枚を選ぶ作業を繰り返し、6枚のデッキを作ります。</li>
+                    <li><strong>ターンの開始</strong>：毎ターン開始時に<strong>MPが全回復＆最大MP+1</strong>され、カードを1枚引きます。</li>
+                    <li><strong>カードを使う</strong>：自分のターンに、水滴マーク(💧)のMPを消費して手札からカードを出します。</li>
+                    <li><strong>攻撃する</strong>：緑色に光る自分のユニットをクリック後、狙いたい敵ユニットまたは敵ヒーローをクリックします。</li>
+                </ol>
+            </div>
+
+            <div class="rule-section">
+                <h4>🔤 状態異常・キーワード解説</h4>
+                <ul class="rule-list">
+                    <li><span class="highlight">🛡️ 挑発 (Taunt)</span>：この能力を持つユニットが相手の場にいる場合、あなたは他のユニットや敵ヒーローを攻撃対象に選べません。</li>
+                    <li><span class="highlight">❄️ 凍結 (Freeze)</span>：この状態のユニットは攻撃ができなくなります（1ターン経過で解除）。</li>
+                    <li><span class="highlight">🔥 火傷 (Burn)</span>：ターン終了時に自動でダメージを受けます。</li>
+                    <li><span class="highlight">🧱 城壁 (Wall)</span>：受けるダメージを軽減または無効化する防御バフです。</li>
+                    <li><span class="highlight">⚔️ 連続攻撃</span>：ステータスの横に <code>(x2)</code> などと表記され、1ターンにその回数分攻撃できます。</li>
+                </ul>
+            </div>
+
+            <div class="rule-section">
+                <h4>🃏 カードの種類</h4>
+                <ul class="rule-list">
+                    <li><strong>ユニットカード</strong>：場に出て戦うキャラクター（攻撃力⚔️と体力❤️を持つ）。HPが0になると破壊されます。<strong>場に出したターンは攻撃できません</strong>（※「速攻」持ちを除く）。</li>
+                    <li><strong>スペルカード</strong>：手札から直接使い、即座に効果を発揮する魔法。味方を強化したり、敵にダメージを与えたりします。「特定の対象を選ぶ」ものと「全体に効果がある」ものがあります。</li>
+                </ul>
+            </div>
+
+            <div class="text-center">
+                <button class="btn-dark" onclick="document.getElementById('rules-modal').style.display='none'">閉じる</button>
             </div>
         </div>
-
-        <div style="background: rgba(0,0,0,0.35); padding: 12px 14px; border-radius: 8px; margin-bottom: 12px;">
-            <div style="font-weight: bold; color: #ffd700; margin-bottom: 8px; font-size: 0.9rem;">🕹️ 戦いの流れ</div>
-            <ol style="margin: 0; padding-left: 20px; font-size: 0.82rem; line-height: 1.8; color: #eee;">
-                <li><strong>ドラフト（編成）</strong>：5枚の候補から1枚を選ぶ作業を繰り返し、6枚のデッキを作ります。</li>
-                <li><strong>初期手札とターン開始</strong>：開始時に3枚ドロー。ターンが回ると<strong>MP全回復＆最大MP+1</strong>され、1枚引きます。</li>
-                <li><strong>カードを使う</strong>：MPを消費して、手札をクリックして場に出します。</li>
-                <li><strong>攻撃する</strong>：光る自分のユニットをクリック後、狙いたい敵ユニットまたは敵顔をクリック。</li>
-            </ol>
-        </div>
-
-        <div style="text-align: center; padding-bottom: 4px;">
-            <button onclick="document.getElementById('rules-modal').style.display='none'">閉じる</button>
-        </div>
     </div>
-</div>
 
     <!-- ロビー -->
     <div id="lobby-screen">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="color: var(--primary); text-shadow: var(--neon-shadow);">⚔️ 村岡王国 TCG</h2>
-            <button onclick="document.getElementById('rules-modal').style.display='flex'" style="background: #333; color: #fff; padding: 6px 12px; font-size: 0.8rem;">ルール確認</button>
+        <div class="lobby-header">
+            <h2 class="lobby-title">⚔️ 村岡王国 TCG</h2>
+            <button class="btn-dark" onclick="document.getElementById('rules-modal').style.display='flex'">ルール確認</button>
         </div>
         
         <div class="create-form">
             <select id="wallet-select"></select>
-            <select id="max-players-select" style="max-width: 80px;">
-                <option value="2">2人</option>
-                <option value="3">3人</option>
+            <select id="max-players-select">
+                <option value="2">2人対戦</option>
+                <option value="3">3人対戦</option>
             </select>
-            <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="max-width: 100px;">
+            <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)">
             <button onclick="createRoom()">部屋作成</button>
         </div>
         
         <div class="room-list" id="room-list"></div>
-        <button style="background:#333; color:#fff;" onclick="location.href='/casino'">カジノへ戻る</button>
+        <button class="btn-dark" style="margin-top: auto;" onclick="location.href='/casino'">カジノへ戻る</button>
     </div>
 
     <!-- バトルレイヤー -->
@@ -324,32 +358,27 @@
         <div class="top-fixed-area">
             <div class="info-bar">
                 <span id="sys-message">待機中...</span>
-                <span id="sys-timer" style="color:var(--primary);">⏳ 0</span>
+                <span id="sys-timer" class="timer-text">⏳ 0</span>
             </div>
             <div id="action-banner">バトル開始を待っています...</div>
         </div>
         
-        <!-- 中央スクロール領域（画面に収まらない場合はここがスクロールされる） -->
+        <!-- 中央スクロール領域 -->
         <div class="battle-scroll-area">
-            <!-- 相手エリア（複数対応） -->
             <div id="opponents-container"></div>
-
-            <div class="battle-divider">BATTLE FIELD</div>
-            
-            <!-- 自分のボード -->
+            <div class="battle-divider"><span>BATTLE FIELD</span></div>
             <div class="board" id="my-board"></div>
 
-            <!-- 自分のヒーロー -->
             <div class="player-area" id="my-hero" onclick="handleTargetClick('hero', myUserId)">
                 <div class="portrait">
-                    <span id="my-name" style="font-weight:bold; color:var(--primary);">You</span>
-                    <span class="hp-mp" style="font-size: 0.8rem;">Deck: <span id="my-deck-count">0</span></span>
+                    <span class="player-name mine" id="my-name">You</span>
+                    <span class="deck-info">Deck: <span id="my-deck-count">0</span>枚</span>
                 </div>
-                <div class="hp-mp">
-                    <span class="hp-text">HP: <span id="my-hp">20</span></span> | 
-                    <span class="mp-text">MP: <span id="my-mp">0</span>/<span id="my-max-mp">0</span></span>
+                <div class="status-gauges">
+                    <span class="hp-text">❤️ <span id="my-hp">20</span></span>
+                    <span class="mp-text">💧 <span id="my-mp">0</span> / <span id="my-max-mp">0</span></span>
                 </div>
-                <button id="end-turn-btn" style="padding: 6px 14px; display:none; background:#ffaa00; box-shadow: 0 0 10px #ffaa00; font-size:0.9rem;" onclick="endTurn()">ターン終了</button>
+                <button id="end-turn-btn" class="end-turn-btn" onclick="endTurn()">ターン終了</button>
             </div>
         </div>
 
@@ -358,14 +387,14 @@
     </div>
 
     <!-- ドラフトモーダル -->
-    <div id="draft-overlay">
-        <h3 style="color: var(--primary); text-shadow: var(--neon-shadow);">🃏 カードをピック！</h3>
-        <!-- ドラフト5枚並べ用 -->
+    <div id="draft-overlay" class="modal-overlay">
+        <h3 style="color: var(--primary); text-shadow: var(--neon-shadow); margin-bottom:15px; font-size:1.5rem;">🃏 カードをピック！</h3>
+        
         <div class="draft-options" id="draft-options"></div>
-        <div id="draft-wait" style="display:none; font-size:1.1rem; font-weight:bold;">他のプレイヤーの選択を待っています...</div>
+        <div id="draft-wait" class="draft-wait-text">他のプレイヤーの選択を待っています...</div>
         
         <div class="draft-history-container">
-            <div style="color: #ccc; font-weight: bold; font-size:0.9rem;">ピック済みのカード (<span id="draft-count">0</span>/6)</div>
+            <div class="draft-history-title">ピック済みのカード (<span id="draft-count">0</span>/6)</div>
             <div class="draft-history" id="draft-history"></div>
         </div>
     </div>
@@ -383,7 +412,6 @@
     let myUserId = null;
     let opponentIds = [];
     
-    // UI State / Animation trackers
     let selectedHandCard = null; 
     let selectedBoardUnit = null; 
     let isTargetingMode = false;
@@ -413,10 +441,10 @@
             document.getElementById("room-list").innerHTML = data.rooms.map(r => `
                 <div class="room-item">
                     <div>
-                        <div style="font-size:1rem; font-weight:bold; color:var(--primary);">${r.host_name}</div>
-                        <div style="font-size:0.8rem; color:#aaa;">Bet: ${r.bet_amount}G | ${r.current_players}/${r.max_players}人</div>
+                        <div class="room-host">${r.host_name}の部屋</div>
+                        <div class="room-info">Bet: ${r.bet_amount}G | 参加: ${r.current_players}/${r.max_players}人</div>
                     </div>
-                    <button onclick="joinRoom('${r.room_id}')" style="font-size:0.8rem; padding: 6px 12px;">参戦</button>
+                    <button onclick="joinRoom('${r.room_id}')">参戦</button>
                 </div>
             `).join('');
         } catch (e) {}
@@ -536,8 +564,9 @@
             const myDeck = state.my_deck || [];
             document.getElementById("draft-count").innerText = myDeck.length;
             document.getElementById("draft-history").innerHTML = myDeck.map(c => `
-                <div class="history-card">
-                    <span style="color:var(--primary);">${c.cost}</span><br>${c.name}
+                <div class="history-item">
+                    <span class="cost">${c.cost}</span>
+                    <span>${c.name}</span>
                 </div>
             `).join('');
 
@@ -546,10 +575,10 @@
                 document.getElementById("draft-wait").style.display = "none";
                 document.getElementById("draft-options").innerHTML = state.draft_options.map(c => `
                     <div class="draft-card" onclick="pickCard('${c.id}')">
-                        <div class="cost">${c.cost}</div>
+                        <div class="card-cost">${c.cost}</div>
                         <div class="card-title">${c.name}</div>
                         <div class="card-desc">${c.desc}</div>
-                        ${c.type === 'unit' ? `<div class="stats" style="margin-top:auto;"><span>⚔️${c.atk}</span><span>❤️${c.hp}</span></div>` : ''}
+                        ${c.type === 'unit' ? `<div class="stats"><span>⚔️${c.atk}</span><span>❤️${c.hp}</span></div>` : ''}
                     </div>
                 `).join('');
             } else {
@@ -594,7 +623,6 @@
         document.getElementById("my-deck-count").innerText = state.deck_counts[myUserId] || 0;
 
         const renderUnit = (u, isMine) => {
-            // 状態異常のアイコン表示用
             const statusIcons = [];
             if (u.taunt) statusIcons.push("🛡️挑発");
             if (u.frozen_turns > 0) statusIcons.push("❄️凍結");
@@ -602,16 +630,16 @@
             if (u.wall_turns > 0) statusIcons.push("🧱城壁");
             
             const statusHtml = statusIcons.length > 0 
-                ? `<div style="font-size:0.55rem; color:#fff; font-weight:bold; background:rgba(0,0,0,0.6); border-radius:3px; padding:2px; margin-top:2px;">${statusIcons.join(" ")}</div>` 
+                ? `<div class="unit-status">${statusIcons.join(" ")}</div>` 
                 : '';
 
             return `
             <div id="unit-${u.instance_id}" class="board-card ${u.taunt ? 'taunt' : ''} ${isMine && u.can_attack && isMyTurn ? 'can-attack' : ''}" 
                  onclick="handleBoardClick('${u.instance_id}', ${isMine})">
-                <div style="font-weight:900; font-size:0.75rem; color:${isMine ? '#00f3ff' : '#ff007f'}; line-height:1.2;">${u.name}</div>
+                <div class="unit-name ${isMine ? 'mine' : 'enemy'}">${u.name}</div>
                 ${statusHtml}
-                <div class="stats" style="margin-top:auto;">
-                    <span>⚔️${u.atk} ${u.attacks_left > 1 ? `<span style="color:yellow;font-size:0.6rem;">(x${u.attacks_left})</span>` : ''}</span>
+                <div class="stats">
+                    <span>⚔️${u.atk} ${u.attacks_left > 1 ? `<span class="multi-atk">(x${u.attacks_left})</span>` : ''}</span>
                     <span>❤️${u.curr_hp}</span>
                 </div>
             </div>`;
@@ -631,7 +659,7 @@
             
             const isDead = hp <= 0;
             const opacity = isDead ? "0.4" : "1";
-            const deadLabel = isDead ? `<span style="color:red; font-size:0.7rem; font-weight:bold; margin-left:5px;">[DEFEATED]</span>` : '';
+            const deadLabel = isDead ? `<span class="dead-label">DEFEATED</span>` : '';
             
             const wrapClass = opponentIds.length > 1 ? "opponent-wrap multi" : "opponent-wrap";
 
@@ -639,12 +667,12 @@
                 <div class="${wrapClass}" style="opacity: ${opacity};">
                     <div class="player-area opponent-area" id="opp-hero-${oppId}" onclick="handleTargetClick('hero', '${oppId}')">
                         <div class="portrait">
-                            <span style="font-weight:bold; color:var(--secondary);">${p.name} ${deadLabel}</span>
-                            <span class="hp-mp" style="font-size: 0.8rem;">Deck: <span>${deck}</span></span>
+                            <span class="player-name enemy">${p.name} ${deadLabel}</span>
+                            <span class="deck-info">Deck: <span>${deck}</span>枚</span>
                         </div>
-                        <div class="hp-mp">
-                            <span class="hp-text">HP: <span>${hp}</span></span> | 
-                            <span class="mp-text">MP: <span>${mp}</span>/<span>${maxMp}</span></span>
+                        <div class="status-gauges">
+                            <span class="hp-text">❤️ <span>${hp}</span></span>
+                            <span class="mp-text">💧 <span>${mp}</span> / <span>${maxMp}</span></span>
                         </div>
                     </div>
                     <div class="board">
@@ -658,10 +686,10 @@
         const myMp = state.mp[myUserId] || 0;
         document.getElementById("my-hand").innerHTML = (state.hands[myUserId] || []).map(c => `
             <div class="hand-card ${c.cost <= myMp && isMyTurn ? 'playable' : ''}" id="hand-${c.instance_id}" onclick="handleHandClick('${c.instance_id}', ${c.cost <= myMp && isMyTurn})">
-                <div class="cost">${c.cost}</div>
+                <div class="card-cost">${c.cost}</div>
                 <div class="card-title">${c.name}</div>
                 <div class="card-desc">${c.desc}</div>
-                ${c.type === 'unit' ? `<div class="stats" style="margin-top:auto;"><span>⚔️${c.atk}</span><span>❤️${c.hp}</span></div>` : ''}
+                ${c.type === 'unit' ? `<div class="stats"><span>⚔️${c.atk}</span><span>❤️${c.hp}</span></div>` : ''}
             </div>
         `).join('');
 
