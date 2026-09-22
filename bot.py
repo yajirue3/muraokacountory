@@ -62,7 +62,7 @@ class SimState:
         new_s.opp_deck = [dict(c) for c in self.opp_deck]
         return new_s
 
-    def get_hash(() -> str:
+    def get_hashs(self) -> str:
         mb = ",".join(f"{u.get('instance_id')}:{u.get('curr_hp')}:{u.get('attacks_left')}:{u.get('wall_turns',0)}" for u in self.my_board)
         ob = ",".join(f"{u.get('instance_id')}:{u.get('curr_hp')}:{u.get('wall_turns',0)}" for u in self.opp_board)
         mh = ",".join(c.get("instance_id", "") for c in self.my_hand)
