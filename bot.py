@@ -8,7 +8,7 @@ logger = logging.getLogger("CardBot")
 # BOT基本設定
 # ====================================================
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "真・究極生命体AI"
+BOT_USER_NAME = "クソザコBOT"
 
 BOT_CARD_TIER = {
     "s_05": 100, "u_06": 98, "s_02": 95, "s_01": 90,
