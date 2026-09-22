@@ -34,7 +34,7 @@ async def get_user_from_token_async(authorization: str):
     except Exception:
         raise HTTPException(status_code=401, detail="無効なトークンです")
 
-# マスターデータ（新カード7種追加）
+# マスターデータ（カードデータベース）
 CARD_DATABASE = {
     "u_01": {"id": "u_01", "name": "先鋒兵", "type": "unit", "cost": 1, "atk": 2, "hp": 1, "haste": True, "desc": "速攻"},
     "u_02": {"id": "u_02", "name": "重装兵", "type": "unit", "cost": 3, "atk": 2, "hp": 5, "taunt": True, "desc": "挑発"},
@@ -45,8 +45,6 @@ CARD_DATABASE = {
     "s_02": {"id": "s_02", "name": "嵐", "type": "spell", "cost": 4, "effect": "aoe_damage", "val": 2, "need_target": False, "desc": "全体2点"},
     "s_03": {"id": "s_03", "name": "治癒", "type": "spell", "cost": 2, "effect": "heal", "val": 5, "need_target": False, "desc": "自分回復5点"},
     "s_04": {"id": "s_04", "name": "補充", "type": "spell", "cost": 3, "effect": "draw", "val": 2, "need_target": False, "desc": "2枚引く"},
-    
-    # 新カード
     "s_05": {"id": "s_05", "name": "暗殺者", "type": "spell", "cost": 6, "effect": "assassinate", "need_target": True, "desc": "敵ユニット1体を即死"},
     "u_06": {"id": "u_06", "name": "小人", "type": "unit", "cost": 5, "atk": 1, "hp": 2, "max_attacks": 3, "ranged": True, "desc": "1点×3回攻撃(対象自由・反撃無効)"},
     "u_07": {"id": "u_07", "name": "奇術師", "type": "unit", "cost": 4, "atk": 0, "hp": 0, "random_stat": True, "desc": "召喚時ステータスランダム決定"},
@@ -103,6 +101,11 @@ async def get_card(request: Request):
 async def get_rooms():
     return {"rooms": [{"room_id": s.room_id, "host_name": s.players[s.host_id]["name"], "bet_amount": s.bet_amount, "max_players": s.max_players, "current_players": len(s.players)} 
                       for s in CARD_SESSIONS.values() if s.status == "WAITING"]}
+
+# カード一覧（図鑑）取得用API
+@router.get("/api/card/database")
+async def get_card_database():
+    return {"cards": list(CARD_DATABASE.values())}
 
 @router.post("/api/card/create")
 async def create_room(data: CreateRoomRequest, authorization: str = Header(None)):
@@ -301,7 +304,7 @@ async def run_timer(room_id: str):
 def start_draft_phase(session: CardGameSession):
     session.status = "DRAFT"
     session.message = "ドラフトフェーズ：カードを選択してください"
-    pool_size = 10 * session.max_players  # ドラフト5択化に伴いプールを拡張
+    pool_size = 15 * session.max_players
     pool = list(CARD_DATABASE.keys()) * pool_size
     random.shuffle(pool)
     session.draft_pool = pool
@@ -317,6 +320,11 @@ def start_draft_phase(session: CardGameSession):
 def generate_draft_candidates(session: CardGameSession):
     if len(session.draft_pool) >= 5:
         session.draft_options[session.turn_user_id] = [session.draft_pool.pop() for _ in range(5)]
+    else:
+        # 万が一プールが尽きた場合全データベースから補充
+        pool = list(CARD_DATABASE.keys())
+        random.shuffle(pool)
+        session.draft_options[session.turn_user_id] = pool[:5]
 
 def auto_draft(session: CardGameSession):
     uid = session.turn_user_id
@@ -326,7 +334,8 @@ def auto_draft(session: CardGameSession):
     advance_draft(session)
 
 def advance_draft(session: CardGameSession):
-    if all(len(session.decks[uid]) == 6 for uid in session.player_order):
+    # ピック上限を6枚から12枚に変更してデッキ枚数を確保
+    if all(len(session.decks[uid]) == 12 for uid in session.player_order):
         start_battle_phase(session)
     else:
         session.turn_idx = (session.turn_idx + 1) % session.max_players
@@ -361,6 +370,18 @@ def get_unit_owner(session: CardGameSession, target_id: str):
             if u["instance_id"] == target_id:
                 return uid, u
     return None, None
+
+# ドローヘルパー関数（山札が切れていたらランダム生成）
+def draw_card_or_generate(session: CardGameSession, user_id: str):
+    if len(session.hands[user_id]) >= 7:
+        return
+    if session.decks[user_id]:
+        c = session.decks[user_id].pop()
+    else:
+        rand_id = random.choice(list(CARD_DATABASE.keys()))
+        c = copy.deepcopy(CARD_DATABASE[rand_id])
+    c["instance_id"] = str(uuid.uuid4())[:8]
+    session.hands[user_id].append(c)
 
 async def process_action(session: CardGameSession, user_id: str, action: dict):
     if session.status == "ENDED" or session.turn_user_id != user_id: return
@@ -495,13 +516,9 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
     elif eff == "heal":
         session.hp[user_id] = min(20, session.hp[user_id] + val)
     elif eff == "draw":
+        # 山札が空でも確実に引ける（ランダム生成）よう改善
         for _ in range(val):
-            if session.decks[user_id] and len(session.hands[user_id]) < 7:
-                c = session.decks[user_id].pop()
-                c["instance_id"] = str(uuid.uuid4())[:8]
-                session.hands[user_id].append(c)
-    
-    # 新カードスペル効果
+            draw_card_or_generate(session, user_id)
     elif eff == "assassinate" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
         if unit:
@@ -512,11 +529,8 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
         if session.hands[user_id]:
             discard_idx = random.randrange(len(session.hands[user_id]))
             session.hands[user_id].pop(discard_idx)
-        # デッキから1枚引く
-        if session.decks[user_id] and len(session.hands[user_id]) < 7:
-            c = session.decks[user_id].pop()
-            c["instance_id"] = str(uuid.uuid4())[:8]
-            session.hands[user_id].append(c)
+        # 確実に1枚引く（山札がなければ生成）
+        draw_card_or_generate(session, user_id)
     elif eff == "freeze" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
         if unit:
@@ -568,17 +582,8 @@ def switch_turn(session: CardGameSession):
 
         u["attacks_left"] = u.get("max_attacks", 1)
 
-    if session.decks[nxt] and len(session.hands[nxt]) < 7:
-        c = session.decks[nxt].pop()
-        c["instance_id"] = str(uuid.uuid4())[:8]
-        session.hands[nxt].append(c)
-
-    if len(session.hands[nxt]) == 0:
-        rand_id = random.choice(list(CARD_DATABASE.keys()))
-        c = copy.deepcopy(CARD_DATABASE[rand_id])
-        c["instance_id"] = str(uuid.uuid4())[:8]
-        session.hands[nxt].append(c)
-        session.message = f"【奇跡のドロー】{session.players[nxt]['name']} は手札がないためランダムなカードを生成した！"
+    # 通常ドロー（山札切れ時は生成）
+    draw_card_or_generate(session, nxt)
 
     set_timer(session, 45)
 
