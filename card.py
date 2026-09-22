@@ -6,6 +6,7 @@ import random
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from bot import BOT_USER_ID, BOT_USER_NAME, HUMAN_DRAFT_MEMORIES, process_super_ai_turn
 
 from fastapi import APIRouter, HTTPException, Header, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import HTMLResponse
@@ -677,3 +678,38 @@ def mask_session_for_client(session: CardGameSession, target_uid: str) -> dict:
         "your_user_id": target_uid
     }
 
+# BOTルーム作成 API (card.py 内)
+@router.post("/api/card/create_bot_room")
+async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(None)):
+    user = await get_user_from_token_async(authorization)
+    supabase = await get_supabase()
+
+    if not supabase:
+        raise HTTPException(status_code=500, detail="DB接続エラーが発生しました")
+
+    w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+    if not w_res.data or w_res.data[0]["balance"] < data.amount:
+        raise HTTPException(status_code=400, detail="残高が不足しています")
+    
+    new_bal = w_res.data[0]["balance"] - data.amount
+    await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+
+    p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
+
+    room_id = str(uuid.uuid4())[:8]
+    session = CardGameSession(room_id, str(user.id), name, data.wallet_id, data.amount, max_players=2)
+    
+    # 名前は「クソザコBOT」に設定
+    session.players[BOT_USER_ID] = {"name": BOT_USER_NAME, "wallet_id": "bot_wallet"}
+    session.player_order.append(BOT_USER_ID)
+    CARD_SESSIONS[room_id] = session
+
+    HUMAN_DRAFT_MEMORIES[room_id] = []
+
+    start_draft_phase(session)
+
+    if session.turn_user_id == BOT_USER_ID:
+        await process_super_ai_turn(session, CARD_DATABASE, process_action)
+
+    return {"room_id": room_id}
