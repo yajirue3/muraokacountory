@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Dict, List, Optional, Any, Tuple
+from itertools import combinations
 
 logger = logging.getLogger("CardBot")
 
@@ -9,18 +10,19 @@ BOT_USER_NAME = "村岡国王（影武者）"
 
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
+# --- カード基本能力値＆評価ベース ---
 CARD_SYNERGY_MATRIX = {
-    "u_01": {"score": 500, "type": "unit", "cost": 1}, # 先鋒兵
-    "u_02": {"score": 750, "type": "unit", "cost": 3}, # 重装兵
-    "u_03": {"score": 400, "type": "unit", "cost": 2}, # 魔導士
-    "u_04": {"score": 550, "type": "unit", "cost": 6}, # 巨兵
+    "u_01": {"score": 300, "type": "unit", "cost": 1}, # 先鋒兵
+    "u_02": {"score": 400, "type": "unit", "cost": 3}, # 重装兵（適正評価に修正）
+    "u_03": {"score": 350, "type": "unit", "cost": 2}, # 魔導士
+    "u_04": {"score": 500, "type": "unit", "cost": 6}, # 巨兵
     "u_05": {"score": 100, "type": "unit", "cost": 4},
     "u_06": {"score": 350, "type": "unit", "cost": 3}, # 小人
     "u_07": {"score": -999, "type": "unit", "cost": 1},
     
-    "s_05": {"score": 650, "type": "spell", "cost": 6}, # 暗殺者
-    "s_09": {"score": 650, "type": "spell", "cost": 2}, # 城壁
-    "s_02": {"score": 400, "type": "spell", "cost": 4}, # 嵐
+    "s_05": {"score": 500, "type": "spell", "cost": 6}, # 暗殺者
+    "s_09": {"score": 400, "type": "spell", "cost": 2}, # 城壁
+    "s_02": {"score": 450, "type": "spell", "cost": 4}, # 嵐
     "s_01": {"score": 10,  "type": "spell", "cost": 1},
     "s_03": {"score": 5,   "type": "spell", "cost": 1},
     "s_04": {"score": 10,  "type": "spell", "cost": 1},
@@ -65,64 +67,37 @@ class SimState:
         mh = ",".join(c.get("instance_id", "") for c in self.my_hand)
         return f"{self.my_hp}|{self.opp_hp}|{self.my_mp}|{self.opp_mp}|[{mb}]|[{ob}]|[{mh}]"
 
-    def predict_opp_max_damage(self) -> int:
-        board_dmg = sum(u.get("atk", 0) for u in self.opp_board if u.get("frozen_turns", 0) == 0)
-        avail_mp = min(10, self.opp_mp + 1)
-        hand_burst = 0
-        for c in self.opp_hand:
-            c_cost = c.get("cost", 99)
-            if c_cost <= avail_mp:
-                if c.get("type") == "spell" and c.get("effect") == "damage":
-                    hand_burst = max(hand_burst, c.get("val", 0))
-                elif c.get("type") == "unit" and c.get("haste"):
-                    hand_burst = max(hand_burst, c.get("atk", 0))
-        return board_dmg + hand_burst
-
     def evaluate_state(self, is_my_turn_eval: bool = True) -> float:
         if self.opp_hp <= 0: return 9999999.0
         if self.my_hp <= 0: return -9999999.0
 
         score = 0.0
 
-        # 1. 完全リーサルチェック（顔面優先の最重要基準）
+        # 1. 完全リーサルチェック
         my_total_atk = sum(u.get("atk", 0) for u in self.my_board if u.get("can_attack") or u.get("haste"))
         opp_taunts = [u for u in self.opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
         
-        # 煽りなしで即殺できるなら極大スコア
         if len(opp_taunts) == 0 and my_total_atk >= self.opp_hp:
             return 9000000.0 if is_my_turn_eval else -9000000.0
 
-        # 2. 次ターンリーサル（顔を削る価値を高める評価）
-        if len(opp_taunts) == 0 and (self.opp_hp - my_total_atk) <= 5:
-            score += 80000.0 # 相手のHPを5以下に追い詰める行動を超高評価
-
-        # 3. テンポ（MP全使い切り）チェック
+        # 2. 残MPペナルティ（手札にプレイ可能カードがあるのにMPを残した場合は強烈なマイナス）
         if is_my_turn_eval:
-            playable_cards = [c for c in self.my_hand if c.get("cost", 99) <= self.my_mp and c.get("id") != "s_07"]
-            if playable_cards and self.my_mp > 0 and len(self.my_board) < 7:
-                score -= 100000.0 # 温存・パスは絶対許さない
+            playable = [c for c in self.my_hand if c.get("cost", 99) <= self.my_mp and c.get("id") != "s_07"]
+            if playable and self.my_mp > 0 and len(self.my_board) < 7:
+                score -= 50000.0 * self.my_mp
 
-        # 4. 生存性チェック
-        opp_max_dmg = self.predict_opp_max_damage()
-        has_taunt = any(u.get("taunt") for u in self.my_board)
-        if opp_max_dmg >= self.my_hp:
-            score -= 800000.0 if not has_taunt else 200000.0
+        # 3. 純粋な盤面スタッツ評価（総攻撃力＋総耐久力）
+        my_board_atk = sum(u.get("atk", 0) for u in self.my_board)
+        my_board_hp = sum(u.get("curr_hp", 0) for u in self.my_board)
+        opp_board_atk = sum(u.get("atk", 0) for u in self.opp_board)
+        opp_board_hp = sum(u.get("curr_hp", 0) for u in self.opp_board)
 
-        # 5. 相手の裏目（全体除去 s_02 / 暗殺者 s_05）警戒
-        if self.opp_mp >= 4:
-            # 敵がAOE（嵐）を持てるターン：小物を並べすぎる裏目を警戒
-            if len(self.my_board) >= 4 and sum(1 for u in self.my_board if u.get("curr_hp",0) <= 2) >= 3:
-                score -= 3000.0
+        score += (my_board_atk * 60 + my_board_hp * 40)
+        score -= (opp_board_atk * 80 + opp_board_hp * 50)
 
-        # 6. 盤面アドバンテージ vs 顔面打点の天秤
-        my_board_val = sum(u.get("atk", 0) * 50 + u.get("curr_hp", 0) * 30 for u in self.my_board)
-        opp_board_val = sum(u.get("atk", 0) * 90 + u.get("curr_hp", 0) * 60 for u in self.opp_board)
-
-        score += (my_board_val - opp_board_val)
-        
-        # 敵のHPを減らすことの価値（相手のHPが低ければ低いほど顔面パンチの価値が指数関数的に上昇）
-        score += (30 - self.opp_hp) * 150.0
-        score += self.my_hp * 10.0
+        # 4. ライフアドバンテージ
+        score += (20 - self.opp_hp) * 120.0
+        score += self.my_hp * 15.0
 
         return score if is_my_turn_eval else -score
 
@@ -138,13 +113,12 @@ class SimState:
         opp_taunts = [u for u in enemy_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
         total_board_atk = sum(u.get("atk", 0) for u in active_board if u.get("can_attack") and u.get("frozen_turns", 0) == 0)
 
-        # --- 1. 攻撃行動（顔面 vs 盤面処理の高度な選別） ---
+        # --- 1. 攻撃行動（最適判断） ---
         for u in active_board:
             if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                 u_atk = u.get("atk", 0)
                 u_hp = u.get("curr_hp", 0)
 
-                # 挑発（Taunt）がいる場合は強制処理
                 if opp_taunts:
                     for t in opp_taunts:
                         actions.append({
@@ -152,7 +126,6 @@ class SimState:
                             "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                         })
                 else:
-                    # 【ガチ勢ロジック】リーサル圏内なら敵盤面無視で全員で顔面を殴る
                     if total_board_atk >= enemy_hp:
                         actions.append({
                             "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": 999999,
@@ -160,34 +133,33 @@ class SimState:
                         })
                         continue
 
-                    # 敵ユニットが存在する場合
                     for t in enemy_board:
                         if t.get("curr_hp", 0) > 0:
                             t_atk = t.get("atk", 0)
                             t_hp = t.get("curr_hp", 0)
                             
-                            # 一方的に倒せる（神トレード）
+                            # 神トレード（一方的に倒せる）
                             if u_atk >= t_hp and u_hp > t_atk:
                                 actions.append({
-                                    "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 3500,
+                                    "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 3800,
                                     "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                                 })
-                            # 相手が「放置すると危険な高攻撃力ユニット（Atk >= 4）」の場合のみ相討ちトレード
-                            elif t_atk >= 4 and u_atk >= t_hp:
+                            # 高脅威ユニット（攻撃力3以上）の処理
+                            elif t_atk >= 3 and u_atk >= t_hp:
                                 actions.append({
-                                    "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 2500,
+                                    "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 2800,
                                     "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                                 })
 
-                    # 【顔面パンチ推進】危険でない雑魚敵はシカトして相手の顔面を殴る！
-                    hero_score = 2000
-                    if enemy_hp <= 12: hero_score += 1500 # 敵のHPが削れてきたら顔面の価値急上昇
+                    # 顔面打点
+                    hero_score = 2200
+                    if enemy_hp <= 10: hero_score += 2000
                     actions.append({
                         "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": hero_score,
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": enemy_id}}
                     })
 
-        # --- 2. 手札プレイ行動 ---
+        # --- 2. 手札プレイ行動（現在のMPで出せるベストパフォーマンス） ---
         for i, c in enumerate(active_hand):
             c_cost = c.get("cost", 99)
             if c_cost > active_mp: continue
@@ -200,13 +172,16 @@ class SimState:
             if cid_type == "s_07": continue
 
             if c_type == "unit" and len(active_board) < 7:
-                score_mod = 2000
-                if active_mp - c_cost == 0: score_mod += 6000 # マナピッタリ使い切り絶大ボーナス
-
-                if cid_type == "u_01": score_mod += 3000
-                elif cid_type == "u_02": score_mod += 3500
-                elif cid_type == "u_03": score_mod += 2500
-                elif cid_type == "u_04": score_mod += 2000
+                # 重装依存を排除し、マナコストとスタッツの効率（マナカーブ）で評価
+                u_atk = c.get("atk", 1)
+                u_hp = c.get("hp", 1)
+                efficiency_score = (u_atk * 2 + u_hp) * 100
+                
+                score_mod = 1500 + efficiency_score
+                
+                # ピッタリマナを使い切れるプレイに加点
+                if active_mp - c_cost == 0:
+                    score_mod += 4000
 
                 actions.append({
                     "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": score_mod,
@@ -218,8 +193,8 @@ class SimState:
                     for t in enemy_board:
                         t_cid = t.get("card_id")
                         ass_score = 2000
-                        if t_cid == "u_04": ass_score = 7000 # 敵の巨兵は絶対確定除去
-                        elif t_cid == "u_02": ass_score = 5000
+                        if t_cid == "u_04": ass_score = 7000
+                        elif t.get("atk", 0) >= 3: ass_score = 4000
 
                         actions.append({
                             "type": "PLAY", "c_inst_id": inst_id, "t_type": "unit", "t_id": t["instance_id"], "score": ass_score,
@@ -229,7 +204,7 @@ class SimState:
                 elif eff == "wall" or cid_type == "s_09":
                     for my_u in active_board:
                         if my_u.get("wall_turns", 0) == 0:
-                            score_wall = 6000 if my_u.get("card_id") == "u_02" else 2000
+                            score_wall = 2000 + (my_u.get("atk", 0) * 500) # 攻撃力が高いユニットを守る
                             actions.append({
                                 "type": "PLAY", "c_inst_id": inst_id, "t_type": "unit", "t_id": my_u["instance_id"], "score": score_wall,
                                 "api": {"action": "PLAY_HAND", "card_instance_id": inst_id, "target": {"type": "unit", "id": my_u["instance_id"]}}
@@ -238,7 +213,7 @@ class SimState:
                 elif eff == "aoe_damage" or cid_type == "s_02":
                     if len(enemy_board) >= 2:
                         actions.append({
-                            "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": 4000,
+                            "type": "PLAY", "c_inst_id": inst_id, "t_type": None, "t_id": None, "score": 3500,
                             "api": {"action": "PLAY_HAND", "card_instance_id": inst_id, "target": None}
                         })
 
@@ -318,14 +293,14 @@ class SimState:
         self.opp_board = [u for u in self.opp_board if u.get("curr_hp", 0) > 0]
 
 class SuperMinimaxSolver:
-    def __init__(self, max_time_nodes=30000): # 探索ノード数を30000まで拡張して先読みをガチ化
+    def __init__(self, max_time_nodes=30000):
         self.max_nodes = max_time_nodes
         self.nodes_visited = 0
         self.transposition_table = {}
 
     def search_best_moves(self, root_state: SimState) -> List[dict]:
         best_seq = []
-        for depth in range(1, 6): # 5手先（自分・敵・自分・敵・自分）まで全シミュレーション
+        for depth in range(1, 6):
             if self.nodes_visited > self.max_nodes: break
             eval_val, seq = self.minimax(root_state, depth, -9999999.0, 9999999.0, True)
             if seq: best_seq = seq
@@ -376,7 +351,8 @@ class SuperMinimaxSolver:
                     eval_val, _ = self.minimax(next_state, depth - 1, alpha, beta, True)
                 else:
                     next_state.step(act, is_bot_turn=False)
-                    eval_val, seq = self.minimax(next_state, depth, False)
+                    # 【完全修復】 alpha, beta, is_max(=False) をすべて正しく伝播
+                    eval_val, _ = self.minimax(next_state, depth, alpha, beta, False)
 
                 if eval_val < min_eval: min_eval = eval_val
                 beta = min(beta, eval_val)
@@ -388,7 +364,7 @@ class SuperMinimaxSolver:
 async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], process_action_func: Any):
     while session.status != "ENDED" and session.turn_user_id == BOT_USER_ID:
         
-        # --- 戦略的ドラフトフェーズ ---
+        # --- 戦略的ドラフトフェーズ（マナカーブ重視） ---
         if session.status == "DRAFT":
             opts = session.draft_options.get(BOT_USER_ID, [])
             if not opts: break
@@ -396,12 +372,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             my_deck = session.decks.get(BOT_USER_ID, [])
             my_card_ids = [c.get("id") for c in my_deck]
 
-            opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)
-            opp_deck = session.decks.get(opp_id, []) if opp_id else []
-            opp_card_ids = [c.get("id") for c in opp_deck]
-
             low_cost_count = sum(1 for cid in my_card_ids if CARD_SYNERGY_MATRIX.get(cid, {}).get("cost", 5) <= 2)
-            has_u02 = "u_02" in my_card_ids
+            mid_cost_count = sum(1 for cid in my_card_ids if CARD_SYNERGY_MATRIX.get(cid, {}).get("cost", 5) in (3, 4))
 
             best_card, best_score = None, -99999
 
@@ -413,13 +385,11 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 if cid == "s_07" or cid == "u_07":
                     base_score = -999999
                 else:
-                    if cid == "s_09" and has_u02: base_score += 500
-                    if cid == "u_02" and "s_09" in my_card_ids: base_score += 400
-                    if low_cost_count < 4 and c_cost <= 2 and c_info.get("type") == "unit": base_score += 450
-
-                    for opp_cid in opp_card_ids:
-                        if opp_cid == "u_04" and cid == "s_05": base_score += 400
-                        if opp_cid == "u_01" and cid == "u_02": base_score += 300
+                    # デッキのマナバランス（低コスト/中コスト）を均等に保つ評価
+                    if low_cost_count < 3 and c_cost <= 2 and c_info.get("type") == "unit":
+                        base_score += 350
+                    elif mid_cost_count < 3 and c_cost in (3, 4) and c_info.get("type") == "unit":
+                        base_score += 250
 
                 if base_score > best_score:
                     best_score = base_score
