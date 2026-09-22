@@ -577,7 +577,7 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
     elif eff == "freeze" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
         if unit:
-            unit["frozen_turns"] = 1
+            unit["frozen_turns"] = 2
             session.message = f"{unit['name']} は凍結された！"
     elif eff == "burn" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
