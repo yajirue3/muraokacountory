@@ -741,3 +741,38 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
     await trigger_bot_if_needed(session)
 
     return {"room_id": room_id}
+
+
+# ====================================================
+# 厳粛な称号付与ロジック＆決裁オーバーライド（追記用）
+# ====================================================
+async def grant_despair_conqueror_title(user_id: str):
+    """
+    BOT（影武者AI）撃破時のみ、サーバー側で厳粛に「絶望を乗り越えし者」を付与する
+    """
+    try:
+        supabase = await get_supabase()
+        if not supabase:
+            logger.error("[Title System] DB接続不可のため称号付与失敗")
+            return
+
+        # user_titles テーブルへ直接挿入
+        await supabase.table("user_titles").upsert(
+            {"user_id": user_id, "title": "絶望を乗り越えし者"},
+            on_conflict="user_id, title"
+        ).execute()
+
+        logger.info(f"[Title Granted] ユーザー {user_id} に称号『絶望を乗り越えし者』を付与しました")
+    except Exception as e:
+        logger.error(f"[Title System Error] 称号付与処理エラー ({user_id}): {e}")
+
+# 既存の settle_payout を退避させてラップ処理（元のコードを変更せず追記のみで機能拡張）
+_original_settle_payout = settle_payout
+
+async def settle_payout(session: CardGameSession, winner: Optional[str]):
+    # 元の決済処理を実行
+    await _original_settle_payout(session, winner)
+    
+    # 厳粛判定：BOTが存在する部屋で、勝者が人間の場合のみ称号を自動付与
+    if winner and BOT_USER_ID in session.player_order and winner != BOT_USER_ID:
+        asyncio.create_task(grant_despair_conqueror_title(winner))
