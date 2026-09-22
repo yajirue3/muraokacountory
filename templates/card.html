@@ -343,34 +343,39 @@
     </div>
 
     <!-- ロビー画面 -->
-<div class="lobby-header">
-    <h2 class="lobby-title">⚔️ 村岡王国 TCG</h2>
-    <button class="btn-dark" onclick="openHelpModal('rule')">ガイド/図鑑</button>
-</div>
+    <div id="lobby-screen">
+        <div class="lobby-header">
+            <h2 class="lobby-title">⚔️ 村岡王国 TCG</h2>
+            <button class="btn-dark" onclick="openHelpModal('rule')">ガイド/図鑑</button>
+        </div>
 
-<div class="create-form">
-    <select id="wallet-select"><option value="">ウォレット読込中...</option></select>
-    <div style="display:flex; gap:10px; width:100%;">
-        <select id="max-players-select" style="flex:1;">
-            <option value="2">2人対戦</option>
-            <option value="3">3人対戦</option>
-        </select>
-        <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="flex:1;">
-    </div>
-    <!-- ▼ BOT対戦用のボタン（限定称号表示付き） ▼ -->
-    <div style="display:flex; gap:10px; width:100%;">
-        <button style="flex:1;" onclick="createRoom()">部屋作成</button>
-        <button class="btn-bot" style="flex:1;" onclick="createBotRoom()">BOTと対戦</button>
-    </div>
-    <div style="text-align: center; margin-top: 6px; font-size: 0.85rem; color: #ffd700; font-weight: bold; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,215,0,0.3);">
-        🏆 BOT撃破で限定称号あり！
-    </div>
-</div>
+        <div class="create-form">
+            <select id="wallet-select">
+                <option value="">ウォレット読込中...</option>
+            </select>
+            <div style="display:flex; gap:10px; width:100%;">
+                <select id="max-players-select" style="flex:1;">
+                    <option value="2">2人対戦</option>
+                    <option value="3">3人対戦</option>
+                </select>
+                <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="flex:1;">
+            </div>
+            <!-- ▼ BOT対戦用のボタン（限定称号アピール付き） ▼ -->
+            <div style="display:flex; gap:10px; width:100%;">
+                <button style="flex:1;" onclick="createRoom()">部屋作成</button>
+                <button class="btn-bot" style="flex:1;" onclick="createBotRoom()">BOTと対戦</button>
+            </div>
+            <div style="text-align: center; margin-top: 6px; font-size: 0.85rem; color: #ffd700; font-weight: bold; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,215,0,0.3);">
+                🏆 BOT撃破で限定称号あり！
+            </div>
+        </div>
 
         <div class="room-list" id="room-list"></div>
+
         <button class="btn-dark" style="margin-top: auto;" onclick="location.href='/casino'">カジノへ戻る</button>
     </div>
 
+    
     <!-- バトル領域 -->
     <div id="battle-screen">
         <div class="top-fixed-area">
