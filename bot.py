@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import copy
+import time
 from typing import Dict, List, Optional, Any, Tuple
 
 logger = logging.getLogger("CardBot")
@@ -11,12 +12,12 @@ BOT_USER_NAME = "村岡国王（影武者）"
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 CARD_SYNERGY_MATRIX = {
-    "u_01": {"score": 150, "counters": ["u_03", "u_06", "u_07"]}, # 速攻（数で押すため評価UP）
-    "s_02": {"score": 110, "counters": ["u_06", "u_01", "u_07"]}, # 全体2点
-    "s_05": {"score": 130, "counters": ["u_04", "u_05", "u_02"]}, # 暗殺
-    "s_09": {"score": 100, "counters": ["u_01", "s_01"]},         # 城壁
-    "s_01": {"score": 40,  "counters": ["u_03", "u_07"]},         # 電撃（優先度低）
-    "u_02": {"score": 120, "counters": ["u_01"]},                 # 挑発（壁）
+    "u_01": {"score": 150, "counters": ["u_03", "u_06", "u_07"]}, # 速攻
+    "s_02": {"score": 130, "counters": ["u_06", "u_01", "u_07"]}, # 全体2点
+    "s_05": {"score": 160, "counters": ["u_04", "u_05", "u_02"]}, # 暗殺
+    "s_09": {"score": 140, "counters": ["u_01", "s_01"]},         # 城壁
+    "s_01": {"score": 40,  "counters": ["u_03", "u_07"]},         # 電撃
+    "u_02": {"score": 130, "counters": ["u_01"]},                 # 挑発
 }
 
 class SimState:
@@ -56,15 +57,21 @@ class SimState:
         oh = ",".join(c.get("instance_id", "") for c in self.opp_hand)
         return f"{self.my_hp}|{self.opp_hp}|{self.my_mp}|{self.opp_mp}|[{mb}]|[{ob}]|[{mh}]|[{oh}]"
 
-    def calculate_opp_max_threat(self) -> int:
+    def calculate_opp_absolute_max_threat(self) -> int:
+        """相手の手札＋山札トップの神引きを含めた『最大理論打点』を徹底算出"""
         threat = sum(u.get("atk", 0) for u in self.opp_board)
         avail_mp = min(10, self.opp_mp + 1)
+        
+        # 手札からの最大火力
         for c in self.opp_hand:
             if c.get("cost", 99) <= avail_mp:
                 if c.get("type") == "spell" and c.get("effect") == "damage":
                     threat += c.get("val", 0)
                 elif c.get("type") == "unit" and c.get("haste"):
                     threat += c.get("atk", 0)
+                    
+        # 山札トップ解決（最高火力カード）のリスクも加算
+        threat += 4 # 神引き想定マージン
         return threat
 
     def evaluate_state(self, is_my_turn_eval: bool = True) -> float:
@@ -73,31 +80,33 @@ class SimState:
 
         score = 0.0
 
+        # 確定リーサル
         my_total_atk = sum(u.get("atk", 0) for u in self.my_board if u.get("can_attack") or u.get("haste"))
         if my_total_atk >= self.opp_hp:
             return 900000.0 if is_my_turn_eval else -900000.0
 
-        opp_threat = self.calculate_opp_max_threat()
+        # 神引き含めた相手の最大打点で死ぬ可能性があるなら極小評価（完全封殺）
+        opp_max_threat = self.calculate_opp_absolute_max_threat()
         has_taunt = any(u.get("taunt") for u in self.my_board)
         
-        if opp_threat >= self.my_hp and not has_taunt:
-            score -= 200000.0
+        if opp_max_threat >= self.my_hp and not has_taunt:
+            score -= 500000.0
 
-        # --- 盤面の「数」を強力に評価 ---
-        score += len(self.my_board) * 40.0 # 数で押すボーナス
+        # 盤面の数（アグロ支配）の絶対評価
+        score += len(self.my_board) * 50.0
 
         for u in self.my_board:
-            score += u.get("atk", 0) * 20.0 + u.get("curr_hp", 0) * 10.0
-            if u.get("taunt"): score += 60.0
-            if u.get("wall_turns", 0) > 0: score += 40.0
+            score += u.get("atk", 0) * 25.0 + u.get("curr_hp", 0) * 15.0
+            if u.get("taunt"): score += 90.0
+            if u.get("wall_turns", 0) > 0: score += 60.0
 
         for u in self.opp_board:
-            score -= u.get("atk", 0) * 30.0 + u.get("curr_hp", 0) * 15.0
-            if u.get("taunt"): score -= 80.0
+            score -= u.get("atk", 0) * 40.0 + u.get("curr_hp", 0) * 20.0
+            if u.get("taunt"): score -= 100.0
 
-        score += (20 - self.opp_hp) * 35.0
+        score += (20 - self.opp_hp) * 40.0
         score += self.my_hp * 10.0
-        score += len(self.my_hand) * 15.0
+        score += len(self.my_hand) * 20.0
 
         return score if is_my_turn_eval else -score
 
@@ -123,9 +132,9 @@ class SimState:
                 else:
                     for t in enemy_board:
                         if t.get("curr_hp", 0) > 0:
-                            trade_score = t.get("atk", 0) * 20 - u.get("atk", 0) * 2
+                            trade_score = t.get("atk", 0) * 25 - u.get("atk", 0) * 2
                             actions.append({
-                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 220 + trade_score,
+                                "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 230 + trade_score,
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
                     actions.append({
@@ -133,7 +142,7 @@ class SimState:
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": enemy_id}}
                     })
 
-        # --- プレイ行動（数・展開の最優先化） ---
+        # --- プレイ行動 ---
         for i, c in enumerate(active_hand):
             if c.get("cost", 99) > active_mp: continue
             c_type = c.get("type")
@@ -141,26 +150,25 @@ class SimState:
             cid = c.get("instance_id", f"dummy_{i}")
 
             if c_type == "unit" and len(active_board) < 7:
-                # 序盤〜中盤のミニオン展開の優先度を極大化（出せるものは即出す）
-                score_mod = 300 - (c.get("cost", 0) * 10)
-                if c.get("taunt"): score_mod += 50
+                score_mod = 350 - (c.get("cost", 0) * 10)
+                if c.get("taunt"): score_mod += 80
                 actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": score_mod, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
             elif c_type == "spell":
                 if eff == "damage":
-                    actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 20, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 10, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
                     for t in enemy_board:
-                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": 140, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
+                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": 160, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
                 elif eff in ["assassinate", "burn"]:
                     for t in enemy_board:
-                        score_boost = t.get("atk", 0) * 35 if eff == "assassinate" else 140
+                        score_boost = t.get("atk", 0) * 40 if eff == "assassinate" else 150
                         actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": score_boost, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
                 elif eff == "aoe_damage":
-                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": len(enemy_board) * 200, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": len(enemy_board) * 220, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
                 elif eff == "wall":
                     for my_u in active_board:
-                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": my_u["instance_id"], "score": 150, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": my_u["instance_id"]}}})
+                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": my_u["instance_id"], "score": 180, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": my_u["instance_id"]}}})
                 elif eff == "draw":
-                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": 130, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": 150, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
 
         actions.sort(key=lambda x: x.get("score", 0), reverse=True)
         return actions
@@ -243,29 +251,36 @@ class SimState:
         self.my_board = [u for u in self.my_board if u.get("curr_hp", 0) > 0]
         self.opp_board = [u for u in self.opp_board if u.get("curr_hp", 0) > 0]
 
-class SuperMinimaxSolver:
-    def __init__(self, max_time_nodes=10000):
-        self.max_nodes = max_time_nodes
-        self.nodes_visited = 0
+class UltraTimeMinimaxSolver:
+    def __init__(self, time_limit_sec=0.8):
+        self.time_limit = time_limit_sec
+        self.start_time = 0.0
         self.transposition_table = {}
 
     def search_best_moves(self, root_state: SimState) -> List[dict]:
+        self.start_time = time.time()
         best_seq = []
-        for depth in range(1, 5):
-            if self.nodes_visited > self.max_nodes: break
+        
+        # 1秒制限の範囲内で限界まで深く先読み（深さ1から順に深める）
+        for depth in range(1, 12):
+            if time.time() - self.start_time > self.time_limit:
+                break
             eval_val, seq = self.minimax(root_state, depth, -9999999.0, 9999999.0, True)
             if seq: best_seq = seq
-            if eval_val > 800000.0: break
+            if eval_val > 800000.0: break # 100%勝ち確定なら即終了
+
         return [act["api"] for act in best_seq if act.get("type") != "END_TURN"]
 
     def minimax(self, state: SimState, depth: int, alpha: float, beta: float, is_max: bool) -> Tuple[float, List[dict]]:
-        self.nodes_visited += 1
+        # 0.8秒超過チェック
+        if time.time() - self.start_time > self.time_limit:
+            return state.evaluate_state(is_my_turn_eval=True), []
 
         state_hash = state.get_hash() + f"|{depth}|{is_max}"
         if state_hash in self.transposition_table:
             return self.transposition_table[state_hash], []
 
-        if depth == 0 or state.opp_hp <= 0 or state.my_hp <= 0 or self.nodes_visited >= self.max_nodes:
+        if depth == 0 or state.opp_hp <= 0 or state.my_hp <= 0:
             return state.evaluate_state(is_my_turn_eval=True), []
 
         legal_actions = state.get_legal_actions(is_bot_turn=is_max)
@@ -275,7 +290,7 @@ class SuperMinimaxSolver:
 
         if is_max:
             max_eval = -9999999.0
-            for act in legal_actions[:15]:
+            for act in legal_actions[:12]:
                 next_state = state.clone()
                 if act["type"] == "END_TURN":
                     next_state.opp_mp = min(10, next_state.current_turn + 1)
@@ -295,7 +310,7 @@ class SuperMinimaxSolver:
             return max_eval, best_seq
         else:
             min_eval = 9999999.0
-            for act in legal_actions[:10]:
+            for act in legal_actions[:8]:
                 next_state = state.clone()
                 if act["type"] == "END_TURN":
                     next_state.my_mp = min(10, next_state.current_turn + 1)
@@ -304,7 +319,7 @@ class SuperMinimaxSolver:
                     eval_val, _ = self.minimax(next_state, depth - 1, alpha, beta, True)
                 else:
                     next_state.step(act, is_bot_turn=False)
-                    eval_val, seq = self.minimax(next_state, depth, alpha, beta, False)
+                    eval_val, seq = self.minimax(next_state, depth, False if act["type"] == "END_TURN" else False)
 
                 if eval_val < min_eval: min_eval = eval_val
                 beta = min(beta, eval_val)
@@ -317,7 +332,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
     if session.status == "ENDED" or session.turn_user_id != BOT_USER_ID:
         return
 
-    # ドラフト（低コストを優先して取らせる）
+    # ドラフト（完璧な敵害妨害ピック）
     if session.status == "DRAFT":
         opts = session.draft_options.get(BOT_USER_ID, [])
         if opts:
@@ -331,7 +346,10 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 c_data = card_database.get(cid, {})
                 base_score = CARD_SYNERGY_MATRIX.get(cid, {}).get("score", 50)
                 
-                # 低コストミニオンほどドラフト評価値を高めに設定（数をそろえる）
+                # 相手がドラフトで欲しがりそうなパワカ・コンボパーツを「カット（横取り）」する妨害評価点
+                if cid in ["s_05", "s_02", "u_01"]:
+                    base_score += 150 # 超強力スペル・速攻を相手に渡さないカット補正
+
                 c_cost = c_data.get("cost", 5)
                 base_score += (6 - c_cost) * 20
 
@@ -371,7 +389,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
         state.my_deck = [dict(c) for c in session.decks.get(BOT_USER_ID, [])]
         state.opp_deck = [dict(c) for c in session.decks.get(opp_id, [])]
 
-        solver = SuperMinimaxSolver()
+        # 0.8秒間限界まで先読み探索
+        solver = UltraTimeMinimaxSolver(time_limit_sec=0.8)
         actions_to_execute = solver.search_best_moves(state)
 
         for act in actions_to_execute:
