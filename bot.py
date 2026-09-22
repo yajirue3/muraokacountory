@@ -7,7 +7,7 @@ logger = logging.getLogger("CardBot")
 
 BOT_USER_ID = "bot_super_ai"
 BOT_USER_NAME = "村岡王子"
-
+HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 CARD_SYNERGY_MATRIX = {
     "u_01": {"score": 100, "counters": ["u_03", "u_06", "u_07"]}, # 速攻
     "s_02": {"score": 110, "counters": ["u_06", "u_01", "u_07"]}, # 全体2点
