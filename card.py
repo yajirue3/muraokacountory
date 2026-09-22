@@ -676,3 +676,282 @@ def mask_session_for_client(session: CardGameSession, target_uid: str) -> dict:
         "winner_id": session.winner_id,
         "your_user_id": target_uid
     }
+
+# --- 以下、card.py(6)_2.txt の末尾追記部分を本コード（超・超ガチAI）に置き換え ---
+
+import math
+
+BOT_USER_ID = "bot_super_ai"
+BOT_USER_NAME = "超・超ガチAI (絶望)"
+
+# AIのドラフト評価（基本評価値）
+BOT_CARD_TIER = {
+    "s_05": 100, # 暗殺者
+    "u_06": 98,  # 小人 (極悪アタッカー)
+    "s_02": 95,  # 嵐 (全体AOE)
+    "s_01": 90,  # 雷撃 (直火・除去)
+    "u_02": 88,  # 重装兵 (壁)
+    "s_09": 85,  # 城壁 (コンボパーツ)
+    "u_05": 80,  # 吸血鬼
+    "s_04": 75,  # 補充
+    "u_04": 70,  # 巨兵
+    "u_01": 65,  # 先鋒兵
+    "s_07": 60,  # 凍結
+    "s_08": 55,  # 火傷
+    "u_03": 50,  # 魔導士
+    "u_07": 30,  # 奇術師
+    "s_03": 25,  # 治癒
+    "s_06": 10,  # 再編
+}
+
+# 人間がドラフトでピックしたカードを記憶する辞書 {room_id: [card_id, ...]}
+HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
+
+@router.post("/api/card/create_bot_room")
+async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(None)):
+    user = await get_user_from_token_async(authorization)
+    supabase = await get_supabase()
+
+    if not supabase:
+        raise HTTPException(status_code=500, detail="DB接続エラーが発生しました")
+
+    w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+    if not w_res.data or w_res.data[0]["balance"] < data.amount:
+        raise HTTPException(status_code=400, detail="残高が不足しています")
+    
+    new_bal = w_res.data[0]["balance"] - data.amount
+    await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+
+    p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
+    name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
+
+    room_id = str(uuid.uuid4())[:8]
+    session = CardGameSession(room_id, str(user.id), name, data.wallet_id, data.amount, max_players=2)
+    
+    session.players[BOT_USER_ID] = {"name": BOT_USER_NAME, "wallet_id": "bot_wallet"}
+    session.player_order.append(BOT_USER_ID)
+    CARD_SESSIONS[room_id] = session
+
+    # 記憶領域の初期化
+    HUMAN_DRAFT_MEMORIES[room_id] = []
+
+    start_draft_phase(session)
+
+    if session.turn_user_id == BOT_USER_ID:
+        await process_super_ai_turn(session)
+
+    return {"room_id": room_id}
+
+
+async def process_super_ai_turn(session: CardGameSession):
+    bot_id = BOT_USER_ID
+    if session.status == "ENDED" or session.turn_user_id != bot_id:
+        return
+
+    # 人間のドラフト選択を監視＆完全記憶する
+    opp_id = next((uid for uid in session.player_order if uid != bot_id), None)
+    if opp_id and session.room_id in HUMAN_DRAFT_MEMORIES:
+        human_deck = session.decks.get(opp_id, [])
+        HUMAN_DRAFT_MEMORIES[session.room_id] = [c["id"] for c in human_deck]
+
+    # 1. ドラフトフェーズ（相性考慮ピック）
+    if session.status == "DRAFT":
+        opts = session.draft_options.get(bot_id, [])
+        if opts:
+            # 自分の現時点のデッキ傾向に合わせて補正をかけてピック
+            my_deck_ids = [c["id"] for c in session.decks.get(bot_id, [])]
+            best_card = None
+            best_score = -1
+
+            for cid in opts:
+                score = BOT_CARD_TIER.get(cid, 0)
+                # シナジー補正: 挑発持ちがいるなら「城壁」の価値UP
+                if cid == "s_09" and any(CARD_DATABASE[c].get("taunt") for c in my_deck_ids):
+                    score += 25
+                # シナジー補正: 重装兵がいるなら「小人」で攻めに特化
+                if cid == "u_06" and "u_02" in my_deck_ids:
+                    score += 15
+                
+                if score > best_score:
+                    best_score = score
+                    best_card = cid
+
+            await process_action(session, bot_id, {"action": "PICK_CARD", "card_id": best_card or opts[0]})
+            
+            if session.status == "DRAFT" and session.turn_user_id == bot_id:
+                await process_super_ai_turn(session)
+        return
+
+    # 2. バトルフェーズ（ノータイム思考エンジン）
+    if session.status == "BATTLE":
+        while session.turn_user_id == bot_id and session.status == "BATTLE":
+            action = find_hyper_best_action(session, bot_id)
+            if not action:
+                break
+            await process_action(session, bot_id, action)
+
+        if session.turn_user_id == bot_id and session.status == "BATTLE":
+            await process_action(session, bot_id, {"action": "END_TURN"})
+
+
+def find_hyper_best_action(session: CardGameSession, bot_id: str) -> Optional[dict]:
+    opp_id = next(uid for uid in session.player_order if uid != bot_id)
+    bot_hp = session.hp.get(bot_id, 0)
+    opp_hp = session.hp.get(opp_id, 0)
+    opp_mp = session.mp.get(opp_id, 0)
+    
+    opp_taunts = [u for u in session.boards[opp_id] if u.get("taunt") and u["curr_hp"] > 0]
+    human_remembered_cards = HUMAN_DRAFT_MEMORIES.get(session.room_id, [])
+
+    # ==========================================
+    # 領域 1: 【完全即死 & 2ターン追い込み（リーサル）計算】
+    # ==========================================
+    # 1ターン即死判定（盤面攻撃＋直火スペル）
+    board_atk_sum = 0
+    for u in session.boards[bot_id]:
+        if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+            board_atk_sum += u["atk"] * u.get("attacks_left", 1)
+
+    hand_damage_sum = sum(c.get("val", 0) for c in session.hands[bot_id] if c["type"] == "spell" and c.get("effect") == "damage" and c["cost"] <= session.mp[bot_id])
+
+    # 挑発がいないなら顔面総攻撃で即死
+    if not opp_taunts and (board_atk_sum + hand_damage_sum) >= opp_hp:
+        # 手札の雷撃でトドメを刺せるならスペルを優先
+        for c in session.hands[bot_id]:
+            if session.mp[bot_id] >= c["cost"] and c.get("effect") == "damage" and c.get("val", 0) >= opp_hp:
+                return {"action": "PLAY_HAND", "card_instance_id": c["instance_id"], "target": {"type": "hero", "id": opp_id}}
+        # ユニット攻撃でトドメ
+        for u in session.boards[bot_id]:
+            if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+                return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+    # 2ターン詰め計算：次のターンに雷撃(3点)等で勝てるよう、挑発を避けて相手HPを事前に極限まで削る
+    if not opp_taunts and opp_hp <= 8:
+        for u in session.boards[bot_id]:
+            if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+                return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+    # ==========================================
+    # 領域 2: 【コンボ ＆ 人間側の手札ケア思考】
+    # ==========================================
+    playable = [c for c in session.hands[bot_id] if c["cost"] <= session.mp[bot_id]]
+    
+    # 【最優先コンボ 1】「重装兵（u_02）」等の挑発持ちを出してから「城壁（s_09）」を即付与して要塞化
+    taunt_units = [u for u in session.boards[bot_id] if u.get("taunt") and u.get("wall_turns", 0) == 0]
+    wall_card = next((c for c in playable if c["id"] == "s_09"), None)
+    if taunt_units and wall_card:
+        return {"action": "PLAY_HAND", "card_instance_id": wall_card["instance_id"], "target": {"type": "unit", "id": taunt_units[0]["instance_id"]}}
+
+    # 【人間ケア 1】相手が「嵐（s_02）」をドラフトで取っており、相手MPが4以上の場合、HP2以下の小型を展開しない
+    has_storm_in_memory = "s_02" in human_remembered_cards
+    if has_storm_in_memory and opp_mp >= 4:
+        # HP2以下のユニットを手札から出すのを自重する filter
+        playable = [c for c in playable if not (c["type"] == "unit" and c.get("hp", 0) <= 2 and not c.get("haste"))]
+
+    # 【最優先コンボ 2】相手の「小人（u_06）」は最優先で「凍結」または「雷撃」で即破壊
+    opp_dwarf = next((u for u in session.boards[opp_id] if u["card_id"] == "u_06"), None)
+    if opp_dwarf:
+        freeze_card = next((c for c in playable if c["id"] == "s_07"), None)
+        if freeze_card and opp_dwarf.get("frozen_turns", 0) == 0:
+            return {"action": "PLAY_HAND", "card_instance_id": freeze_card["instance_id"], "target": {"type": "unit", "id": opp_dwarf["instance_id"]}}
+        
+        lightning_card = next((c for c in playable if c["id"] == "s_01"), None)
+        if lightning_card:
+            return {"action": "PLAY_HAND", "card_instance_id": lightning_card["instance_id"], "target": {"type": "unit", "id": opp_dwarf["instance_id"]}}
+
+    # ==========================================
+    # 領域 3: 【盤面攻撃＆有利トレード（小人の極悪運用含む）】
+    # ==========================================
+    for attacker in session.boards[bot_id]:
+        if attacker.get("can_attack") and attacker.get("frozen_turns", 0) == 0 and attacker.get("attacks_left", 0) > 0:
+            atk_val = attacker["atk"]
+
+            # 小人(u_06)の思考：反撃を受けない利点を活かして最適対象へ叩き込む
+            if attacker.get("ranged"):
+                if opp_taunts:
+                    # 城壁が付いていない挑発へ
+                    valid_taunts = [u for u in opp_taunts if u.get("wall_turns", 0) == 0]
+                    target_u = valid_taunts[0] if valid_taunts else opp_taunts[0]
+                    return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": target_u["instance_id"]}}
+                else:
+                    # 敵の強力アタッカーを無傷で削るか、無ければヒーロー顔面
+                    high_atk_enemy = [u for u in session.boards[opp_id] if u["atk"] >= 3 and u.get("wall_turns", 0) == 0]
+                    if high_atk_enemy:
+                        return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": high_atk_enemy[0]["instance_id"]}}
+                    return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+            # 通常ユニットの攻撃
+            if opp_taunts:
+                for taunt in opp_taunts:
+                    dmg = max(0, atk_val - 1) if taunt.get("wall_turns", 0) > 0 else atk_val
+                    if dmg > 0:
+                        return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": taunt["instance_id"]}}
+            else:
+                # 一方的に敵を倒して生き残るトレード
+                for defender in session.boards[opp_id]:
+                    dmg_to_def = max(0, atk_val - 1) if defender.get("wall_turns", 0) > 0 else atk_val
+                    dmg_to_atk = max(0, defender["atk"] - 1) if attacker.get("wall_turns", 0) > 0 else defender["atk"]
+                    
+                    if dmg_to_def >= defender["curr_hp"] and dmg_to_atk < attacker["curr_hp"]:
+                        return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "unit", "id": defender["instance_id"]}}
+
+                # 有利トレードがなければ顔面攻撃
+                return {"action": "DECLARE_ATTACK", "attacker_id": attacker["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+    # ==========================================
+    # 領域 4: 【最適手札使用（優先順位アルゴリズム）】
+    # ==========================================
+    playable.sort(key=lambda c: c["cost"], reverse=True)
+
+    for card in playable:
+        c_type = card["type"]
+        eff = card.get("effect")
+
+        if c_type == "unit":
+            if len(session.boards[bot_id]) < 7:
+                return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": None}
+
+        elif c_type == "spell":
+            # 暗殺者(s_05): 【人間ケア】低ステータスには絶対に使わず、大型（巨兵等）を狙い撃ち
+            if eff == "assassinate":
+                big_targets = [u for u in session.boards[opp_id] if u["curr_hp"] >= 5 or u["atk"] >= 4]
+                if big_targets:
+                    best_t = max(big_targets, key=lambda u: u["atk"] + u["curr_hp"])
+                    return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+            # 嵐(s_02): 相手の盤面に2体以上、または壊滅させられる状況で一括除去
+            elif eff == "aoe_damage":
+                if len(session.boards[opp_id]) >= 2 or any(u["curr_hp"] <= 2 for u in session.boards[opp_id]):
+                    return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": None}
+
+            # 補充(s_04): 手札確保
+            elif eff == "draw" and len(session.hands[bot_id]) <= 5:
+                return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": None}
+
+            # 治癒(s_03): 自分HP15以下で発動
+            elif eff == "heal" and bot_hp <= 15:
+                return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": None}
+
+            # 雷撃(s_01): 単体除去または顔面
+            elif eff == "damage":
+                targets = [u for u in session.boards[opp_id] if u["curr_hp"] <= 3]
+                if targets:
+                    best_t = max(targets, key=lambda u: u["atk"])
+                    return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+                return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": {"type": "hero", "id": opp_id}}
+
+            # 凍結(s_07): 未凍結の最も攻撃力が高い敵を拘束
+            elif eff == "freeze":
+                targets = [u for u in session.boards[opp_id] if u.get("frozen_turns", 0) == 0 and u["atk"] >= 2]
+                if targets:
+                    best_t = max(targets, key=lambda u: u["atk"])
+                    return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+            # 城壁(s_09): 自分の重要ユニットへ付与
+            elif eff == "wall":
+                targets = [u for u in session.boards[bot_id] if u.get("wall_turns", 0) == 0]
+                if targets:
+                    best_t = max(targets, key=lambda u: u["curr_hp"] + (5 if u.get("taunt") else 0))
+                    return {"action": "PLAY_HAND", "card_instance_id": card["instance_id"], "target": {"type": "unit", "id": best_t["instance_id"]}}
+
+    return None
