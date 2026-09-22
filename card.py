@@ -34,7 +34,7 @@ async def get_user_from_token_async(authorization: str):
     except Exception:
         raise HTTPException(status_code=401, detail="無効なトークンです")
 
-# マスターデータ
+# マスターデータ（新カード7種追加）
 CARD_DATABASE = {
     "u_01": {"id": "u_01", "name": "先鋒兵", "type": "unit", "cost": 1, "atk": 2, "hp": 1, "haste": True, "desc": "速攻"},
     "u_02": {"id": "u_02", "name": "重装兵", "type": "unit", "cost": 3, "atk": 2, "hp": 5, "taunt": True, "desc": "挑発"},
@@ -45,12 +45,21 @@ CARD_DATABASE = {
     "s_02": {"id": "s_02", "name": "嵐", "type": "spell", "cost": 4, "effect": "aoe_damage", "val": 2, "need_target": False, "desc": "全体2点"},
     "s_03": {"id": "s_03", "name": "治癒", "type": "spell", "cost": 2, "effect": "heal", "val": 5, "need_target": False, "desc": "自分回復5点"},
     "s_04": {"id": "s_04", "name": "補充", "type": "spell", "cost": 3, "effect": "draw", "val": 2, "need_target": False, "desc": "2枚引く"},
+    
+    # 新カード
+    "s_05": {"id": "s_05", "name": "暗殺者", "type": "spell", "cost": 6, "effect": "assassinate", "need_target": True, "desc": "敵ユニット1体を即死"},
+    "u_06": {"id": "u_06", "name": "小人", "type": "unit", "cost": 5, "atk": 1, "hp": 2, "max_attacks": 3, "ranged": True, "desc": "1点×3回攻撃(対象自由・反撃無効)"},
+    "u_07": {"id": "u_07", "name": "奇術師", "type": "unit", "cost": 4, "atk": 0, "hp": 0, "random_stat": True, "desc": "召喚時ステータスランダム決定"},
+    "s_06": {"id": "s_06", "name": "再編", "type": "spell", "cost": 1, "effect": "reshape", "need_target": False, "desc": "手札をランダムに1枚捨て、1枚引く"},
+    "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True, "desc": "ユニット1体の次ターン攻撃を封じる"},
+    "s_08": {"id": "s_08", "name": "火傷", "type": "spell", "cost": 1, "effect": "burn", "need_target": True, "desc": "ユニット1体に3ターン毎ターン終了時1ダメージ"},
+    "s_09": {"id": "s_09", "name": "城壁", "type": "spell", "cost": 2, "effect": "wall", "need_target": True, "desc": "ユニット1体の被ダメージを3ターンの間1軽減"},
 }
 
 class CreateRoomRequest(BaseModel):
     wallet_id: str
     amount: int = Field(..., gt=0)
-    max_players: int = Field(2, ge=2, le=3) # 2 or 3
+    max_players: int = Field(2, ge=2, le=3)
 
 class CardGameSession:
     def __init__(self, room_id: str, host_id: str, host_name: str, host_wallet_id: str, bet_amount: int, max_players: int):
@@ -59,7 +68,6 @@ class CardGameSession:
         self.bet_amount = bet_amount
         self.max_players = max_players
         
-        # プレイヤー情報管理 {user_id: {"name": str, "wallet_id": str}}
         self.players: Dict[str, dict] = {
             host_id: {"name": host_name, "wallet_id": host_wallet_id}
         }
@@ -293,7 +301,7 @@ async def run_timer(room_id: str):
 def start_draft_phase(session: CardGameSession):
     session.status = "DRAFT"
     session.message = "ドラフトフェーズ：カードを選択してください"
-    pool_size = 6 * session.max_players
+    pool_size = 10 * session.max_players  # ドラフト5択化に伴いプールを拡張
     pool = list(CARD_DATABASE.keys()) * pool_size
     random.shuffle(pool)
     session.draft_pool = pool
@@ -307,8 +315,8 @@ def start_draft_phase(session: CardGameSession):
     set_timer(session, 15)
 
 def generate_draft_candidates(session: CardGameSession):
-    if len(session.draft_pool) >= 3:
-        session.draft_options[session.turn_user_id] = [session.draft_pool.pop() for _ in range(3)]
+    if len(session.draft_pool) >= 5:
+        session.draft_options[session.turn_user_id] = [session.draft_pool.pop() for _ in range(5)]
 
 def auto_draft(session: CardGameSession):
     uid = session.turn_user_id
@@ -382,16 +390,32 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
             session.message = f"{session.players[user_id]['name']} が {played['name']} を使用！"
 
             if played["type"] == "unit":
+                atk_val = played.get("atk", 0)
+                hp_val = played.get("hp", 1)
+                name_val = played["name"]
+
+                # 奇術師のランダムステータス生成
+                if played.get("random_stat"):
+                    atk_val = random.randint(1, 5)
+                    hp_val = random.randint(1, 6)
+                    name_val = f"奇術師({atk_val}/{hp_val})"
+
                 session.boards[user_id].append({
                     "instance_id": str(uuid.uuid4())[:8],
                     "card_id": played["id"],
-                    "name": played["name"],
-                    "atk": played["atk"],
-                    "max_hp": played["hp"],
-                    "curr_hp": played["hp"],
+                    "name": name_val,
+                    "atk": atk_val,
+                    "max_hp": hp_val,
+                    "curr_hp": hp_val,
                     "can_attack": played.get("haste", False),
                     "taunt": played.get("taunt", False),
-                    "lifesteal": played.get("lifesteal", False)
+                    "lifesteal": played.get("lifesteal", False),
+                    "attacks_left": played.get("max_attacks", 1),
+                    "max_attacks": played.get("max_attacks", 1),
+                    "ranged": played.get("ranged", False),
+                    "frozen_turns": 0,
+                    "burn_turns": 0,
+                    "wall_turns": 0
                 })
             elif played["type"] == "spell":
                 resolve_spell(session, user_id, played, target)
@@ -404,6 +428,7 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
 
             attacker = next((u for u in session.boards[user_id] if u["instance_id"] == atk_id), None)
             if not attacker or not attacker["can_attack"] or not target: return
+            if attacker.get("frozen_turns", 0) > 0: return
 
             target_id = target.get("id")
             if target.get("type") == "hero":
@@ -423,14 +448,28 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                     return
 
             session.message = f"{attacker['name']} の攻撃！"
+            
+            atk_val = attacker["atk"]
+            def_atk = defender["atk"] if defender else 0
+
             if target.get("type") == "hero":
-                session.hp[opp_id] -= attacker["atk"]
-                if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + attacker["atk"])
-                attacker["can_attack"] = False
+                session.hp[opp_id] -= atk_val
+                if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + atk_val)
             elif target.get("type") == "unit" and defender:
-                defender["curr_hp"] -= attacker["atk"]
-                attacker["curr_hp"] -= defender["atk"]
-                if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + attacker["atk"])
+                # 攻撃時の城壁（ダメージ軽減）適用
+                dmg_to_def = max(0, atk_val - 1) if defender.get("wall_turns", 0) > 0 else atk_val
+                defender["curr_hp"] -= dmg_to_def
+                
+                # 遠距離（ranged）でなければ反撃を受ける
+                if not attacker.get("ranged", False):
+                    dmg_to_atk = max(0, def_atk - 1) if attacker.get("wall_turns", 0) > 0 else def_atk
+                    attacker["curr_hp"] -= dmg_to_atk
+                
+                if attacker["lifesteal"]: session.hp[user_id] = min(20, session.hp[user_id] + dmg_to_def)
+
+            # 攻撃回数の消費
+            attacker["attacks_left"] = attacker.get("attacks_left", 1) - 1
+            if attacker["attacks_left"] <= 0:
                 attacker["can_attack"] = False
 
             await check_battle_state(session)
@@ -446,11 +485,13 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
             session.hp[target.get("id")] -= val
         elif target.get("type") == "unit":
             opp_id, unit = get_unit_owner(session, target.get("id"))
-            if unit: unit["curr_hp"] -= val
+            # ダメージスペルにも城壁軽減を適用
+            if unit: unit["curr_hp"] -= max(0, val - 1) if unit.get("wall_turns", 0) > 0 else val
     elif eff == "aoe_damage":
         for pid in session.player_order:
             if pid != user_id and session.hp.get(pid, 0) > 0:
-                for u in session.boards[pid]: u["curr_hp"] -= val
+                for u in session.boards[pid]:
+                    u["curr_hp"] -= max(0, val - 1) if u.get("wall_turns", 0) > 0 else val
     elif eff == "heal":
         session.hp[user_id] = min(20, session.hp[user_id] + val)
     elif eff == "draw":
@@ -459,8 +500,49 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
                 c = session.decks[user_id].pop()
                 c["instance_id"] = str(uuid.uuid4())[:8]
                 session.hands[user_id].append(c)
+    
+    # 新カードスペル効果
+    elif eff == "assassinate" and target and target.get("type") == "unit":
+        opp_id, unit = get_unit_owner(session, target.get("id"))
+        if unit:
+            unit["curr_hp"] = 0
+            session.message = f"{session.players[user_id]['name']} の暗殺者が対象を仕留めた！"
+    elif eff == "reshape":
+        # 手札をランダムに1枚捨てる
+        if session.hands[user_id]:
+            discard_idx = random.randrange(len(session.hands[user_id]))
+            session.hands[user_id].pop(discard_idx)
+        # デッキから1枚引く
+        if session.decks[user_id] and len(session.hands[user_id]) < 7:
+            c = session.decks[user_id].pop()
+            c["instance_id"] = str(uuid.uuid4())[:8]
+            session.hands[user_id].append(c)
+    elif eff == "freeze" and target and target.get("type") == "unit":
+        opp_id, unit = get_unit_owner(session, target.get("id"))
+        if unit:
+            unit["frozen_turns"] = 1
+            session.message = f"{unit['name']} は凍結された！"
+    elif eff == "burn" and target and target.get("type") == "unit":
+        opp_id, unit = get_unit_owner(session, target.get("id"))
+        if unit:
+            unit["burn_turns"] = 3
+            session.message = f"{unit['name']} は火傷を負った！"
+    elif eff == "wall" and target and target.get("type") == "unit":
+        opp_id, unit = get_unit_owner(session, target.get("id"))
+        if unit:
+            unit["wall_turns"] = 3
+            session.message = f"{unit['name']} に城壁が付与された！"
 
 def switch_turn(session: CardGameSession):
+    # ターン終了時の処理（火傷ダメージの適用など）
+    if session.turn_user_id:
+        for u in session.boards[session.turn_user_id]:
+            if u.get("burn_turns", 0) > 0:
+                u["curr_hp"] -= 1
+                u["burn_turns"] -= 1
+        # 死亡判定の整理
+        session.boards[session.turn_user_id] = [u for u in session.boards[session.turn_user_id] if u["curr_hp"] > 0]
+
     for _ in range(session.max_players):
         session.turn_idx = (session.turn_idx + 1) % session.max_players
         nxt = session.player_order[session.turn_idx]
@@ -472,7 +554,19 @@ def switch_turn(session: CardGameSession):
     
     session.max_mp[nxt] = min(10, session.max_mp[nxt] + 1)
     session.mp[nxt] = session.max_mp[nxt]
-    for u in session.boards[nxt]: u["can_attack"] = True
+
+    # 次ターンプレイヤーのユニット状態更新
+    for u in session.boards[nxt]:
+        if u.get("frozen_turns", 0) > 0:
+            u["can_attack"] = False
+            u["frozen_turns"] -= 1
+        else:
+            u["can_attack"] = True
+        
+        if u.get("wall_turns", 0) > 0:
+            u["wall_turns"] -= 1
+
+        u["attacks_left"] = u.get("max_attacks", 1)
 
     if session.decks[nxt] and len(session.hands[nxt]) < 7:
         c = session.decks[nxt].pop()
