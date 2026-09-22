@@ -107,26 +107,26 @@ class SuperBotEngine:
 
             # === 1. 確定リーサル（即勝ち）判定 ===
             board_atk_sum = sum(
-                u.get("atk", 0) * u.get("attacks_left", 1)[span_41](start_span)[span_41](end_span)
-                for u in bot_board if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0[span_42](start_span)[span_42](end_span)
+                u.get("atk", 0) * u.get("attacks_left", 1)
+                for u in bot_board if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0
             )
-            playable_spells = [c for c in bot_hand if c.get("type") == "spell" and c.get("cost", 99) <= bot_mp][span_43](start_span)[span_43](end_span)
-            direct_dmg_spells = [c for c in playable_spells if c.get("effect") == "damage"][span_44](start_span)[span_44](end_span)
-            hand_dmg_sum = sum(c.get("val", 0) for c in direct_dmg_spells)[span_45](start_span)[span_45](end_span)
+            playable_spells = [c for c in bot_hand if c.get("type") == "spell" and c.get("cost", 99) <= bot_mp]
+            direct_dmg_spells = [c for c in playable_spells if c.get("effect") == "damage"]
+            hand_dmg_sum = sum(c.get("val", 0) for c in direct_dmg_spells)
 
-            for spell in direct_dmg_spells:[span_46](start_span)[span_46](end_span)
-                if spell.get("val", 0) >= opp_hp:[span_47](start_span)[span_47](end_span)
-                    return {"action": "PLAY_HAND", "card_instance_id": spell["instance_id"], "target": {"type": "hero", "id": opp_id}}[span_48](start_span)[span_48](end_span)
+            for spell in direct_dmg_spells:
+                if spell.get("val", 0) >= opp_hp:
+                    return {"action": "PLAY_HAND", "card_instance_id": spell["instance_id"], "target": {"type": "hero", "id": opp_id}}
 
-            if opp_taunts and (board_atk_sum + hand_dmg_sum >= opp_hp):[span_49](start_span)[span_49](end_span)
-                assassinate = next((c for c in playable_spells if c.get("id") == "s_05"), None)[span_50](start_span)[span_50](end_span)
-                if assassinate:[span_51](start_span)[span_51](end_span)
-                    return {"action": "PLAY_HAND", "card_instance_id": assassinate["instance_id"], "target": {"type": "unit", "id": opp_taunts[0]["instance_id"]}}[span_52](start_span)[span_52](end_span)
+            if opp_taunts and (board_atk_sum + hand_dmg_sum >= opp_hp):
+                assassinate = next((c for c in playable_spells if c.get("id") == "s_05"), None)
+                if assassinate:
+                    return {"action": "PLAY_HAND", "card_instance_id": assassinate["instance_id"], "target": {"type": "unit", "id": opp_taunts[0]["instance_id"]}}
 
-            if not opp_taunts and (board_atk_sum >= opp_hp or board_atk_sum + hand_dmg_sum >= opp_hp):[span_53](start_span)[span_53](end_span)
-                for u in bot_board:[span_54](start_span)[span_54](end_span)
-                    if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:[span_55](start_span)[span_55](end_span)
-                        return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}[span_56](start_span)[span_56](end_span)
+            if not opp_taunts and (board_atk_sum >= opp_hp or board_atk_sum + hand_dmg_sum >= opp_hp):
+                for u in bot_board:
+                    if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
+                        return {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": opp_id}}
 
             # === 2. 高危険度目標の優先処理（魔導士等） ===
             priority_targets = [u for u in opp_board if u.get("card_id") == "u_03" or u.get("atk", 0) >= 4][span_57](start_span)[span_57](end_span)
