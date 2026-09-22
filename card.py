@@ -90,9 +90,37 @@ class CardGameSession:
         self.max_mp: Dict[str, int] = {}
         self.winner_id: Optional[str] = None
         self.message: str = "待機中..."
+        self.bot_is_running = False
 
 CARD_SESSIONS: Dict[str, CardGameSession] = {}
 CLIENT_CONNECTIONS: Dict[str, Dict[str, WebSocket]] = {}
+
+# ====================================================
+# 爆速・完全同期のBOT起動トリガー
+# ====================================================
+async def trigger_bot_if_needed(session: CardGameSession):
+    if session.status not in ["DRAFT", "BATTLE"]:
+        return
+    if session.turn_user_id != BOT_USER_ID:
+        return
+    if getattr(session, "bot_is_running", False):
+        return
+        
+    session.bot_is_running = True
+    try:
+        async def bot_action_executor(s, uid, act):
+            async with s.lock:
+                await process_action(s, uid, act)
+            await broadcast_state(s.room_id)
+            # ドラフトは待機0秒で爆速消化、バトル中は画面反映のため極小ウェイト(10ms)
+            if s.status == "BATTLE":
+                await asyncio.sleep(0.01)
+
+        await process_super_ai_turn(session, CARD_DATABASE, bot_action_executor)
+    except Exception as e:
+        logger.error(f"[BOT Trigger Error]: {e}")
+    finally:
+        session.bot_is_running = False
 
 @router.get("/card", response_class=HTMLResponse)
 async def get_card(request: Request):
@@ -208,7 +236,11 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
 
                 async with session.lock:
                     await process_action(session, user_id, payload)
+                
+                # 状態を配信後、BOTの手番になっていれば即座にトリガーする
                 await broadcast_state(room_id)
+                await trigger_bot_if_needed(session)
+                
             except Exception as e:
                 logger.error(f"Error processing action for user {user_id}: {e}")
                 await websocket.send_json({"type": "ERROR", "message": "無効な操作、または処理エラーが発生しました"})
@@ -243,7 +275,6 @@ async def handle_disconnect(room_id: str, user_id: str):
                     session.message = f"参加者を待っています... ({len(session.players)}/{session.max_players})"
         elif session.status in ["DRAFT", "BATTLE"]:
             session.message = f"{session.players.get(user_id, {}).get('name', 'プレイヤー')} が通信を切断しました。復帰を待機します。"
-            # 以前はここで HP=0 にして即敗北させていた処理を削除し、再接続を可能にしました。
             await check_battle_state(session)
     
     await broadcast_state(room_id)
@@ -278,26 +309,33 @@ async def run_timer(room_id: str):
             session = CARD_SESSIONS.get(room_id)
             if not session: break
             
+            is_timeout = False
             async with session.lock:
                 if session.status == "ENDED": break
                 session.time_limit -= 1
                 
                 if session.time_limit <= 0:
+                    is_timeout = True
                     if session.status == "WAITING":
                         session.status = "ENDED"
                         session.message = "対戦相手が集まりませんでした。"
                         for pid, pinfo in session.players.items():
                             await refund_wallet(pinfo["wallet_id"], session.bet_amount)
-                        await broadcast_state(room_id)
-                        await cleanup_room(room_id)
-                        break
                     elif session.status == "DRAFT":
                         auto_draft(session)
                     elif session.status == "BATTLE":
                         switch_turn(session)
 
-            if session.time_limit % 5 == 0 or session.time_limit <= 5:
+            if session.time_limit % 5 == 0 or session.time_limit <= 5 or is_timeout:
                 await broadcast_state(room_id)
+                
+            if is_timeout and session.status == "ENDED":
+                await cleanup_room(room_id)
+                break
+                
+            if is_timeout:
+                await trigger_bot_if_needed(session)
+
     except asyncio.CancelledError:
         pass
 
@@ -333,7 +371,6 @@ def auto_draft(session: CardGameSession):
     advance_draft(session)
 
 def advance_draft(session: CardGameSession):
-    # ピック上限を元の仕様である6枚に修正
     if all(len(session.decks[uid]) == 6 for uid in session.player_order):
         start_battle_phase(session)
     else:
@@ -404,7 +441,6 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
             card = hand[idx]
             if session.mp[user_id] < card["cost"]: return
 
-            # スペルのターゲット事前検証処理を追加（無効な対象ならMPを消費せず不発にする）
             if card["type"] == "spell":
                 if card.get("need_target"):
                     if not target: return
@@ -421,7 +457,6 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                         else:
                             return
 
-            # 検証通過後にはじめてMP消費・手札から除外
             session.mp[user_id] -= card["cost"]
             played = hand.pop(idx)
             session.message = f"{session.players[user_id]['name']} が {played['name']} を使用！"
@@ -478,7 +513,6 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
             if opp_id == user_id or opp_id not in session.player_order or session.hp.get(opp_id, 0) <= 0:
                 return
 
-            # 死んでいる挑発ユニットを対象から外す処理を強化
             taunts = [u for u in session.boards[opp_id] if u.get("taunt") and u["curr_hp"] > 0]
             if taunts:
                 if target.get("type") != "unit" or target_id not in [u["instance_id"] for u in taunts]:
@@ -557,13 +591,11 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
             session.message = f"{unit['name']} に城壁が付与された！"
 
 def switch_turn(session: CardGameSession):
-    # 全プレイヤーの盤面に対して火傷ダメージを適用する（毎ターン終了時に確実にダメージを与える）
     for uid in session.player_order:
         for u in session.boards[uid]:
             if u.get("burn_turns", 0) > 0:
                 u["curr_hp"] -= 1
                 u["burn_turns"] -= 1
-        # 死亡判定の整理
         session.boards[uid] = [u for u in session.boards[uid] if u["curr_hp"] > 0]
 
     for _ in range(session.max_players):
@@ -678,7 +710,6 @@ def mask_session_for_client(session: CardGameSession, target_uid: str) -> dict:
         "your_user_id": target_uid
     }
 
-# BOTルーム作成 API (card.py 内)
 @router.post("/api/card/create_bot_room")
 async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(None)):
     user = await get_user_from_token_async(authorization)
@@ -700,7 +731,6 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
     room_id = str(uuid.uuid4())[:8]
     session = CardGameSession(room_id, str(user.id), name, data.wallet_id, data.amount, max_players=2)
     
-    # 名前は「クソザコBOT」に設定
     session.players[BOT_USER_ID] = {"name": BOT_USER_NAME, "wallet_id": "bot_wallet"}
     session.player_order.append(BOT_USER_ID)
     CARD_SESSIONS[room_id] = session
@@ -708,8 +738,6 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
     HUMAN_DRAFT_MEMORIES[room_id] = []
 
     start_draft_phase(session)
-
-    if session.turn_user_id == BOT_USER_ID:
-        await process_super_ai_turn(session, CARD_DATABASE, process_action)
+    await trigger_bot_if_needed(session)
 
     return {"room_id": room_id}
