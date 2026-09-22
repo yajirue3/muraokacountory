@@ -6,14 +6,16 @@ from typing import Dict, List, Optional, Any, Tuple
 logger = logging.getLogger("CardBot")
 
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "村岡王子"
+BOT_USER_NAME = "村岡国王（絶対不可侵）"
+
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
+
 CARD_SYNERGY_MATRIX = {
     "u_01": {"score": 100, "counters": ["u_03", "u_06", "u_07"]}, # 速攻
     "s_02": {"score": 110, "counters": ["u_06", "u_01", "u_07"]}, # 全体2点
     "s_05": {"score": 130, "counters": ["u_04", "u_05", "u_02"]}, # 暗殺（即死除去）
     "s_09": {"score": 120, "counters": ["u_01", "s_01"]},         # 城壁
-    "s_01": {"score": 95,  "counters": ["u_03", "u_07"]},         # 雷撃
+    "s_01": {"score": 50,  "counters": ["u_03", "u_07"]},         # 雷撃（電撃）：優先度ダウン
     "u_02": {"score": 100, "counters": ["u_01"]},                 # 挑発（壁）
 }
 
@@ -55,7 +57,6 @@ class SimState:
         return f"{self.my_hp}|{self.opp_hp}|{self.my_mp}|{self.opp_mp}|[{mb}]|[{ob}]|[{mh}]|[{oh}]"
 
     def calculate_opp_max_threat(self) -> int:
-        """相手の手札＋盤面から次のターンに出せる『最大打点』を完全計算"""
         threat = sum(u.get("atk", 0) for u in self.opp_board)
         avail_mp = min(10, self.opp_mp + 1)
         for c in self.opp_hand:
@@ -72,26 +73,22 @@ class SimState:
 
         score = 0.0
 
-        # --- 1. リーサルチェック（即死可能なら最優先） ---
         my_total_atk = sum(u.get("atk", 0) for u in self.my_board if u.get("can_attack") or u.get("haste"))
         if my_total_atk >= self.opp_hp:
             return 900000.0 if is_my_turn_eval else -900000.0
 
-        # --- 2. 詰み・即死の予防（絶対に追い詰めさせない） ---
         opp_threat = self.calculate_opp_max_threat()
         has_taunt = any(u.get("taunt") for u in self.my_board)
         
-        # 相手の最大攻撃力が自分のHP以上で、かつ挑発壁が居ないなら絶望的評価マイナス
         if opp_threat >= self.my_hp and not has_taunt:
             score -= 200000.0
 
-        # --- 3. 盤面支配・更地（コントロール）の最優先化 ---
         if len(self.opp_board) == 0:
-            score += 300.0 # 相手の盤面ゼロ（完全コントロール状態）
+            score += 300.0
 
         for u in self.my_board:
             score += u.get("atk", 0) * 25.0 + u.get("curr_hp", 0) * 15.0
-            if u.get("taunt"): score += 80.0  # 挑発の価値を極大化
+            if u.get("taunt"): score += 80.0
             if u.get("wall_turns", 0) > 0: score += 50.0
 
         for u in self.opp_board:
@@ -114,7 +111,7 @@ class SimState:
 
         opp_taunts = [u for u in enemy_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
 
-        # --- 攻撃行動（有利トレード＆更地化を最優先） ---
+        # --- 攻撃行動 ---
         for u in active_board:
             if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                 if opp_taunts:
@@ -124,22 +121,19 @@ class SimState:
                             "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                         })
                 else:
-                    # 相手盤面に敵がいるなら「一方的・有利トレード」で即掃除
                     for t in enemy_board:
                         if t.get("curr_hp", 0) > 0:
-                            # 相手の危険度が高いユニットほど優先して撃破
                             trade_score = t.get("atk", 0) * 20 - u.get("atk", 0) * 2
                             actions.append({
                                 "type": "ATTACK", "a_id": u["instance_id"], "t_type": "unit", "t_id": t["instance_id"], "score": 250 + trade_score,
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
-                    # 盤面がキレイなら顔面へ叩き込む
                     actions.append({
                         "type": "ATTACK", "a_id": u["instance_id"], "t_type": "hero", "t_id": None, "score": 180,
                         "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "hero", "id": enemy_id}}
                     })
 
-        # --- プレイ行動（除去・挑発・城壁の展開） ---
+        # --- プレイ行動 ---
         for i, c in enumerate(active_hand):
             if c.get("cost", 99) > active_mp: continue
             c_type = c.get("type")
@@ -147,20 +141,23 @@ class SimState:
             cid = c.get("instance_id", f"dummy_{i}")
 
             if c_type == "unit" and len(active_board) < 7:
-                score_mod = 120 if c.get("taunt") else 80
+                # ユニット展開の優先度を高めに設定（200〜250点）
+                score_mod = 250 if c.get("taunt") else 200 - c.get("cost", 0) * 5
                 actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": score_mod, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
             elif c_type == "spell":
-                if eff in ["assassinate", "damage", "burn"]:
+                if eff == "damage":
+                    # 【ここを修正】単体火力（電撃）の顔面使用は優先度を大幅ダウン（30点）
+                    actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 30, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
+                    # 敵ユニットの除去として使うなら優先度高め（150点）
                     for t in enemy_board:
-                        # 危険度の高い敵を呪文で確殺
+                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": 150, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
+                elif eff in ["assassinate", "burn"]:
+                    for t in enemy_board:
                         score_boost = t.get("atk", 0) * 35 if eff == "assassinate" else 150
                         actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": t["instance_id"], "score": score_boost, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}})
-                    if eff == "damage":
-                        actions.append({"type": "PLAY", "h_idx": i, "t_type": "hero", "t_id": None, "score": 100, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "hero", "id": enemy_id}}})
                 elif eff == "aoe_damage":
                     actions.append({"type": "PLAY", "h_idx": i, "t_type": None, "t_id": None, "score": len(enemy_board) * 200, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}})
                 elif eff == "wall":
-                    # 城壁をエースユニットに付与
                     for my_u in active_board:
                         actions.append({"type": "PLAY", "h_idx": i, "t_type": "unit", "t_id": my_u["instance_id"], "score": 160, "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": my_u["instance_id"]}}})
                 elif eff == "draw":
