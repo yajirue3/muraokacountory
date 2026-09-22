@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import logging
 from typing import Dict, List, Optional, Any, Tuple
 
@@ -9,9 +8,8 @@ logger = logging.getLogger("CardBot")
 # BOT基本設定
 # ====================================================
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "クソザコBOT"
+BOT_USER_NAME = "雑魚EX"
 
-# 基本Tier（ドラフト時の基礎点として使用）
 BOT_CARD_TIER = {
     "s_05": 100, "u_06": 98, "s_02": 95, "s_01": 90,
     "u_02": 88,  "s_09": 85, "u_05": 80, "s_04": 75,
@@ -22,7 +20,7 @@ BOT_CARD_TIER = {
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
 
 # ====================================================
-# 内部シミュレータ（ターン内の全手順を読み切るための仮想空間）
+# 高速シミュレータ（状態ハッシュによる重複計算の完全排除）
 # ====================================================
 class SimState:
     def __init__(self):
@@ -36,6 +34,7 @@ class SimState:
         self.opp_hand_ids = []
         self.my_id = ""
         self.opp_id = ""
+        self.opp_deck_count = 6
 
     def clone(self):
         new_s = SimState()
@@ -45,39 +44,61 @@ class SimState:
         new_s.next_opp_mp = self.next_opp_mp
         new_s.my_id = self.my_id
         new_s.opp_id = self.opp_id
-        # 軽量コピーで高速化
+        new_s.opp_deck_count = self.opp_deck_count
         new_s.my_board = [dict(u) for u in self.my_board]
         new_s.opp_board = [dict(u) for u in self.opp_board]
         new_s.my_hand = [dict(c) for c in self.my_hand]
         new_s.opp_hand_ids = list(self.opp_hand_ids)
         return new_s
 
-    def evaluate(self) -> int:
-        # 1. 確定リーサルの無限スコア化
-        if self.opp_hp <= 0: return 9999999
-        if self.my_hp <= 0: return -9999999
+    # 後半の組み合わせ爆発を防ぐための状態識別キー生成
+    def get_hash(self) -> str:
+        mb = ",".join(f"{u['instance_id']}:{u['curr_hp']}:{u['attacks_left']}:{u['wall_turns']}" for u in self.my_board)
+        ob = ",".join(f"{u['instance_id']}:{u['curr_hp']}:{u['frozen_turns']}:{u['burn_turns']}:{u['wall_turns']}" for u in self.opp_board)
+        mh = ",".join(c['instance_id'] for c in self.my_hand)
+        return f"{self.my_hp}|{self.opp_hp}|{self.my_mp}|{mb}|{ob}|{mh}"
 
-        # 2. 基本HPと盤面スタッツの評価
-        score = (20 - self.opp_hp) * 15 - (20 - self.my_hp) * 15
+    def evaluate(self) -> float:
+        if self.opp_hp <= 0: return 9999999.0
+        if self.my_hp <= 0: return -9999999.0
+
+        score = 0.0
         
+        # 1. HPの重み付け（後半ほど重要度増大）
+        hp_weight = 20.0 if self.my_hp <= 10 else 10.0
+        score += (20 - self.opp_hp) * 15.0
+        score -= (20 - self.my_hp) * hp_weight
+
+        # 2. 盤面支配力（目先の強さ）
         my_board_atk = 0
+        has_lifesteal = False
         for u in self.my_board:
-            score += u["atk"] * 3 + u["curr_hp"] * 2
-            if u.get("taunt"): score += 12
-            if u.get("haste") and u.get("can_attack"): score += 2
+            score += u["atk"] * 4.0 + u["curr_hp"] * 3.0
+            if u.get("taunt"): score += 18.0
+            if u.get("wall_turns", 0) > 0: score += 12.0
+            if u.get("lifesteal"): has_lifesteal = True
             my_board_atk += u["atk"]
             
-        opp_board_atk = 0
+        opp_trash_count = 0
         for u in self.opp_board:
-            score -= u["atk"] * 3 + u["curr_hp"] * 2
-            if u.get("taunt"): score -= 12
-            opp_board_atk += u["atk"]
+            score -= u["atk"] * 4.5 + u["curr_hp"] * 2.5
+            if u.get("taunt"): score -= 18.0
+            if u.get("frozen_turns", 0) > 0: score += u["atk"] * 3.5 # 無力化ボーナス
+            if u.get("burn_turns", 0) > 0: score += min(u["curr_hp"], 3) * 2.5
+            
+            # 盤面ロック＆吸血鬼バッテリーの評価
+            if u["atk"] <= 1 and not u.get("taunt"):
+                opp_trash_count += 1
+                if has_lifesteal: score += 10.0
 
-        # 3. 手札価値とマナ消費の評価
-        score += len(self.my_hand) * 8
-        score -= self.my_mp * 3 # マナを残さず使い切るほどスコアが高い
+        if opp_trash_count >= 3 and len(self.opp_board) >= 5:
+            score += 40.0 # 相手の盤面枠圧迫による行動封殺
 
-        # 4. 次ターン相手の反撃予測とケア（DPによる厳密カンニング）
+        # 3. 長期戦リソース（裏の強さ）
+        score += len(self.my_hand) * 12.0
+        score -= self.my_mp * 5.0 # マナを残さない
+
+        # 4. 反撃予測（Min-Max）
         opp_spell_dmgs = []
         for cid in self.opp_hand_ids:
             if cid == "s_01": opp_spell_dmgs.append((2, 3))
@@ -89,19 +110,46 @@ class SimState:
             for w in range(self.next_opp_mp, cost - 1, -1):
                 if dp[w - cost] != -1:
                     dp[w] = max(dp[w], dp[w - cost] + val)
-        max_opp_spell_dmg = max(dp)
+        max_opp_spell_dmg = max(dp) if dp else 0
         
-        potential_opp_dmg = opp_board_atk + max_opp_spell_dmg
+        active_opp_board_atk = sum(u["atk"] for u in self.opp_board if u.get("frozen_turns", 0) == 0)
+        potential_opp_dmg = active_opp_board_atk + max_opp_spell_dmg
+        
+        score -= potential_opp_dmg * 2.5
+        
         if self.my_hp <= potential_opp_dmg:
-            score -= 50000 # 死ぬ危険がある盤面を徹底的に避ける
+            score -= 50000.0 # 死ぬ危険がある盤面を徹底排除
+            
+        if self.opp_deck_count == 0 and len(self.opp_hand_ids) <= 2:
+            score += self.my_hp * 6.0
+            score += sum(u["curr_hp"] * 4 for u in self.my_board if u.get("taunt"))
+
+        if my_board_atk >= self.opp_hp:
+            score += 1500.0 # 次ターン確定リーサルのセットアップ
 
         return score
+
+    # 行動候補の事前評価（ビームサーチ用ヒューリスティック）
+    def quick_eval_action(self, action: dict) -> int:
+        act_type = action["type"]
+        val = 0
+        if act_type == "PLAY":
+            card = self.my_hand[action["h_idx"]]
+            val += card.get("cost", 0) * 10 # 高コスト優先
+            if card.get("effect") == "draw": val += 50 # ドロー優先
+            if card.get("effect") == "aoe_damage": val += len(self.opp_board) * 15
+        elif act_type == "ATTACK":
+            if action["t_type"] == "hero": val += 20
+            else:
+                tgt = self.opp_board[action["t_idx"]]
+                if tgt.get("taunt"): val += 40
+                val += tgt.get("atk", 0) * 5
+        return val
 
     def get_legal_actions(self) -> List[dict]:
         actions = []
         opp_taunts = [u for u in self.opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
         
-        # --- ユニット攻撃の列挙 ---
         for i, u in enumerate(self.my_board):
             if u.get("can_attack") and u.get("frozen_turns", 0) == 0 and u.get("attacks_left", 0) > 0:
                 if opp_taunts:
@@ -123,7 +171,6 @@ class SimState:
                                 "api": {"action": "DECLARE_ATTACK", "attacker_id": u["instance_id"], "target": {"type": "unit", "id": t["instance_id"]}}
                             })
                             
-        # --- 手札プレイの列挙 ---
         for i, c in enumerate(self.my_hand):
             if c.get("cost", 99) > self.my_mp: continue
             
@@ -150,6 +197,7 @@ class SimState:
                         })
                 elif eff in ["assassinate", "freeze", "burn"]:
                     for j, t in enumerate(self.opp_board):
+                        if eff == "assassinate" and t.get("cost", 0) < 3 and t.get("max_hp", 0) < 4: continue # 無駄撃ち防止
                         actions.append({
                             "type": "PLAY", "h_idx": i, "t_type": "unit", "t_idx": j,
                             "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": t["instance_id"]}}
@@ -160,12 +208,15 @@ class SimState:
                             "type": "PLAY", "h_idx": i, "t_type": "unit", "t_idx": j,
                             "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": {"type": "unit", "id": u["instance_id"]}}
                         })
-                else: # AoE, Draw, Heal, Reshape
+                else: 
                     actions.append({
                         "type": "PLAY", "h_idx": i, "t_type": None, "t_idx": None,
                         "api": {"action": "PLAY_HAND", "card_instance_id": cid, "target": None}
                     })
-        return actions
+                    
+        # ビームサーチ：無数にある行動の中から「賢い行動」上位8手に絞り込む（後半の爆発的遅延を完全消滅させる）
+        actions.sort(key=lambda a: self.quick_eval_action(a), reverse=True)
+        return actions[:8]
 
     def step(self, action: dict):
         act_type = action["type"]
@@ -205,7 +256,7 @@ class SimState:
             if c_type == "unit":
                 atk = card.get("atk", 0)
                 hp = card.get("hp", 1)
-                if card.get("random_stat"): atk, hp = 3, 3 # 仮想期待値
+                if card.get("random_stat"): atk, hp = 3, 3
                 self.my_board.append({
                     "instance_id": card["instance_id"],
                     "atk": atk, "curr_hp": hp, "max_hp": hp,
@@ -246,30 +297,36 @@ class SimState:
                 elif eff == "wall":
                     self.my_board[t_idx]["wall_turns"] = 3
 
-        # 死亡判定の即時適用
         self.my_board = [u for u in self.my_board if u["curr_hp"] > 0]
         self.opp_board = [u for u in self.opp_board if u["curr_hp"] > 0]
 
 
 # ====================================================
-# 深さ優先探索（DFS）によるコンボ最適化エンジン
+# 深さ優先探索（DFS）エンジン：メモ化とビームサーチによる高速化
 # ====================================================
 class DFSSolver:
     def __init__(self):
-        self.max_nodes = 1500 # 爆速（約0.05秒以内）で完了する計算上限
+        self.max_nodes = 800 # ビームサーチ＋メモ化により、上限800でも深さ限界まで瞬時に到達可能
         self.nodes_visited = 0
+        self.visited_states = set()
         
-    def search(self, state: SimState, depth: int) -> Tuple[int, List[dict]]:
+    def search(self, state: SimState, depth: int) -> Tuple[float, List[dict]]:
         self.nodes_visited += 1
+        
+        # 状態のハッシュ化による順序違いの重複計算カット（劇的な高速化）
+        state_hash = state.get_hash()
+        if state_hash in self.visited_states:
+            return -999999.0, []
+        self.visited_states.add(state_hash)
         
         best_score = state.evaluate()
         best_seq = []
         
-        # 探索制限（深さ6手、またはリーサル、または計算上限）
-        if depth >= 6 or state.opp_hp <= 0 or self.nodes_visited >= self.max_nodes:
+        if depth >= 7 or state.opp_hp <= 0 or self.nodes_visited >= self.max_nodes:
             return best_score, best_seq
             
-        for act in state.get_legal_actions():
+        legal_actions = state.get_legal_actions()
+        for act in legal_actions:
             next_state = state.clone()
             next_state.step(act)
             
@@ -299,6 +356,9 @@ class SuperBotEngine:
         state.next_opp_mp = min(10, self.session.max_mp.get(opp_id, 1) + 1)
         state.my_id = self.bot_id
         state.opp_id = opp_id
+        
+        opp_deck = self.session.decks.get(opp_id, [])
+        state.opp_deck_count = len(opp_deck)
 
         state.my_board = [dict(u) for u in self.session.boards.get(self.bot_id, [])]
         state.opp_board = [dict(u) for u in self.session.boards.get(opp_id, [])]
@@ -306,9 +366,8 @@ class SuperBotEngine:
         state.opp_hand_ids = [c.get("id") for c in self.session.hands.get(opp_id, [])]
 
         solver = DFSSolver()
-        best_score, best_seq = solver.search(state, 0)
+        _, best_seq = solver.search(state, 0)
 
-        # 抽出した最善手順のAPIペイロードだけを抽出して返す
         return [act["api"] for act in best_seq]
 
 
@@ -322,14 +381,19 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
     bot_engine = SuperBotEngine(session, card_database)
 
     # -------------------------
-    # ドラフトフェーズ
+    # ドラフトフェーズ：ヘイトピックと黄金比率の完全管理
     # -------------------------
     if session.status == "DRAFT":
         opts = session.draft_options.get(BOT_USER_ID, [])
         if opts:
             my_deck = session.decks.get(BOT_USER_ID, [])
+            opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)
+            opp_deck = session.decks.get(opp_id, []) if opp_id else []
+            
             my_deck_ids = [c.get("id") for c in my_deck]
-            best_card, best_score = None, -1
+            opp_deck_ids = [c.get("id") for c in opp_deck]
+            
+            best_card, best_score = None, -9999
             
             unit_count = sum(1 for c in my_deck if c.get("type") == "unit")
             spell_count = len(my_deck) - unit_count
@@ -339,17 +403,28 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 c_data = card_database.get(cid, {})
                 score = BOT_CARD_TIER.get(cid, 50)
                 
-                if cid == "s_09" and any(c.get("taunt") for c in my_deck): score += 25
-                if cid == "u_06" and "u_02" in my_deck_ids: score += 15
+                # --- 黄金比率の構築 ---
+                if c_data.get("type") == "unit":
+                    if unit_count < 4: score += 40
+                if c_data.get("type") == "spell":
+                    if spell_count >= 2: score -= 40
+                    
+                if avg_cost > 3.0 and c_data.get("cost", 0) <= 2: score += 30
+                if avg_cost < 2.5 and c_data.get("cost", 0) >= 4: score += 20
                 
-                if c_data.get("type") == "unit" and unit_count < 4: score += 30
-                if c_data.get("type") == "spell" and spell_count >= 3: score -= 30
+                # --- シナジー ---
+                if cid == "s_09" and any(c.get("taunt") for c in my_deck): score += 35
+                if cid == "u_06" and "u_02" in my_deck_ids: score += 20
+                if cid == "u_05" and "s_09" in my_deck_ids: score += 25 # 無敵要塞コンボ
                 
-                if avg_cost > 3.5 and c_data.get("cost", 0) <= 2: score += 20
-                if avg_cost < 2.5 and c_data.get("cost", 0) >= 4: score += 15
+                # --- ヘイトピック（カット戦術） ---
+                if cid == "s_02": score += 25 # 嵐は渡さない
+                if cid == "s_09" and "u_02" in opp_deck_ids: score += 50 # 相手の鉄壁を阻止
+                if cid == "u_04" and "s_05" not in my_deck_ids: score += 20 # 自分が暗殺できない大型はカット
                 
                 if score > best_score:
-                    best_score, best_card = score, cid
+                    best_score = score
+                    best_card = cid
 
             await process_action_func(session, BOT_USER_ID, {"action": "PICK_CARD", "card_id": best_card or opts[0]})
             await asyncio.sleep(0.1)
@@ -362,16 +437,15 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
     # バトルフェーズ
     # -------------------------
     if session.status == "BATTLE":
-        # 思考時間(0.01〜0.05秒)でターン内の完全な順序最適化を一括計算
+        # 思考時間(0.01秒)でターン内の完全な順序最適化を一括計算
         actions_to_execute = bot_engine.plan_turn()
 
-        # 人間に絶望を刻み込むため、算出したコンボを0.15秒のウェイト付きで流麗に実行
+        # 算出したコンボを0.15秒のウェイト付きで流麗に実行
         for act in actions_to_execute:
             if session.status != "BATTLE" or session.turn_user_id != BOT_USER_ID:
                 break
             await process_action_func(session, BOT_USER_ID, act)
             await asyncio.sleep(0.15) 
 
-        # 最後に確実にターンエンド
         if session.turn_user_id == BOT_USER_ID and session.status == "BATTLE":
             await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})
