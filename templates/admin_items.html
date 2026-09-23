@@ -262,7 +262,6 @@
         document.getElementById(id).style.display = "none";
     }
 
-    // 所持者一覧取得＆表示（インベントリ編集対応）
     async function openPossessorsModal(itemId, itemName) {
         currentViewingItemId = itemId;
         document.getElementById("possessors-item-name").innerText = `${itemName} (${itemId})`;
@@ -275,13 +274,18 @@
                 headers: { "Authorization": `Bearer ${token}` }
             });
 
+            const text = await res.text();
             if (!res.ok) {
-                const data = await res.json();
-                tbody.innerHTML = `<tr><td colspan="3" style="color:#e74c3c; text-align:center;">エラー: ${escapeHtml(data.detail)}</td></tr>`;
+                let detail = text;
+                try {
+                    const parsed = JSON.parse(text);
+                    detail = parsed.detail || text;
+                } catch (_) {}
+                tbody.innerHTML = `<tr><td colspan="3" style="color:#e74c3c; text-align:center;">[${res.status}] ${escapeHtml(detail)}</td></tr>`;
                 return;
             }
 
-            const data = await res.json();
+            const data = JSON.parse(text);
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#aaa;">所持者はいません</td></tr>`;
                 return;
@@ -305,12 +309,10 @@
                 </tr>
             `).join('');
         } catch (err) {
-            console.error(err);
-            tbody.innerHTML = `<tr><td colspan="3" style="color:#e74c3c; text-align:center;">通信エラーが発生しました</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" style="color:#e74c3c; text-align:center;">通信エラー: ${escapeHtml(err.message)}</td></tr>`;
         }
     }
 
-    // 所持数の直接上書き更新
     async function updateInventory(inventoryId) {
         const inputElem = document.getElementById(`qty-${inventoryId}`);
         const qty = parseInt(inputElem.value, 10);
@@ -325,19 +327,22 @@
                 },
                 body: JSON.stringify({ inventory_id: inventoryId, quantity: qty })
             });
-            const data = await res.json();
+
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {}
+
             if (res.ok) {
                 alert(data.message || "更新しました");
                 openPossessorsModal(currentViewingItemId, document.getElementById("possessors-item-name").innerText);
             } else {
-                alert("エラー: " + data.detail);
+                alert(`[${res.status}] エラー: ${data.detail || text}`);
             }
         } catch (e) {
-            alert("通信エラーが発生しました");
+            alert("通信エラー: " + e.message);
         }
     }
 
-    // インベントリから完全回収（削除）
     async function removeInventory(inventoryId) {
         if (!confirm("このユーザーからアイテムを完全に没収（削除）しますか？")) return;
         try {
@@ -345,19 +350,22 @@
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             });
-            const data = await res.json();
+
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {}
+
             if (res.ok) {
                 alert(data.message || "回収しました");
                 openPossessorsModal(currentViewingItemId, document.getElementById("possessors-item-name").innerText);
             } else {
-                alert("エラー: " + data.detail);
+                alert(`[${res.status}] エラー: ${data.detail || text}`);
             }
         } catch (e) {
-            alert("通信エラーが発生しました");
+            alert("通信エラー: " + e.message);
         }
     }
 
-    // 付与モーダルを開く
     function openGrantModal(itemId, itemName) {
         document.getElementById("grant-item-name").innerText = `${itemName} (${itemId})`;
         document.getElementById("grant-item-id").value = itemId;
@@ -367,7 +375,6 @@
         document.getElementById("modal-grant").style.display = "flex";
     }
 
-    // アイテム直接付与
     async function executeGrant() {
         const itemId = document.getElementById("grant-item-id").value;
         const userId = document.getElementById("grant-user-id").value.trim();
@@ -393,16 +400,18 @@
                 })
             });
 
-            const data = await res.json();
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {}
+
             if (res.ok) {
                 alert(data.message || "付与しました");
                 closeModal("modal-grant");
             } else {
-                alert("エラー: " + data.detail);
+                alert(`[${res.status}] エラー: ${data.detail || text}`);
             }
         } catch (err) {
-            console.error(err);
-            alert("通信エラーが発生しました");
+            alert("通信エラー: " + err.message);
         }
     }
 
