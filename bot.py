@@ -42,14 +42,14 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             return
 
         # ==========================================================
-        # 1. ドラフトフェーズ
+        # 1. ドラフトフェーズ（再帰を排除して即時1手ピックで抜ける）
         # ==========================================================
         if session.status == "DRAFT":
             opts = safe_get_val(session.draft_options, BOT_USER_ID, [])
             if opts:
                 my_deck = safe_get_val(session.decks, BOT_USER_ID, [])
                 my_card_ids = [c.get("id") if isinstance(c, dict) else c for c in my_deck]
-                heavy_count = sum(1 for cid in my_card_ids if BOT_CARD_DB.get(cid, {}).get("cost", 0) >= 6)[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+                heavy_count = sum(1 for cid in my_card_ids if BOT_CARD_DB.get(cid, {}).get("cost", 0) >= 6)[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)
 
                 weights = {
                     "u_01": 110,
@@ -68,23 +68,19 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     "s_03": 40,
                 }
 
-                best_card = max(opts, key=lambda cid: weights.get(cid, 20))[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)
-                await process_action_func(session, BOT_USER_ID, {"action": "PICK_CARD", "card_id": best_card})[span_6](start_span)[span_6](end_span)[span_7](start_span)[span_7](end_span)
-                await asyncio.sleep(0.01)
-
-                if session.status == "DRAFT" and session.turn_user_id == BOT_USER_ID:
-                    await process_super_ai_turn(session, card_database, process_action_func)[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)
+                best_card = max(opts, key=lambda cid: weights.get(cid, 20))[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)
+                await process_action_func(session, BOT_USER_ID, {"action": "PICK_CARD", "card_id": best_card})[span_12](start_span)[span_12](end_span)[span_13](start_span)[span_13](end_span)
             return
 
         # ==========================================================
         # 2. バトルフェーズ
         # ==========================================================
         if session.status == "BATTLE":
-            opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)
+            opp_id = next((uid for uid in session.player_order if uid != BOT_USER_ID), None)[span_14](start_span)[span_14](end_span)[span_15](start_span)[span_15](end_span)
             if not opp_id:
                 return
 
-            # 最適初手配牌
+            # 最適配牌（T1先鋒兵、T2魔導士/雷撃、T3重装兵、T4奇術師、T5〜暗殺者/補充）
             if getattr(session, "_deck_stacked", False) is False:
                 b_hands = safe_get_val(session.hands, BOT_USER_ID, [])
                 b_decks = safe_get_val(session.decks, BOT_USER_ID, [])
@@ -104,7 +100,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
 
                 for c in all_cards:
                     if "instance_id" not in c:
-                        c["instance_id"] = str(uuid.uuid4())[:8][span_12](start_span)[span_12](end_span)[span_13](start_span)[span_13](end_span)
+                        c["instance_id"] = str(uuid.uuid4())[:8][span_16](start_span)[span_16](end_span)[span_17](start_span)[span_17](end_span)
 
                 hand_count = max(3, len(b_hands))
                 session.hands[BOT_USER_ID] = all_cards[:hand_count]
@@ -115,7 +111,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             # PHASE 1: 手札カードプレイ（MP完全消化＋貪欲法）
             # ------------------------------------------------------
             play_loop_count = 0
-            while play_loop_count < 25:
+            while play_loop_count < 10: # 無駄な空回りを防ぐため回数を制限
                 play_loop_count += 1
                 my_mp = safe_get_val(session.mp, BOT_USER_ID, 1)
                 opp_hp = safe_get_val(session.hp, opp_id, 20)
@@ -123,14 +119,13 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 my_board = safe_get_val(session.boards, BOT_USER_ID, [])
                 opp_board = safe_get_val(session.boards, opp_id, [])
 
-                # 奇術師ステータス底上げ[span_14](start_span)[span_14](end_span)[span_15](start_span)[span_15](end_span)
                 for u in my_board:
                     if u.get("card_id") == "u_07" and not u.get("_buffed"):
-                        u["atk"] = random.randint(3, 5)[span_16](start_span)[span_16](end_span)[span_17](start_span)[span_17](end_span)
-                        u["curr_hp"] = random.randint(4, 6)[span_18](start_span)[span_18](end_span)[span_19](start_span)[span_19](end_span)
-                        u["max_hp"] = u["curr_hp"][span_20](start_span)[span_20](end_span)[span_21](start_span)[span_21](end_span)
-                        u["name"] = f"奇術師({u['atk']}/{u['curr_hp']})[span_22](start_span)[span_23](start_span)"[span_22](end_span)[span_23](end_span)
-                        u["_buffed"] = True[span_24](start_span)[span_24](end_span)[span_25](start_span)[span_25](end_span)
+                        u["atk"] = random.randint(3, 5)[span_18](start_span)[span_18](end_span)[span_19](start_span)[span_19](end_span)
+                        u["curr_hp"] = random.randint(4, 6)[span_20](start_span)[span_20](end_span)[span_21](start_span)[span_21](end_span)
+                        u["max_hp"] = u["curr_hp"][span_22](start_span)[span_22](end_span)[span_23](start_span)[span_23](end_span)
+                        u["name"] = f"奇術師({u['atk']}/{u['curr_hp']})[span_24](start_span)[span_25](start_span)"[span_24](end_span)[span_25](end_span)
+                        u["_buffed"] = True[span_26](start_span)[span_26](end_span)[span_27](start_span)[span_27](end_span)
 
                 playable_cards = [c for c in my_hand if c.get("cost", 99) <= my_mp]
                 if not playable_cards:
@@ -141,8 +136,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 # 雷撃による即時スペルリーサル
                 s01_card = next((c for c in playable_cards if c.get("id") == "s_01"), None)
                 if s01_card and opp_hp <= 3 and not opp_taunts:
-                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_card["instance_id"], "target": {"type": "hero", "id": opp_id}})[span_26](start_span)[span_26](end_span)[span_27](start_span)[span_27](end_span)
-                    await asyncio.sleep(0.01)
+                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_card["instance_id"], "target": {"type": "hero", "id": opp_id}})[span_28](start_span)[span_28](end_span)[span_29](start_span)[span_29](end_span)
                     continue
 
                 best_play = None
@@ -153,7 +147,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     cost = c.get("cost", 0)
                     c_type = c.get("type")
 
-                    # 暗殺者（敵の巨兵・挑発即殺）
                     if cid == "s_05" and opp_board:
                         for t in opp_board:
                             score = 15000 + (t.get("atk", 0) * 500) + (6000 if t.get("card_id") == "u_04" else 0) + (3000 if t.get("taunt") else 0)
@@ -161,7 +154,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 highest_score = score
                                 best_play = {"card": c, "target": {"type": "unit", "id": t["instance_id"]}}
 
-                    # 凍結（巨兵・高ATK足止め）
                     elif cid == "s_07" and opp_board:
                         freezable = [t for t in opp_board if t.get("frozen_turns", 0) <= 0]
                         if freezable:
@@ -171,7 +163,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 highest_score = score
                                 best_play = {"card": c, "target": {"type": "unit", "id": target["instance_id"]}}
 
-                    # 雷撃（小人即殺、挑発削り）
                     elif cid == "s_01" and opp_board:
                         for t in opp_board:
                             score = 4000 + (t.get("atk", 0) * 200)
@@ -181,7 +172,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 highest_score = score
                                 best_play = {"card": c, "target": {"type": "unit", "id": t["instance_id"]}}
 
-                    # 嵐（敵2体以上または即殺可能な敵がいる場合）
                     elif cid == "s_02" and opp_board:
                         wipes = sum(1 for t in opp_board if t.get("curr_hp", 0) <= 2)
                         score = (len(opp_board) * 2500) + (wipes * 5000)
@@ -189,14 +179,12 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             highest_score = score
                             best_play = {"card": c, "target": None}
 
-                    # 補充（ドロー）
                     elif cid == "s_04":
                         score = 8000 if len(my_hand) <= 4 else (4500 if len(my_hand) <= 6 else 1000)
                         if score > highest_score:
                             highest_score = score
                             best_play = {"card": c, "target": None}
 
-                    # 城壁
                     elif cid == "s_09" and my_board:
                         unwalled = [u for u in my_board if u.get("wall_turns", 0) == 0]
                         if unwalled:
@@ -206,7 +194,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 highest_score = score
                                 best_play = {"card": c, "target": {"type": "unit", "id": target["instance_id"]}}
 
-                    # ユニット展開
                     elif c_type == "unit" and len(my_board) < 7:
                         score = cost * 1500
                         if cid == "u_07": score += 7000
@@ -226,34 +213,17 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             "card_instance_id": best_play["card"]["instance_id"],
                             "target": best_play["target"]
                         })
-                        await asyncio.sleep(0.01)
-                        continue
-                    except Exception as play_err:
-                        logger.warning(f"Play card failed, skipping: {play_err}")
-
-                # MP5以上余り時の強制フォールバック
-                if my_mp >= 5 and playable_cards:
-                    fallback_card = max(playable_cards, key=lambda x: x.get("cost", 0))
-                    tgt = None
-                    if fallback_card.get("need_target") and opp_board:
-                        tgt = {"type": "unit", "id": opp_board[0]["instance_id"]}
-                    try:
-                        await process_action_func(session, BOT_USER_ID, {
-                            "action": "PLAY_HAND",
-                            "card_instance_id": fallback_card["instance_id"],
-                            "target": tgt
-                        })
-                        await asyncio.sleep(0.01)
                         continue
                     except Exception:
                         pass
+
                 break
 
             # ------------------------------------------------------
-            # PHASE 2: 盤面総攻撃（リーサル・挑発粉砕・有利トレード）
+            # PHASE 2: 盤面総攻撃（挑発粉砕・脳死リーサル）
             # ------------------------------------------------------
             attack_loop_count = 0
-            while attack_loop_count < 25:
+            while attack_loop_count < 10:
                 attack_loop_count += 1
                 my_board = safe_get_val(session.boards, BOT_USER_ID, [])
                 opp_board = safe_get_val(session.boards, opp_id, [])
@@ -266,7 +236,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 attacker = active_units[0]
                 opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
 
-                # 1. 挑発不在時の絶対リーサル（脳死攻撃）
+                # 挑発不在時の絶対リーサル
                 if not opp_taunts:
                     total_board_dmg = sum(u.get("atk", 0) * u.get("attacks_left", 1) for u in active_units)
                     if total_board_dmg >= opp_hp or attacker.get("atk", 0) >= opp_hp:
@@ -275,10 +245,9 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             "attacker_id": attacker["instance_id"],
                             "target": {"type": "hero", "id": opp_id}
                         })
-                        await asyncio.sleep(0.01)
                         continue
 
-                # 2. 挑発がいる場合は集中砲火で最速粉砕
+                # 挑発がいる場合は最優先集中攻撃
                 if opp_taunts:
                     target_taunt = min(opp_taunts, key=lambda x: x.get("curr_hp", 0))
                     await process_action_func(session, BOT_USER_ID, {
@@ -286,10 +255,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         "attacker_id": attacker["instance_id"],
                         "target": {"type": "unit", "id": target_taunt["instance_id"]}
                     })
-                    await asyncio.sleep(0.01)
                     continue
 
-                # 3. 挑発不在時の盤面トレード vs 顔面判定
                 best_target = None
                 best_val = -9999
 
@@ -303,13 +270,13 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     survives = t_atk < attacker.get("curr_hp", 0)
 
                     threat = t.get("atk", 0) * 400
-                    if t.get("card_id") == "u_04": threat += 5000  # 巨兵
-                    if t.get("card_id") == "u_06": threat += 4000  # 小人
+                    if t.get("card_id") == "u_04": threat += 5000
+                    if t.get("card_id") == "u_06": threat += 4000
 
                     if kills and survives:
                         val = 20000 + threat
                     elif kills and not survives:
-                        val = 14000 + threat  # 相打ち
+                        val = 14000 + threat
                     elif not kills and survives:
                         val = 6000 + (u_atk * 100)
                     else:
@@ -330,14 +297,12 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     "attacker_id": attacker["instance_id"],
                     "target": best_target
                 })
-                await asyncio.sleep(0.01)
 
-            # ターン終了
-            await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})[span_28](start_span)[span_28](end_span)[span_29](start_span)[span_29](end_span)
+            await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})[span_30](start_span)[span_30](end_span)[span_31](start_span)[span_31](end_span)
 
     except Exception as e:
-        logger.error(f"AI Turn Error: {e}", exc_info=True)[span_30](start_span)[span_30](end_span)[span_31](start_span)[span_31](end_span)
+        logger.error(f"AI Turn Error: {e}", exc_info=True)[span_32](start_span)[span_32](end_span)[span_33](start_span)[span_33](end_span)
         try:
-            await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})[span_32](start_span)[span_32](end_span)[span_33](start_span)[span_33](end_span)
+            await process_action_func(session, BOT_USER_ID, {"action": "END_TURN"})[span_34](start_span)[span_34](end_span)[span_35](start_span)[span_35](end_span)
         except Exception:
             pass
