@@ -57,7 +57,7 @@ CARD_DATABASE = {
 
 class CreateRoomRequest(BaseModel):
     wallet_id: str
-    amount: int = Field(..., gt=0)
+    amount: int = Field(..., ge=0)  # 0以上を許可
     max_players: int = Field(2, ge=2, le=3)
 
 class CardGameSession:
@@ -112,7 +112,6 @@ async def trigger_bot_if_needed(session: CardGameSession):
             async with s.lock:
                 await process_action(s, uid, act)
             await broadcast_state(s.room_id)
-            # ドラフトは待機0秒で爆速消化、バトル中は画面反映のため極小ウェイト(10ms)
             if s.status == "BATTLE":
                 await asyncio.sleep(0.01)
 
@@ -143,12 +142,14 @@ async def create_room(data: CreateRoomRequest, authorization: str = Header(None)
     if not supabase:
         raise HTTPException(status_code=500, detail="データベース接続エラーによりルームを作成できません")
 
-    w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-    if not w_res.data or w_res.data[0]["balance"] < data.amount:
-        raise HTTPException(status_code=400, detail="残高が不足しています")
-    
-    new_bal = w_res.data[0]["balance"] - data.amount
-    await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+    # 賭け金が設定されている場合のみ引き落とし
+    if data.amount > 0:
+        w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+        if not w_res.data or w_res.data[0]["balance"] < data.amount:
+            raise HTTPException(status_code=400, detail="残高が不足しています")
+        
+        new_bal = w_res.data[0]["balance"] - data.amount
+        await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
 
     p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
@@ -193,14 +194,21 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
                     await websocket.close()
                     return
 
-                w_res = await supabase.table("wallets").select("*").eq("user_id", user.id).gte("balance", session.bet_amount).execute()
+                w_res = await supabase.table("wallets").select("*").eq("user_id", user.id).execute()
                 if not w_res or not w_res.data:
-                    await websocket.send_json({"type": "ERROR", "message": "参加資金が不足しています"})
+                    await websocket.send_json({"type": "ERROR", "message": "ウォレット情報が見つかりません"})
                     await websocket.close()
                     return
                 
                 guest_w = w_res.data[0]
-                await supabase.table("wallets").update({"balance": guest_w["balance"] - session.bet_amount}).eq("wallet_id", guest_w["wallet_id"]).execute()
+
+                # 賭け金がある場合のみ残高確認＆引き落とし
+                if session.bet_amount > 0:
+                    if guest_w["balance"] < session.bet_amount:
+                        await websocket.send_json({"type": "ERROR", "message": "参加資金が不足しています"})
+                        await websocket.close()
+                        return
+                    await supabase.table("wallets").update({"balance": guest_w["balance"] - session.bet_amount}).eq("wallet_id", guest_w["wallet_id"]).execute()
 
                 p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
                 guest_name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{user_id[:4]}"
@@ -237,7 +245,6 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
                 async with session.lock:
                     await process_action(session, user_id, payload)
                 
-                # 状態を配信後、BOTの手番になっていれば即座にトリガーする
                 await broadcast_state(room_id)
                 await trigger_bot_if_needed(session)
                 
@@ -282,8 +289,11 @@ async def handle_disconnect(room_id: str, user_id: str):
         await cleanup_room(room_id)
 
 async def refund_wallet(wallet_id: str, amount: int):
+    # BOT用ウォレットまたは返金額が0以下の場合は処理をスキップ
+    if not wallet_id or wallet_id == "bot_wallet" or amount <= 0:
+        return
     supabase = await get_supabase()
-    if not supabase or not wallet_id: return
+    if not supabase: return
     w_res = await supabase.table("wallets").select("balance").eq("wallet_id", wallet_id).execute()
     if w_res and w_res.data:
         await supabase.table("wallets").update({"balance": w_res.data[0]["balance"] + amount}).eq("wallet_id", wallet_id).execute()
@@ -652,15 +662,20 @@ async def check_battle_state(session: CardGameSession):
 async def settle_payout(session: CardGameSession, winner: Optional[str]):
     supabase = await get_supabase()
     if not supabase: return
-    if winner is None:
-        for uid in session.player_order:
-            await refund_wallet(session.players[uid]["wallet_id"], session.bet_amount)
-    else:
-        win_wid = session.players[winner]["wallet_id"]
-        reward = session.bet_amount * session.max_players
-        w_res = await supabase.table("wallets").select("balance").eq("wallet_id", win_wid).execute()
-        if w_res and w_res.data:
-            await supabase.table("wallets").update({"balance": w_res.data[0]["balance"] + reward}).eq("wallet_id", win_wid).execute()
+
+    # 賭け金が設定されている場合のみ配当/返金処理を実行
+    if session.bet_amount > 0:
+        if winner is None:
+            for uid in session.player_order:
+                await refund_wallet(session.players[uid]["wallet_id"], session.bet_amount)
+        else:
+            # BOT以外のプレイヤーが勝利した時のみ配当を付与
+            if winner != BOT_USER_ID:
+                win_wid = session.players[winner]["wallet_id"]
+                reward = session.bet_amount * session.max_players
+                w_res = await supabase.table("wallets").select("balance").eq("wallet_id", win_wid).execute()
+                if w_res and w_res.data:
+                    await supabase.table("wallets").update({"balance": w_res.data[0]["balance"] + reward}).eq("wallet_id", win_wid).execute()
 
 async def broadcast_state(room_id: str):
     session = CARD_SESSIONS.get(room_id)
@@ -718,18 +733,14 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
     if not supabase:
         raise HTTPException(status_code=500, detail="DB接続エラーが発生しました")
 
-    w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-    if not w_res.data or w_res.data[0]["balance"] < data.amount:
-        raise HTTPException(status_code=400, detail="残高が不足しています")
-    
-    new_bal = w_res.data[0]["balance"] - data.amount
-    await supabase.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+    # BOT部屋作成時はウォレットの引き落としを行わない
 
     p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
 
     room_id = str(uuid.uuid4())[:8]
-    session = CardGameSession(room_id, str(user.id), name, data.wallet_id, data.amount, max_players=2)
+    # bet_amount = 0 固定でセッション作成
+    session = CardGameSession(room_id, str(user.id), name, data.wallet_id, 0, max_players=2)
     
     session.players[BOT_USER_ID] = {"name": BOT_USER_NAME, "wallet_id": "bot_wallet"}
     session.player_order.append(BOT_USER_ID)
@@ -766,7 +777,6 @@ async def grant_despair_conqueror_title(user_id: str):
     except Exception as e:
         logger.error(f"[Title System Error] 称号付与処理エラー ({user_id}): {e}")
 
-# 既存の settle_payout を退避させてラップ処理（元のコードを変更せず追記のみで機能拡張）
 _original_settle_payout = settle_payout
 
 async def settle_payout(session: CardGameSession, winner: Optional[str]):
