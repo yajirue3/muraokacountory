@@ -152,9 +152,9 @@
         .full-log-box {
             display: flex; flex-direction: column; gap: 4px; font-family: monospace; font-size: 0.75rem;
             background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #333;
-            max-height: 55vh; overflow-y: auto;
+            max-height: 50vh; overflow-y: auto; user-select: text;
         }
-        .full-log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.3; }
+        .full-log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.3; user-select: text; }
 
         #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
         .lobby-header { display: flex; justify-content: space-between; align-items: center; }
@@ -348,12 +348,19 @@
             </div>
 
             <div id="tab-log" class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:0.8rem; color:#aaa;">直近1試合の全行動ログ</span>
+                    <button id="copy-log-btn" class="btn-dark" style="padding:4px 10px; font-size:0.75rem;" onclick="copyBattleLog()">📋 ログをコピー</button>
+                </div>
                 <div class="full-log-box" id="full-battle-log">
                     <div class="full-log-entry" style="color:#aaa;">対戦ログはまだありません</div>
                 </div>
             </div>
 
-            <button class="btn-dark" style="margin-top: 15px;" onclick="document.getElementById('rules-modal').style.display='none'">閉じる</button>
+            <div style="display:flex; gap:10px; margin-top: 15px;">
+                <button class="btn-dark" style="flex:1;" onclick="handleModalClose()">閉じる</button>
+                <button id="return-lobby-modal-btn" class="btn-dark" style="flex:1; display:none;" onclick="returnToLobby()">ロビーへ戻る</button>
+            </div>
         </div>
     </div>
 
@@ -422,6 +429,7 @@
                     <span class="mp-text">💧 <span id="my-mp">0</span> / <span id="my-max-mp">0</span></span>
                 </div>
                 <button id="end-turn-btn" class="end-turn-btn" onclick="endTurn()">ターン終了</button>
+                <button id="game-over-lobby-btn" class="end-turn-btn" style="background:#444; box-shadow:none; display:none;" onclick="returnToLobby()">ロビーへ</button>
             </div>
         </div>
 
@@ -461,6 +469,7 @@
     let lastRawEvent = null;
     let currentTurnUser = null;
     let battleLogHistory = [];
+    let currentGameSessionId = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
@@ -485,6 +494,38 @@
     function openHelpModal(defaultTab = 'rule') {
         document.getElementById('rules-modal').style.display = 'flex';
         switchTab(defaultTab);
+    }
+
+    function handleModalClose() {
+        document.getElementById('rules-modal').style.display = 'none';
+        if (gameState && gameState.status === "ENDED") {
+            returnToLobby();
+        }
+    }
+
+    function returnToLobby() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        location.reload();
+    }
+
+    function copyBattleLog() {
+        if (!battleLogHistory || battleLogHistory.length === 0) {
+            return alert("コピーするログがありません");
+        }
+        const textToCopy = battleLogHistory.join("\n");
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const btn = document.getElementById("copy-log-btn");
+            if (btn) {
+                const originalText = btn.innerText;
+                btn.innerText = "✅ コピー完了！";
+                setTimeout(() => { btn.innerText = originalText; }, 2000);
+            }
+        }).catch(err => {
+            alert("コピーに失敗しました: " + err);
+        });
     }
 
     async function fetchCardDatabase() {
@@ -666,6 +707,14 @@
     function renderState(state) {
         if (!state || !state.players) return; 
         
+        // 新しい試合が始まった場合、直前の1試合分のログのみ保持するためクリア
+        if (currentGameSessionId !== currentRoomId && (state.status === "DRAFT" || state.status === "BATTLE")) {
+            currentGameSessionId = currentRoomId;
+            battleLogHistory = [];
+            const fullLogBox = document.getElementById("full-battle-log");
+            if (fullLogBox) fullLogBox.innerHTML = '';
+        }
+
         gameState = state;
         myUserId = state.your_user_id;
         opponentIds = Object.keys(state.players).filter(id => id !== myUserId);
@@ -724,14 +773,19 @@
         }
         
         if (state.status === "ENDED") {
-            updateActionBanner("ゲーム終了！ログ画面で対戦結果・詳細を確認できます", true);
+            updateActionBanner("ゲーム終了！ログ画面で検証・コピーが可能です", true);
+            const returnBtn = document.getElementById("return-lobby-modal-btn");
+            if (returnBtn) returnBtn.style.display = "block";
+            const gameOverLobbyBtn = document.getElementById("game-over-lobby-btn");
+            if (gameOverLobbyBtn) gameOverLobbyBtn.style.display = "block";
             openHelpModal('log');
         }
     }
 
     function renderBattlePhase(state) {
         const isMyTurn = state.turn_user_id === myUserId;
-        document.getElementById("end-turn-btn").style.display = isMyTurn ? "block" : "none";
+        const isEnded = state.status === "ENDED";
+        document.getElementById("end-turn-btn").style.display = (isMyTurn && !isEnded) ? "block" : "none";
 
         opponentIds.forEach(oppId => {
             const currentHp = state.hp[oppId] !== undefined ? state.hp[oppId] : 20;
