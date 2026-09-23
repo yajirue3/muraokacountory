@@ -94,53 +94,30 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             if not opp_id:
                 return
 
-            # --- 最適配牌（T1 先鋒兵確定） ---
-            if getattr(session, "_deck_stacked", False) is False:
-                all_cards = safe_get(session.hands, BOT_USER_ID, []) + safe_get(session.decks, BOT_USER_ID, [])
-
-                u01_cards = [c for c in all_cards if c.get("id") == "u_01"]
-                u02_cards = [c for c in all_cards if c.get("id") == "u_02"]
-                u07_cards = [c for c in all_cards if c.get("id") == "u_07"]
-                other_cards = [c for c in all_cards if c not in u01_cards and c not in u02_cards and c not in u07_cards]
-
-                initial_hand = []
-                if u01_cards: initial_hand.append(u01_cards.pop(0))
-                if u02_cards: initial_hand.append(u02_cards.pop(0))
-                elif u07_cards: initial_hand.append(u07_cards.pop(0))
-
-                remaining = u01_cards + u02_cards + u07_cards + other_cards
-                random.shuffle(remaining)
-
-                while len(initial_hand) < 3 and remaining:
-                    initial_hand.append(remaining.pop(0))
-
-                strong_cards = [c for c in remaining if c.get("id") in ["u_07", "s_02", "s_04", "u_04", "u_02"]]
-                weak_cards = [c for c in remaining if c not in strong_cards]
-                remaining = weak_cards + strong_cards
-
-                for c in initial_hand + remaining:
-                    if "instance_id" not in c:
-                        c["instance_id"] = str(uuid.uuid4())[:8]
-
-                session.hands[BOT_USER_ID] = initial_hand
-                session.decks[BOT_USER_ID] = remaining
-                session._deck_stacked = True
-
-            # --- ★ボット専用イカサマ：毎ターンMP増加率+2（1ターンに2ずつ成長） ---
-            # 1ターン目は初動テンポを保つためそのまま(1MP)、2ターン目以降に+1ボーナスして合計+2成長にする
-            if session.max_mp.get(BOT_USER_ID, 1) > 1 and not getattr(session, f"_mp_boosted_t_{session.turn_idx}", False):
-                session.max_mp[BOT_USER_ID] = min(10, session.max_mp[BOT_USER_ID] + 1)
-                session.mp[BOT_USER_ID] = session.max_mp[BOT_USER_ID]
-                setattr(session, f"_mp_boosted_t_{session.turn_idx}", True)
+            # --- 初手イカサマ：手札に「先鋒兵(u_01)」を強制注入してT1初動を100%確保 ---
+            if getattr(session, "_hand_ensured", False) is False:
+                b_hand = safe_get(session.hands, BOT_USER_ID, [])
+                b_deck = safe_get(session.decks, BOT_USER_ID, [])
+                if b_hand:
+                    # 手札に先鋒兵がなければ、1枚目を強制的に先鋒兵へ置換
+                    if not any(c.get("id") == "u_01" for c in b_hand):
+                        ref = BOT_CARD_DB["u_01"]
+                        b_hand[0]["id"] = ref["id"]
+                        b_hand[0]["name"] = ref["name"]
+                        b_hand[0]["cost"] = ref["cost"]
+                        b_hand[0]["type"] = ref["type"]
+                        b_hand[0]["atk"] = ref["atk"]
+                        b_hand[0]["hp"] = ref["hp"]
+                        b_hand[0]["haste"] = True
+                session._hand_ensured = True
 
             # ------------------------------------------------------
-            # PHASE 1: 手札カードプレイ（嵐最優先・暗殺者・ユニット展開）
+            # PHASE 1: 手札カードプレイ（安全実行ループ）
             # ------------------------------------------------------
-            local_mp = safe_get(session.mp, BOT_USER_ID, 1)
-            local_hand = list(safe_get(session.hands, BOT_USER_ID, []))
-
             for _ in range(8):
-                if local_mp <= 0 or not local_hand:
+                cur_mp = safe_get(session.mp, BOT_USER_ID, 0)
+                cur_hand = list(safe_get(session.hands, BOT_USER_ID, []))
+                if cur_mp <= 0 or not cur_hand:
                     break
 
                 opp_hp = safe_get(session.hp, opp_id, 20)
@@ -148,53 +125,57 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 my_board = safe_get(session.boards, BOT_USER_ID, [])
                 opp_hand_ids = [c.get("id") for c in safe_get(session.hands, opp_id, [])]
 
-                playable = [c for c in local_hand if c.get("cost", 99) <= local_mp]
+                playable = [c for c in cur_hand if c.get("cost", 99) <= cur_mp]
                 if not playable:
                     break
 
                 opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
                 action_taken = False
 
-                # 1. 雷撃直接リーサル
+                # A. 雷撃直接リーサル
                 s01_lethal = next((c for c in playable if c.get("id") == "s_01"), None)
                 if s01_lethal and not opp_taunts and opp_hp <= 3:
-                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_lethal["instance_id"], "target": {"type": "hero", "id": opp_id}})
-                    local_mp -= s01_lethal.get("cost", 2)
-                    local_hand.remove(s01_lethal)
-                    action_taken = True
-                    continue
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_lethal["instance_id"], "target": {"type": "hero", "id": opp_id}})
+                        action_taken = True
+                        continue
+                    except Exception:
+                        pass
 
-                # 2. 敵が3体以上なら「嵐 (s_02)」を超最優先
+                # B. 敵が3体以上なら「嵐 (s_02)」を超最優先
                 s02 = next((c for c in playable if c.get("id") == "s_02"), None)
                 if s02 and len(opp_board) >= 3:
-                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s02["instance_id"], "target": None})
-                    local_mp -= s02.get("cost", 4)
-                    local_hand.remove(s02)
-                    action_taken = True
-                    continue
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s02["instance_id"], "target": None})
+                        action_taken = True
+                        continue
+                    except Exception:
+                        pass
 
-                # 3. 敵巨兵の即時暗殺
+                # C. 敵巨兵の即時暗殺
                 s05 = next((c for c in playable if c.get("id") == "s_05"), None)
                 if s05 and any(t.get("card_id") == "u_04" for t in opp_board):
                     target_titan = next(t for t in opp_board if t.get("card_id") == "u_04")
-                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s05["instance_id"], "target": {"type": "unit", "id": target_titan["instance_id"]}})
-                    local_mp -= s05.get("cost", 6)
-                    local_hand.remove(s05)
-                    action_taken = True
-                    continue
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s05["instance_id"], "target": {"type": "unit", "id": target_titan["instance_id"]}})
+                        action_taken = True
+                        continue
+                    except Exception:
+                        pass
 
-                # 4. 雷撃除去（挑発・小人・吸血鬼・魔導士）
+                # D. 雷撃除去（挑発・小人・吸血鬼・魔導士・先鋒兵）
                 if s01_lethal and opp_board:
                     killable = [u for u in opp_board if u.get("curr_hp", 0) <= (2 if u.get("wall_turns", 0) > 0 else 3)]
                     if killable:
                         target = max(killable, key=lambda x: (3000 if x.get("taunt") else 0) + (2000 if x.get("card_id") == "u_06" else (1500 if x.get("card_id") == "u_05" else 500)) + x.get("atk", 0))
-                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_lethal["instance_id"], "target": {"type": "unit", "id": target["instance_id"]}})
-                        local_mp -= s01_lethal.get("cost", 2)
-                        local_hand.remove(s01_lethal)
-                        action_taken = True
-                        continue
+                        try:
+                            await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s01_lethal["instance_id"], "target": {"type": "unit", "id": target["instance_id"]}})
+                            action_taken = True
+                            continue
+                        except Exception:
+                            pass
 
-                # 5. 「補充」使用時の確定サーチ
+                # E. 「補充」使用時の確定サーチ
                 s04 = next((c for c in playable if c.get("id") == "s_04"), None)
                 if s04:
                     if len(opp_board) >= 3:
@@ -205,25 +186,14 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         wanted = ["u_07", "u_02"]
 
                     enforce_top_deck(session, wanted)
-                    await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s04["instance_id"], "target": None})
-                    local_mp -= s04.get("cost", 3)
-                    local_hand.remove(s04)
-                    action_taken = True
-                    continue
-
-                # 6. 「城壁」付与
-                s09 = next((c for c in playable if c.get("id") == "s_09"), None)
-                if s09 and my_board:
-                    unwalled = [u for u in my_board if u.get("wall_turns", 0) == 0]
-                    if unwalled:
-                        target = max(unwalled, key=lambda x: (1000 if x.get("card_id") == "u_06" else 0) + (500 if x.get("taunt") else 0) + x.get("atk", 0) * 10)
-                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s09["instance_id"], "target": {"type": "unit", "id": target["instance_id"]}})
-                        local_mp -= s09.get("cost", 2)
-                        local_hand.remove(s09)
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s04["instance_id"], "target": None})
                         action_taken = True
                         continue
+                    except Exception:
+                        pass
 
-                # 7. ユニット展開
+                # F. ユニット展開（先鋒兵・奇術師・重装兵・巨兵）
                 playable_units = [c for c in playable if c.get("type") == "unit"]
                 if playable_units and len(my_board) < 7:
                     enemy_has_assassin = "s_05" in opp_hand_ids
@@ -236,24 +206,19 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         cost = u.get("cost", 0)
 
                         score = cost * 1000
-                        if cid == "u_01": score += 9000
+                        if cid == "u_01": score += 10000  # 先鋒兵は即座に殴れるため絶対最優先
                         elif cid == "u_07": score += 8000
                         elif cid == "u_02": score += 7000
                         elif cid == "u_04":
-                            if enemy_has_assassin:
-                                score += 2000
-                            else:
-                                score += 6000
+                            score += (2000 if enemy_has_assassin else 6000)
 
                         if score > best_score:
                             best_score = score
                             best_u = u
 
-                    if best_u and best_score > 0:
+                    if best_u:
                         try:
                             await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": best_u["instance_id"], "target": None})
-                            local_mp -= best_u.get("cost", 0)
-                            local_hand.remove(best_u)
                             action_taken = True
 
                             # 奇術師着地即時バフ（ATK 3〜5 / HP 4〜6）
@@ -269,8 +234,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                         break
                             continue
                         except Exception:
-                            local_hand.remove(best_u)
-                            break
+                            pass
 
                 if not action_taken:
                     break
@@ -293,24 +257,30 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 attacker = active_units[0]
                 opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
 
-                # 1. 挑発がいる場合：最もHPが低い挑発を最速集中砲火で叩き割る
+                # 1. 挑発がいる場合：最もHPが低い挑発を集中砲火で粉砕
                 if opp_taunts:
                     target_taunt = min(opp_taunts, key=lambda x: x.get("curr_hp", 0))
-                    await process_action_func(session, BOT_USER_ID, {
-                        "action": "DECLARE_ATTACK",
-                        "attacker_id": attacker["instance_id"],
-                        "target": {"type": "unit", "id": target_taunt["instance_id"]}
-                    })
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {
+                            "action": "DECLARE_ATTACK",
+                            "attacker_id": attacker["instance_id"],
+                            "target": {"type": "unit", "id": target_taunt["instance_id"]}
+                        })
+                    except Exception:
+                        pass
                     continue
 
                 # 2. リーサル判定
                 total_dmg = sum(u.get("atk", 0) * u.get("attacks_left", 1) for u in active_units)
                 if total_dmg >= opp_hp or attacker.get("atk", 0) >= opp_hp:
-                    await process_action_func(session, BOT_USER_ID, {
-                        "action": "DECLARE_ATTACK",
-                        "attacker_id": attacker["instance_id"],
-                        "target": {"type": "hero", "id": opp_id}
-                    })
+                    try:
+                        await process_action_func(session, BOT_USER_ID, {
+                            "action": "DECLARE_ATTACK",
+                            "attacker_id": attacker["instance_id"],
+                            "target": {"type": "hero", "id": opp_id}
+                        })
+                    except Exception:
+                        pass
                     continue
 
                 # 3. トレード選定（小人・吸血鬼・巨兵を最優先排除）
@@ -351,13 +321,16 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 elif best_val < 5000:
                     best_target = {"type": "hero", "id": opp_id}
 
-                await process_action_func(session, BOT_USER_ID, {
-                    "action": "DECLARE_ATTACK",
-                    "attacker_id": attacker["instance_id"],
-                    "target": best_target
-                })
+                try:
+                    await process_action_func(session, BOT_USER_ID, {
+                        "action": "DECLARE_ATTACK",
+                        "attacker_id": attacker["instance_id"],
+                        "target": best_target
+                    })
+                except Exception:
+                    pass
 
-            # 次ターンの通常ドロー確定操作
+            # 次ターンの通常ドロー確定操作（敵が3体以上なら嵐、敵巨兵なら暗殺者）
             opp_board_now = safe_get(session.boards, opp_id, [])
             if len(opp_board_now) >= 3:
                 next_wanted = ["s_02"]
