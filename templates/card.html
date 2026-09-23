@@ -380,11 +380,11 @@
                     <option value="2">2人対戦</option>
                     <option value="3">3人対戦</option>
                 </select>
-                <input type="number" id="bet-amount" value="100" min="10" placeholder="Bet(G)" style="flex:1;">
+                <input type="number" id="bet-amount" value="100" min="0" placeholder="Bet(G)" style="flex:1;">
             </div>
             <div style="display:flex; gap:10px; width:100%;">
                 <button style="flex:1;" onclick="createRoom()">部屋作成</button>
-                <button class="btn-bot" style="flex:1;" onclick="createBotRoom()">BOTと対戦</button>
+                <button class="btn-bot" style="flex:1;" onclick="createBotRoom()">BOTと対戦(無料)</button>
             </div>
             <div style="text-align: center; margin-top: 6px; font-size: 0.85rem; color: #ffd700; font-weight: bold; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,215,0,0.3);">
                 🏆 BOT撃破で限定称号あり！
@@ -579,9 +579,9 @@
 
     async function createRoom() {
         const walletId = document.getElementById("wallet-select").value;
-        const amount = parseInt(document.getElementById("bet-amount").value);
+        const amount = parseInt(document.getElementById("bet-amount").value) || 0;
         const maxPlayers = parseInt(document.getElementById("max-players-select").value);
-        if (!walletId || amount <= 0) return alert("入力が不正です");
+        if (!walletId || amount < 0) return alert("入力が不正です");
 
         const res = await fetch("/api/card/create", {
             method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -594,12 +594,12 @@
 
     async function createBotRoom() {
         const walletId = document.getElementById("wallet-select").value;
-        const amount = parseInt(document.getElementById("bet-amount").value);
-        if (!walletId || amount <= 0) return alert("入力が不正です");
+        if (!walletId) return alert("ウォレットを選択してください");
 
+        // BOT対戦は賭け金なし（0固定）で送信
         const res = await fetch("/api/card/create_bot_room", {
             method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ wallet_id: walletId, amount: amount, max_players: 2 })
+            body: JSON.stringify({ wallet_id: walletId, amount: 0, max_players: 2 })
         });
         const data = await res.json();
         if (!res.ok) return alert(data.detail);
@@ -707,7 +707,6 @@
     function renderState(state) {
         if (!state || !state.players) return; 
         
-        // 新しい試合が始まった場合、直前の1試合分のログのみ保持するためクリア
         if (currentGameSessionId !== currentRoomId && (state.status === "DRAFT" || state.status === "BATTLE")) {
             currentGameSessionId = currentRoomId;
             battleLogHistory = [];
