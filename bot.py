@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger("CardBot")
 
 BOT_USER_ID = "bot_super_ai"
-BOT_USER_NAME = "村岡国王（完全体）"
+BOT_USER_NAME = "村岡国王（影武者）"
 
 # ========== 復元：これがないとcard.py等でImportErrorになります ==========
 HUMAN_DRAFT_MEMORIES: Dict[str, List[str]] = {}
