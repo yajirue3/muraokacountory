@@ -31,13 +31,15 @@
         .i-info { font-size: 0.75rem; color: #888; margin-bottom: 4px; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); justify-content: center; align-items: center; }
-        .modal-content { background: #2a2a2a; padding: 20px; border-radius: 12px; width: 90%; max-width: 380px; border: 2px solid #555; position: relative; box-sizing: border-box; }
+        .modal-content { background: #2a2a2a; padding: 20px; border-radius: 12px; width: 95%; max-width: 440px; border: 2px solid #555; position: relative; box-sizing: border-box; }
         .close-btn { position: absolute; right: 15px; top: 10px; color: #aaa; font-size: 24px; font-weight: bold; cursor: pointer; }
         .close-btn:hover { color: #fff; }
-        .table-container { max-height: 250px; overflow-y: auto; margin-top: 10px; background: #1a1a1a; border-radius: 6px; }
+        .table-container { max-height: 280px; overflow-y: auto; margin-top: 10px; background: #1a1a1a; border-radius: 6px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-        th, td { border: 1px solid #444; padding: 6px; text-align: left; }
+        th, td { border: 1px solid #444; padding: 6px; text-align: left; vertical-align: middle; }
         th { background: #333; color: #d4af37; position: sticky; top: 0; }
+        .input-mini { width: 60px; padding: 4px; margin: 0; display: inline-block; background: #222; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: right; }
+        .btn-mini { padding: 4px 6px; font-size: 0.7rem; width: auto; margin: 0; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -46,7 +48,7 @@
     <div class="card">
         <div class="header">👑 アイテムマスター管理</div>
         <p style="font-size: 0.75rem; color: #aaa; margin-top: 0; line-height: 1.4;">
-            王国に存在するマスターアイテムの管理、所持状況確認、および直接付与を行います。
+            王国に存在するマスターアイテムの管理、所持状況確認、および直接操作を行います。
         </p>
     </div>
 
@@ -79,19 +81,19 @@
     <button class="btn-back" onclick="location.href='/dashboard'">◀ 国民証に戻る</button>
 </div>
 
-<!-- 所持者一覧モーダル -->
+<!-- 所持者一覧＆直接編集モーダル -->
 <div id="modal-possessors" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="closeModal('modal-possessors')">&times;</span>
-        <div class="header">👥 所持者一覧</div>
+        <div class="header">👥 所持者一覧・直接編集</div>
         <div id="possessors-item-name" style="color: #f39c12; font-weight: bold; margin-bottom: 8px; font-size: 0.9rem;"></div>
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th>口座名</th>
-                        <th>ユーザーID</th>
-                        <th>個数</th>
+                        <th>ユーザー / 口座</th>
+                        <th>所持数変更</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="possessors-tbody"></tbody>
@@ -128,6 +130,7 @@
     }
 
     let itemsCache = [];
+    let currentViewingItemId = "";
 
     window.onload = function() {
         loadItems();
@@ -159,7 +162,7 @@
                     <div class="i-desc">${escapeHtml(item.description || '説明なし')}</div>
                     
                     <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <button class="btn-info" style="flex: 1; margin: 0; padding: 6px;" onclick="openPossessorsModal('${escapeHtml(item.item_id)}', '${escapeHtml(item.name)}')">👥 所持者</button>
+                        <button class="btn-info" style="flex: 1; margin: 0; padding: 6px;" onclick="openPossessorsModal('${escapeHtml(item.item_id)}', '${escapeHtml(item.name)}')">👥 所持者・変更</button>
                         <button class="btn-success" style="flex: 1; margin: 0; padding: 6px;" onclick="openGrantModal('${escapeHtml(item.item_id)}', '${escapeHtml(item.name)}')">🎁 付与</button>
                     </div>
 
@@ -259,8 +262,9 @@
         document.getElementById(id).style.display = "none";
     }
 
-    // 1. 所持者一覧を取得
+    // 所持者一覧取得＆表示（インベントリ編集対応）
     async function openPossessorsModal(itemId, itemName) {
+        currentViewingItemId = itemId;
         document.getElementById("possessors-item-name").innerText = `${itemName} (${itemId})`;
         const tbody = document.getElementById("possessors-tbody");
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">読み込み中...</td></tr>`;
@@ -285,9 +289,19 @@
 
             tbody.innerHTML = data.map(p => `
                 <tr>
-                    <td>${escapeHtml(p.account_name)}</td>
-                    <td style="font-size:0.65rem; word-break:break-all; font-family:monospace;">${escapeHtml(p.user_id)}</td>
-                    <td style="text-align:right; font-weight:bold; color:#f1c40f;">${p.quantity}</td>
+                    <td>
+                        <div style="font-weight:bold; color:#f1c40f;">${escapeHtml(p.account_name)}</div>
+                        <div style="font-size:0.65rem; color:#888; word-break:break-all;">${escapeHtml(p.user_id)}</div>
+                    </td>
+                    <td>
+                        <input type="number" id="qty-${p.id}" class="input-mini" value="${p.quantity}" min="0"> 個
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn-mini btn-success" onclick="updateInventory(${p.id})">更新</button>
+                            <button class="btn-mini btn-delete" onclick="removeInventory(${p.id})">回収</button>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
         } catch (err) {
@@ -296,7 +310,54 @@
         }
     }
 
-    // 2. 付与モーダルを開く
+    // 所持数の直接上書き更新
+    async function updateInventory(inventoryId) {
+        const inputElem = document.getElementById(`qty-${inventoryId}`);
+        const qty = parseInt(inputElem.value, 10);
+        if (isNaN(qty) || qty < 0) return alert("正しい個数を入力してください");
+
+        try {
+            const res = await fetch(`/api/admin/inventories/${inventoryId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ inventory_id: inventoryId, quantity: qty })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message || "更新しました");
+                openPossessorsModal(currentViewingItemId, document.getElementById("possessors-item-name").innerText);
+            } else {
+                alert("エラー: " + data.detail);
+            }
+        } catch (e) {
+            alert("通信エラーが発生しました");
+        }
+    }
+
+    // インベントリから完全回収（削除）
+    async function removeInventory(inventoryId) {
+        if (!confirm("このユーザーからアイテムを完全に没収（削除）しますか？")) return;
+        try {
+            const res = await fetch(`/api/admin/inventories/${inventoryId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message || "回収しました");
+                openPossessorsModal(currentViewingItemId, document.getElementById("possessors-item-name").innerText);
+            } else {
+                alert("エラー: " + data.detail);
+            }
+        } catch (e) {
+            alert("通信エラーが発生しました");
+        }
+    }
+
+    // 付与モーダルを開く
     function openGrantModal(itemId, itemName) {
         document.getElementById("grant-item-name").innerText = `${itemName} (${itemId})`;
         document.getElementById("grant-item-id").value = itemId;
@@ -306,7 +367,7 @@
         document.getElementById("modal-grant").style.display = "flex";
     }
 
-    // 3. 直接付与を実行
+    // アイテム直接付与
     async function executeGrant() {
         const itemId = document.getElementById("grant-item-id").value;
         const userId = document.getElementById("grant-user-id").value.trim();
