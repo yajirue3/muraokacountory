@@ -282,7 +282,11 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             ]
 
             for attacker in attack_candidates:
-                while attacker.get("attacks_left", 0) > 0 and attacker.get("can_attack"):
+                safety_counter = 0
+                while attacker.get("attacks_left", 0) > 0 and attacker.get("can_attack") and safety_counter < 10:
+                    safety_counter += 1
+                    prev_attacks_left = attacker.get("attacks_left", 0)
+
                     opp_board = safe_get(session.boards, opp_id, [])
                     opp_hp = safe_get(session.hp, opp_id, 20)
                     opp_taunts = [u for u in opp_board if u.get("taunt") and u.get("curr_hp", 0) > 0]
@@ -297,7 +301,9 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                                 "target": {"type": "unit", "id": target_taunt["instance_id"]}
                             })
                         except Exception:
-                            pass
+                            break
+                        if attacker.get("attacks_left", 0) >= prev_attacks_left:
+                            break
                         continue
 
                     # 2. リーサル判定
@@ -310,7 +316,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             })
                         except Exception:
                             pass
-                        continue
+                        break
 
                     # 3. 最適トレード（小人・吸血鬼・巨兵・奇術師を最優先）
                     best_target = None
@@ -358,7 +364,10 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             "target": best_target
                         })
                     except Exception:
-                        pass
+                        break
+
+                    if attacker.get("attacks_left", 0) >= prev_attacks_left:
+                        break
 
             # 次ターンの通常ドロー確定操作
             opp_board_now = safe_get(session.boards, opp_id, [])
