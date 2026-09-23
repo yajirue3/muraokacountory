@@ -150,7 +150,7 @@
         .db-stats { font-size: 0.8rem; color: #ffaa00; font-weight: bold; }
 
         #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
-        .lobby-header { display: flex; justify-content: space-between; align-items: center; }
+        .lobby-header { display: justify-content: space-between; align-items: center; display: flex; }
         .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; }
         
         .create-form { display: flex; gap: 10px; flex-wrap: wrap; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: var(--glass-border); }
@@ -213,33 +213,14 @@
             min-height: 95px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
         }
 
-        /* ▼ 改善されたバトルログスタイル ▼ */
         .battle-divider {
-            display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
-            border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 6px; padding: 4px 8px;
-            background: rgba(0, 0, 0, 0.65); box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
-        }
-        .battle-log-header {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.65rem; color: #888; font-weight: bold; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            padding-bottom: 2px; margin-bottom: 2px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 4px;
         }
         .battle-log {
-            font-size: 0.72rem; text-align: left; max-height: 60px; overflow-y: auto;
-            display: flex; flex-direction: column; gap: 2px; padding-right: 2px;
-            font-family: 'Consolas', 'Courier New', monospace, sans-serif;
+            font-size: 0.7rem; color: #00ffcc; text-align: center; max-height: 24px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; font-weight: bold;
         }
-        .log-entry {
-            display: flex; gap: 6px; line-height: 1.25; align-items: baseline; word-break: break-all;
-        }
-        .log-time { color: #666; font-size: 0.62rem; flex-shrink: 0; }
-        .log-text { color: #e0e0e0; }
-        .log-actor-me { color: var(--primary); font-weight: bold; }
-        .log-actor-opp { color: var(--secondary); font-weight: bold; }
-        .log-card { color: #ffd700; font-weight: bold; }
-        .log-dmg { color: #ff4d4d; font-weight: bold; }
-        .log-turn { color: #ffaa00; font-weight: bold; }
-        .log-status { color: #00ffcc; }
 
         .board-card {
             width: 75px; min-width: 75px; height: 90px; background: var(--card-bg); 
@@ -411,15 +392,8 @@
         <div class="battle-scroll-area">
             <div id="opponents-container"></div>
             
-            <!-- ▼ バトルログコンテナ ▼ -->
             <div class="battle-divider">
-                <div class="battle-log-header">
-                    <span>📜 バトルログ履歴</span>
-                    <span style="font-size: 0.55rem; color: #555;">最新順</span>
-                </div>
-                <div class="battle-log" id="battle-log">
-                    <div class="log-entry"><span class="log-time">--:--</span><span class="log-text">ゲーム準備中...</span></div>
-                </div>
+                <div class="battle-log" id="battle-log">バトルログ: ゲーム準備中...</div>
             </div>
             
             <div class="board" id="my-board"></div>
@@ -469,8 +443,9 @@
     let isTargetingMode = false;
     let prevHpState = { my: 20, opps: {} };
     let prevBoardState = {}; 
-    let lastRecordedEvent = null;
-    let previousTurnPlayer = null;
+
+    let lastRawEvent = null;
+    let currentTurnUser = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
@@ -622,35 +597,12 @@
         };
     }
 
-    // ▼ アクション・時系列を識別してログを追加する高機能ロガー ▼
-    function addLog(text, actorType = 'neutral') {
-        const logContainer = document.getElementById("battle-log");
-        if (!logContainer) return;
-
+    function addLog(text) {
+        const logEl = document.getElementById("battle-log");
+        if (!logEl) return;
         const now = new Date();
-        const timeStr = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        
-        let actorClass = '';
-        if (actorType === 'me') actorClass = 'log-actor-me';
-        else if (actorType === 'opp') actorClass = 'log-actor-opp';
-
-        // 特定キーワードの強調ハイライト
-        let formattedText = text
-            .replace(/「(.*?)」/g, '<span class="log-card">「$1」</span>')
-            .replace(/(\d+)\s*ダメージ/g, '<span class="log-dmg">$1 ダメージ</span>')
-            .replace(/(ターン開始|ターン終了)/g, '<span class="log-turn">$1</span>')
-            .replace(/(凍結|挑発|火傷|城壁|速攻)/g, '<span class="log-status">[$1]</span>');
-
-        const entry = document.createElement("div");
-        entry.className = "log-entry";
-        entry.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-text ${actorClass}">${formattedText}</span>`;
-
-        logContainer.insertBefore(entry, logContainer.firstChild);
-
-        // ログが多すぎる場合は上限40件で破棄
-        while (logContainer.children.length > 40) {
-            logContainer.removeChild(logContainer.lastChild);
-        }
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        logEl.innerText = `[${timeStr}] ${text}`;
     }
 
     function spawnDamageText(elementId, amount) {
@@ -690,35 +642,17 @@
         document.getElementById("sys-message").innerText = state.message || "待機中...";
         document.getElementById("sys-timer").innerText = `⏳ ${state.time_limit || 0}`;
 
-        // サーバー側 last_event の監視とログ蓄積
-        if (state.last_event && state.last_event !== lastRecordedEvent) {
-            lastRecordedEvent = state.last_event;
-            const myName = state.players[myUserId] ? state.players[myUserId].name : "You";
-            let actor = 'neutral';
-            if (state.last_event.includes(myName) || state.last_event.startsWith("あなた")) {
-                actor = 'me';
-            } else {
-                for (let oppId of opponentIds) {
-                    const oppName = state.players[oppId] ? state.players[oppId].name : "";
-                    if (oppName && state.last_event.includes(oppName)) {
-                        actor = 'opp';
-                        break;
-                    }
-                }
+        if (state.status === "BATTLE") {
+            if (currentTurnUser !== state.turn_user_id) {
+                currentTurnUser = state.turn_user_id;
+                const turnPlayerName = state.players[currentTurnUser] ? state.players[currentTurnUser].name : '不明';
+                addLog(`【${turnPlayerName}】のターン開始`);
             }
-            addLog(state.last_event, actor);
         }
 
-        // ターン移行イベントの検知・ログ
-        if (state.status === "BATTLE" && state.turn_user_id && state.turn_user_id !== previousTurnPlayer) {
-            previousTurnPlayer = state.turn_user_id;
-            const turnUser = state.players[state.turn_user_id];
-            const turnUserName = turnUser ? turnUser.name : "不明";
-            if (state.turn_user_id === myUserId) {
-                addLog(`▶ あなたのターン開始 (MP: ${state.mp[myUserId]}/${state.max_mp[myUserId]})`, 'me');
-            } else {
-                addLog(`▶ [${turnUserName}] のターン開始`, 'opp');
-            }
+        if (state.last_event && state.last_event !== lastRawEvent) {
+            lastRawEvent = state.last_event;
+            addLog(state.last_event);
         }
 
         if (state.status === "WAITING") {
@@ -770,12 +704,12 @@
 
         opponentIds.forEach(oppId => {
             const currentHp = state.hp[oppId] !== undefined ? state.hp[oppId] : 20;
+            const oppName = state.players[oppId] ? state.players[oppId].name : "敵ヒーロー";
             if (prevHpState.opps[oppId] !== undefined && currentHp < prevHpState.opps[oppId]) {
                 const dmg = prevHpState.opps[oppId] - currentHp;
                 spawnDamageText(`opp-hero-${oppId}`, dmg);
                 triggerShake();
-                const oppName = state.players[oppId] ? state.players[oppId].name : "敵";
-                addLog(`💥 [${oppName}] のヒーローが ${dmg} ダメージを受けた！`, 'opp');
+                addLog(`💥「${oppName}」が ${dmg} ダメージ受けて残りHP: ${currentHp}`);
             }
             prevHpState.opps[oppId] = currentHp;
         });
@@ -785,7 +719,7 @@
             const dmg = prevHpState.my - myCurrentHp;
             spawnDamageText("my-hero", dmg);
             triggerShake();
-            addLog(`⚡ あなたのヒーローが ${dmg} ダメージを受けた！`, 'me');
+            addLog(`⚡ あなたが ${dmg} ダメージ受けて残りHP: ${myCurrentHp}`);
         }
         prevHpState.my = myCurrentHp;
 
@@ -808,7 +742,7 @@
                 const unitDmg = prevBoardState[u.instance_id] - u.curr_hp;
                 setTimeout(() => spawnDamageText(`unit-${u.instance_id}`, unitDmg), 50);
                 if (u.burn_turns > 0) {
-                    addLog(`🔥 「${u.name}」は火傷で ${unitDmg} ダメージ！`, isMine ? 'me' : 'opp');
+                    addLog(`🔥「${u.name}」が火傷で ${unitDmg} ダメージ (残HP: ${u.curr_hp})`);
                 }
             }
             prevBoardState[u.instance_id] = u.curr_hp;
@@ -896,6 +830,7 @@
     function endTurn() { 
         resetSelection();
         if (ws && ws.readyState === WebSocket.OPEN) {
+            addLog("あなたがターンを終了しました");
             ws.send(JSON.stringify({ action: "END_TURN" })); 
         }
     }
@@ -916,6 +851,11 @@
         document.getElementById(`hand-${instanceId}`).classList.add("selected");
         
         if (selectedHandCard.type === "unit" || (selectedHandCard.type === "spell" && !selectedHandCard.need_target)) {
+            if (selectedHandCard.type === "unit") {
+                addLog(`あなたが「${selectedHandCard.name}」を場に召喚 (消費MP: ${selectedHandCard.cost})`);
+            } else {
+                addLog(`あなたが全体呪文「${selectedHandCard.name}」を発動 (消費MP: ${selectedHandCard.cost})`);
+            }
             ws.send(JSON.stringify({ action: "PLAY_HAND", card_instance_id: instanceId, target: null }));
             resetSelection();
         } else {
@@ -950,10 +890,43 @@
 
     function handleTargetClick(type, id) {
         if (!isTargetingMode) return;
+
+        let targetName = "対象";
+        let targetHp = "";
+
+        if (type === 'hero') {
+            if (id === myUserId) {
+                targetName = "あなた自身";
+                targetHp = `(HP: ${gameState.hp[myUserId] || 0})`;
+            } else {
+                const opp = gameState.players[id];
+                targetName = `敵「${opp ? opp.name : 'ヒーロー'}」`;
+                targetHp = `(HP: ${gameState.hp[id] || 0})`;
+            }
+        } else if (type === 'unit') {
+            let u = (gameState.boards[myUserId] || []).find(x => x.instance_id === id);
+            let ownerLabel = "味方";
+            if (!u) {
+                for (const oppId of opponentIds) {
+                    u = (gameState.boards[oppId] || []).find(x => x.instance_id === id);
+                    if (u) {
+                        const opp = gameState.players[oppId];
+                        ownerLabel = opp ? opp.name : "敵";
+                        break;
+                    }
+                }
+            }
+            if (u) {
+                targetName = `【${ownerLabel}】の「${u.name}」`;
+                targetHp = `(HP: ${u.curr_hp})`;
+            }
+        }
         
         if (selectedHandCard) {
+            addLog(`あなたが「${selectedHandCard.name}」を ${targetName} ${targetHp} に使用！ (消費MP: ${selectedHandCard.cost})`);
             ws.send(JSON.stringify({ action: "PLAY_HAND", card_instance_id: selectedHandCard.instance_id, target: { type, id } }));
         } else if (selectedBoardUnit) {
+            addLog(`あなたの「${selectedBoardUnit.name}」が ${targetName} ${targetHp} を攻撃！ (ATK: ${selectedBoardUnit.atk})`);
             ws.send(JSON.stringify({ action: "DECLARE_ATTACK", attacker_id: selectedBoardUnit.instance_id, target: { type, id } }));
         }
         resetSelection();
