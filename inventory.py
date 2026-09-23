@@ -235,17 +235,47 @@ async def transfer_item(req: TransferItemRequest, current_user: Any = Depends(ge
 
     return {"message": f"「{sender_item['items']['name']}」を {req.quantity} 個譲渡しました。"}
 
-# ▼ 管理者用: 所持数を直接変更・削除するAPI
+# ==========================================
+# ▼ 管理者用: 所持者一覧・直接変更・削除・直接付与API
+# ==========================================
+class AdminGrantItemRequest(BaseModel):
+    user_id: str
+    item_id: str
+    quantity: int
+    account_id: Optional[str] = None
+
 class AdminUpdateInventoryRequest(BaseModel):
     inventory_id: int
     quantity: int
 
+# 1. 所持者一覧取得 (※ routerのprefixが /api なのでパスは /admin/... にします)
+@router.get("/admin/items/{item_id}/possessors")
+async def get_item_possessors(item_id: str, current_user: Any = Depends(verify_king_user)):
+    supabase = await get_supabase()
+    res = await supabase.table("user_inventories") \
+        .select("id, quantity, user_id, account_id, item_accounts(account_name)") \
+        .eq("item_id", item_id) \
+        .gt("quantity", 0) \
+        .execute()
+    
+    formatted = []
+    for row in res.data:
+        formatted.append({
+            "id": row["id"],
+            "account_id": row["account_id"],
+            "account_name": row["item_accounts"]["account_name"] if row.get("item_accounts") else "メイン",
+            "user_id": row["user_id"],
+            "quantity": row["quantity"]
+        })
+    return formatted
+
+# 2. 個数変更 (上書き)
 @router.put("/admin/inventories/{inventory_id}")
 async def admin_update_inventory(inventory_id: int, req: AdminUpdateInventoryRequest, current_user: Any = Depends(verify_king_user)):
     supabase = await get_supabase()
     if req.quantity <= 0:
         await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
-        return {"message": "アイテムをインベントリから削除しました"}
+        return {"message": "アイテムを削除しました"}
     
     await supabase.table("user_inventories").update({
         "quantity": req.quantity,
@@ -253,8 +283,47 @@ async def admin_update_inventory(inventory_id: int, req: AdminUpdateInventoryReq
     }).eq("id", inventory_id).execute()
     return {"message": f"所持数を {req.quantity} 個に更新しました"}
 
+# 3. インベントリから削除 (回収)
 @router.delete("/admin/inventories/{inventory_id}")
 async def admin_delete_inventory(inventory_id: int, current_user: Any = Depends(verify_king_user)):
     supabase = await get_supabase()
     await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
     return {"message": "インベントリからアイテムを削除しました"}
+
+# 4. 直接付与
+@router.post("/admin/grant-item")
+async def grant_item_to_user(req: AdminGrantItemRequest, current_user: Any = Depends(verify_king_user)):
+    supabase = await get_supabase()
+    if req.quantity <= 0:
+        raise HTTPException(status_code=400, detail="個数は1以上を指定してください")
+
+    target_account_id = req.account_id
+    if not target_account_id:
+        acc_res = await supabase.table("item_accounts") \
+            .select("account_id") \
+            .eq("user_id", req.user_id) \
+            .order("created_at") \
+            .limit(1) \
+            .execute()
+        if not acc_res.data:
+            raise HTTPException(status_code=404, detail="対象ユーザーの口座が見つかりません")
+        target_account_id = acc_res.data[0]["account_id"]
+
+    inv_res = await supabase.table("user_inventories") \
+        .select("id, quantity") \
+        .eq("account_id", target_account_id) \
+        .eq("item_id", req.item_id) \
+        .execute()
+
+    if inv_res.data:
+        new_qty = inv_res.data[0]["quantity"] + req.quantity
+        await supabase.table("user_inventories").update({"quantity": new_qty}).eq("id", inv_res.data[0]["id"]).execute()
+    else:
+        await supabase.table("user_inventories").insert({
+            "user_id": req.user_id,
+            "account_id": target_account_id,
+            "item_id": req.item_id,
+            "quantity": req.quantity
+        }).execute()
+
+    return {"message": f"アイテム({req.item_id})を {req.quantity} 個付与しました"}
