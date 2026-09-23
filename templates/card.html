@@ -213,14 +213,33 @@
             min-height: 95px; border: var(--glass-border); -webkit-overflow-scrolling: touch;
         }
 
+        /* ▼ 改善されたバトルログスタイル ▼ */
         .battle-divider {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 4px;
+            display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+            border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 6px; padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.65); box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+        .battle-log-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.65rem; color: #888; font-weight: bold; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 2px; margin-bottom: 2px;
         }
         .battle-log {
-            font-size: 0.7rem; color: #00ffcc; text-align: center; max-height: 24px; overflow: hidden;
-            text-overflow: ellipsis; white-space: nowrap; font-weight: bold;
+            font-size: 0.72rem; text-align: left; max-height: 60px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 2px; padding-right: 2px;
+            font-family: 'Consolas', 'Courier New', monospace, sans-serif;
         }
+        .log-entry {
+            display: flex; gap: 6px; line-height: 1.25; align-items: baseline; word-break: break-all;
+        }
+        .log-time { color: #666; font-size: 0.62rem; flex-shrink: 0; }
+        .log-text { color: #e0e0e0; }
+        .log-actor-me { color: var(--primary); font-weight: bold; }
+        .log-actor-opp { color: var(--secondary); font-weight: bold; }
+        .log-card { color: #ffd700; font-weight: bold; }
+        .log-dmg { color: #ff4d4d; font-weight: bold; }
+        .log-turn { color: #ffaa00; font-weight: bold; }
+        .log-status { color: #00ffcc; }
 
         .board-card {
             width: 75px; min-width: 75px; height: 90px; background: var(--card-bg); 
@@ -288,33 +307,6 @@
         }
 
         @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 8px var(--secondary); } 50% { box-shadow: 0 0 20px var(--secondary); } }
-
-        /* ▼ バトル終了後のログ閲覧モーダル用スタイル ▼ */
-        .battle-log-item {
-            padding: 6px 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            font-size: 0.8rem;
-            line-height: 1.4;
-            display: flex;
-            align-items: flex-start;
-            gap: 6px;
-        }
-        .battle-log-item:nth-child(even) { background: rgba(0, 0, 0, 0.2); }
-        .battle-log-item .log-idx { color: #888; font-size: 0.7rem; min-width: 28px; }
-        .battle-log-item .log-text { flex: 1; word-break: break-all; }
-        .btn-view-logs {
-            background: #ffaa00;
-            color: #000;
-            font-size: 0.95rem;
-            padding: 10px 16px;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 0 10px #ffaa00;
-            cursor: pointer;
-            font-weight: 900;
-            margin-top: 8px;
-        }
-        .btn-view-logs:hover { filter: brightness(1.2); }
     </style>
 </head>
 <body>
@@ -369,19 +361,6 @@
         </div>
     </div>
 
-    <!-- ▼ 試合終了後ログ閲覧モーダル ▼ -->
-    <div id="match-log-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 style="color: var(--primary); text-shadow: var(--neon-shadow); margin-bottom: 10px; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
-                <span>📜 バトル全ログ</span>
-                <span id="log-total-count" style="font-size: 0.8rem; color: #888;"></span>
-            </h3>
-            <div id="match-log-body" class="modal-body active" style="background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); padding: 5px;">
-            </div>
-            <button class="btn-dark" style="margin-top: 15px;" onclick="document.getElementById('match-log-modal').style.display='none'">閉じる</button>
-        </div>
-    </div>
-
     <!-- ロビー画面 -->
     <div id="lobby-screen">
         <div class="lobby-header">
@@ -432,8 +411,15 @@
         <div class="battle-scroll-area">
             <div id="opponents-container"></div>
             
+            <!-- ▼ バトルログコンテナ ▼ -->
             <div class="battle-divider">
-                <div class="battle-log" id="battle-log">バトルログ: ゲーム準備中...</div>
+                <div class="battle-log-header">
+                    <span>📜 バトルログ履歴</span>
+                    <span style="font-size: 0.55rem; color: #555;">最新順</span>
+                </div>
+                <div class="battle-log" id="battle-log">
+                    <div class="log-entry"><span class="log-time">--:--</span><span class="log-text">ゲーム準備中...</span></div>
+                </div>
             </div>
             
             <div class="board" id="my-board"></div>
@@ -483,9 +469,8 @@
     let isTargetingMode = false;
     let prevHpState = { my: 20, opps: {} };
     let prevBoardState = {}; 
-
-    // ▼ バトル全ログ追跡用配列 ▼
-    const battleLogHistory = [];
+    let lastRecordedEvent = null;
+    let previousTurnPlayer = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadWallets();
@@ -506,25 +491,6 @@
     function openHelpModal(defaultTab = 'rule') {
         document.getElementById('rules-modal').style.display = 'flex';
         switchTab(defaultTab);
-    }
-
-    // ▼ 試合終了後のログモーダル表示 ▼
-    function openMatchLogModal() {
-        const bodyEl = document.getElementById("match-log-body");
-        const countEl = document.getElementById("log-total-count");
-        if (battleLogHistory.length === 0) {
-            bodyEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">ログが記録されていません</div>`;
-            countEl.innerText = "";
-        } else {
-            countEl.innerText = `(${battleLogHistory.length} 件)`;
-            bodyEl.innerHTML = battleLogHistory.map((log, idx) => `
-                <div class="battle-log-item">
-                    <span class="log-idx">#${idx + 1}</span>
-                    <span class="log-text">${log}</span>
-                </div>
-            `).join('');
-        }
-        document.getElementById("match-log-modal").style.display = "flex";
     }
 
     async function fetchCardDatabase() {
@@ -656,13 +622,34 @@
         };
     }
 
-    function addLog(text) {
-        const logEl = document.getElementById("battle-log");
-        if(logEl) logEl.innerText = text;
+    // ▼ アクション・時系列を識別してログを追加する高機能ロガー ▼
+    function addLog(text, actorType = 'neutral') {
+        const logContainer = document.getElementById("battle-log");
+        if (!logContainer) return;
 
-        // 全ログ履歴に記録（重複登録の抑制）
-        if (text && (!battleLogHistory.length || battleLogHistory[battleLogHistory.length - 1] !== text)) {
-            battleLogHistory.push(text);
+        const now = new Date();
+        const timeStr = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        
+        let actorClass = '';
+        if (actorType === 'me') actorClass = 'log-actor-me';
+        else if (actorType === 'opp') actorClass = 'log-actor-opp';
+
+        // 特定キーワードの強調ハイライト
+        let formattedText = text
+            .replace(/「(.*?)」/g, '<span class="log-card">「$1」</span>')
+            .replace(/(\d+)\s*ダメージ/g, '<span class="log-dmg">$1 ダメージ</span>')
+            .replace(/(ターン開始|ターン終了)/g, '<span class="log-turn">$1</span>')
+            .replace(/(凍結|挑発|火傷|城壁|速攻)/g, '<span class="log-status">[$1]</span>');
+
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-text ${actorClass}">${formattedText}</span>`;
+
+        logContainer.insertBefore(entry, logContainer.firstChild);
+
+        // ログが多すぎる場合は上限40件で破棄
+        while (logContainer.children.length > 40) {
+            logContainer.removeChild(logContainer.lastChild);
         }
     }
 
@@ -693,8 +680,6 @@
         else banner.classList.remove("alert");
     }
 
-    let hasEndedHandled = false;
-
     function renderState(state) {
         if (!state || !state.players) return; 
         
@@ -705,7 +690,36 @@
         document.getElementById("sys-message").innerText = state.message || "待機中...";
         document.getElementById("sys-timer").innerText = `⏳ ${state.time_limit || 0}`;
 
-        if (state.last_event) addLog(state.last_event);
+        // サーバー側 last_event の監視とログ蓄積
+        if (state.last_event && state.last_event !== lastRecordedEvent) {
+            lastRecordedEvent = state.last_event;
+            const myName = state.players[myUserId] ? state.players[myUserId].name : "You";
+            let actor = 'neutral';
+            if (state.last_event.includes(myName) || state.last_event.startsWith("あなた")) {
+                actor = 'me';
+            } else {
+                for (let oppId of opponentIds) {
+                    const oppName = state.players[oppId] ? state.players[oppId].name : "";
+                    if (oppName && state.last_event.includes(oppName)) {
+                        actor = 'opp';
+                        break;
+                    }
+                }
+            }
+            addLog(state.last_event, actor);
+        }
+
+        // ターン移行イベントの検知・ログ
+        if (state.status === "BATTLE" && state.turn_user_id && state.turn_user_id !== previousTurnPlayer) {
+            previousTurnPlayer = state.turn_user_id;
+            const turnUser = state.players[state.turn_user_id];
+            const turnUserName = turnUser ? turnUser.name : "不明";
+            if (state.turn_user_id === myUserId) {
+                addLog(`▶ あなたのターン開始 (MP: ${state.mp[myUserId]}/${state.max_mp[myUserId]})`, 'me');
+            } else {
+                addLog(`▶ [${turnUserName}] のターン開始`, 'opp');
+            }
+        }
 
         if (state.status === "WAITING") {
             const currentPlayers = Object.keys(state.players).length;
@@ -744,24 +758,9 @@
             renderBattlePhase(state);
         }
         
-        // ▼ 試合終了（ENDED）：勝敗表示＋任意ログ閲覧ボタンの動的追加 ▼
         if (state.status === "ENDED") {
-            if (!hasEndedHandled) {
-                hasEndedHandled = true;
-                addLog(state.message || "ゲーム終了！");
-
-                const banner = document.getElementById("action-banner");
-                banner.classList.add("alert");
-                banner.innerHTML = `
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:4px;">
-                        <span>${state.message || "ゲーム終了！"}</span>
-                        <div style="display:flex; gap:8px;">
-                            <button class="btn-view-logs" onclick="openMatchLogModal()">📜 バトルログを見る</button>
-                            <button class="btn-dark" style="font-size:0.85rem; padding:6px 12px;" onclick="location.reload()">再戦/戻る</button>
-                        </div>
-                    </div>
-                `;
-            }
+            updateActionBanner("ゲーム終了！", true);
+            setTimeout(() => location.reload(), 5000);
         }
     }
 
@@ -775,7 +774,8 @@
                 const dmg = prevHpState.opps[oppId] - currentHp;
                 spawnDamageText(`opp-hero-${oppId}`, dmg);
                 triggerShake();
-                addLog(`💥 敵ヒーローが ${dmg} ダメージを受けた！`);
+                const oppName = state.players[oppId] ? state.players[oppId].name : "敵";
+                addLog(`💥 [${oppName}] のヒーローが ${dmg} ダメージを受けた！`, 'opp');
             }
             prevHpState.opps[oppId] = currentHp;
         });
@@ -785,7 +785,7 @@
             const dmg = prevHpState.my - myCurrentHp;
             spawnDamageText("my-hero", dmg);
             triggerShake();
-            addLog(`⚡ あなたが ${dmg} ダメージを受けた！`);
+            addLog(`⚡ あなたのヒーローが ${dmg} ダメージを受けた！`, 'me');
         }
         prevHpState.my = myCurrentHp;
 
@@ -807,7 +807,9 @@
             if (prevBoardState[u.instance_id] !== undefined && u.curr_hp < prevBoardState[u.instance_id]) {
                 const unitDmg = prevBoardState[u.instance_id] - u.curr_hp;
                 setTimeout(() => spawnDamageText(`unit-${u.instance_id}`, unitDmg), 50);
-                if (u.burn_turns > 0) addLog(`🔥 「${u.name}」は火傷で ${unitDmg} ダメージ！`);
+                if (u.burn_turns > 0) {
+                    addLog(`🔥 「${u.name}」は火傷で ${unitDmg} ダメージ！`, isMine ? 'me' : 'opp');
+                }
             }
             prevBoardState[u.instance_id] = u.curr_hp;
 
@@ -874,16 +876,14 @@
             </div>
         `).join('');
 
-        if (state.status !== "ENDED") {
-            if (myCurrentHp <= 0) {
-                updateActionBanner("あなたは敗北しました。観戦モードです...", true);
-            } else if (!isMyTurn) {
-                resetSelection();
-                const turnPlayer = state.players[state.turn_user_id];
-                updateActionBanner(`${turnPlayer ? turnPlayer.name : '相手'}のターンです...`, false);
-            } else if (!isTargetingMode) {
-                updateActionBanner("あなたのターン！カードを出すか、ユニットで攻撃しよう！", false);
-            }
+        if (myCurrentHp <= 0) {
+            updateActionBanner("あなたは敗北しました。観戦モードです...", true);
+        } else if (!isMyTurn) {
+            resetSelection();
+            const turnPlayer = state.players[state.turn_user_id];
+            updateActionBanner(`${turnPlayer ? turnPlayer.name : '相手'}のターンです...`, false);
+        } else if (!isTargetingMode) {
+            updateActionBanner("あなたのターン！カードを出すか、ユニットで攻撃しよう！", false);
         }
     }
 
@@ -904,7 +904,7 @@
         selectedHandCard = null; selectedBoardUnit = null; isTargetingMode = false;
         document.getElementById("battle-screen").classList.remove("target-mode");
         document.querySelectorAll('.hand-card').forEach(el => el.classList.remove('selected'));
-        if(gameState && gameState.turn_user_id === myUserId && gameState.hp[myUserId] > 0 && gameState.status !== "ENDED") {
+        if(gameState && gameState.turn_user_id === myUserId && gameState.hp[myUserId] > 0) {
             updateActionBanner("あなたのターン！カードを出すか、ユニットで攻撃しよう！", false);
         }
     }
