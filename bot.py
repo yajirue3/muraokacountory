@@ -5,9 +5,6 @@ import random
 import uuid
 from typing import Dict, List, Any, Optional
 
-# card.py のドロー関数をインポート
-from card import draw_card_or_generate
-
 logger = logging.getLogger("CardBot")
 
 BOT_USER_ID = "bot_super_ai"
@@ -58,6 +55,19 @@ def enforce_top_deck(session: Any, wanted_card_ids: List[str]):
                     elif k in deck[idx]:
                         del deck[idx][k]
 
+def bot_internal_draw(session: Any, user_id: str):
+    hand = safe_get(session.hands, user_id, [])
+    deck = safe_get(session.decks, user_id, [])
+    if len(hand) >= 7:
+        return
+    if deck:
+        c = deck.pop()
+    else:
+        rand_id = random.choice(list(BOT_CARD_DB.keys()))
+        c = copy.deepcopy(BOT_CARD_DB[rand_id])
+    c["instance_id"] = str(uuid.uuid4())[:8]
+    hand.append(c)
+
 async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], process_action_func: Any):
     try:
         if session.status == "ENDED" or session.turn_user_id != BOT_USER_ID:
@@ -74,7 +84,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                 heavy_count = sum(1 for cid in my_card_ids if BOT_CARD_DB.get(cid, {}).get("cost", 0) >= 6)
 
                 weights = {
-                    "u_06": 140, # 小人（5回攻撃チート化に伴い最高評価）
+                    "u_06": 140, # 小人
                     "u_07": 130, # 奇術師
                     "u_01": 125, # 先鋒兵
                     "s_02": 115, # 嵐
@@ -101,7 +111,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             if not opp_id:
                 return
 
-            # --- ★イカサマ1：初期HP40化（ボス化） ---
+            # --- ★イカサマ1：初期HP40化（ボス仕様） ---
             if getattr(session, "_boss_hp_set", False) is False:
                 session.hp[BOT_USER_ID] = 40
                 session._boss_hp_set = True
@@ -120,10 +130,8 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     b_hand[0]["haste"] = True
                 session._hand_ensured = True
 
-            # --- ★イカサマ3：毎ターン確定2枚ドロー（通常ドローに追加で1枚引く） ---
-            # card.py の switch_turn で1枚引かれた後、裏でもう1枚引く
-            if len(session.hands[BOT_USER_ID]) < 7:
-                draw_card_or_generate(session, BOT_USER_ID)
+            # --- ★イカサマ3：毎ターン確定2枚ドロー（自前関数で安全実行） ---
+            bot_internal_draw(session, BOT_USER_ID)
 
             # ------------------------------------------------------
             # PHASE 1: 手札カードプレイ
@@ -156,7 +164,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-                # 2. 敵が3体以上なら「嵐 (s_02)」を超最優先発動
+                # 2. 敵が3体以上なら「嵐 (s_02)」を超最優先
                 s02 = next((c for c in playable if c.get("id") == "s_02"), None)
                 if s02 and len(opp_board) >= 3:
                     try:
@@ -208,7 +216,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-                # 6. ユニット展開（小人・奇術師・重装兵・巨兵）
+                # 6. ユニット展開（小人・先鋒兵・奇術師・重装兵・巨兵）
                 playable_units = [c for c in playable if c.get("type") == "unit"]
                 if playable_units and len(my_board) < 7:
                     enemy_has_assassin = "s_05" in opp_hand_ids
@@ -221,7 +229,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         cost = u.get("cost", 0)
 
                         score = cost * 1000
-                        if cid == "u_06": score += 15000 # 5回攻撃の小人を最優先
+                        if cid == "u_06": score += 15000
                         elif cid == "u_01": score += 10000
                         elif cid == "u_07": score += 8000
                         elif cid == "u_02": score += 7000
@@ -238,7 +246,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             action_taken = True
 
                             current_board = safe_get(session.boards, BOT_USER_ID, [])
-                            # ★イカサマ4：小人召喚直後フック（5回攻撃へ強制強化）
+                            # ★小人着地直後フック（5回攻撃へ強制強化）
                             if best_u.get("id") == "u_06":
                                 for unit in reversed(current_board):
                                     if unit.get("card_id") == "u_06" and not unit.get("_custom_buffed"):
@@ -274,7 +282,6 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             ]
 
             for attacker in attack_candidates:
-                # 攻撃回数が残っている限り同じユニットでも殴り続ける（小人の5連打対応）
                 while attacker.get("attacks_left", 0) > 0 and attacker.get("can_attack"):
                     opp_board = safe_get(session.boards, opp_id, [])
                     opp_hp = safe_get(session.hp, opp_id, 20)
@@ -353,7 +360,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-            # 次ターンの通常ドロー確定操作（敵が3体以上なら嵐、敵巨兵なら暗殺者、それ以外は小人）
+            # 次ターンの通常ドロー確定操作
             opp_board_now = safe_get(session.boards, opp_id, [])
             if len(opp_board_now) >= 3:
                 next_wanted = ["s_02"]
