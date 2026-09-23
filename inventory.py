@@ -234,7 +234,6 @@ async def transfer_item(req: TransferItemRequest, current_user: Any = Depends(ge
         await supabase.table("user_inventories").insert({"account_id": req.target_account_id, "item_id": sender_item["item_id"], "quantity": req.quantity}).execute()
 
     return {"message": f"「{sender_item['items']['name']}」を {req.quantity} 個譲渡しました。"}
-
 # ==========================================
 # ▼ 管理者用: 所持者一覧・直接変更・削除・直接付与API
 # ==========================================
@@ -248,47 +247,58 @@ class AdminUpdateInventoryRequest(BaseModel):
     inventory_id: int
     quantity: int
 
-# 1. 所持者一覧取得 (※ routerのprefixが /api なのでパスは /admin/... にします)
+# 1. 所持者一覧取得
 @router.get("/admin/items/{item_id}/possessors")
 async def get_item_possessors(item_id: str, current_user: Any = Depends(verify_king_user)):
     supabase = await get_supabase()
-    res = await supabase.table("user_inventories") \
-        .select("id, quantity, user_id, account_id, item_accounts(account_name)") \
-        .eq("item_id", item_id) \
-        .gt("quantity", 0) \
-        .execute()
-    
-    formatted = []
-    for row in res.data:
-        formatted.append({
-            "id": row["id"],
-            "account_id": row["account_id"],
-            "account_name": row["item_accounts"]["account_name"] if row.get("item_accounts") else "メイン",
-            "user_id": row["user_id"],
-            "quantity": row["quantity"]
-        })
-    return formatted
+    try:
+        res = await supabase.table("user_inventories") \
+            .select("id, quantity, user_id, account_id, item_accounts(account_name)") \
+            .eq("item_id", item_id) \
+            .gt("quantity", 0) \
+            .execute()
+        
+        formatted = []
+        for row in res.data:
+            acc_name = "メイン"
+            if row.get("item_accounts") and isinstance(row["item_accounts"], dict):
+                acc_name = row["item_accounts"].get("account_name", "メイン")
+            formatted.append({
+                "id": row["id"],
+                "account_id": row["account_id"],
+                "account_name": acc_name,
+                "user_id": row.get("user_id"),
+                "quantity": row["quantity"]
+            })
+        return formatted
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"所持者取得失敗: {str(e)}")
 
 # 2. 個数変更 (上書き)
 @router.put("/admin/inventories/{inventory_id}")
 async def admin_update_inventory(inventory_id: int, req: AdminUpdateInventoryRequest, current_user: Any = Depends(verify_king_user)):
     supabase = await get_supabase()
-    if req.quantity <= 0:
-        await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
-        return {"message": "アイテムを削除しました"}
-    
-    await supabase.table("user_inventories").update({
-        "quantity": req.quantity,
-        "updated_at": "now()"
-    }).eq("id", inventory_id).execute()
-    return {"message": f"所持数を {req.quantity} 個に更新しました"}
+    try:
+        if req.quantity <= 0:
+            await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
+            return {"message": "アイテムを削除しました"}
+        
+        await supabase.table("user_inventories").update({
+            "quantity": req.quantity
+        }).eq("id", inventory_id).execute()
+        return {"message": f"所持数を {req.quantity} 個に更新しました"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新失敗: {str(e)}")
 
 # 3. インベントリから削除 (回収)
 @router.delete("/admin/inventories/{inventory_id}")
 async def admin_delete_inventory(inventory_id: int, current_user: Any = Depends(verify_king_user)):
     supabase = await get_supabase()
-    await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
-    return {"message": "インベントリからアイテムを削除しました"}
+    try:
+        await supabase.table("user_inventories").delete().eq("id", inventory_id).execute()
+        return {"message": "インベントリからアイテムを削除しました"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"削除失敗: {str(e)}")
 
 # 4. 直接付与
 @router.post("/admin/grant-item")
@@ -297,33 +307,44 @@ async def grant_item_to_user(req: AdminGrantItemRequest, current_user: Any = Dep
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="個数は1以上を指定してください")
 
-    target_account_id = req.account_id
-    if not target_account_id:
-        acc_res = await supabase.table("item_accounts") \
-            .select("account_id") \
-            .eq("user_id", req.user_id) \
-            .order("created_at") \
-            .limit(1) \
+    try:
+        target_account_id = req.account_id
+        # 口座IDが未指定の場合は、そのユーザーの最古の口座を自動取得
+        if not target_account_id:
+            acc_res = await supabase.table("item_accounts") \
+                .select("account_id") \
+                .eq("user_id", req.user_id) \
+                .order("created_at") \
+                .limit(1) \
+                .execute()
+            if not acc_res.data:
+                raise HTTPException(status_code=404, detail="対象ユーザーの口座が見つかりません")
+            target_account_id = acc_res.data[0]["account_id"]
+
+        # 口座内の既存アイテム存在確認
+        inv_res = await supabase.table("user_inventories") \
+            .select("id, quantity") \
+            .eq("account_id", target_account_id) \
+            .eq("item_id", req.item_id) \
             .execute()
-        if not acc_res.data:
-            raise HTTPException(status_code=404, detail="対象ユーザーの口座が見つかりません")
-        target_account_id = acc_res.data[0]["account_id"]
 
-    inv_res = await supabase.table("user_inventories") \
-        .select("id, quantity") \
-        .eq("account_id", target_account_id) \
-        .eq("item_id", req.item_id) \
-        .execute()
+        if inv_res.data and len(inv_res.data) > 0:
+            new_qty = inv_res.data[0]["quantity"] + req.quantity
+            await supabase.table("user_inventories").update({
+                "quantity": new_qty
+            }).eq("id", inv_res.data[0]["id"]).execute()
+        else:
+            # user_id NOT NULL 制約に対応した新規挿入
+            await supabase.table("user_inventories").insert({
+                "user_id": req.user_id,
+                "account_id": target_account_id,
+                "item_id": req.item_id,
+                "quantity": req.quantity
+            }).execute()
 
-    if inv_res.data:
-        new_qty = inv_res.data[0]["quantity"] + req.quantity
-        await supabase.table("user_inventories").update({"quantity": new_qty}).eq("id", inv_res.data[0]["id"]).execute()
-    else:
-        await supabase.table("user_inventories").insert({
-            "user_id": req.user_id,
-            "account_id": target_account_id,
-            "item_id": req.item_id,
-            "quantity": req.quantity
-        }).execute()
+        return {"message": f"アイテム({req.item_id})を {req.quantity} 個付与しました"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"付与処理内部エラー: {str(e)}")
 
-    return {"message": f"アイテム({req.item_id})を {req.quantity} 個付与しました"}
