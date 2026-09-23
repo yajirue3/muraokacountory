@@ -769,11 +769,11 @@ async def grant_despair_conqueror_title(user_id: str):
 
         # user_titles テーブルへ直接挿入
         await supabase.table("user_titles").upsert(
-            {"user_id": user_id, "title": "絶望を乗り越えし者"},
+            {"user_id": user_id, "title": "真・絶望を乗り越えし者"},
             on_conflict="user_id, title"
         ).execute()
 
-        logger.info(f"[Title Granted] ユーザー {user_id} に称号『絶望を乗り越えし者』を付与しました")
+        logger.info(f"[Title Granted] ユーザー {user_id} に称号『真・絶望を乗り越えし者』を付与しました")
     except Exception as e:
         logger.error(f"[Title System Error] 称号付与処理エラー ({user_id}): {e}")
 
