@@ -16,7 +16,7 @@
         .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
         
         .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
-        .tab-btn { flex: 1; min-width: 30%; padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; text-align: center; }
+        .tab-btn { flex: 1; min-width: 22%; padding: 10px 2px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s; text-align: center; }
         .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); }
         .tab-content { display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
@@ -73,14 +73,17 @@
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('shops', this)">🛍️ 商店街</button>
             <button class="tab-btn" onclick="switchTab('myshop', this)">🏪 マイショップ</button>
-            <button class="tab-btn" onclick="switchTab('orders', this)">📜 購入履歴</button>
+            <button class="tab-btn" onclick="switchTab('purchases', this)">📜 購入履歴</button>
+            <button class="tab-btn" onclick="switchTab('sales', this)">💰 販売履歴</button>
         </div>
 
+        <!-- 商店街 -->
         <div id="tab-shops" class="tab-content active">
             <div id="shop-list"><div style="text-align:center; color:#888;">読み込み中...</div></div>
             <button class="btn-sub" onclick="loadShops()">🔄 商店街を更新</button>
         </div>
 
+        <!-- マイショップ -->
         <div id="tab-myshop" class="tab-content">
             <div style="background:#15171a; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px;">
                 <h4 style="color:var(--gold); margin:0 0 10px 0;">⚙️ 店舗設定</h4>
@@ -99,6 +102,7 @@
                 <button class="btn-action" onclick="saveMyShopSettings()">店舗情報を保存・更新</button>
             </div>
 
+            <!-- 出品 -->
             <div id="item-create-section" style="display:none; background:#15171a; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px;">
                 <h4 style="color:var(--gold); margin:0 0 10px 0;">📦 新規商品を出品する</h4>
                 <select id="item-cat-select" onchange="toggleItemCatForm()">
@@ -109,29 +113,34 @@
                 <div id="cat-item-area">
                     <label style="font-size:0.75rem; color:#94a3b8;">出品するアイテム口座</label>
                     <select id="item-inv-select"></select>
+
+                    <label style="font-size:0.75rem; color:#94a3b8;">出品数量</label>
+                    <input type="number" id="item-stock-input" min="1" value="1">
                 </div>
 
                 <div id="cat-general-area" style="display:none;">
                     <label style="font-size:0.75rem; color:#94a3b8;">商品タイトル</label>
                     <input type="text" id="item-title-input" placeholder="タイトル (例: 鉱山ダンジョン攻略メモ)" maxlength="60">
 
-                    <label style="font-size:0.75rem; color:#94a3b8;">購入者限定の秘密情報（合言葉・URL・連絡先など）</label>
-                    <textarea id="item-secret-input" placeholder="購入した国民にのみ開示されます" rows="2"></textarea>
-
-                    <label style="font-size:0.75rem; color:#94a3b8;">在庫モード</label>
+                    <label style="font-size:0.75rem; color:#94a3b8;">販売形式</label>
                     <select id="item-unlimited-select" onchange="toggleUnlimited()">
-                        <option value="false">数量限定 (在庫管理)</option>
-                        <option value="true">無制限 (売り切れなし)</option>
+                        <option value="false">個別ストック販売 (1行＝1在庫・シリアル/個別データ)</option>
+                        <option value="true">無制限販売 (全員共通の合言葉・リンクなど)</option>
                     </select>
+
+                    <div id="general-unlimited-box" style="display:none;">
+                        <label style="font-size:0.75rem; color:#94a3b8;">共通の秘密情報 (合言葉・固定URL)</label>
+                        <textarea id="item-secret-input" placeholder="購入者全員に共通して開示される情報" rows="2"></textarea>
+                    </div>
+
+                    <div id="general-individual-box">
+                        <label style="font-size:0.75rem; color:#94a3b8;">個別データ投入 (1行につき1個の在庫になります)</label>
+                        <textarea id="item-secrets-multi" placeholder="CODE-AAA-111&#10;CODE-BBB-222&#10;CODE-CCC-333" rows="4"></textarea>
+                    </div>
                 </div>
 
                 <label style="font-size:0.75rem; color:#94a3b8;">商品説明</label>
                 <textarea id="item-desc-input" placeholder="商品の特徴・注意点" rows="2" maxlength="500"></textarea>
-
-                <div id="stock-input-wrapper">
-                    <label style="font-size:0.75rem; color:#94a3b8;">初期在庫数</label>
-                    <input type="number" id="item-stock-input" min="1" value="1">
-                </div>
 
                 <label style="font-size:0.75rem; color:#94a3b8;">販売単価 (1個あたり Gold)</label>
                 <input type="number" id="item-price-input" min="1" placeholder="価格 (G)">
@@ -143,15 +152,23 @@
             <div id="my-items-list"><div style="text-align:center; color:#888;">商品を読み込み中...</div></div>
         </div>
 
-        <div id="tab-orders" class="tab-content">
-            <div id="order-list"><div style="text-align:center; color:#888;">購入履歴を読み込み中...</div></div>
-            <button class="btn-sub" onclick="loadMyOrders()">🔄 履歴を更新</button>
+        <!-- 購入履歴 -->
+        <div id="tab-purchases" class="tab-content">
+            <div id="purchase-list"><div style="text-align:center; color:#888;">購入履歴を読み込み中...</div></div>
+            <button class="btn-sub" onclick="loadMyPurchases()">🔄 履歴を更新</button>
+        </div>
+
+        <!-- 販売履歴 (店主専用) -->
+        <div id="tab-sales" class="tab-content">
+            <div id="sales-list"><div style="text-align:center; color:#888;">販売履歴を読み込み中...</div></div>
+            <button class="btn-sub" onclick="loadMySales()">🔄 履歴を更新</button>
         </div>
 
         <button class="btn-sub" style="margin-top:20px;" onclick="location.href='/dashboard'">◀ ダッシュボードへ戻る</button>
     </div>
 </div>
 
+<!-- ショールーム モーダル -->
 <div id="shop-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -205,7 +222,8 @@
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(`tab-${tabId}`).classList.add('active');
-        if(tabId === 'orders') loadMyOrders();
+        if(tabId === 'purchases') loadMyPurchases();
+        if(tabId === 'sales') loadMySales();
         if(tabId === 'myshop') loadMyShop();
     }
 
@@ -213,7 +231,7 @@
         try {
             const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
             if(res.ok) currentUser = await res.json();
-        } catch(e) { console.error("loadProfile error:", e); }
+        } catch(e) {}
     }
 
     async function loadWallets() {
@@ -224,7 +242,7 @@
                 const opts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
                 document.getElementById("shop-wallet-select").innerHTML = opts;
             }
-        } catch(e) { console.error("loadWallets error:", e); }
+        } catch(e) {}
     }
 
     async function loadInventory() {
@@ -243,20 +261,14 @@
                 });
                 document.getElementById("item-inv-select").innerHTML = opts || '<option value="">アイテムがありません</option>';
             }
-        } catch(e) { console.error("loadInventory error:", e); }
+        } catch(e) {}
     }
 
     async function loadShops() {
         const listEl = document.getElementById("shop-list");
         try {
             const res = await fetch("/api/mall/shops");
-            if(!res.ok) {
-                const err = await res.json();
-                listEl.innerHTML = `<div style="text-align:center; color:var(--danger);">店舗取得失敗: ${escapeHtml(err.detail || res.statusText)}</div>`;
-                return;
-            }
             const data = await res.json();
-            
             if(!data.shops || data.shops.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; color:#888;">まだ店舗がありません</div>';
                 return;
@@ -281,7 +293,6 @@
             });
             listEl.innerHTML = html;
         } catch(e) {
-            console.error("loadShops error:", e);
             listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
         }
     }
@@ -356,7 +367,7 @@
             }
 
             document.getElementById("shop-modal").style.display = 'flex';
-        } catch(e) { console.error("openShopModal error:", e); }
+        } catch(e) {}
     }
 
     function closeShopModal() {
@@ -393,10 +404,7 @@
     async function loadMyShop() {
         try {
             const res = await fetch("/api/mall/my-shop", { headers: { "Authorization": `Bearer ${token}` } });
-            if(!res.ok) {
-                document.getElementById("my-items-list").innerHTML = '<div style="text-align:center; color:var(--danger);">店舗情報の読み込みに失敗しました</div>';
-                return;
-            }
+            if(!res.ok) return;
             const data = await res.json();
             currentMyShop = data.shop;
 
@@ -410,7 +418,7 @@
                 document.getElementById("item-create-section").style.display = "none";
                 document.getElementById("my-items-list").innerHTML = '<div style="text-align:center; color:#888;">店舗を開設すると商品を出品できます</div>';
             }
-        } catch(e) { console.error("loadMyShop error:", e); }
+        } catch(e) {}
     }
 
     async function saveMyShopSettings() {
@@ -453,7 +461,6 @@
         if(cat === "ITEM") {
             document.getElementById("cat-item-area").style.display = "block";
             document.getElementById("cat-general-area").style.display = "none";
-            document.getElementById("stock-input-wrapper").style.display = "block";
         } else {
             document.getElementById("cat-item-area").style.display = "none";
             document.getElementById("cat-general-area").style.display = "block";
@@ -463,7 +470,8 @@
 
     function toggleUnlimited() {
         const isUnlimited = document.getElementById("item-unlimited-select").value === "true";
-        document.getElementById("stock-input-wrapper").style.display = isUnlimited ? "none" : "block";
+        document.getElementById("general-unlimited-box").style.display = isUnlimited ? "block" : "none";
+        document.getElementById("general-individual-box").style.display = isUnlimited ? "none" : "block";
     }
 
     async function submitCreateItem() {
@@ -478,7 +486,8 @@
             price: price,
             description: desc,
             stock_quantity: 0,
-            is_unlimited: false
+            is_unlimited: false,
+            secret_lines: []
         };
 
         if(cat === "ITEM") {
@@ -489,12 +498,15 @@
             if(!payload.stock_quantity || payload.stock_quantity <= 0) return showToast("出品数を1個以上にしてください", true);
         } else {
             payload.title = document.getElementById("item-title-input").value.trim();
-            payload.secret_content = document.getElementById("item-secret-input").value.trim();
             payload.is_unlimited = document.getElementById("item-unlimited-select").value === "true";
             if(!payload.title) return showToast("タイトルを入力してください", true);
-            if(!payload.is_unlimited) {
-                payload.stock_quantity = parseInt(document.getElementById("item-stock-input").value);
-                if(!payload.stock_quantity || payload.stock_quantity <= 0) return showToast("有限商品の在庫数を指定してください", true);
+
+            if(payload.is_unlimited) {
+                payload.secret_content = document.getElementById("item-secret-input").value.trim();
+            } else {
+                const rawSecrets = document.getElementById("item-secrets-multi").value;
+                payload.secret_lines = rawSecrets.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+                if(payload.secret_lines.length === 0) return showToast("個別データを1行以上入力してください", true);
             }
         }
 
@@ -510,6 +522,7 @@
                 document.getElementById("item-title-input").value = "";
                 document.getElementById("item-desc-input").value = "";
                 document.getElementById("item-secret-input").value = "";
+                document.getElementById("item-secrets-multi").value = "";
                 document.getElementById("item-price-input").value = "";
                 await loadInventory();
                 await loadMyShop();
@@ -534,13 +547,23 @@
 
             let controlHtml = '';
             if(!it.is_unlimited) {
-                controlHtml = `
-                    <div style="display:flex; gap:8px; margin-top:8px;">
-                        <input type="number" id="ctrl-qty-${it.id}" value="1" min="1" style="width:70px; margin:0;">
-                        <button class="btn-sub" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="restockItem(${it.id})">＋補充</button>
-                        <button class="btn-danger" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="withdrawItem(${it.id})">－引戻し</button>
-                    </div>
-                `;
+                if(isItem) {
+                    controlHtml = `
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <input type="number" id="ctrl-qty-${it.id}" value="1" min="1" style="width:70px; margin:0;">
+                            <button class="btn-sub" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="restockItemItem(${it.id})">＋補充</button>
+                            <button class="btn-danger" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="withdrawItem(${it.id})">－引戻し</button>
+                        </div>
+                    `;
+                } else {
+                    controlHtml = `
+                        <div style="margin-top:8px; border-top:1px dashed var(--border); padding-top:6px;">
+                            <label style="font-size:0.7rem; color:#94a3b8;">個別データの追加補充 (1行1個)</label>
+                            <textarea id="ctrl-lines-${it.id}" placeholder="追加するコード等を改行区切りで入力" rows="2" style="margin-bottom:6px;"></textarea>
+                            <button class="btn-sub" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="restockGeneralItem(${it.id})">＋個別在庫を追加補充</button>
+                        </div>
+                    `;
+                }
             }
 
             html += `
@@ -551,7 +574,7 @@
                     </div>
                     <div style="font-weight:bold;">${escapeHtml(it.title)}</div>
                     <div style="font-size:0.8rem; color:#bbb;">${escapeHtml(it.description || '')}</div>
-                    ${it.secret_content ? `<div style="font-size:0.75rem; color:var(--purple); background:#0f1115; padding:6px; border-radius:4px;">合言葉: ${escapeHtml(it.secret_content)}</div>` : ''}
+                    ${it.secret_content ? `<div style="font-size:0.75rem; color:var(--purple); background:#0f1115; padding:6px; border-radius:4px;">共通情報: ${escapeHtml(it.secret_content)}</div>` : ''}
                     ${controlHtml}
                 </div>
             `;
@@ -559,7 +582,7 @@
         listEl.innerHTML = html;
     }
 
-    async function restockItem(itemId) {
+    async function restockItemItem(itemId) {
         const qty = parseInt(document.getElementById(`ctrl-qty-${itemId}`).value);
         if(!qty || qty <= 0) return showToast("数量を入力してください", true);
 
@@ -567,12 +590,34 @@
             const res = await fetch(`/api/mall/items/${itemId}/restock`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ quantity: qty })
+                body: JSON.stringify({ quantity: qty, secret_lines: [] })
             });
             const data = await res.json();
             if(res.ok) {
                 showToast(data.message);
                 await loadInventory();
+                await loadMyShop();
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    async function restockGeneralItem(itemId) {
+        const raw = document.getElementById(`ctrl-lines-${itemId}`).value;
+        const lines = raw.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+        if(lines.length === 0) return showToast("補充するデータを1行以上入力してください", true);
+
+        try {
+            const res = await fetch(`/api/mall/items/${itemId}/restock`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ quantity: lines.length, secret_lines: lines })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message);
+                document.getElementById(`ctrl-lines-${itemId}`).value = "";
                 await loadMyShop();
             } else {
                 showToast(data.detail, true);
@@ -601,15 +646,11 @@
         } catch(e) { showToast("通信エラー", true); }
     }
 
-    async function loadMyOrders() {
-        const listEl = document.getElementById("order-list");
+    // 購入履歴（買い手側）
+    async function loadMyPurchases() {
+        const listEl = document.getElementById("purchase-list");
         try {
             const res = await fetch("/api/mall/my-purchases", { headers: { "Authorization": `Bearer ${token}` } });
-            if(!res.ok) {
-                const err = await res.json();
-                listEl.innerHTML = `<div style="text-align:center; color:var(--danger);">履歴取得失敗: ${escapeHtml(err.detail || res.statusText)}</div>`;
-                return;
-            }
             const data = await res.json();
 
             if(!data.orders || data.orders.length === 0) {
@@ -630,11 +671,11 @@
                             <span>${dateStr}</span>
                         </div>
                         <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${o.quantity}個</div>
-                        <div style="font-size:0.85rem;">支払総額: <b>${o.total_price} G</b> (単価:${o.unit_price}G)</div>
-                        ${it.secret_content ? `
+                        <div style="font-size:0.85rem;">支払総額: <b>${o.total_price} G</b></div>
+                        ${o.distributed_content ? `
                             <div style="background:#0f1115; border:1px solid var(--purple); padding:8px; border-radius:6px; margin-top:4px;">
-                                <div style="font-size:0.7rem; color:var(--purple); font-weight:bold;">🔑 購入特典 / 秘密の情報</div>
-                                <div style="font-size:0.85rem; color:#fff; word-break:break-all;">${escapeHtml(it.secret_content)}</div>
+                                <div style="font-size:0.7rem; color:var(--purple); font-weight:bold;">🔑 あなたに割り当てられたデータ / 秘密情報</div>
+                                <div style="font-size:0.85rem; color:#fff; white-space:pre-wrap; word-break:break-all;">${escapeHtml(o.distributed_content)}</div>
                             </div>
                         ` : ''}
                     </div>
@@ -642,7 +683,46 @@
             });
             listEl.innerHTML = html;
         } catch(e) {
-            console.error("loadMyOrders error:", e);
+            listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
+        }
+    }
+
+    // 販売履歴（店主側）
+    async function loadMySales() {
+        const listEl = document.getElementById("sales-list");
+        try {
+            const res = await fetch("/api/mall/my-sales", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+
+            if(!data.sales || data.sales.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#888;">まだ売上履歴はありません</div>';
+                return;
+            }
+
+            let html = '';
+            data.sales.forEach(s => {
+                const it = s.mall_items || {};
+                const buyer = s.buyer || {};
+                const dateStr = new Date(s.created_at).toLocaleString('ja-JP');
+
+                html += `
+                    <div class="item-row">
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#888;">
+                            <span>購入者: [${escapeHtml(buyer.equipped_title || '奴隷')}] ${escapeHtml(buyer.nickname || '不明')}</span>
+                            <span>${dateStr}</span>
+                        </div>
+                        <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${s.quantity}個</div>
+                        <div style="font-size:0.85rem;">売上受取額: <b>+${s.total_price} G</b> (単価:${s.unit_price}G)</div>
+                        ${s.distributed_content ? `
+                            <div style="background:#0f1115; border:1px solid #333842; padding:6px; border-radius:4px; margin-top:4px; font-size:0.75rem; color:#aaa;">
+                                <span>引渡済データ: </span><span style="color:#fff; white-space:pre-wrap;">${escapeHtml(s.distributed_content)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        } catch(e) {
             listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
         }
     }
