@@ -11,7 +11,7 @@
             --primary: #ff5252;
             --primary-dim: rgba(255, 82, 82, 0.2);
             --secondary: #00f3ff;
-            --secondary-dim: rgba(0, 243, 255, 0.2);
+            --secondary-dim: rgba(255, 0, 243, 0.2);
             --bg-dark: #0d0614;
             --panel-bg: rgba(26, 17, 34, 0.9);
             --glass-border: 1px solid rgba(255, 255, 255, 0.1);
@@ -75,11 +75,23 @@
         button.btn-cyan { background: var(--secondary); color: #000; box-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
         button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: grayscale(1); }
 
-        /* ロビー */
-        #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
+        /* ロビー画面 */
+        #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 12px; }
         .lobby-header { display: flex; justify-content: space-between; align-items: center; }
         .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; font-weight: 900; }
-        .create-form { display: flex; flex-direction: column; gap: 10px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: var(--glass-border); }
+        .create-form { display: flex; gap: 8px; background: var(--panel-bg); padding: 12px; border-radius: 12px; border: var(--glass-border); align-items: center; }
+
+        .room-list-header { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
+        .room-list-title { font-size: 0.9rem; font-weight: bold; color: #aaa; }
+        
+        .room-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+        .room-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 12px; background: rgba(255,255,255,0.05); border-radius: 10px; border: var(--glass-border); 
+        }
+        .room-host { font-size: 1rem; font-weight: bold; color: var(--secondary); }
+        .room-info { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+        .room-empty-text { text-align: center; color: #666; font-size: 0.85rem; padding: 20px 0; }
 
         /* ゲーム画面 */
         #battle-screen { display: none; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
@@ -102,7 +114,6 @@
             display: flex; flex-direction: column; gap: 8px; padding: 10px;
         }
 
-        /* 対戦相手エリア */
         #opponents-container { display: flex; flex-direction: column; gap: 8px; }
         .player-row {
             display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
@@ -114,7 +125,6 @@
         .player-tag { font-size: 0.85rem; font-weight: bold; }
         .player-meta { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
 
-        /* 中央テーブル（山札・捨て札） */
         .field-center {
             display: flex; justify-content: center; align-items: center; gap: 20px;
             padding: 15px 0; margin: auto 0;
@@ -131,24 +141,19 @@
             background: linear-gradient(135deg, #301015, #150508);
         }
         .deck-stack:hover { transform: scale(1.05); }
-        .deck-count-badge {
-            font-size: 1.4rem; font-weight: 900; color: #fff;
-        }
+        .deck-count-badge { font-size: 1.4rem; font-weight: 900; color: #fff; }
 
-        /* ログ通知 */
         .battle-divider {
             border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 5px;
             text-align: center; font-size: 0.75rem; color: #00ffcc; cursor: pointer;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        /* 自分ステータス */
         .my-status-box {
             display: flex; justify-content: space-between; align-items: center;
             background: var(--panel-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--primary);
         }
 
-        /* 手札エリア */
         .hand-area { 
             flex-shrink: 0; min-height: 125px; display: flex; gap: 8px; padding: 10px; 
             overflow-x: auto; overflow-y: hidden; background: #060209; 
@@ -171,7 +176,6 @@
         .hand-card-title { font-weight: 900; font-size: 0.85rem; margin-top: 2px; }
         .hand-card-sub { font-size: 0.6rem; color: #aaa; }
 
-        /* モーダル */
         .modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(5px);
@@ -192,7 +196,7 @@
 <body>
 <div class="container" id="main-container">
 
-    <!-- モーダル（ルール／ログ／情報表示） -->
+    <!-- モーダル（ルール／ログ） -->
     <div id="rules-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 id="modal-title" style="color:var(--primary); margin-bottom:10px;">📜 ゲームログ</h3>
@@ -204,7 +208,7 @@
         </div>
     </div>
 
-    <!-- ターゲット選択用モーダル（強奪用） -->
+    <!-- 強奪用ターゲット選択モーダル -->
     <div id="target-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 style="color:var(--secondary); margin-bottom:10px;">🎯 強奪する相手を選択</h3>
@@ -221,19 +225,22 @@
         </div>
 
         <div class="create-form">
-            <label style="font-size:0.8rem; color:#aaa;">ルーム作成（2〜4人）</label>
-            <select id="max-players-select">
+            <select id="max-players-select" style="flex:1;">
                 <option value="2">2人対戦</option>
                 <option value="3">3人対戦</option>
                 <option value="4" selected>4人対戦</option>
             </select>
-            <button onclick="kb_createRoom()">部屋を作る</button>
+            <button style="flex:1;" onclick="kb_createRoom()">部屋作成</button>
         </div>
 
-        <div class="create-form">
-            <label style="font-size:0.8rem; color:#aaa;">既存の部屋に参加</label>
-            <input type="text" id="join-room-id" placeholder="部屋IDを入力 (8桁)">
-            <button class="btn-cyan" onclick="kb_joinRoom()">合流する</button>
+        <div class="room-list-header">
+            <span class="room-list-title">待機中の部屋一覧</span>
+            <button class="btn-dark" style="padding:4px 8px; font-size:0.75rem;" onclick="fetchRooms()">🔄 更新</button>
+        </div>
+
+        <!-- 部屋一覧リスト -->
+        <div class="room-list" id="room-list">
+            <div class="room-empty-text">部屋を読み込み中...</div>
         </div>
 
         <button class="btn-dark" style="margin-top: auto;" onclick="location.href='/games'">ゲーム一覧へ戻る</button>
@@ -253,15 +260,12 @@
         </div>
         
         <div class="battle-scroll-area">
-            <!-- 対戦相手リスト -->
             <div id="opponents-container"></div>
             
-            <!-- ログ短縮バー -->
             <div class="battle-divider" onclick="openLogModal()" id="quick-log">
                 ログ: 待機中...
             </div>
 
-            <!-- フィールド中央（山札 & 捨て札） -->
             <div class="field-center">
                 <div class="deck-stack" id="deck-click-area" onclick="kb_drawCard(false)">
                     <span style="font-size:0.65rem; color:#aaa;">山札から引く</span>
@@ -274,7 +278,6 @@
                 </div>
             </div>
 
-            <!-- 自分のプレイヤーステータス -->
             <div class="my-status-box" id="my-status-box">
                 <div>
                     <div style="font-weight:900;" id="my-name">You</div>
@@ -289,7 +292,6 @@
             </div>
         </div>
 
-        <!-- 自分の手札 -->
         <div class="hand-area" id="my-hand"></div>
     </div>
 </div>
@@ -300,11 +302,11 @@
 
     let currentRoomId = null;
     let pollTimer = null;
+    let roomListTimer = null;
     let myUserId = null;
     let pendingCardIndex = null;
     let latestLogs = [];
 
-    // JWTからユーザーIDを復号取得
     try {
         const payloadBase64 = token.split('.')[1];
         const decodedJson = JSON.parse(atob(payloadBase64));
@@ -313,7 +315,42 @@
         console.error("トークン解析失敗", e);
     }
 
-    // --- ルーム作成 ---
+    document.addEventListener("DOMContentLoaded", () => {
+        fetchRooms();
+        roomListTimer = setInterval(fetchRooms, 3000); // 3秒毎に部屋一覧を自動更新
+    });
+
+    // --- 部屋一覧取得 ---
+    async function fetchRooms() {
+        if (currentRoomId) return; // 対戦中はフェッチしない
+        try {
+            const res = await fetch("/api/kb_room/list", {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const container = document.getElementById("room-list");
+
+            if (!data.rooms || data.rooms.length === 0) {
+                container.innerHTML = '<div class="room-empty-text">現在待機中の部屋はありません</div>';
+                return;
+            }
+
+            container.innerHTML = data.rooms.map(r => `
+                <div class="room-item">
+                    <div>
+                        <div class="room-host">👑 ${r.host_name} の部屋</div>
+                        <div class="room-info">参加状況: ${r.current_players} / ${r.max_players} 人</div>
+                    </div>
+                    <button class="btn-cyan" onclick="kb_joinRoom('${r.room_id}')">参戦</button>
+                </div>
+            `).join('');
+        } catch(e) {
+            console.error("部屋一覧取得エラー", e);
+        }
+    }
+
+    // --- 部屋作成 ---
     async function kb_createRoom() {
         const maxPlayers = parseInt(document.getElementById("max-players-select").value);
         const res = await fetch("/api/kb_room/create", {
@@ -326,10 +363,8 @@
         enterRoom(data.room_id);
     }
 
-    // --- ルーム参加 ---
-    async function kb_joinRoom() {
-        const roomId = document.getElementById("join-room-id").value.trim();
-        if (!roomId) return alert("部屋IDを入力してください");
+    // --- 部屋参加（一覧の参戦ボタンから） ---
+    async function kb_joinRoom(roomId) {
         const res = await fetch("/api/kb_room/join", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -342,6 +377,8 @@
 
     function enterRoom(roomId) {
         currentRoomId = roomId;
+        if (roomListTimer) clearInterval(roomListTimer);
+
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("battle-screen").style.display = "flex";
         document.getElementById("room-display-id").innerText = `ROOM: ${roomId}`;
@@ -356,7 +393,7 @@
         location.reload();
     }
 
-    // --- ゲーム開始（ホスト用） ---
+    // --- ゲーム開始 ---
     async function kb_startGame() {
         const res = await fetch("/api/kb_room/start", {
             method: "POST",
@@ -368,7 +405,7 @@
         fetchState();
     }
 
-    // --- 状態取得・レンダリング ---
+    // --- 状態描画 ---
     async function fetchState() {
         if (!currentRoomId) return;
         try {
@@ -416,7 +453,7 @@
             document.getElementById("return-lobby-modal-btn").style.display = "block";
         }
 
-        // 他プレイヤー描画（手札は見せず枚数のみ表示）
+        // 他プレイヤー描画
         const oppContainer = document.getElementById("opponents-container");
         oppContainer.innerHTML = state.players.filter(p => p.user_id !== myUserId).map(p => {
             const isOppTurn = p.user_id === state.turn_user_id;
@@ -467,7 +504,7 @@
         }
     }
 
-    // --- カードを引く ---
+    // --- ドロー ---
     async function kb_drawCard(fromBottom = false) {
         const res = await fetch("/api/kb_game/draw", {
             method: "POST",
@@ -485,14 +522,10 @@
         fetchState();
     }
 
-    // --- カード使用判定 ---
+    // --- カード使用 ---
     async function kb_handleCardClick(cardIndex, cardName, isMyTurn) {
-        if (cardName === "解除") {
-            return alert("解除は爆弾を引いた際に自動で使用されます。");
-        }
-        if (cardName !== "拒否" && !isMyTurn) {
-            return alert("あなたのターンではありません。");
-        }
+        if (cardName === "解除") return alert("解除は爆弾を引いた際に自動で使用されます。");
+        if (cardName !== "拒否" && !isMyTurn) return alert("あなたのターンではありません。");
 
         if (cardName === "強奪") {
             pendingCardIndex = cardIndex;
@@ -522,18 +555,13 @@
         const data = await res.json();
         if (!res.ok) return alert(data.detail || "発動できませんでした");
 
-        if (data.peek) {
-            alert(`🔮【透視】山札の上3枚: [ ${data.peek.join(" , ")} ]`);
-        }
-        if (data.message) {
-            alert(`🔮【予言】${data.message}`);
-        }
+        if (data.peek) alert(`🔮【透視】山札の上3枚: [ ${data.peek.join(" , ")} ]`);
+        if (data.message) alert(`🔮【予言】${data.message}`);
 
         addLocalLog(`【${data.card}】を使用しました。`);
         fetchState();
     }
 
-    // --- 強奪ターゲット選択モーダル ---
     async function openTargetSelector() {
         const res = await fetch(`/api/kb_room/${currentRoomId}`, {
             headers: { "Authorization": `Bearer ${token}` }
@@ -541,9 +569,7 @@
         const state = await res.json();
         const targets = state.players.filter(p => p.user_id !== myUserId && p.is_alive && p.card_count > 0);
 
-        if (targets.length === 0) {
-            return alert("手札を持っている対象がいません");
-        }
+        if (targets.length === 0) return alert("手札を持っている対象がいません");
 
         const list = document.getElementById("target-list");
         list.innerHTML = targets.map(t => `
@@ -565,7 +591,6 @@
         document.getElementById("target-modal").style.display = "none";
     }
 
-    // --- ログ・モーダル補助 ---
     function addLocalLog(text) {
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
