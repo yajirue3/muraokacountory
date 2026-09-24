@@ -141,10 +141,12 @@ class MallItemCreate(BaseModel):
     price: int = Field(..., gt=0, le=100_000_000)
     stock_quantity: int = Field(0, ge=0, le=9999)
     is_unlimited: bool = False
+    secret_lines: List[str] = []
 
 class MallItemRestock(BaseModel):
-    quantity: int = Field(..., gt=0, le=9999)
+    quantity: int = Field(0, ge=0, le=9999)
     source_inventory_id: Optional[int] = None
+    secret_lines: List[str] = []
 
 class MallItemWithdraw(BaseModel):
     quantity: int = Field(..., gt=0, le=9999)
@@ -155,21 +157,14 @@ class MallItemBuy(BaseModel):
     quantity: int = Field(..., gt=0, le=9999)
     target_account_id: Optional[str] = None
 
-# ==========================================
-# 店舗一覧 & 詳細 (安全な個別フェッチに変更)
-# ==========================================
-
 @router.get("/shops")
 async def get_shops(page: int = Query(1, ge=1)):
     try:
         client = await get_supabase()
         limit = 20
         offset = (page - 1) * limit
-        
-        # 結合構文で落ちないよう素直に取得
         res = await client.table("mall_shops").select("*").order("created_at", desc=True).range(offset, offset + limit - 1).execute()
         shops = res.data or []
-        
         if shops:
             owner_ids = list({s["owner_user_id"] for s in shops if s.get("owner_user_id")})
             if owner_ids:
@@ -177,7 +172,6 @@ async def get_shops(page: int = Query(1, ge=1)):
                 prof_map = {p["id"]: p for p in (prof_res.data or [])}
                 for s in shops:
                     s["profiles"] = prof_map.get(s["owner_user_id"], {"nickname": "不明", "equipped_title": "奴隷"})
-        
         return {"shops": shops}
     except Exception as e:
         print("[MALL ERROR /shops]:")
@@ -189,11 +183,9 @@ async def get_my_shop(authorization: str = Header(None)):
     try:
         user = await get_user_from_token(authorization)
         client = await get_supabase()
-        
         res = await client.table("mall_shops").select("*").eq("owner_user_id", user.id).execute()
         if not res.data:
             return {"shop": None, "items": []}
-        
         shop = res.data[0]
         items_res = await client.table("mall_items").select("*").eq("shop_id", shop["id"]).order("created_at", desc=False).execute()
         return {"shop": shop, "items": items_res.data or []}
@@ -211,15 +203,12 @@ async def get_shop_detail(shop_id: int):
         shop_res = await client.table("mall_shops").select("*").eq("id", shop_id).execute()
         if not shop_res.data:
             raise HTTPException(status_code=404, detail="指定された店舗は見つかりません")
-        
         shop = shop_res.data[0]
         prof_res = await client.table("profiles").select("nickname, equipped_title").eq("id", shop["owner_user_id"]).execute()
         shop["profiles"] = prof_res.data[0] if prof_res.data else {"nickname": "不明", "equipped_title": "奴隷"}
-        
         items_res = await client.table("mall_items").select(
             "id, shop_id, category, item_master_id, title, description, price, stock_quantity, is_unlimited, status, created_at"
         ).eq("shop_id", shop_id).neq("status", "HIDDEN").order("created_at", desc=False).execute()
-        
         return {"shop": shop, "items": items_res.data or []}
     except HTTPException:
         raise
@@ -240,7 +229,6 @@ async def create_or_update_shop(
         user = await get_user_from_token(authorization)
         enforce_mall_rate_limit(user.id)
         client = await get_supabase()
-        
         clean_name = shop_name.strip()
         clean_desc = description.strip()
         if not clean_name or len(clean_name) > 30:
@@ -261,14 +249,12 @@ async def create_or_update_shop(
             banner_drive_id = await upload_banner_to_drive(banner.file, banner.filename, mime_type, file_size)
 
         exist_res = await client.table("mall_shops").select("id, banner_drive_id").eq("owner_user_id", user.id).execute()
-        
         upsert_data = {
             "owner_user_id": str(user.id),
             "wallet_id": wallet_id,
             "shop_name": clean_name,
             "description": clean_desc,
         }
-        
         if banner_drive_id:
             upsert_data["banner_drive_id"] = banner_drive_id
         elif exist_res.data:
@@ -290,16 +276,16 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
         enforce_mall_rate_limit(user.id)
         client = await get_supabase()
 
+        clean_lines = [line.strip() for line in data.secret_lines if line.strip()]
+
         if data.category == "ITEM":
             if not data.user_inventory_id:
                 raise HTTPException(status_code=400, detail="出品するインベントリアイテムを選択してください")
-            if data.is_unlimited:
-                raise HTTPException(status_code=400, detail="インベントリアイテムを無限在庫にすることはできません")
             if data.stock_quantity <= 0:
                 raise HTTPException(status_code=400, detail="出品数は1個以上必要です")
         elif data.category == "GENERAL":
-            if not data.is_unlimited and data.stock_quantity <= 0:
-                raise HTTPException(status_code=400, detail="有限商品の場合、在庫数は1個以上必要です")
+            if not data.is_unlimited and len(clean_lines) == 0:
+                raise HTTPException(status_code=400, detail="有限商品には個別データ（シリアル等）を1行以上入力してください")
 
         shop_res = await client.table("mall_shops").select("id").eq("owner_user_id", user.id).execute()
         if not shop_res.data:
@@ -315,8 +301,9 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
             "p_description": data.description.strip(),
             "p_secret_content": data.secret_content.strip() if data.secret_content else None,
             "p_price": data.price,
-            "p_stock_quantity": data.stock_quantity,
-            "p_is_unlimited": data.is_unlimited
+            "p_stock_quantity": data.stock_quantity if data.category == "ITEM" else len(clean_lines),
+            "p_is_unlimited": data.is_unlimited,
+            "p_secret_lines": clean_lines
         }).execute()
         return {"message": "商品を出品しました！", "item_id": res.data}
     except HTTPException:
@@ -332,22 +319,17 @@ async def restock_item(item_id: int, data: MallItemRestock, authorization: str =
         user = await get_user_from_token(authorization)
         enforce_mall_rate_limit(user.id)
         client = await get_supabase()
-        
-        item_res = await client.table("mall_items").select("shop_id").eq("id", item_id).execute()
-        if not item_res.data:
-            raise HTTPException(status_code=404, detail="商品が見つかりません")
-        
-        shop_res = await client.table("mall_shops").select("owner_user_id").eq("id", item_res.data[0]["shop_id"]).execute()
-        if not shop_res.data or shop_res.data[0]["owner_user_id"] != str(user.id):
-            raise HTTPException(status_code=403, detail="この商品の在庫を補充する権限がありません")
-            
+
+        clean_lines = [line.strip() for line in data.secret_lines if line.strip()]
+
         await client.rpc("execute_mall_restock_item", {
             "p_user_id": str(user.id),
             "p_item_id": item_id,
             "p_quantity": data.quantity,
-            "p_source_inventory_id": data.source_inventory_id
+            "p_source_inventory_id": data.source_inventory_id,
+            "p_secret_lines": clean_lines
         }).execute()
-        return {"message": f"在庫を {data.quantity} 個補充しました！"}
+        return {"message": "在庫を補充しました！"}
     except HTTPException:
         raise
     except Exception as e:
@@ -361,15 +343,6 @@ async def withdraw_item(item_id: int, data: MallItemWithdraw, authorization: str
         user = await get_user_from_token(authorization)
         enforce_mall_rate_limit(user.id)
         client = await get_supabase()
-        
-        item_res = await client.table("mall_items").select("shop_id").eq("id", item_id).execute()
-        if not item_res.data:
-            raise HTTPException(status_code=404, detail="商品が見つかりません")
-        
-        shop_res = await client.table("mall_shops").select("owner_user_id").eq("id", item_res.data[0]["shop_id"]).execute()
-        if not shop_res.data or shop_res.data[0]["owner_user_id"] != str(user.id):
-            raise HTTPException(status_code=403, detail="この商品を引き戻す権限がありません")
-            
         await client.rpc("execute_mall_withdraw_item", {
             "p_user_id": str(user.id),
             "p_item_id": item_id,
@@ -412,6 +385,7 @@ async def buy_item(item_id: int, data: MallItemBuy, authorization: str = Header(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
 
+# 買い手用：購入履歴
 @router.get("/my-purchases")
 async def get_my_purchases(page: int = Query(1, ge=1), authorization: str = Header(None)):
     try:
@@ -421,7 +395,7 @@ async def get_my_purchases(page: int = Query(1, ge=1), authorization: str = Head
         offset = (page - 1) * limit
         
         res = await client.table("mall_orders").select(
-            "id, shop_id, item_id, quantity, unit_price, total_price, target_account_id, created_at"
+            "id, shop_id, item_id, quantity, unit_price, total_price, distributed_content, created_at"
         ).eq("buyer_user_id", user.id).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
         
         orders = res.data or []
@@ -431,7 +405,7 @@ async def get_my_purchases(page: int = Query(1, ge=1), authorization: str = Head
             
             items_map = {}
             if item_ids:
-                it_res = await client.table("mall_items").select("id, title, category, secret_content").in_("id", item_ids).execute()
+                it_res = await client.table("mall_items").select("id, title, category").in_("id", item_ids).execute()
                 items_map = {x["id"]: x for x in (it_res.data or [])}
                 
             shops_map = {}
@@ -450,3 +424,48 @@ async def get_my_purchases(page: int = Query(1, ge=1), authorization: str = Head
         print("[MALL ERROR /my-purchases]:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"購入履歴の取得に失敗しました: {str(e)}")
+
+# 店主用：自店舗の販売履歴
+@router.get("/my-sales")
+async def get_my_sales(page: int = Query(1, ge=1), authorization: str = Header(None)):
+    try:
+        user = await get_user_from_token(authorization)
+        client = await get_supabase()
+        
+        shop_res = await client.table("mall_shops").select("id").eq("owner_user_id", user.id).execute()
+        if not shop_res.data:
+            return {"sales": []}
+        shop_id = shop_res.data[0]["id"]
+
+        limit = 20
+        offset = (page - 1) * limit
+        res = await client.table("mall_orders").select(
+            "id, item_id, buyer_user_id, quantity, unit_price, total_price, distributed_content, created_at"
+        ).eq("shop_id", shop_id).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+
+        sales = res.data or []
+        if sales:
+            item_ids = list({s["item_id"] for s in sales if s.get("item_id")})
+            buyer_ids = list({s["buyer_user_id"] for s in sales if s.get("buyer_user_id")})
+
+            items_map = {}
+            if item_ids:
+                it_res = await client.table("mall_items").select("id, title, category").in_("id", item_ids).execute()
+                items_map = {x["id"]: x for x in (it_res.data or [])}
+
+            buyers_map = {}
+            if buyer_ids:
+                prof_res = await client.table("profiles").select("id, nickname, equipped_title").in_("id", buyer_ids).execute()
+                buyers_map = {p["id"]: p for p in (prof_res.data or [])}
+
+            for s in sales:
+                s["mall_items"] = items_map.get(s.get("item_id"), {"title": "商品", "category": "ITEM"})
+                s["buyer"] = buyers_map.get(s.get("buyer_user_id"), {"nickname": "不明", "equipped_title": "奴隷"})
+
+        return {"sales": sales}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("[MALL ERROR /my-sales]:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"販売履歴の取得に失敗しました: {str(e)}")
