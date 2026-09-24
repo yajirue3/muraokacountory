@@ -35,8 +35,8 @@ async def get_user_from_token_async(authorization: str):
     except Exception:
         raise HTTPException(status_code=401, detail="無効なトークンです")
 
-# マスターデータ（カードデータベース）
-CARD_DATABASE = {
+# 通常マスターデータ（ドラフト・通常ドロー用プール）
+BASE_CARD_DATABASE = {
     "u_01": {"id": "u_01", "name": "先鋒兵", "type": "unit", "cost": 1, "atk": 2, "hp": 1, "haste": True, "desc": "速攻"},
     "u_02": {"id": "u_02", "name": "重装兵", "type": "unit", "cost": 3, "atk": 2, "hp": 5, "taunt": True, "desc": "挑発"},
     "u_03": {"id": "u_03", "name": "魔導士", "type": "unit", "cost": 2, "atk": 3, "hp": 2, "desc": "標準アタッカー"},
@@ -55,9 +55,38 @@ CARD_DATABASE = {
     "s_09": {"id": "s_09", "name": "城壁", "type": "spell", "cost": 2, "effect": "wall", "need_target": True, "desc": "ユニット1体の被ダメージを3ターンの間1軽減"},
 }
 
+# BOT戦限定の配布専用カード（ドラフトや通常生成には出現しない）
+BOT_EXCLUSIVE_CARDS = {
+    "u_08": {
+        "id": "u_08",
+        "name": "重装備巨兵",
+        "type": "unit",
+        "cost": 6,
+        "atk": 7,
+        "hp": 6,
+        "taunt": True,
+        "cannot_assassinate": True,
+        "desc": "挑発・常時城壁(被ダメ-1)・暗殺無効"
+    },
+    "s_10": {
+        "id": "s_10",
+        "name": "王家の矛",
+        "type": "spell",
+        "cost": 8,
+        "effect": "royal_spear",
+        "val": 1,
+        "need_target": False,
+        "desc": "味方ユニット全体の攻撃力+1(小人を除く)"
+    }
+}
+
+# 全カード辞書（実行時の参照用）
+CARD_DATABASE = {**BASE_CARD_DATABASE, **BOT_EXCLUSIVE_CARDS}
+BASE_CARD_IDS = list(BASE_CARD_DATABASE.keys())
+
 class CreateRoomRequest(BaseModel):
     wallet_id: str
-    amount: int = Field(..., ge=0)  # 0以上を許可
+    amount: int = Field(..., ge=0)
     max_players: int = Field(2, ge=2, le=3)
 
 class CardGameSession:
@@ -132,7 +161,7 @@ async def get_rooms():
 
 @router.get("/api/card/database")
 async def get_card_database():
-    return {"cards": list(CARD_DATABASE.values())}
+    return {"cards": list(BASE_CARD_DATABASE.values())}
 
 @router.post("/api/card/create")
 async def create_room(data: CreateRoomRequest, authorization: str = Header(None)):
@@ -142,7 +171,6 @@ async def create_room(data: CreateRoomRequest, authorization: str = Header(None)
     if not supabase:
         raise HTTPException(status_code=500, detail="データベース接続エラーによりルームを作成できません")
 
-    # 賭け金が設定されている場合のみ引き落とし
     if data.amount > 0:
         w_res = await supabase.table("wallets").select("*").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
         if not w_res.data or w_res.data[0]["balance"] < data.amount:
@@ -202,7 +230,6 @@ async def card_websocket(websocket: WebSocket, room_id: str, token: str):
                 
                 guest_w = w_res.data[0]
 
-                # 賭け金がある場合のみ残高確認＆引き落とし
                 if session.bet_amount > 0:
                     if guest_w["balance"] < session.bet_amount:
                         await websocket.send_json({"type": "ERROR", "message": "参加資金が不足しています"})
@@ -289,7 +316,6 @@ async def handle_disconnect(room_id: str, user_id: str):
         await cleanup_room(room_id)
 
 async def refund_wallet(wallet_id: str, amount: int):
-    # BOT用ウォレットまたは返金額が0以下の場合は処理をスキップ
     if not wallet_id or wallet_id == "bot_wallet" or amount <= 0:
         return
     supabase = await get_supabase()
@@ -353,7 +379,8 @@ def start_draft_phase(session: CardGameSession):
     session.status = "DRAFT"
     session.message = "ドラフトフェーズ：カードを選択してください"
     pool_size = 15 * session.max_players
-    pool = list(CARD_DATABASE.keys()) * pool_size
+    # 限定カードは除外し、通常プールのみでドラフト山札を構築
+    pool = list(BASE_CARD_IDS) * pool_size
     random.shuffle(pool)
     session.draft_pool = pool
     
@@ -366,10 +393,11 @@ def start_draft_phase(session: CardGameSession):
     set_timer(session, 15)
 
 def generate_draft_candidates(session: CardGameSession):
+    # 通常プールのみから候補を提示
     if len(session.draft_pool) >= 5:
         session.draft_options[session.turn_user_id] = [session.draft_pool.pop() for _ in range(5)]
     else:
-        pool = list(CARD_DATABASE.keys())
+        pool = list(BASE_CARD_IDS)
         random.shuffle(pool)
         session.draft_options[session.turn_user_id] = pool[:5]
 
@@ -393,6 +421,8 @@ def start_battle_phase(session: CardGameSession):
     session.status = "BATTLE"
     session.message = "バトル開始！"
     
+    is_bot_match = BOT_USER_ID in session.player_order
+
     for uid in session.player_order:
         random.shuffle(session.decks[uid])
         session.hp[uid] = 20
@@ -401,10 +431,24 @@ def start_battle_phase(session: CardGameSession):
         session.boards[uid] = []
         session.hands[uid] = []
         
+        # 通常の初期手札3枚
         for _ in range(min(3, len(session.decks[uid]))):
             c = session.decks[uid].pop()
             c["instance_id"] = str(uuid.uuid4())[:8]
             session.hands[uid].append(c)
+
+        # ★ BOT戦限定：デッキには含めず、それぞれの手札に1枚のみ専用カードを直接付与
+        if is_bot_match:
+            if uid == BOT_USER_ID:
+                # 皇太子には「王家の矛」
+                spear = copy.deepcopy(CARD_DATABASE["s_10"])
+                spear["instance_id"] = str(uuid.uuid4())[:8]
+                session.hands[uid].append(spear)
+            else:
+                # 人間プレイヤーには「重装備巨兵」
+                heavy_golem = copy.deepcopy(CARD_DATABASE["u_08"])
+                heavy_golem["instance_id"] = str(uuid.uuid4())[:8]
+                session.hands[uid].append(heavy_golem)
 
     session.turn_idx = 0
     session.turn_user_id = session.player_order[session.turn_idx]
@@ -423,7 +467,8 @@ def draw_card_or_generate(session: CardGameSession, user_id: str):
     if session.decks[user_id]:
         c = session.decks[user_id].pop()
     else:
-        rand_id = random.choice(list(CARD_DATABASE.keys()))
+        # 枯渇時生成も通常プールのみから選出
+        rand_id = random.choice(BASE_CARD_IDS)
         c = copy.deepcopy(CARD_DATABASE[rand_id])
     c["instance_id"] = str(uuid.uuid4())[:8]
     session.hands[user_id].append(c)
@@ -481,6 +526,9 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                     hp_val = random.randint(1, 6)
                     name_val = f"奇術師({atk_val}/{hp_val})"
 
+                # 重装備巨兵（u_08）は初期城壁99ターン（実質常時被ダメ-1）
+                default_wall = 99 if played["id"] == "u_08" else 0
+
                 session.boards[user_id].append({
                     "instance_id": str(uuid.uuid4())[:8],
                     "card_id": played["id"],
@@ -494,9 +542,10 @@ async def process_action(session: CardGameSession, user_id: str, action: dict):
                     "attacks_left": played.get("max_attacks", 1),
                     "max_attacks": played.get("max_attacks", 1),
                     "ranged": played.get("ranged", False),
+                    "cannot_assassinate": played.get("cannot_assassinate", False),
                     "frozen_turns": 0,
                     "burn_turns": 0,
-                    "wall_turns": 0
+                    "wall_turns": default_wall
                 })
             elif played["type"] == "spell":
                 resolve_spell(session, user_id, played, target)
@@ -577,8 +626,12 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
     elif eff == "assassinate" and target and target.get("type") == "unit":
         opp_id, unit = get_unit_owner(session, target.get("id"))
         if unit:
-            unit["curr_hp"] = 0
-            session.message = f"{session.players[user_id]['name']} の暗殺者が対象を仕留めた！"
+            # ★ 重装備巨兵（u_08）または暗殺無効フラグ持ちは即死を無効化
+            if unit.get("cannot_assassinate") or unit.get("card_id") == "u_08":
+                session.message = f"{unit['name']} には暗殺が通じない！"
+            else:
+                unit["curr_hp"] = 0
+                session.message = f"{session.players[user_id]['name']} の暗殺者が対象を仕留めた！"
     elif eff == "reshape":
         if session.hands[user_id]:
             discard_idx = random.randrange(len(session.hands[user_id]))
@@ -599,6 +652,14 @@ def resolve_spell(session: CardGameSession, user_id: str, card: dict, target: Op
         if unit:
             unit["wall_turns"] = 3
             session.message = f"{unit['name']} に城壁が付与された！"
+    elif eff == "royal_spear":
+        # ★ 王家の矛：小人（u_06）以外の味方全ユニットの攻撃力を+1
+        buffed = False
+        for u in session.boards[user_id]:
+            if u.get("card_id") != "u_06":
+                u["atk"] += val
+                buffed = True
+        session.message = f"{session.players[user_id]['name']} が王家の矛を掲げた！小人以外の戦力が強化！"
 
 def switch_turn(session: CardGameSession):
     for uid in session.player_order:
@@ -627,7 +688,8 @@ def switch_turn(session: CardGameSession):
         else:
             u["can_attack"] = True
         
-        if u.get("wall_turns", 0) > 0:
+        # 99ターンの永続城壁は減衰させない（通常の3ターン城壁のみ減らす）
+        if 0 < u.get("wall_turns", 0) < 50:
             u["wall_turns"] -= 1
 
         u["attacks_left"] = u.get("max_attacks", 1)
@@ -663,13 +725,11 @@ async def settle_payout(session: CardGameSession, winner: Optional[str]):
     supabase = await get_supabase()
     if not supabase: return
 
-    # 賭け金が設定されている場合のみ配当/返金処理を実行
     if session.bet_amount > 0:
         if winner is None:
             for uid in session.player_order:
                 await refund_wallet(session.players[uid]["wallet_id"], session.bet_amount)
         else:
-            # BOT以外のプレイヤーが勝利した時のみ配当を付与
             if winner != BOT_USER_ID:
                 win_wid = session.players[winner]["wallet_id"]
                 reward = session.bet_amount * session.max_players
@@ -733,13 +793,10 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
     if not supabase:
         raise HTTPException(status_code=500, detail="DB接続エラーが発生しました")
 
-    # BOT部屋作成時はウォレットの引き落としを行わない
-
     p_res = await supabase.table("profiles").select("nickname").eq("id", user.id).execute()
     name = p_res.data[0]["nickname"] if p_res and p_res.data and "nickname" in p_res.data[0] else f"Player-{str(user.id)[:4]}"
 
     room_id = str(uuid.uuid4())[:8]
-    # bet_amount = 0 固定でセッション作成
     session = CardGameSession(room_id, str(user.id), name, data.wallet_id, 0, max_players=2)
     
     session.players[BOT_USER_ID] = {"name": BOT_USER_NAME, "wallet_id": "bot_wallet"}
@@ -755,19 +812,15 @@ async def create_bot_room(data: CreateRoomRequest, authorization: str = Header(N
 
 
 # ====================================================
-# 厳粛な称号付与ロジック＆決裁オーバーライド（追記用）
+# 厳粛な称号付与ロジック＆決裁オーバーライド
 # ====================================================
 async def grant_despair_conqueror_title(user_id: str):
-    """
-    BOT（影武者AI）撃破時のみ、サーバー側で厳粛に「絶望を乗り越えし者」を付与する
-    """
     try:
         supabase = await get_supabase()
         if not supabase:
             logger.error("[Title System] DB接続不可のため称号付与失敗")
             return
 
-        # user_titles テーブルへ直接挿入
         await supabase.table("user_titles").upsert(
             {"user_id": user_id, "title": "真・絶望を乗り越えし者"},
             on_conflict="user_id, title"
@@ -780,9 +833,7 @@ async def grant_despair_conqueror_title(user_id: str):
 _original_settle_payout = settle_payout
 
 async def settle_payout(session: CardGameSession, winner: Optional[str]):
-    # 元の決済処理を実行
     await _original_settle_payout(session, winner)
     
-    # 厳粛判定：BOTが存在する部屋で、勝者が人間の場合のみ称号を自動付与
     if winner and BOT_USER_ID in session.player_order and winner != BOT_USER_ID:
         asyncio.create_task(grant_despair_conqueror_title(winner))
