@@ -21,6 +21,7 @@ from game_2048 import router as game_2048_router
 from auction import router as auction_router
 from fastapi.responses import FileResponse
 from dm import router as dm_router
+from mall import router as mall_router
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -260,8 +261,13 @@ def get_sw():
     return FileResponse("sw.js", media_type="application/javascript")
 
 @app.get("/dm", response_class=HTMLResponse)
-def get_dm_page(request: Request):
+def get_dm(request: Request):
     return templates.TemplateResponse(request=request, name="dm.html")
+
+@app.get("/mall", response_class=HTMLResponse)
+def get_mall(request: Request):
+    return templates.TemplateResponse(request=request, name="mall.html")
+
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
@@ -705,6 +711,7 @@ from video import router as video_router
 app.include_router(video_router)
 app.include_router(auction_router)
 app.include_router(dm_router, prefix="/api/dm", tags=["dm"])
+app.include_router(mall_router)
 
 # ==================================================
 # 資産保有税（所得税・保管料）処理モジュール (main.py用)
