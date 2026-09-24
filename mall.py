@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Optional, List
 import httpx
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form, Query
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field
 from db import get_supabase
 
 # ==========================================
@@ -84,7 +84,6 @@ async def upload_banner_to_drive(file_obj, filename: str, mime_type: str, file_s
     if not file_id:
         raise HTTPException(status_code=500, detail="Google Drive ファイルID取得に失敗しました")
 
-    # 全体読み取り許可設定
     perm_url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
     await http_client.post(perm_url, headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
     return file_id
@@ -131,13 +130,13 @@ def enforce_mall_rate_limit(user_id: str):
     _mall_request_history[user_id] = history
 
 # ==========================================
-# Pydantic 厳格モデル
+# Pydantic モデル定義
 # ==========================================
 router = APIRouter(prefix="/api/mall", tags=["mall"])
 
 class MallItemCreate(BaseModel):
     category: str = Field(..., pattern="^(ITEM|GENERAL)$")
-    inventory_id: Optional[int] = None
+    user_inventory_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=60)
     description: str = Field("", max_length=500)
     secret_content: Optional[str] = Field(None, max_length=1000)
@@ -145,34 +144,18 @@ class MallItemCreate(BaseModel):
     stock_quantity: int = Field(0, ge=0, le=9999)
     is_unlimited: bool = False
 
-    @root_validator
-    def validate_category(cls, values):
-        cat = values.get("category")
-        inv_id = values.get("inventory_id")
-        stock = values.get("stock_quantity", 0)
-        unlimited = values.get("is_unlimited", False)
-
-        if cat == "ITEM":
-            if not inv_id:
-                raise ValueError("インベントリアイテムのIDが指定されていません")
-            if unlimited:
-                raise ValueError("インベントリ品を無制限在庫にすることはできません")
-            if stock <= 0:
-                raise ValueError("インベントリ品の初期在庫は1個以上必要です")
-        elif cat == "GENERAL":
-            if not unlimited and stock <= 0:
-                raise ValueError("有限販売の場合、在庫数は1個以上必要です")
-        return values
-
 class MallItemRestock(BaseModel):
     quantity: int = Field(..., gt=0, le=9999)
+    source_inventory_id: Optional[int] = None
 
 class MallItemWithdraw(BaseModel):
     quantity: int = Field(..., gt=0, le=9999)
+    target_account_id: Optional[str] = None
 
 class MallItemBuy(BaseModel):
     buyer_wallet_id: str
     quantity: int = Field(..., gt=0, le=9999)
+    target_account_id: Optional[str] = None
 
 # ==========================================
 # 店舗 (Shop) 管理 API
@@ -197,7 +180,9 @@ async def get_my_shop(authorization: str = Header(None)):
         return {"shop": None, "items": []}
     
     shop = res.data[0]
-    items_res = await client.table("mall_items").select("*").eq("shop_id", shop["id"]).order("created_at", desc=False).execute()
+    items_res = await client.table("mall_items").select(
+        "*, items:item_master_id(name, base_price, description)"
+    ).eq("shop_id", shop["id"]).order("created_at", desc=False).execute()
     return {"shop": shop, "items": items_res.data or []}
 
 @router.get("/shops/{shop_id}")
@@ -210,9 +195,8 @@ async def get_shop_detail(shop_id: int):
     if not shop_res.data:
         raise HTTPException(status_code=404, detail="指定された店舗は見つかりません")
     
-    # 秘密情報(secret_content)を除外して取得
     items_res = await client.table("mall_items").select(
-        "id, shop_id, category, inventory_id, title, description, price, stock_quantity, is_unlimited, status, created_at"
+        "id, shop_id, category, item_master_id, title, description, price, stock_quantity, is_unlimited, status, created_at, items:item_master_id(name, base_price)"
     ).eq("shop_id", shop_id).neq("status", "HIDDEN").order("created_at", desc=False).execute()
     
     return {"shop": shop_res.data[0], "items": items_res.data or []}
@@ -281,7 +265,19 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     enforce_mall_rate_limit(user.id)
     client = await get_supabase()
-    
+
+    # カテゴリ整合性のゼロトラストチェック
+    if data.category == "ITEM":
+        if not data.user_inventory_id:
+            raise HTTPException(status_code=400, detail="出品するインベントリアイテムを選択してください")
+        if data.is_unlimited:
+            raise HTTPException(status_code=400, detail="インベントリアイテムを無限在庫にすることはできません")
+        if data.stock_quantity <= 0:
+            raise HTTPException(status_code=400, detail="出品数は1個以上必要です")
+    elif data.category == "GENERAL":
+        if not data.is_unlimited and data.stock_quantity <= 0:
+            raise HTTPException(status_code=400, detail="有限商品の場合、在庫数は1個以上必要です")
+
     shop_res = await client.table("mall_shops").select("id").eq("owner_user_id", user.id).execute()
     if not shop_res.data:
         raise HTTPException(status_code=400, detail="商品を出品する前に店舗を開設してください")
@@ -292,7 +288,7 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
             "p_shop_id": shop_id,
             "p_user_id": str(user.id),
             "p_category": data.category,
-            "p_inventory_id": data.inventory_id,
+            "p_user_inventory_id": data.user_inventory_id,
             "p_title": data.title.strip(),
             "p_description": data.description.strip(),
             "p_secret_content": data.secret_content.strip() if data.secret_content else None,
@@ -319,7 +315,8 @@ async def restock_item(item_id: int, data: MallItemRestock, authorization: str =
         await client.rpc("execute_mall_restock_item", {
             "p_user_id": str(user.id),
             "p_item_id": item_id,
-            "p_quantity": data.quantity
+            "p_quantity": data.quantity,
+            "p_source_inventory_id": data.source_inventory_id
         }).execute()
         return {"message": f"在庫を {data.quantity} 個補充しました！"}
     except Exception as e:
@@ -340,7 +337,8 @@ async def withdraw_item(item_id: int, data: MallItemWithdraw, authorization: str
         await client.rpc("execute_mall_withdraw_item", {
             "p_user_id": str(user.id),
             "p_item_id": item_id,
-            "p_quantity": data.quantity
+            "p_quantity": data.quantity,
+            "p_target_account_id": data.target_account_id
         }).execute()
         return {"message": f"店頭から在庫を {data.quantity} 個手元に戻しました！"}
     except Exception as e:
@@ -366,7 +364,8 @@ async def buy_item(item_id: int, data: MallItemBuy, authorization: str = Header(
             "p_buyer_user_id": str(user.id),
             "p_buyer_wallet_id": data.buyer_wallet_id,
             "p_item_id": item_id,
-            "p_quantity": data.quantity
+            "p_quantity": data.quantity,
+            "p_target_account_id": data.target_account_id
         }).execute()
         
         result = res.data
@@ -381,9 +380,8 @@ async def get_my_purchases(page: int = Query(1, ge=1), authorization: str = Head
     limit = 20
     offset = (page - 1) * limit
     
-    # 注文履歴を取得。GENERAL商品の場合は秘密のテキスト(secret_content)も購入者本人に開示
     res = await client.table("mall_orders").select(
-        "id, quantity, unit_price, total_price, created_at, mall_items(title, category, secret_content), mall_shops(shop_name)"
+        "id, quantity, unit_price, total_price, target_account_id, created_at, mall_items(title, category, secret_content), mall_shops(shop_name)"
     ).eq("buyer_user_id", user.id).order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     
     return {"orders": res.data or []}
