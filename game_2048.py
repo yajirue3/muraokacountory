@@ -1,3 +1,5 @@
+import random
+import uuid
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import HTMLResponse
@@ -46,7 +48,6 @@ async def get_2048_ranking():
     supabase = await get_supabase()
     
     try:
-        # 1人1枠のビューからトップ10を取得
         daily_res = await supabase.table("view_2048_daily").select("*").order("score", desc=True).limit(10).execute()
         alltime_res = await supabase.table("view_2048_alltime").select("*").order("score", desc=True).limit(10).execute()
         
@@ -72,7 +73,6 @@ async def submit_2048_score(data: Score2048Submit, authorization: str = Header(N
     try:
         nickname = "名無し"
         
-        # profilesテーブルの取得でエラーが起きてもクラッシュしないように保護
         try:
             profile_res = await supabase.table("profiles").select("nickname").eq("id", str(user.id)).execute()
             if profile_res.data and len(profile_res.data) > 0:
@@ -81,7 +81,6 @@ async def submit_2048_score(data: Score2048Submit, authorization: str = Header(N
             print(f"[Warning] 2048 profiles取得スキップ: {pe}")
             nickname = "名無し"
 
-        # ログとして全記録をInsertする（ランキング抽出はビューが自動で処理する）
         await supabase.table("scores_2048").insert({
             "user_id": str(user.id),
             "nickname": nickname,
@@ -89,11 +88,9 @@ async def submit_2048_score(data: Score2048Submit, authorization: str = Header(N
             "max_tile": data.max_tile
         }).execute()
 
-        # 更新後の最新ランキングを取得
         daily_res = await supabase.table("view_2048_daily").select("*").order("score", desc=True).limit(10).execute()
         alltime_res = await supabase.table("view_2048_alltime").select("*").order("score", desc=True).limit(10).execute()
         
-        # 自分の累計順位を判定
         higher_scores = await supabase.table("view_2048_alltime").select("user_id", count="exact").gt("score", data.score).execute()
         my_rank = (higher_scores.count or 0) + 1
 
@@ -116,7 +113,7 @@ async def submit_2048_score(data: Score2048Submit, authorization: str = Header(N
 
 class ScoreSameGameSubmit(BaseModel):
     score: int
-    remaining_blocks: int  # 0なら全消しボーナス達成などの指標に利用
+    remaining_blocks: int
 
 # --- 画面配信 ---
 @router.get("/samegame", response_class=HTMLResponse)
@@ -129,7 +126,6 @@ async def get_samegame_ranking():
     supabase = await get_supabase()
     
     try:
-        # 1人1枠のビューからトップ10を取得
         daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
         alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
         
@@ -155,7 +151,6 @@ async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = 
     try:
         nickname = "名無し"
         
-        # profilesテーブルの取得でエラーが起きてもクラッシュしないように保護
         try:
             profile_res = await supabase.table("profiles").select("nickname").eq("id", str(user.id)).execute()
             if profile_res.data and len(profile_res.data) > 0:
@@ -164,7 +159,6 @@ async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = 
             print(f"[Warning] samegame profiles取得スキップ: {pe}")
             nickname = "名無し"
 
-        # ログとして全記録をInsertする
         await supabase.table("scores_samegame").insert({
             "user_id": str(user.id),
             "nickname": nickname,
@@ -172,11 +166,9 @@ async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = 
             "remaining_blocks": data.remaining_blocks
         }).execute()
 
-        # 更新後の最新ランキングを取得
         daily_res = await supabase.table("view_samegame_daily").select("*").order("score", desc=True).limit(10).execute()
         alltime_res = await supabase.table("view_samegame_alltime").select("*").order("score", desc=True).limit(10).execute()
         
-        # 自分の累計順位を判定
         higher_scores = await supabase.table("view_samegame_alltime").select("user_id", count="exact").gt("score", data.score).execute()
         my_rank = (higher_scores.count or 0) + 1
 
@@ -192,8 +184,6 @@ async def submit_samegame_score(data: ScoreSameGameSubmit, authorization: str = 
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"DB処理エラー: {str(e)}")
 
-import random
-import uuid
 
 # ==========================================
 # こねこばくはつ (Exploding Kittens) ノートラストDB駆動完全版
@@ -223,6 +213,37 @@ class kb_DrawCardRequest(BaseModel):
 @router.get("/koneko", response_class=HTMLResponse)
 async def kb_get_page(request: Request):
     return templates.TemplateResponse(request=request, name="koneko.html")
+
+
+# --- 部屋一覧取得 API (待機中のみ) ---
+@router.get("/api/kb_room/list")
+async def kb_get_room_list(authorization: str = Header(None)):
+    await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    try:
+        kb_rooms_res = await supabase.table("kb_rooms").select("*").eq("status", "waiting").order("created_at", desc=True).limit(20).execute()
+        kb_rooms = kb_rooms_res.data or []
+
+        kb_result = []
+        for r in kb_rooms:
+            kb_players_res = await supabase.table("kb_players").select("nickname").eq("room_id", r["room_id"]).order("seat_order").execute()
+            kb_players = kb_players_res.data or []
+            kb_host_name = kb_players[0]["nickname"] if kb_players else "名無し"
+            
+            kb_result.append({
+                "room_id": r["room_id"],
+                "host_name": kb_host_name,
+                "current_players": len(kb_players),
+                "max_players": r["max_players"]
+            })
+
+        return {"rooms": kb_result}
+    except Exception as e:
+        import traceback
+        print("=== KB ROOM LIST ERROR ===")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"部屋一覧取得エラー: {str(e)}")
 
 
 # --- 部屋作成 API ---
