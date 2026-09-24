@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>こねこばくはつ - Exploding Kittens</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;700;900&display=swap');
+        
+        :root {
+            --primary: #ff5252;
+            --primary-dim: rgba(255, 82, 82, 0.2);
+            --secondary: #00f3ff;
+            --secondary-dim: rgba(0, 243, 255, 0.2);
+            --bg-dark: #0d0614;
+            --panel-bg: rgba(26, 17, 34, 0.9);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+            --neon-shadow: 0 0 10px rgba(255, 82, 82, 0.5), 0 0 20px rgba(255, 82, 82, 0.3);
+            --text-light: #e0e0e0;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'M PLUS 1p', sans-serif;
+            background: var(--bg-dark);
+            color: #fff;
+            height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; 
+        }
+
+        .container {
+            width: 100%;
+            max-width: 440px;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top, #24142e 0%, #08030b 100%);
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        @media (min-width: 600px) {
+            .container {
+                height: 95dvh;
+                border-radius: 16px;
+                border: var(--glass-border);
+            }
+        }
+
+        input, select, button { 
+            padding: 10px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            font-family: inherit; 
+            font-size: 0.95rem; 
+            outline: none;
+            transition: all 0.2s; 
+        }
+        select, input { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #555; width: 100%; }
+        select:focus, input:focus { border-color: var(--primary); }
+        
+        button { 
+            background: var(--primary); color: #fff; border: none; 
+            cursor: pointer; box-shadow: var(--neon-shadow); text-transform: uppercase;
+        }
+        button:hover { transform: translateY(-2px); filter: brightness(1.2); }
+        button:active { transform: translateY(1px); }
+        button.btn-dark { background: #333; color: #fff; box-shadow: none; border: 1px solid #555; }
+        button.btn-cyan { background: var(--secondary); color: #000; box-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: grayscale(1); }
+
+        /* ロビー */
+        #lobby-screen { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 15px; }
+        .lobby-header { display: flex; justify-content: space-between; align-items: center; }
+        .lobby-title { color: var(--primary); text-shadow: var(--neon-shadow); font-size: 1.5rem; font-weight: 900; }
+        .create-form { display: flex; flex-direction: column; gap: 10px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: var(--glass-border); }
+
+        /* ゲーム画面 */
+        #battle-screen { display: none; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
+        .top-fixed-area { flex-shrink: 0; z-index: 10; }
+        .info-bar { 
+            display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.85); 
+            padding: 8px 12px; border-bottom: 1px solid var(--primary-dim); font-size: 0.85rem; font-weight: bold; 
+        }
+        .help-btn { padding: 4px 8px; font-size: 0.75rem; margin-left: 6px; }
+
+        #action-banner {
+            background: linear-gradient(90deg, transparent, var(--primary-dim), transparent);
+            text-align: center; font-weight: bold; padding: 6px; font-size: 0.85rem; color: #fff;
+            min-height: 34px; display: flex; align-items: center; justify-content: center;
+        }
+        #action-banner.alert { background: linear-gradient(90deg, transparent, rgba(255, 0, 70, 0.4), transparent); color: #ff5252; }
+
+        .battle-scroll-area {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            display: flex; flex-direction: column; gap: 8px; padding: 10px;
+        }
+
+        /* 対戦相手エリア */
+        #opponents-container { display: flex; flex-direction: column; gap: 8px; }
+        .player-row {
+            display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
+            background: var(--panel-bg); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.3s;
+        }
+        .player-row.active-turn { border-color: var(--secondary); box-shadow: 0 0 10px var(--secondary-dim); }
+        .player-row.dead { opacity: 0.35; filter: grayscale(0.8); }
+        .player-tag { font-size: 0.85rem; font-weight: bold; }
+        .player-meta { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+
+        /* 中央テーブル（山札・捨て札） */
+        .field-center {
+            display: flex; justify-content: center; align-items: center; gap: 20px;
+            padding: 15px 0; margin: auto 0;
+        }
+        .deck-stack, .discard-stack {
+            width: 85px; height: 120px; border-radius: 8px; border: 2px dashed #666;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; background: rgba(0,0,0,0.4); position: relative;
+        }
+        .deck-stack {
+            border: 2px solid var(--primary);
+            box-shadow: var(--neon-shadow);
+            cursor: pointer;
+            background: linear-gradient(135deg, #301015, #150508);
+        }
+        .deck-stack:hover { transform: scale(1.05); }
+        .deck-count-badge {
+            font-size: 1.4rem; font-weight: 900; color: #fff;
+        }
+
+        /* ログ通知 */
+        .battle-divider {
+            border-top: 1px dashed #444; border-bottom: 1px dashed #444; padding: 5px;
+            text-align: center; font-size: 0.75rem; color: #00ffcc; cursor: pointer;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* 自分ステータス */
+        .my-status-box {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--panel-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--primary);
+        }
+
+        /* 手札エリア */
+        .hand-area { 
+            flex-shrink: 0; min-height: 125px; display: flex; gap: 8px; padding: 10px; 
+            overflow-x: auto; overflow-y: hidden; background: #060209; 
+            border-top: 2px solid var(--primary); box-shadow: 0 -5px 20px rgba(0,0,0,0.8); z-index: 10;
+            align-items: center;
+        }
+        .hand-card {
+            width: 80px; min-width: 80px; height: 105px; border-radius: 8px; padding: 6px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            font-size: 0.75rem; text-align: center; cursor: pointer; transition: all 0.2s;
+            background: linear-gradient(145deg, #2b172a, #130a17);
+            border: 1px solid #777;
+            position: relative;
+        }
+        .hand-card:hover { transform: translateY(-8px); filter: brightness(1.2); }
+        .hand-card.card-defuse { border-color: #00ff88; box-shadow: 0 0 8px rgba(0,255,136,0.5); }
+        .hand-card.card-attack { border-color: #ff3333; }
+        .hand-card.card-skip { border-color: #33aaff; }
+        .hand-card.card-nope { border-color: #ff0055; }
+        .hand-card-title { font-weight: 900; font-size: 0.85rem; margin-top: 2px; }
+        .hand-card-sub { font-size: 0.6rem; color: #aaa; }
+
+        /* モーダル */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(5px);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 999; padding: 15px;
+        }
+        .modal-content {
+            background: var(--panel-bg); border: 2px solid var(--primary); box-shadow: var(--neon-shadow);
+            border-radius: 12px; padding: 15px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;
+        }
+        .full-log-box {
+            display: flex; flex-direction: column; gap: 4px; font-family: monospace; font-size: 0.75rem;
+            background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #333;
+            max-height: 50vh; overflow-y: auto; user-select: text;
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="main-container">
+
+    <!-- モーダル（ルール／ログ／情報表示） -->
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title" style="color:var(--primary); margin-bottom:10px;">📜 ゲームログ</h3>
+            <div class="full-log-box" id="full-battle-log"></div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-dark" style="flex:1;" onclick="closeModal()">閉じる</button>
+                <button id="return-lobby-modal-btn" class="btn-dark" style="flex:1; display:none;" onclick="returnToLobby()">ロビーへ戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ターゲット選択用モーダル（強奪用） -->
+    <div id="target-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="color:var(--secondary); margin-bottom:10px;">🎯 強奪する相手を選択</h3>
+            <div id="target-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <button class="btn-dark" style="margin-top:12px;" onclick="closeTargetModal()">キャンセル</button>
+        </div>
+    </div>
+
+    <!-- ロビー画面 -->
+    <div id="lobby-screen">
+        <div class="lobby-header">
+            <h2 class="lobby-title">💣 こねこばくはつ</h2>
+            <button class="btn-dark help-btn" onclick="openRules()">ルール</button>
+        </div>
+
+        <div class="create-form">
+            <label style="font-size:0.8rem; color:#aaa;">ルーム作成（2〜4人）</label>
+            <select id="max-players-select">
+                <option value="2">2人対戦</option>
+                <option value="3">3人対戦</option>
+                <option value="4" selected>4人対戦</option>
+            </select>
+            <button onclick="kb_createRoom()">部屋を作る</button>
+        </div>
+
+        <div class="create-form">
+            <label style="font-size:0.8rem; color:#aaa;">既存の部屋に参加</label>
+            <input type="text" id="join-room-id" placeholder="部屋IDを入力 (8桁)">
+            <button class="btn-cyan" onclick="kb_joinRoom()">合流する</button>
+        </div>
+
+        <button class="btn-dark" style="margin-top: auto;" onclick="location.href='/games'">ゲーム一覧へ戻る</button>
+    </div>
+
+    <!-- 対戦画面 -->
+    <div id="battle-screen">
+        <div class="top-fixed-area">
+            <div class="info-bar">
+                <div>
+                    <span id="room-display-id" style="color:#aaa;">ROOM: -</span>
+                    <button class="btn-dark help-btn" onclick="openLogModal()">📜ログ</button>
+                </div>
+                <div id="room-status-badge" style="color:var(--secondary);">待機中</div>
+            </div>
+            <div id="action-banner">参加者を待っています...</div>
+        </div>
+        
+        <div class="battle-scroll-area">
+            <!-- 対戦相手リスト -->
+            <div id="opponents-container"></div>
+            
+            <!-- ログ短縮バー -->
+            <div class="battle-divider" onclick="openLogModal()" id="quick-log">
+                ログ: 待機中...
+            </div>
+
+            <!-- フィールド中央（山札 & 捨て札） -->
+            <div class="field-center">
+                <div class="deck-stack" id="deck-click-area" onclick="kb_drawCard(false)">
+                    <span style="font-size:0.65rem; color:#aaa;">山札から引く</span>
+                    <span class="deck-count-badge" id="deck-count">0</span>
+                    <span style="font-size:0.55rem; color:#ff8888;">(引くとターン終了)</span>
+                </div>
+                <div class="discard-stack">
+                    <span style="font-size:0.65rem; color:#aaa;">捨て札</span>
+                    <span id="discard-top-card" style="font-weight:900; font-size:0.85rem; margin-top:5px; color:#fff;">なし</span>
+                </div>
+            </div>
+
+            <!-- 自分のプレイヤーステータス -->
+            <div class="my-status-box" id="my-status-box">
+                <div>
+                    <div style="font-weight:900;" id="my-name">You</div>
+                    <div style="font-size:0.75rem; color:#aaa;" id="my-turn-info">待機中</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button id="game-over-lobby-btn" class="btn-dark" style="padding:6px 12px; font-size:0.8rem; display:none;" onclick="returnToLobby()">ロビーへ</button>
+                    <div id="host-start-container" style="display:none;">
+                        <button class="btn-cyan" style="padding:6px 12px; font-size:0.8rem;" onclick="kb_startGame()">開始する</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自分の手札 -->
+        <div class="hand-area" id="my-hand"></div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let currentRoomId = null;
+    let pollTimer = null;
+    let myUserId = null;
+    let pendingCardIndex = null;
+    let latestLogs = [];
+
+    // JWTからユーザーIDを復号取得
+    try {
+        const payloadBase64 = token.split('.')[1];
+        const decodedJson = JSON.parse(atob(payloadBase64));
+        myUserId = decodedJson.sub || decodedJson.id;
+    } catch(e) {
+        console.error("トークン解析失敗", e);
+    }
+
+    // --- ルーム作成 ---
+    async function kb_createRoom() {
+        const maxPlayers = parseInt(document.getElementById("max-players-select").value);
+        const res = await fetch("/api/kb_room/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ max_players: maxPlayers })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.detail || "作成失敗");
+        enterRoom(data.room_id);
+    }
+
+    // --- ルーム参加 ---
+    async function kb_joinRoom() {
+        const roomId = document.getElementById("join-room-id").value.trim();
+        if (!roomId) return alert("部屋IDを入力してください");
+        const res = await fetch("/api/kb_room/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ room_id: roomId })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.detail || "合流失敗");
+        enterRoom(roomId);
+    }
+
+    function enterRoom(roomId) {
+        currentRoomId = roomId;
+        document.getElementById("lobby-screen").style.display = "none";
+        document.getElementById("battle-screen").style.display = "flex";
+        document.getElementById("room-display-id").innerText = `ROOM: ${roomId}`;
+
+        fetchState();
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(fetchState, 1500);
+    }
+
+    function returnToLobby() {
+        if (pollTimer) clearInterval(pollTimer);
+        location.reload();
+    }
+
+    // --- ゲーム開始（ホスト用） ---
+    async function kb_startGame() {
+        const res = await fetch("/api/kb_room/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ room_id: currentRoomId })
+        });
+        const data = await res.json();
+        if (!res.ok) alert(data.detail || "開始エラー");
+        fetchState();
+    }
+
+    // --- 状態取得・レンダリング ---
+    async function fetchState() {
+        if (!currentRoomId) return;
+        try {
+            const res = await fetch(`/api/kb_room/${currentRoomId}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            const state = await res.json();
+            renderState(state);
+        } catch(e) {
+            console.error("状態同期エラー", e);
+        }
+    }
+
+    function renderState(state) {
+        document.getElementById("deck-count").innerText = state.deck_count;
+        document.getElementById("room-status-badge").innerText = 
+            state.status === "waiting" ? "待機中" : (state.status === "playing" ? "対戦中" : "終了");
+
+        if (state.discard_top && state.discard_top.length > 0) {
+            document.getElementById("discard-top-card").innerText = state.discard_top[0];
+        }
+
+        const isMyTurn = state.turn_user_id === myUserId && state.status === "playing";
+        const banner = document.getElementById("action-banner");
+
+        if (state.status === "waiting") {
+            banner.innerText = `対戦相手を待っています... (${state.players.length}人)`;
+            document.getElementById("host-start-container").style.display = (state.players.length >= 2) ? "block" : "none";
+        } else if (state.status === "playing") {
+            document.getElementById("host-start-container").style.display = "none";
+            if (isMyTurn) {
+                banner.innerText = `あなたのターン！カードを使うか、山札を引いてください (残ドロー: ${state.draws_remaining}回)`;
+                banner.classList.add("alert");
+            } else {
+                const turnPlayer = state.players.find(p => p.user_id === state.turn_user_id);
+                banner.innerText = `【${turnPlayer ? turnPlayer.nickname : '他プレイヤー'}】の思考中...`;
+                banner.classList.remove("alert");
+            }
+        } else if (state.status === "finished") {
+            const isWinner = state.winner_id === myUserId;
+            banner.innerText = isWinner ? "🎉 あなたの勝利です！" : "💥 ゲーム終了";
+            banner.classList.add("alert");
+            document.getElementById("game-over-lobby-btn").style.display = "block";
+            document.getElementById("return-lobby-modal-btn").style.display = "block";
+        }
+
+        // 他プレイヤー描画（手札は見せず枚数のみ表示）
+        const oppContainer = document.getElementById("opponents-container");
+        oppContainer.innerHTML = state.players.filter(p => p.user_id !== myUserId).map(p => {
+            const isOppTurn = p.user_id === state.turn_user_id;
+            const statusClass = !p.is_alive ? "dead" : (isOppTurn ? "active-turn" : "");
+            return `
+                <div class="player-row ${statusClass}">
+                    <div>
+                        <div class="player-tag">${p.nickname} ${!p.is_alive ? '💀 [爆死]' : ''}</div>
+                        <div class="player-meta">席番: ${p.seat_order + 1}</div>
+                    </div>
+                    <div style="font-weight:900; font-size:0.85rem; color:var(--secondary);">
+                        🃏 手札: ${p.card_count} 枚
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 自分の手札描画
+        const handBox = document.getElementById("my-hand");
+        handBox.innerHTML = (state.my_hand || []).map((card, idx) => {
+            let cardClass = "";
+            if (card === "解除") cardClass = "card-defuse";
+            if (card === "アタック") cardClass = "card-attack";
+            if (card === "スキップ") cardClass = "card-skip";
+            if (card === "拒否") cardClass = "card-nope";
+
+            return `
+                <div class="hand-card ${cardClass}" onclick="kb_handleCardClick(${idx}, '${card}', ${isMyTurn})">
+                    <div class="hand-card-title">${card}</div>
+                    <div class="hand-card-sub">${getCardDesc(card)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function getCardDesc(card) {
+        switch(card) {
+            case "解除": return "爆弾を無効化";
+            case "アタック": return "2回引かせる";
+            case "スキップ": return "引かずに終了";
+            case "透視": return "山札の上3枚";
+            case "予言": return "爆弾の距離探知";
+            case "ボトムドロー": return "一番下を引く";
+            case "強奪": return "手札を1枚奪う";
+            case "シャッフル": return "山札を混ぜる";
+            case "拒否": return "効果の無効化";
+            default: return "";
+        }
+    }
+
+    // --- カードを引く ---
+    async function kb_drawCard(fromBottom = false) {
+        const res = await fetch("/api/kb_game/draw", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ room_id: currentRoomId, from_bottom: fromBottom })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.detail || "引けませんでした");
+
+        if (data.is_exploded) {
+            alert("💥【こねこばくはつ】を引いて爆死・脱落しました！");
+        } else {
+            addLocalLog(`カード【${data.drawn}】を引きました。`);
+        }
+        fetchState();
+    }
+
+    // --- カード使用判定 ---
+    async function kb_handleCardClick(cardIndex, cardName, isMyTurn) {
+        if (cardName === "解除") {
+            return alert("解除は爆弾を引いた際に自動で使用されます。");
+        }
+        if (cardName !== "拒否" && !isMyTurn) {
+            return alert("あなたのターンではありません。");
+        }
+
+        if (cardName === "強奪") {
+            pendingCardIndex = cardIndex;
+            openTargetSelector();
+            return;
+        }
+
+        if (cardName === "ボトムドロー") {
+            await kb_executePlay(cardIndex);
+            await kb_drawCard(true);
+            return;
+        }
+
+        await kb_executePlay(cardIndex);
+    }
+
+    async function kb_executePlay(cardIndex, targetUserId = null) {
+        const res = await fetch("/api/kb_game/play", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({
+                room_id: currentRoomId,
+                card_index: cardIndex,
+                target_user_id: targetUserId
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.detail || "発動できませんでした");
+
+        if (data.peek) {
+            alert(`🔮【透視】山札の上3枚: [ ${data.peek.join(" , ")} ]`);
+        }
+        if (data.message) {
+            alert(`🔮【予言】${data.message}`);
+        }
+
+        addLocalLog(`【${data.card}】を使用しました。`);
+        fetchState();
+    }
+
+    // --- 強奪ターゲット選択モーダル ---
+    async function openTargetSelector() {
+        const res = await fetch(`/api/kb_room/${currentRoomId}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const state = await res.json();
+        const targets = state.players.filter(p => p.user_id !== myUserId && p.is_alive && p.card_count > 0);
+
+        if (targets.length === 0) {
+            return alert("手札を持っている対象がいません");
+        }
+
+        const list = document.getElementById("target-list");
+        list.innerHTML = targets.map(t => `
+            <button onclick="confirmTarget('${t.user_id}')">${t.nickname} (手札: ${t.card_count}枚)</button>
+        `).join('');
+
+        document.getElementById("target-modal").style.display = "flex";
+    }
+
+    function confirmTarget(targetUserId) {
+        closeTargetModal();
+        if (pendingCardIndex !== null) {
+            kb_executePlay(pendingCardIndex, targetUserId);
+            pendingCardIndex = null;
+        }
+    }
+
+    function closeTargetModal() {
+        document.getElementById("target-modal").style.display = "none";
+    }
+
+    // --- ログ・モーダル補助 ---
+    function addLocalLog(text) {
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        const logEntry = `[${timeStr}] ${text}`;
+        latestLogs.push(logEntry);
+        document.getElementById("quick-log").innerText = logEntry;
+        
+        const fullBox = document.getElementById("full-battle-log");
+        const div = document.createElement("div");
+        div.innerText = logEntry;
+        fullBox.appendChild(div);
+        fullBox.scrollTop = fullBox.scrollHeight;
+    }
+
+    function openLogModal() {
+        document.getElementById("modal-title").innerText = "📜 ゲームログ";
+        document.getElementById("rules-modal").style.display = "flex";
+    }
+
+    function openRules() {
+        alert("【こねこばくはつ ルール】\n・爆弾を引いた時に【解除】がなければ即脱落！\n・ターンの最後に山札を引くとターン終了\n・各種カードでドローを回避・妨害せよ！");
+    }
+
+    function closeModal() {
+        document.getElementById("rules-modal").style.display = "none";
+    }
+</script>
+</body>
+</html>
