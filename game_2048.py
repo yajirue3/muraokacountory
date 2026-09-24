@@ -590,3 +590,55 @@ async def kb_play_card(data: kb_PlayCardRequest, authorization: str = Header(Non
     }).eq("room_id", data.room_id).execute()
 
     return {"success": True, "card": kb_card, **kb_extra_response}
+
+from datetime import datetime, timezone, timedelta
+
+# ==========================================
+# こねこばくはつ (Exploding Kittens) 部屋自動削除処理
+# ==========================================
+
+# --- 期限切れ・放置部屋の削除関数 ---
+async def kb_cleanup_expired_rooms(kb_expire_minutes: int = 30):
+    supabase = await get_supabase()
+    try:
+        # 現在時刻から指定時間前（ISO 8601形式）を算出
+        kb_threshold_time = (datetime.now(timezone.utc) - timedelta(minutes=kb_expire_minutes)).isoformat()
+
+        # 30分以上経過した待機中部屋、または終了した古い部屋を検索して削除
+        # ※ kb_players は kb_rooms の room_id に on delete cascade が設定されているため自動連動削除されます
+        kb_expired_res = await supabase.table("kb_rooms").delete().lt("created_at", kb_threshold_time).execute()
+        return len(kb_expired_res.data or [])
+    except Exception as e:
+        print(f"[Warning] kb_rooms cleanup error: {e}")
+        return 0
+
+
+# --- 手動クリーンアップ実行 / 定期実行用 API ---
+@router.post("/api/kb_room/cleanup")
+async def kb_trigger_cleanup(authorization: str = Header(None)):
+    await get_user_from_token(authorization)
+    
+    # 30分以上経過した部屋を一括削除
+    kb_deleted_count = await kb_cleanup_expired_rooms(kb_expire_minutes=30)
+    return {"success": True, "deleted_rooms_count": kb_deleted_count}
+
+
+# --- 部屋個別手動削除 API（ホストが解散・終了した時用） ---
+@router.delete("/api/kb_room/{kb_room_id}")
+async def kb_delete_room(kb_room_id: str, authorization: str = Header(None)):
+    kb_user = await get_user_from_token(authorization)
+    supabase = await get_supabase()
+
+    kb_room_res = await supabase.table("kb_rooms").select("host_id").eq("room_id", kb_room_id).execute()
+    if not kb_room_res.data:
+        raise HTTPException(status_code=404, detail="部屋が見つかりません")
+    
+    kb_room = kb_room_res.data[0]
+    if str(kb_room["host_id"]) != str(kb_user.id):
+        raise HTTPException(status_code=403, detail="ホストのみ部屋を解散・削除できます")
+
+    # 部屋を削除（外部キーにより kb_players も自動削除）
+    await supabase.table("kb_rooms").delete().eq("room_id", kb_room_id).execute()
+
+    return {"success": True, "message": "部屋を削除しました"}
+
