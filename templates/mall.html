@@ -15,7 +15,6 @@
         .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .header { font-size: 1.3rem; font-weight: 800; color: var(--gold); text-align: center; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
         
-        /* タブUI */
         .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
         .tab-btn { flex: 1; min-width: 30%; padding: 10px 4px; background: #262932; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; text-align: center; }
         .tab-btn.active { background: rgba(212, 175, 55, 0.1); color: var(--gold); border-color: var(--gold); }
@@ -23,7 +22,6 @@
         .tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* リスト・カードアイテム */
         .shop-card { background: #15171a; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; transition: 0.2s; overflow: hidden; display: flex; flex-direction: column; }
         .shop-card:hover { border-color: var(--gold); transform: translateY(-2px); }
         .shop-banner { width: 100%; height: 110px; object-fit: cover; background: #262932; display: block; }
@@ -38,7 +36,6 @@
 
         .price-text { font-size: 1.2rem; font-weight: bold; color: var(--gold); }
 
-        /* フォーム要素 */
         input, select, textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #15171a; color: #fff; box-sizing: border-box; margin-bottom: 12px; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
         button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.1s; margin-top: 8px; }
@@ -48,13 +45,11 @@
         .btn-sub { background: #262932; color: #fff; border: 1px solid var(--border); }
         .btn-danger { background: var(--danger); color: #fff; }
 
-        /* ショールームモーダル */
         #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
         .modal-content { background: var(--bg-dark); width: 100%; max-width: 650px; height: 90vh; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 30px rgba(212,175,55,0.2); }
         .modal-header { padding: 12px 16px; background: #15171a; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 
-        /* トースト */
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .toast { background: rgba(30,30,30,0.95); border-left: 4px solid var(--gold); padding: 12px 20px; border-radius: 6px; color: #fff; animation: fadein 0.3s, fadeout 0.3s 2.7s forwards; }
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -81,15 +76,12 @@
             <button class="tab-btn" onclick="switchTab('orders', this)">📜 購入履歴</button>
         </div>
 
-        <!-- 1. 商店街（店舗一覧） -->
         <div id="tab-shops" class="tab-content active">
             <div id="shop-list"><div style="text-align:center; color:#888;">読み込み中...</div></div>
             <button class="btn-sub" onclick="loadShops()">🔄 商店街を更新</button>
         </div>
 
-        <!-- 2. マイショップ管理 -->
         <div id="tab-myshop" class="tab-content">
-            <!-- 店舗設定フォーム -->
             <div style="background:#15171a; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px;">
                 <h4 style="color:var(--gold); margin:0 0 10px 0;">⚙️ 店舗設定</h4>
                 <label style="font-size:0.75rem; color:#94a3b8;">店舗名 (1〜30文字)</label>
@@ -107,7 +99,6 @@
                 <button class="btn-action" onclick="saveMyShopSettings()">店舗情報を保存・更新</button>
             </div>
 
-            <!-- 商品出品フォーム -->
             <div id="item-create-section" style="display:none; background:#15171a; border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px;">
                 <h4 style="color:var(--gold); margin:0 0 10px 0;">📦 新規商品を出品する</h4>
                 <select id="item-cat-select" onchange="toggleItemCatForm()">
@@ -148,12 +139,10 @@
                 <button class="btn-action" onclick="submitCreateItem()">商品棚に並べる</button>
             </div>
 
-            <!-- 自店舗の陳列一覧 -->
             <h4 style="color:var(--gold); margin:0 0 10px 0;">📋 現在の商品棚</h4>
             <div id="my-items-list"><div style="text-align:center; color:#888;">商品を読み込み中...</div></div>
         </div>
 
-        <!-- 3. 購入履歴 -->
         <div id="tab-orders" class="tab-content">
             <div id="order-list"><div style="text-align:center; color:#888;">購入履歴を読み込み中...</div></div>
             <button class="btn-sub" onclick="loadMyOrders()">🔄 履歴を更新</button>
@@ -163,7 +152,6 @@
     </div>
 </div>
 
-<!-- 店舗ショールーム モーダル -->
 <div id="shop-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -191,11 +179,13 @@
     let currentMyShop = null;
 
     async function init() {
-        await loadProfile();
-        await loadWallets();
-        await loadInventory();
-        await loadShops();
-        await loadMyShop();
+        await Promise.allSettled([
+            loadProfile(),
+            loadWallets(),
+            loadInventory(),
+            loadShops(),
+            loadMyShop()
+        ]);
     }
 
     function showToast(message, isError = false) {
@@ -220,142 +210,153 @@
     }
 
     async function loadProfile() {
-        const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
-        if(res.ok) currentUser = await res.json();
+        try {
+            const res = await fetch("/api/profile", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) currentUser = await res.json();
+        } catch(e) { console.error("loadProfile error:", e); }
     }
 
     async function loadWallets() {
-        const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-        if(res.ok) {
-            myWallets = await res.json();
-            const opts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
-            document.getElementById("shop-wallet-select").innerHTML = opts;
-        }
+        try {
+            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                myWallets = await res.json();
+                const opts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
+                document.getElementById("shop-wallet-select").innerHTML = opts;
+            }
+        } catch(e) { console.error("loadWallets error:", e); }
     }
 
     async function loadInventory() {
-        const res = await fetch("/api/inventory", { headers: { "Authorization": `Bearer ${token}` } });
-        if(res.ok) {
-            const data = await res.json();
-            myItemAccounts = data.accounts || [];
-            let opts = '';
-            myItemAccounts.forEach(acc => {
-                if(acc.user_inventories) {
-                    acc.user_inventories.forEach(inv => {
-                        opts += `<option value="${inv.id}">[${escapeHtml(acc.account_name)}] ${escapeHtml(inv.items.name)} (所持:${inv.quantity})</option>`;
-                    });
-                }
-            });
-            document.getElementById("item-inv-select").innerHTML = opts || '<option value="">アイテムがありません</option>';
-        }
-    }
-
-    // ==========================================
-    // 商店街（全店舗）表示
-    // ==========================================
-    async function loadShops() {
-        const res = await fetch("/api/mall/shops");
-        if(!res.ok) return;
-        const data = await res.json();
-        const listEl = document.getElementById("shop-list");
-        
-        if(!data.shops || data.shops.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center; color:#888;">まだ店舗がありません</div>';
-            return;
-        }
-
-        let html = '';
-        data.shops.forEach(s => {
-            const owner = s.profiles || {};
-            const bannerSrc = s.banner_drive_id ? `https://lh3.googleusercontent.com/u/0/d/${s.banner_drive_id}=w800` : '';
-            const bannerTag = bannerSrc ? `<img src="${bannerSrc}" class="shop-banner" onerror="this.style.display='none'">` : '';
-
-            html += `
-                <div class="shop-card" onclick="openShopModal(${s.id})">
-                    ${bannerTag}
-                    <div class="shop-info">
-                        <div style="font-weight:bold; font-size:1.1rem; color:var(--gold);">${escapeHtml(s.shop_name)}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin:3px 0 6px 0;">店主: [${escapeHtml(owner.equipped_title || '奴隷')}] ${escapeHtml(owner.nickname || '不明')}</div>
-                        <div style="font-size:0.85rem; color:#ccc;">${escapeHtml(s.description || '挨拶なし')}</div>
-                    </div>
-                </div>
-            `;
-        });
-        listEl.innerHTML = html;
-    }
-
-    // ==========================================
-    // 店舗ショールーム & 商品購入
-    // ==========================================
-    async function openShopModal(shopId) {
-        const res = await fetch(`/api/mall/shops/${shopId}`);
-        if(!res.ok) return showToast("店舗情報が取得できませんでした", true);
-        const data = await res.json();
-        const shop = data.shop;
-        const items = data.items || [];
-        const owner = shop.profiles || {};
-
-        document.getElementById("modal-shop-title").innerText = `🏪 ${shop.shop_name}`;
-        document.getElementById("modal-shop-owner").innerText = `店主: [${owner.equipped_title || '奴隷'}] ${owner.nickname || '不明'}`;
-        document.getElementById("modal-shop-desc").innerText = shop.description || '説明なし';
-
-        const bannerImg = document.getElementById("modal-shop-banner");
-        if(shop.banner_drive_id) {
-            bannerImg.src = `https://lh3.googleusercontent.com/u/0/d/${shop.banner_drive_id}=w800`;
-            bannerImg.style.display = 'block';
-        } else {
-            bannerImg.style.display = 'none';
-        }
-
-        const itemsEl = document.getElementById("modal-items-list");
-        if(items.length === 0) {
-            itemsEl.innerHTML = '<div style="text-align:center; color:#888; padding:20px 0;">現在並んでいる商品はありません</div>';
-        } else {
-            let html = '';
-            items.forEach(it => {
-                const isItem = it.category === 'ITEM';
-                const badgeCat = isItem ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般</span>';
-                const badgeStock = it.is_unlimited ? '<span class="type-badge badge-unlimited">無制限</span>' : (it.stock_quantity > 0 ? `<span class="type-badge" style="background:#262932;">残り ${it.stock_quantity}個</span>` : '<span class="type-badge badge-soldout">売り切れ</span>');
-                const canBuy = (it.is_unlimited || it.stock_quantity > 0) && (shop.owner_user_id !== currentUser?.id);
-
-                let buyActionHtml = '';
-                if(canBuy) {
-                    const walletOpts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
-                    let accOpts = '';
-                    if(isItem) {
-                        accOpts = `<select id="buy-acc-${it.id}" style="margin-bottom:6px;">${myItemAccounts.map(a => `<option value="${a.account_id}">${escapeHtml(a.account_name)}</option>`).join('')}</select>`;
+        try {
+            const res = await fetch("/api/inventory", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                const data = await res.json();
+                myItemAccounts = data.accounts || [];
+                let opts = '';
+                myItemAccounts.forEach(acc => {
+                    if(acc.user_inventories) {
+                        acc.user_inventories.forEach(inv => {
+                            opts += `<option value="${inv.id}">[${escapeHtml(acc.account_name)}] ${escapeHtml(inv.items.name)} (所持:${inv.quantity})</option>`;
+                        });
                     }
-                    buyActionHtml = `
-                        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
-                            <label style="font-size:0.7rem; color:#94a3b8;">支払口座</label>
-                            <select id="buy-wallet-${it.id}" style="margin-bottom:6px;">${walletOpts}</select>
-                            ${isItem ? `<label style="font-size:0.7rem; color:#94a3b8;">受取アイテム口座</label>${accOpts}` : ''}
-                            <div style="display:flex; gap:8px;">
-                                <input type="number" id="buy-qty-${it.id}" value="1" min="1" ${it.is_unlimited ? '' : `max="${it.stock_quantity}"`} style="margin:0; width:80px;">
-                                <button class="btn-action" style="margin:0; flex:1;" onclick="executeBuy(${it.id})">購入する</button>
-                            </div>
-                        </div>
-                    `;
-                } else if(shop.owner_user_id === currentUser?.id) {
-                    buyActionHtml = '<div style="font-size:0.75rem; color:#888; margin-top:4px;">※自分の店舗の商品です</div>';
-                }
+                });
+                document.getElementById("item-inv-select").innerHTML = opts || '<option value="">アイテムがありません</option>';
+            }
+        } catch(e) { console.error("loadInventory error:", e); }
+    }
+
+    async function loadShops() {
+        const listEl = document.getElementById("shop-list");
+        try {
+            const res = await fetch("/api/mall/shops");
+            if(!res.ok) {
+                const err = await res.json();
+                listEl.innerHTML = `<div style="text-align:center; color:var(--danger);">店舗取得失敗: ${escapeHtml(err.detail || res.statusText)}</div>`;
+                return;
+            }
+            const data = await res.json();
+            
+            if(!data.shops || data.shops.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#888;">まだ店舗がありません</div>';
+                return;
+            }
+
+            let html = '';
+            data.shops.forEach(s => {
+                const owner = s.profiles || {};
+                const bannerSrc = s.banner_drive_id ? `https://lh3.googleusercontent.com/u/0/d/${s.banner_drive_id}=w800` : '';
+                const bannerTag = bannerSrc ? `<img src="${bannerSrc}" class="shop-banner" onerror="this.style.display='none'">` : '';
 
                 html += `
-                    <div class="item-row">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>${badgeCat} ${badgeStock}</div>
-                            <div class="price-text">${it.price} G</div>
+                    <div class="shop-card" onclick="openShopModal(${s.id})">
+                        ${bannerTag}
+                        <div class="shop-info">
+                            <div style="font-weight:bold; font-size:1.1rem; color:var(--gold);">${escapeHtml(s.shop_name)}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin:3px 0 6px 0;">店主: [${escapeHtml(owner.equipped_title || '奴隷')}] ${escapeHtml(owner.nickname || '不明')}</div>
+                            <div style="font-size:0.85rem; color:#ccc;">${escapeHtml(s.description || '挨拶なし')}</div>
                         </div>
-                        <div style="font-weight:bold; font-size:1.05rem;">${escapeHtml(it.title)}</div>
-                        <div style="font-size:0.8rem; color:#bbb;">${escapeHtml(it.description || '')}</div>
-                        ${buyActionHtml}
                     </div>
                 `;
             });
-            itemsEl.innerHTML = html;
+            listEl.innerHTML = html;
+        } catch(e) {
+            console.error("loadShops error:", e);
+            listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
         }
+    }
 
-        document.getElementById("shop-modal").style.display = 'flex';
+    async function openShopModal(shopId) {
+        try {
+            const res = await fetch(`/api/mall/shops/${shopId}`);
+            if(!res.ok) return showToast("店舗情報が取得できませんでした", true);
+            const data = await res.json();
+            const shop = data.shop;
+            const items = data.items || [];
+            const owner = shop.profiles || {};
+
+            document.getElementById("modal-shop-title").innerText = `🏪 ${shop.shop_name}`;
+            document.getElementById("modal-shop-owner").innerText = `店主: [${owner.equipped_title || '奴隷'}] ${owner.nickname || '不明'}`;
+            document.getElementById("modal-shop-desc").innerText = shop.description || '説明なし';
+
+            const bannerImg = document.getElementById("modal-shop-banner");
+            if(shop.banner_drive_id) {
+                bannerImg.src = `https://lh3.googleusercontent.com/u/0/d/${shop.banner_drive_id}=w800`;
+                bannerImg.style.display = 'block';
+            } else {
+                bannerImg.style.display = 'none';
+            }
+
+            const itemsEl = document.getElementById("modal-items-list");
+            if(items.length === 0) {
+                itemsEl.innerHTML = '<div style="text-align:center; color:#888; padding:20px 0;">現在並んでいる商品はありません</div>';
+            } else {
+                let html = '';
+                items.forEach(it => {
+                    const isItem = it.category === 'ITEM';
+                    const badgeCat = isItem ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般</span>';
+                    const badgeStock = it.is_unlimited ? '<span class="type-badge badge-unlimited">無制限</span>' : (it.stock_quantity > 0 ? `<span class="type-badge" style="background:#262932;">残り ${it.stock_quantity}個</span>` : '<span class="type-badge badge-soldout">売り切れ</span>');
+                    const canBuy = (it.is_unlimited || it.stock_quantity > 0) && (shop.owner_user_id !== currentUser?.id);
+
+                    let buyActionHtml = '';
+                    if(canBuy) {
+                        const walletOpts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
+                        let accOpts = '';
+                        if(isItem) {
+                            accOpts = `<select id="buy-acc-${it.id}" style="margin-bottom:6px;">${myItemAccounts.map(a => `<option value="${a.account_id}">${escapeHtml(a.account_name)}</option>`).join('')}</select>`;
+                        }
+                        buyActionHtml = `
+                            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
+                                <label style="font-size:0.7rem; color:#94a3b8;">支払口座</label>
+                                <select id="buy-wallet-${it.id}" style="margin-bottom:6px;">${walletOpts}</select>
+                                ${isItem ? `<label style="font-size:0.7rem; color:#94a3b8;">受取アイテム口座</label>${accOpts}` : ''}
+                                <div style="display:flex; gap:8px;">
+                                    <input type="number" id="buy-qty-${it.id}" value="1" min="1" ${it.is_unlimited ? '' : `max="${it.stock_quantity}"`} style="margin:0; width:80px;">
+                                    <button class="btn-action" style="margin:0; flex:1;" onclick="executeBuy(${it.id})">購入する</button>
+                                </div>
+                            </div>
+                        `;
+                    } else if(shop.owner_user_id === currentUser?.id) {
+                        buyActionHtml = '<div style="font-size:0.75rem; color:#888; margin-top:4px;">※自分の店舗の商品です</div>';
+                    }
+
+                    html += `
+                        <div class="item-row">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>${badgeCat} ${badgeStock}</div>
+                                <div class="price-text">${it.price} G</div>
+                            </div>
+                            <div style="font-weight:bold; font-size:1.05rem;">${escapeHtml(it.title)}</div>
+                            <div style="font-size:0.8rem; color:#bbb;">${escapeHtml(it.description || '')}</div>
+                            ${buyActionHtml}
+                        </div>
+                    `;
+                });
+                itemsEl.innerHTML = html;
+            }
+
+            document.getElementById("shop-modal").style.display = 'flex';
+        } catch(e) { console.error("openShopModal error:", e); }
     }
 
     function closeShopModal() {
@@ -389,25 +390,27 @@
         } catch(e) { showToast("通信エラー", true); }
     }
 
-    // ==========================================
-    // マイショップ管理
-    // ==========================================
     async function loadMyShop() {
-        const res = await fetch("/api/mall/my-shop", { headers: { "Authorization": `Bearer ${token}` } });
-        if(!res.ok) return;
-        const data = await res.json();
-        currentMyShop = data.shop;
+        try {
+            const res = await fetch("/api/mall/my-shop", { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) {
+                document.getElementById("my-items-list").innerHTML = '<div style="text-align:center; color:var(--danger);">店舗情報の読み込みに失敗しました</div>';
+                return;
+            }
+            const data = await res.json();
+            currentMyShop = data.shop;
 
-        if(currentMyShop) {
-            document.getElementById("shop-name-input").value = currentMyShop.shop_name;
-            document.getElementById("shop-desc-input").value = currentMyShop.description || "";
-            document.getElementById("shop-wallet-select").value = currentMyShop.wallet_id;
-            document.getElementById("item-create-section").style.display = "block";
-            renderMyItems(data.items || []);
-        } else {
-            document.getElementById("item-create-section").style.display = "none";
-            document.getElementById("my-items-list").innerHTML = '<div style="text-align:center; color:#888;">店舗を開設すると商品を出品できます</div>';
-        }
+            if(currentMyShop) {
+                document.getElementById("shop-name-input").value = currentMyShop.shop_name;
+                document.getElementById("shop-desc-input").value = currentMyShop.description || "";
+                document.getElementById("shop-wallet-select").value = currentMyShop.wallet_id;
+                document.getElementById("item-create-section").style.display = "block";
+                renderMyItems(data.items || []);
+            } else {
+                document.getElementById("item-create-section").style.display = "none";
+                document.getElementById("my-items-list").innerHTML = '<div style="text-align:center; color:#888;">店舗を開設すると商品を出品できます</div>';
+            }
+        } catch(e) { console.error("loadMyShop error:", e); }
     }
 
     async function saveMyShopSettings() {
@@ -598,44 +601,50 @@
         } catch(e) { showToast("通信エラー", true); }
     }
 
-    // ==========================================
-    // 注文履歴
-    // ==========================================
     async function loadMyOrders() {
-        const res = await fetch("/api/mall/my-purchases", { headers: { "Authorization": `Bearer ${token}` } });
-        if(!res.ok) return;
-        const data = await res.json();
         const listEl = document.getElementById("order-list");
+        try {
+            const res = await fetch("/api/mall/my-purchases", { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) {
+                const err = await res.json();
+                listEl.innerHTML = `<div style="text-align:center; color:var(--danger);">履歴取得失敗: ${escapeHtml(err.detail || res.statusText)}</div>`;
+                return;
+            }
+            const data = await res.json();
 
-        if(!data.orders || data.orders.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center; color:#888;">購入履歴はありません</div>';
-            return;
-        }
+            if(!data.orders || data.orders.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#888;">購入履歴はありません</div>';
+                return;
+            }
 
-        let html = '';
-        data.orders.forEach(o => {
-            const it = o.mall_items || {};
-            const shop = o.mall_shops || {};
-            const dateStr = new Date(o.created_at).toLocaleString('ja-JP');
+            let html = '';
+            data.orders.forEach(o => {
+                const it = o.mall_items || {};
+                const shop = o.mall_shops || {};
+                const dateStr = new Date(o.created_at).toLocaleString('ja-JP');
 
-            html += `
-                <div class="item-row">
-                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#888;">
-                        <span>🏬 ${escapeHtml(shop.shop_name || '店舗')}</span>
-                        <span>${dateStr}</span>
-                    </div>
-                    <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${o.quantity}個</div>
-                    <div style="font-size:0.85rem;">支払総額: <b>${o.total_price} G</b> (単価:${o.unit_price}G)</div>
-                    ${it.secret_content ? `
-                        <div style="background:#0f1115; border:1px solid var(--purple); padding:8px; border-radius:6px; margin-top:4px;">
-                            <div style="font-size:0.7rem; color:var(--purple); font-weight:bold;">🔑 購入特典 / 秘密の情報</div>
-                            <div style="font-size:0.85rem; color:#fff; word-break:break-all;">${escapeHtml(it.secret_content)}</div>
+                html += `
+                    <div class="item-row">
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#888;">
+                            <span>🏬 ${escapeHtml(shop.shop_name || '店舗')}</span>
+                            <span>${dateStr}</span>
                         </div>
-                    ` : ''}
-                </div>
-            `;
-        });
-        listEl.innerHTML = html;
+                        <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${o.quantity}個</div>
+                        <div style="font-size:0.85rem;">支払総額: <b>${o.total_price} G</b> (単価:${o.unit_price}G)</div>
+                        ${it.secret_content ? `
+                            <div style="background:#0f1115; border:1px solid var(--purple); padding:8px; border-radius:6px; margin-top:4px;">
+                                <div style="font-size:0.7rem; color:var(--purple); font-weight:bold;">🔑 購入特典 / 秘密の情報</div>
+                                <div style="font-size:0.85rem; color:#fff; word-break:break-all;">${escapeHtml(it.secret_content)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        } catch(e) {
+            console.error("loadMyOrders error:", e);
+            listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
+        }
     }
 
     init();
