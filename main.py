@@ -268,6 +268,9 @@ def get_dm(request: Request):
 def get_mall(request: Request):
     return templates.TemplateResponse(request=request, name="mall.html")
 
+@app.get("/koneko", response_class=HTMLResponse)
+def get_koneko(request: Request):
+    return templates.TemplateResponse(request=request, name="koneko.html")
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
