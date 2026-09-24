@@ -29,6 +29,7 @@ BOT_CARD_DB = {
     "s_07": {"id": "s_07", "name": "凍結", "type": "spell", "cost": 1, "effect": "freeze", "need_target": True},
     "s_08": {"id": "s_08", "name": "火傷", "type": "spell", "cost": 1, "effect": "burn", "need_target": True},
     "s_09": {"id": "s_09", "name": "城壁", "type": "spell", "cost": 2, "effect": "wall", "need_target": True},
+    "s_10": {"id": "s_10", "name": "王家の矛", "type": "spell", "cost": 8, "effect": "royal_spear", "val": 1, "need_target": False},
 }
 
 def safe_get(container: Any, key: str, default: Any = None) -> Any:
@@ -63,7 +64,9 @@ def bot_internal_draw(session: Any, user_id: str):
     if deck:
         c = deck.pop()
     else:
-        rand_id = random.choice(list(BOT_CARD_DB.keys()))
+        # ランダム生成時も通常カード群から選定
+        normal_keys = [k for k in BOT_CARD_DB.keys() if k != "s_10"]
+        rand_id = random.choice(normal_keys)
         c = copy.deepcopy(BOT_CARD_DB[rand_id])
     c["instance_id"] = str(uuid.uuid4())[:8]
     hand.append(c)
@@ -130,7 +133,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     b_hand[0]["haste"] = True
                 session._hand_ensured = True
 
-            # --- ★イカサマ3：毎ターン確定2枚ドロー（自前関数で安全実行） ---
+            # --- ★イカサマ3：毎ターン確定2枚ドロー ---
             bot_internal_draw(session, BOT_USER_ID)
 
             # ------------------------------------------------------
@@ -164,7 +167,25 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-                # 2. 敵が3体以上なら「嵐 (s_02)」を超最優先
+                # 2. ★王家の矛（s_10）：味方強化・リーサル突撃
+                s10 = next((c for c in playable if c.get("id") == "s_10"), None)
+                if s10:
+                    buffable_units = [u for u in my_board if u.get("card_id") != "u_06"]
+                    ready_attackers = [u for u in buffable_units if u.get("can_attack") and u.get("frozen_turns", 0) <= 0]
+                    # リーサル確定、または小人以外の味方が2体以上並んでいるなら撃つ
+                    potential_extra_dmg = len(ready_attackers)
+                    curr_total_atk = sum(u.get("atk", 0) for u in ready_attackers)
+                    is_spear_lethal = not opp_taunts and (curr_total_atk + potential_extra_dmg >= opp_hp)
+
+                    if is_spear_lethal or len(buffable_units) >= 2:
+                        try:
+                            await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s10["instance_id"], "target": None})
+                            action_taken = True
+                            continue
+                        except Exception:
+                            pass
+
+                # 3. 敵が3体以上なら「嵐 (s_02)」を超最優先
                 s02 = next((c for c in playable if c.get("id") == "s_02"), None)
                 if s02 and len(opp_board) >= 3:
                     try:
@@ -174,10 +195,11 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-                # 3. 敵大型（巨兵・高HP奇術師）の即時暗殺
+                # 4. 敵大型（通常の巨兵u_04・高HP奇術師u_07）の即時暗殺
+                # ※重装備巨兵（u_08）は暗殺無効のため対象から除外
                 s05 = next((c for c in playable if c.get("id") == "s_05"), None)
                 if s05 and opp_board:
-                    target_boss = next((t for t in opp_board if t.get("card_id") in ["u_04", "u_07"] and t.get("curr_hp", 0) >= 4), None)
+                    target_boss = next((t for t in opp_board if t.get("card_id") in ["u_04", "u_07"] and t.get("card_id") != "u_08" and not t.get("cannot_assassinate") and t.get("curr_hp", 0) >= 4), None)
                     if target_boss:
                         try:
                             await process_action_func(session, BOT_USER_ID, {"action": "PLAY_HAND", "card_instance_id": s05["instance_id"], "target": {"type": "unit", "id": target_boss["instance_id"]}})
@@ -186,7 +208,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         except Exception:
                             pass
 
-                # 4. 雷撃除去（挑発・小人・吸血鬼・魔導士・先鋒兵）
+                # 5. 雷撃除去（挑発・小人・吸血鬼・魔導士・先鋒兵）
                 if s01_lethal and opp_board:
                     killable = [u for u in opp_board if u.get("curr_hp", 0) <= (2 if u.get("wall_turns", 0) > 0 else 3)]
                     if killable:
@@ -198,11 +220,12 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         except Exception:
                             pass
 
-                # 5. 「補充」使用時の確定サーチ
+                # 6. 「補充」使用時の確定サーチ
                 s04 = next((c for c in playable if c.get("id") == "s_04"), None)
                 if s04:
                     if len(opp_board) >= 3:
                         wanted = ["s_02", "u_06"]
+                    # 通常の巨兵（u_04）がいる時のみ暗殺者をサーチ（u_08には反応させない）
                     elif any(t.get("card_id") == "u_04" for t in opp_board):
                         wanted = ["s_05", "u_06"]
                     else:
@@ -216,7 +239,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                     except Exception:
                         pass
 
-                # 6. ユニット展開（小人・先鋒兵・奇術師・重装兵・巨兵）
+                # 7. ユニット展開（小人・先鋒兵・奇術師・重装兵・巨兵）
                 playable_units = [c for c in playable if c.get("type") == "unit"]
                 if playable_units and len(my_board) < 7:
                     enemy_has_assassin = "s_05" in opp_hand_ids
@@ -293,7 +316,12 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
 
                     # 1. 挑発がいる場合：残HPが最も低い挑発へ攻撃
                     if opp_taunts:
-                        target_taunt = min(opp_taunts, key=lambda x: x.get("curr_hp", 0))
+                        # 城壁持ちでダメージが通らない相手（与ダメ0）への自爆を回避
+                        valid_taunts = [
+                            t for t in opp_taunts
+                            if (attacker.get("atk", 0) - (1 if t.get("wall_turns", 0) > 0 else 0)) > 0 or attacker.get("ranged")
+                        ]
+                        target_taunt = min(valid_taunts or opp_taunts, key=lambda x: x.get("curr_hp", 0))
                         try:
                             await process_action_func(session, BOT_USER_ID, {
                                 "action": "DECLARE_ATTACK",
@@ -318,12 +346,13 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                             pass
                         break
 
-                    # 3. 最適トレード（小人・吸血鬼・巨兵・奇術師を最優先）
+                    # 3. 最適トレード（小人・吸血鬼・重装備巨兵・巨兵・奇術師を優先）
                     best_target = None
                     best_val = -9999
 
                     for t in opp_board:
                         u_atk = max(0, attacker.get("atk", 0) - 1) if t.get("wall_turns", 0) > 0 else attacker.get("atk", 0)
+                        # ダメージが0点、かつ反撃を受ける場合は殴らない
                         if u_atk <= 0 and not attacker.get("ranged"):
                             continue
 
@@ -334,6 +363,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
                         threat = t.get("atk", 0) * 300
                         if t.get("card_id") == "u_06": threat += 30000  # 小人
                         if t.get("card_id") == "u_05": threat += 25000  # 吸血鬼
+                        if t.get("card_id") == "u_08": threat += 22000  # 重装備巨兵
                         if t.get("card_id") == "u_04": threat += 20000  # 巨兵
                         if t.get("card_id") == "u_07": threat += 18000  # 奇術師
                         if t.get("card_id") == "u_03": threat += 10000  # 魔導士
@@ -373,7 +403,7 @@ async def process_super_ai_turn(session: Any, card_database: Dict[str, dict], pr
             opp_board_now = safe_get(session.boards, opp_id, [])
             if len(opp_board_now) >= 3:
                 next_wanted = ["s_02"]
-            elif any(t.get("card_id") in ["u_04", "u_07"] and t.get("curr_hp", 0) >= 4 for t in opp_board_now):
+            elif any(t.get("card_id") == "u_04" and t.get("curr_hp", 0) >= 4 for t in opp_board_now):
                 next_wanted = ["s_05"]
             else:
                 next_wanted = ["u_06"]
