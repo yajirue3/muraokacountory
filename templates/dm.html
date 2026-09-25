@@ -71,7 +71,7 @@
         .reactions-bar { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
         .react-badge { background: #111317; border: 1px solid var(--border); border-radius: 10px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; }
 
-        /* スマホ安全 インラインアクションパネル (⋮ボタン展開) */
+        /* スマホ安全 インラインアクションパネル */
         .btn-msg-menu { background: transparent; border: none; color: var(--sub); font-size: 1.2rem; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
         .msg-action-panel { display: none; flex-wrap: wrap; gap: 6px; margin-top: 4px; background: #0c0e12; border: 1px solid var(--border); padding: 6px 8px; border-radius: 8px; width: max-content; max-width: 100%; }
         .msg-action-panel.show { display: flex; animation: fadein 0.15s ease-out; }
@@ -109,7 +109,6 @@
         .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
         .nav-icon { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.3rem; padding: 8px; border-radius: 50%; }
 
-        /* 市場アイテム */
         .market-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: center; }
         .market-img { width: 60px; height: 60px; object-fit: contain; background: #111; border-radius: 8px; }
 
@@ -282,6 +281,7 @@
     let isAdminMode = false;
     let myWallets = [];
     let cropperInstance = null;
+    let lastRenderedHash = "";
 
     // WebRTC
     let localStream = null;
@@ -422,6 +422,7 @@
         document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
 
         showView('view-chat'); closeDrawers();
+        lastRenderedHash = "";
         document.getElementById('chat-messages').innerHTML = '<div class="empty-state">読み込み中...</div>';
         fetchMessages(false);
     }
@@ -442,6 +443,7 @@
         document.getElementById('chat-header-actions').style.display = 'none';
         document.getElementById('chat-header-avatar').style.display = 'none';
         showView('view-chat');
+        lastRenderedHash = "";
         await fetchAdminMessages(idA, idB, false);
     }
 
@@ -461,7 +463,9 @@
             const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
             if(res.ok) {
                 const data = await res.json();
-                if (activeConversation.type === 'DIRECT') activeConversation.target_user_id = data.partner_user_id;
+                if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
+                    activeConversation.target_user_id = data.partner_user_id;
+                }
                 renderMessagesList(data.messages || [], isBg);
             }
         } catch(e) {}
@@ -470,7 +474,12 @@
     function renderMessagesList(messages, isBackground) {
         const box = document.getElementById('chat-messages');
         if(!box) return;
-        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+
+        const currentHash = messages.map(m => `${m.id}_${m.is_read}_${m.is_deleted}_${(m.reactions||[]).length}`).join('|');
+        if (isBackground && currentHash === lastRenderedHash) return;
+        lastRenderedHash = currentHash;
+
+        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 50;
         let html = '';
         let pinnedMsg = null;
 
@@ -488,7 +497,6 @@
             const roleTag = !isAdminMode ? (isMine ? '<span class="msg-role-tag">自分</span>' : '<span class="msg-role-tag">相手</span>') : '';
             const readStatus = (isMine && m.is_read) ? '<span class="read-status">既読</span>' : '';
 
-            // 本文組み立て
             let bodyHtml = '';
             if (m.is_deleted) {
                 bodyHtml = `<i style="color:var(--sub);">このメッセージの送信は取り消されました。</i>`;
@@ -502,7 +510,6 @@
                 bodyHtml = escapeHtml(m.content);
             }
 
-            // リアクションバッジ
             let reactHtml = '';
             const reacts = m.reactions || [];
             if(reacts.length > 0) {
@@ -511,7 +518,6 @@
                 reactHtml = '<div class="reactions-bar">' + Object.entries(countMap).map(([k, v]) => `<span class="react-badge" onclick="reactToMessage(${m.id}, '${k}')">${k} ${v}</span>`).join('') + '</div>';
             }
 
-            // スマホ安全アクションパネル (インライン展開)
             const canDelete = isAdminMode || (isMine && !m.is_deleted);
             const panelHtml = !m.is_deleted ? `
                 <div class="msg-action-panel" id="action-panel-${m.id}">
@@ -545,10 +551,8 @@
         });
         
         if(!html) html = `<div class="empty-state">まだメッセージがありません</div>`;
-        if (box.innerHTML !== html || !isBackground) {
-            box.innerHTML = html;
-            setTimeout(() => { if(!isBackground || isAtBottom) box.scrollTop = box.scrollHeight; }, 10);
-        }
+        box.innerHTML = html;
+        if(!isBackground || isAtBottom) setTimeout(() => box.scrollTop = box.scrollHeight, 10);
 
         const pinBanner = document.getElementById("pin-banner");
         if(pinnedMsg) {
@@ -794,8 +798,18 @@
     // --- WebRTC ---
     async function startCall(isVideo = false) {
         if(!activeConversation) return;
+        
+        if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
+            showToast("相手の接続情報を確認中です。少々お待ちください...");
+            await fetchMessages(false);
+            if (!activeConversation.target_user_id) {
+                showToast("通話相手の特定に失敗しました", true);
+                return;
+            }
+        }
+
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo ? { width: 320, height: 240 } : false });
             document.getElementById("local-video").srcObject = localStream;
             if(isVideo) document.getElementById("video-pip-container").style.display = "block";
 
@@ -808,10 +822,12 @@
             sendSignal("OFFER", offer); startCallTimer(); showToast("発信中...");
         } catch(e) { showToast("マイク・カメラの権限エラー", true); }
     }
+
     async function sendSignal(type, data) {
         if(!activeConversation) return;
         try { await fetch("/api/dm/call/signal", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ target_id: activeConversation.target_user_id || null, room_id: activeConversation.room_id || null, signal_type: type, signal_data: data }) }); } catch(e) {}
     }
+
     async function pollCallSignals() {
         if(!activeConversation) return;
         const q = activeConversation.type === 'GROUP' ? `room_id=${activeConversation.room_id}` : `target_user_id=${activeConversation.target_user_id}`;
@@ -826,6 +842,7 @@
             }
         } catch(e) {}
     }
+
     async function answerCall(offerData) {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -840,18 +857,22 @@
             sendSignal("ANSWER", answer); startCallTimer();
         } catch(e) {}
     }
+
     function toggleMic() {
         if(!localStream) return;
         const t = localStream.getAudioTracks()[0];
         if(t) { t.enabled = !t.enabled; document.getElementById("btn-toggle-mic").innerText = t.enabled ? "🎤" : "🔇"; }
     }
+
     function toggleCam() { const p = document.getElementById("video-pip-container"); p.style.display = p.style.display === "block" ? "none" : "block"; }
+
     function hangupCall() {
         if(peerConnection) { peerConnection.close(); peerConnection = null; }
         if(localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
         sendSignal("LEAVE_CALL", {}); clearInterval(callTimer);
         document.getElementById("call-bar").style.display = "none"; document.getElementById("video-pip-container").style.display = "none";
     }
+
     function startCallTimer() {
         document.getElementById("call-bar").style.display = "flex"; callSeconds = 0; clearInterval(callTimer);
         callTimer = setInterval(() => { callSeconds++; const m = String(Math.floor(callSeconds/60)).padStart(2,'0'); const s = String(callSeconds%60).padStart(2,'0'); document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`; }, 1000);
@@ -872,6 +893,7 @@
             showToast("通知設定を有効化しました");
         } catch (e) {}
     }
+
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
         const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
