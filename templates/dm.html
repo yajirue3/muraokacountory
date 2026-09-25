@@ -829,8 +829,11 @@
         if (activeConversation.type === 'GROUP') {
             return `room_${activeConversation.room_id}`;
         }
-        const ids = [String(currentUser.id), String(activeConversation.target_user_id)].sort();
-        return `dm_${ids[0]}_${ids[1]}`;
+        // UUIDのハイフンを除去して短縮し、64バイト以内に収める
+        const idA = String(currentUser.id).replace(/-/g, '').slice(0, 24);
+        const idB = String(activeConversation.target_user_id).replace(/-/g, '').slice(0, 24);
+        const ids = [idA, idB].sort();
+        return `c_${ids[0]}_${ids[1]}`;
     }
 
     async function startCall(isVideo = false) {
@@ -849,6 +852,9 @@
             }
         }
 
+
+
+        
         try {
             const channelName = getAgoraChannelName();
             await joinAgoraChannel(channelName, isVideo);
