@@ -1,6 +1,4 @@
-import os
-import json
-import re
+import osimport jsonimport re
 import time
 import traceback
 from typing import Optional, List, Dict, Any
@@ -160,10 +158,11 @@ async def get_agora_token(channel_name: str, authorization: str = Header(None)):
         AGORA_APP_CERTIFICATE,
         channel_name,
         0,
-        RtcTokenBuilder.Role_Publisher,
+        1,
         expire_time
     )
     return {"token": token, "app_id": AGORA_APP_ID}
+
 
 @router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
