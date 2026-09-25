@@ -2,319 +2,1108 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>村岡王国 - 密書 (DM)</title>
-    <!-- Cropper.js -->
+    <!-- Cropper.js (手動正方形トリミング) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
         :root { 
             --bg: #000000; 
             --card-bg: #16181c; 
+            --card-hover: #1e2126;
             --border: #2f3336; 
             --primary: #d4af37; 
             --primary-hover: #b8962e; 
             --text: #e7e9ea; 
             --sub: #71767b; 
             --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.15);
+            --success: #10b981;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; height: 100dvh; overflow: hidden; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            height: 100vh; 
+            height: 100dvh; 
+            overflow: hidden; 
+        }
         
-        .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; position: relative; }
+        .container { 
+            width: 100%; 
+            max-width: 600px; 
+            display: flex; 
+            flex-direction: column; 
+            border-left: 1px solid var(--border); 
+            border-right: 1px solid var(--border); 
+            height: 100%; 
+            position: relative; 
+            background: var(--bg);
+        }
         
-        /* 共通ヘッダー */
-        .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; flex-shrink: 0; }
+        .header { 
+            height: 60px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 14px; 
+            border-bottom: 1px solid var(--border); 
+            background: rgba(0,0,0,0.85); 
+            backdrop-filter: blur(12px); 
+            z-index: 20; 
+            font-weight: bold; 
+            font-size: 1.05rem; 
+            flex-shrink: 0; 
+        }
+        
         .view { display: none; flex-direction: column; height: 100%; width: 100%; min-height: 0; }
-        .view.active { display: flex; animation: fadein 0.2s ease-out; }
-        @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .view.active { display: flex; animation: fadein 0.15s ease-out; }
+        @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* リスト画面 */
-        .action-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+        /* 通話中スリムバー */
+        #call-bar {
+            display: none;
+            background: #111418;
+            border-bottom: 1px solid var(--primary);
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 30;
+            backdrop-filter: blur(8px);
+        }
+        .call-controls { display: flex; gap: 6px; align-items: center; }
+        .btn-call-ctrl {
+            background: var(--card-bg); border: 1px solid var(--border); color: #fff; padding: 4px 10px; border-radius: 14px;
+            cursor: pointer; font-size: 0.72rem; font-weight: bold;
+        }
+        .btn-call-hangup { background: var(--danger); border-color: var(--danger); }
+
+        /* ビデオPIP小窓 */
+        #video-pip-container {
+            display: none; position: fixed; top: 70px; right: 16px; width: 110px; height: 150px;
+            background: #000; border: 2px solid var(--primary); border-radius: 10px; overflow: hidden; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+        }
+        #remote-video { width: 100%; height: 100%; object-fit: cover; }
+        #local-video { position: absolute; bottom: 4px; right: 4px; width: 34px; height: 46px; border-radius: 4px; border: 1px solid #fff; object-fit: cover; }
+
+        /* スレッド一覧 */
+        .action-bar { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
         .thread-list { flex: 1; overflow-y: auto; }
-        .thread-item { padding: 16px; display: flex; cursor: pointer; border-bottom: 1px solid var(--border); align-items: center; }
+        .thread-item { padding: 14px 16px; display: flex; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); align-items: center; }
         .thread-item:hover { background: var(--card-bg); }
-        .avatar { width: 46px; height: 46px; border-radius: 50%; background: #333; margin-right: 14px; display: flex; align-items: center; justify-content: center; font-weight: bold; object-fit: cover; flex-shrink: 0; }
-        .thread-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-        .thread-name { font-weight: bold; font-size: 1rem; }
+        
+        .avatar { width: 44px; height: 44px; border-radius: 50%; background: #262930; margin-right: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; object-fit: cover; border: 1px solid var(--border); }
+        .thread-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .thread-name { font-weight: bold; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
         .thread-msg { color: var(--sub); font-size: 0.85rem; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .unread-badge { background: var(--primary); color: #000; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: bold; }
 
-        /* チャット画面 */
-        .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        /* ピン留め固定バー */
+        #pin-banner {
+            display: none; background: rgba(212, 175, 55, 0.08); border-bottom: 1px solid rgba(212,175,55,0.3);
+            padding: 8px 14px; font-size: 0.8rem; color: var(--primary); align-items: center; justify-content: space-between; z-index: 15;
+        }
+
+        /* チャット吹き出し領域 */
+        .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 18px; }
         .msg-row { display: flex; flex-direction: column; width: 100%; position: relative; }
         .msg-mine { align-items: flex-end; }
         .msg-other { align-items: flex-start; }
-        .msg-container { display: flex; gap: 8px; max-width: 85%; align-items: flex-end; }
+        
+        .msg-container { display: flex; gap: 8px; max-width: 86%; align-items: flex-end; }
         .msg-mine .msg-container { flex-direction: row-reverse; }
 
-        .msg-bubble { padding: 12px 16px; font-size: 0.95rem; line-height: 1.45; word-break: break-word; position: relative; }
+        .msg-bubble { 
+            padding: 10px 14px; font-size: 0.92rem; line-height: 1.45; word-break: break-word;
+            position: relative; cursor: pointer; user-select: text;
+        }
         .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 18px 18px 2px 18px; font-weight: 500; }
         .msg-other .msg-bubble { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 18px 18px 18px 2px; }
 
-        .msg-image { max-width: 220px; border-radius: 12px; }
-        .msg-stamp { width: 130px; }
-        .msg-meta { font-size: 0.7rem; color: var(--sub); margin-top: 4px; display: flex; gap: 6px; }
-
-        /* 📱 スマホ対応: フローティングツールバー (折り返し対応) */
-        .msg-floating-toolbar {
-            display: none; position: absolute; top: -52px; left: 0;
-            background: #000; border: 1px solid var(--border); border-radius: 12px; 
-            padding: 6px; gap: 6px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.8);
-            /* スマホファーストな折り返し設定 */
-            display: none; flex-wrap: wrap; width: max-content; max-width: 200px; justify-content: center;
+        .msg-image { max-width: 200px; max-height: 240px; border-radius: 12px; border: 1px solid var(--border); object-fit: cover; display: block; }
+        .msg-stamp { width: 130px; height: 130px; object-fit: contain; display: block; }
+        
+        .msg-transfer-card {
+            background: #101216; border: 1px solid var(--primary); padding: 12px 14px; border-radius: 14px;
+            display: flex; flex-direction: column; gap: 4px; min-width: 170px;
         }
+        .msg-transfer-card.mine { border-color: #000; background: rgba(0,0,0,0.1); }
+
+        .msg-meta { font-size: 0.68rem; color: var(--sub); margin-top: 3px; display: flex; gap: 4px; align-items: center; }
+        .read-status { color: var(--primary); font-weight: bold; }
+
+        .reactions-bar { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .react-badge { background: #111317; border: 1px solid var(--border); border-radius: 10px; padding: 2px 6px; font-size: 0.72rem; cursor: pointer; }
+
+        /* 📱 スマホ最適化: 横スクロール型フローティングツールバー */
+        .msg-floating-toolbar {
+            display: none;
+            position: absolute;
+            top: -46px;
+            background: #000000;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 4px 8px;
+            gap: 6px;
+            align-items: center;
+            z-index: 25;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.9);
+            
+            /* 横幅が小さいスマホでも絶対にはみ出さない横スクロール設定 */
+            max-width: 85vw;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .msg-floating-toolbar::-webkit-scrollbar { display: none; }
+        
+        .msg-mine .msg-floating-toolbar { right: 0; left: auto; }
+        .msg-other .msg-floating-toolbar { left: 0; right: auto; }
         .msg-row:hover .msg-floating-toolbar, .msg-bubble:active .msg-floating-toolbar { display: flex; }
-        .msg-mine .msg-floating-toolbar { left: auto; right: 0; }
-        
-        .toolbar-btn { background: transparent; border: none; font-size: 1.1rem; padding: 2px 4px; cursor: pointer; color: var(--text); transition: 0.1s; }
-        .toolbar-btn:hover { transform: scale(1.2); }
-        .react-badge { background: #000; border: 1px solid var(--border); border-radius: 12px; padding: 2px 6px; font-size: 0.75rem; margin-top: 4px; display: inline-block; cursor: pointer; }
 
-        /* 入力バー */
-        .chat-input-wrapper { padding: 10px 14px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 8px; align-items: center; }
-        .btn-circle { width: 38px; height: 38px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; flex-shrink: 0; }
-        .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 12px 16px; border-radius: 20px; color: var(--text); font-size: 0.95rem; outline: none; }
-        .chat-input-wrapper input:focus { border-color: var(--primary); }
-        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 16px; height: 38px; border-radius: 19px; font-weight: bold; cursor: pointer; display: none; }
-        .btn-send.active { display: block; }
+        .toolbar-btn {
+            background: transparent; border: none; cursor: pointer; font-size: 1.05rem; padding: 4px 6px;
+            border-radius: 6px; transition: transform 0.1s; flex-shrink: 0; color: var(--text);
+        }
+        .toolbar-btn:active { transform: scale(1.25); }
+        .toolbar-divider { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
 
-        /* ドロワー */
-        .drawer-panel { display: none; background: #000; border-top: 1px solid var(--border); padding: 16px; max-height: 200px; overflow-y: auto; }
-        .launcher-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center; }
-        .launcher-item { background: var(--card-bg); border-radius: 12px; padding: 12px 0; cursor: pointer; font-size: 0.8rem; }
-        
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #000; padding: 24px; border-radius: 16px; width: 360px; max-width: 90%; border: 1px solid var(--border); }
-        .input-text { width: 100%; padding: 12px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin: 8px 0; font-size: 0.95rem; }
-        .btn-full { width: 100%; padding: 12px; background: var(--primary); color: #000; border: none; border-radius: 20px; font-weight: bold; margin-top: 8px; cursor: pointer; }
-        .btn-sub { background: transparent; color: var(--text); border: 1px solid var(--border); }
-        .nav-icon { background: transparent; border: none; color: var(--text); font-size: 1.2rem; cursor: pointer; padding: 6px; }
+        /* チャット入力バー */
+        .chat-input-wrapper { 
+            padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg); 
+            display: flex; gap: 8px; align-items: center; flex-shrink: 0; 
+        }
+        .btn-circle-icon { 
+            width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent; 
+            color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.25rem; flex-shrink: 0; 
+        }
+        .btn-circle-icon:hover { background: var(--card-bg); }
+        .chat-input-wrapper input { 
+            flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 11px 16px; border-radius: 20px; 
+            color: var(--text); font-size: 0.92rem; outline: none; min-width: 0;
+        }
+        .chat-input-wrapper input:focus { border-color: var(--primary); background: #000; }
+        .btn-send { 
+            background: var(--primary); border: none; color: #000; padding: 0 16px; height: 38px; border-radius: 19px; 
+            display: none; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; flex-shrink: 0; font-size: 0.9rem;
+        }
+        .btn-send.active { display: flex; }
 
-        #block-warning { display: none; background: #2a0808; border-top: 1px solid var(--danger); color: #ff9999; text-align: center; padding: 12px; font-size: 0.85rem; }
+        /* ブロック警告バー */
+        #block-warning-bar {
+            display: none; padding: 12px 16px; background: #160a0a; border-top: 1px solid var(--danger);
+            color: #ff9999; font-size: 0.85rem; text-align: center; font-weight: bold; flex-shrink: 0;
+        }
+
+        /* 拡張ドロワー（＋）＆ スタンプピッカー（☺） */
+        .drawer-panel {
+            display: none; background: #0c0d10; border-top: 1px solid var(--border); padding: 14px;
+            max-height: 220px; overflow-y: auto; flex-shrink: 0; animation: fadein 0.15s ease-out;
+        }
+        .launcher-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+        .launcher-item { 
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 4px; 
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 0.75rem; 
+        }
+        .launcher-item:hover { background: var(--card-hover); border-color: var(--primary); }
+        .launcher-icon { font-size: 1.35rem; }
+
+        /* スタンプピッカー */
+        .stamp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 180px; overflow-y: auto; }
+        .stamp-pick-item { width: 100%; aspect-ratio: 1; object-fit: contain; cursor: pointer; border-radius: 8px; padding: 4px; }
+        .stamp-pick-item:active { transform: scale(0.92); background: rgba(255,255,255,0.08); }
+
+        /* モーダル */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #000; padding: 24px; border-radius: 16px; width: 380px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+        .input-text, select { width: 100%; padding: 12px 14px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin: 8px 0; font-size: 0.9rem; }
+        .input-text:focus, select:focus { border-color: var(--primary); outline: none; }
+        .btn-full { width: 100%; padding: 12px; background: var(--primary); color: #000; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.92rem; }
+        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .nav-icon { background: transparent; border: none; color: var(--text); font-size: 1.25rem; padding: 6px; cursor: pointer; border-radius: 50%; }
+
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast { background: rgba(22, 24, 28, 0.96); border-left: 4px solid var(--primary); padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.2s, fadeout 0.2s 3.8s forwards; }
+        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
     </style>
 </head>
 <body>
 
+<div id="toast-container"></div>
+
+<!-- ビデオ通話PIP小窓 -->
+<div id="video-pip-container">
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+</div>
+
 <div class="container">
     
-    <!-- リスト画面 -->
+    <!-- 1. スレッド一覧画面 -->
     <div id="view-list" class="view active">
         <div class="header">
             <span id="sidebar-title">密書 (DM)</span>
-            <div style="display:flex; gap: 4px;">
-                <button class="nav-icon" onclick="openModal('new-group-modal')">👥</button>
-                <button class="nav-icon" onclick="openModal('settings-modal')">⚙️</button>
-                <button class="nav-icon" onclick="location.href='/dashboard'">◀</button>
+            <div style="display:flex; gap: 4px; align-items:center;">
+                <button class="nav-icon" onclick="requestPushPermission()" title="通知設定">🔔</button>
+                <button class="nav-icon" onclick="openModal('settings-modal')" title="DM ID設定">⚙️</button>
+                <button class="btn-call-ctrl" onclick="location.href='/dashboard'" style="margin-left:4px;">◀ 国民証</button>
             </div>
         </div>
         <div class="action-bar">
-            <button class="btn-full" style="margin:0;" onclick="openModal('new-dm-modal')">＋ 新しい密書</button>
-            <button class="btn-full btn-sub" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 国王検閲</button>
+            <button class="btn-full" style="margin:0; flex:1;" onclick="openModal('new-dm-modal')">＋ 新しい密書</button>
+            <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openModal('new-group-modal')">👥 密談部屋結成</button>
         </div>
-        <div class="thread-list" id="thread-list"></div>
+        <div style="padding:4px 14px;" id="admin-toggle-wrapper">
+            <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:4px 0 0 0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
+        </div>
+        <div class="thread-list" id="thread-list">
+            <div style="text-align:center; color:var(--sub); padding:40px 0;">密談を読み込み中...</div>
+        </div>
     </div>
 
-    <!-- チャット画面 -->
+    <!-- 2. チャット画面 -->
     <div id="view-chat" class="view">
         <div class="header">
-            <div style="display:flex; align-items:center; gap: 4px;">
+            <div style="display:flex; align-items:center; gap: 4px; overflow:hidden;">
                 <button class="nav-icon" onclick="closeChat()">←</button>
-                <img id="chat-avatar" class="avatar" style="width:34px; height:34px; margin:0 8px 0 4px; display:none;">
-                <div style="display:flex; flex-direction:column;">
-                    <span id="chat-title" style="font-size:0.95rem;">名前</span>
-                    <span id="chat-subtitle" style="font-size:0.7rem; color:var(--sub);"></span>
+                <img id="chat-header-avatar" class="avatar" style="width:34px; height:34px; margin:0 6px 0 2px; display:none;">
+                <div style="display:flex; flex-direction:column; overflow:hidden;">
+                    <span id="chat-title" style="line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.95rem;">相手の名前</span>
+                    <span id="chat-subtitle" style="font-size:0.7rem; color:var(--sub); font-weight:normal;"></span>
                 </div>
             </div>
-            <div id="chat-header-actions" style="display:flex;">
-                <button class="nav-icon">📞</button>
-                <button class="nav-icon">🎥</button>
-                <button class="nav-icon" onclick="toggleBlock()">︙</button>
+            <!-- 右側通話＆操作ボタン -->
+            <div id="chat-header-actions" style="display:flex; gap: 2px; flex-shrink:0;">
+                <button class="nav-icon" onclick="startCall(false)" title="音声通話">📞</button>
+                <button class="nav-icon" onclick="startCall(true)" title="ビデオ通話">🎥</button>
+                <button class="nav-icon" onclick="openChatMenu()" title="メニュー">︙</button>
             </div>
         </div>
 
-        <div class="chat-messages" id="chat-messages"></div>
-        <div id="block-warning">⛔ この国民とは交信が制限されています</div>
-
-        <div class="chat-input-wrapper" id="chat-input-area">
-            <button class="btn-circle" onclick="toggleDrawer('launcher-drawer')">＋</button>
-            <input type="text" id="chat-input" placeholder="メッセージ..." oninput="toggleSendBtn()" onkeypress="if(event.key==='Enter') sendMsg()">
-            <button class="btn-circle" id="btn-stamp" onclick="toggleDrawer('stamp-drawer')">☺</button>
-            <button class="btn-send" id="btn-send-msg" onclick="sendMsg()">➤</button>
+        <!-- 通話中スリムバー -->
+        <div id="call-bar">
+            <span id="call-status-text" style="color:var(--success); font-weight:bold;">🟢 通話中 (00:00)</span>
+            <div class="call-controls">
+                <button class="btn-call-ctrl" id="btn-toggle-mic" onclick="toggleMic()">🎤 消音</button>
+                <button class="btn-call-ctrl" id="btn-toggle-cam" onclick="toggleCam()">📷 映像</button>
+                <button class="btn-call-ctrl btn-call-hangup" onclick="hangupCall()">切断</button>
+            </div>
         </div>
 
+        <!-- ピン留め固定バナー -->
+        <div id="pin-banner">
+            <span id="pin-content" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📌 ピン留め</span>
+            <button style="background:transparent; border:none; color:var(--primary); cursor:pointer; font-weight:bold;" onclick="unpinCurrent()">✕</button>
+        </div>
+
+        <!-- メッセージ一覧 -->
+        <div class="chat-messages" id="chat-messages"></div>
+
+        <!-- ブロック警告バー -->
+        <div id="block-warning-bar">⛔ この国民とは交信が制限されています</div>
+
+        <!-- 入力バー -->
+        <div class="chat-input-wrapper" id="chat-input-area">
+            <button class="btn-circle-icon" onclick="toggleDrawer('launcher-drawer')">＋</button>
+            <input type="text" id="chat-input" placeholder="メッセージを入力..." oninput="toggleSendBtn()" onkeypress="if(event.key==='Enter') sendTextMessage()">
+            <button class="btn-circle-icon" id="btn-stamp-icon" onclick="toggleDrawer('stamp-drawer')">☺</button>
+            <button class="btn-send" id="btn-send-msg" onclick="sendTextMessage()">➤</button>
+        </div>
+
+        <!-- 拡張アクションドロワー（＋メニュー） -->
         <div class="drawer-panel" id="launcher-drawer">
             <div class="launcher-grid">
-                <div class="launcher-item" onclick="openModal('transfer-modal')">💰 送金</div>
-                <div class="launcher-item" onclick="document.getElementById('img-file').click()">🖼️ 画像</div>
+                <div class="launcher-item" onclick="openTransferModal()">
+                    <span class="launcher-icon">💰</span><span>送金</span>
+                </div>
+                <div class="launcher-item" onclick="document.getElementById('img-file-input').click()">
+                    <span class="launcher-icon">🖼️</span><span>画像</span>
+                </div>
+                <div class="launcher-item" onclick="openModal('stamp-create-modal')">
+                    <span class="launcher-icon">🎨</span><span>スタンプ自作</span>
+                </div>
+                <div class="launcher-item" onclick="openModal('stamp-market-modal')">
+                    <span class="launcher-icon">🛍️</span><span>市場</span>
+                </div>
             </div>
-            <input type="file" id="img-file" style="display:none;" onchange="uploadImage(event)">
+            <input type="file" id="img-file-input" accept="image/*" style="display:none;" onchange="uploadImage(event)">
         </div>
+
+        <!-- スタンプピッカーピル（☺メニュー） -->
         <div class="drawer-panel" id="stamp-drawer">
-            <div style="text-align:center; font-size:0.8rem; color:var(--sub);">スタンプ準備中</div>
+            <div class="stamp-grid" id="my-stamps-picker">
+                <div style="grid-column:span 4; text-align:center; color:var(--sub); font-size:0.8rem; padding:20px 0;">所持スタンプがありません</div>
+            </div>
         </div>
     </div>
 
 </div>
 
-<!-- モーダル: 1v1 DM -->
+<!-- ================= モーダル群 ================= -->
+
+<!-- 1. 新規1対1 DM -->
 <div class="modal" id="new-dm-modal">
     <div class="modal-content">
         <h3 style="margin-top:0;">新しい密書</h3>
-        <input type="text" id="target-dm-id" class="input-text" placeholder="@dm_id">
-        <button class="btn-full" onclick="startChat('DM')">開始</button>
-        <button class="btn-full btn-sub" onclick="closeModal('new-dm-modal')">キャンセル</button>
+        <p style="color:var(--sub); font-size:0.85rem;">相手のDM IDを入力してください</p>
+        <div style="display:flex; align-items:center; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; margin: 10px 0; padding:0 12px;">
+            <span style="color:var(--sub); font-weight:bold;">@</span>
+            <input type="text" id="target-dm-id" class="input-text" style="border:none; margin:0; background:transparent;" placeholder="muraoka_king">
+        </div>
+        <button class="btn-full" onclick="startDirectChat()">密書を開始</button>
+        <button class="btn-full btn-outline" onclick="closeModal('new-dm-modal')">キャンセル</button>
     </div>
 </div>
 
-<!-- モーダル: グループ -->
+<!-- 2. 新規グループ密談部屋結成 -->
 <div class="modal" id="new-group-modal">
     <div class="modal-content">
         <h3 style="margin-top:0;">密談部屋を結成</h3>
-        <input type="text" id="group-name" class="input-text" placeholder="部屋名">
-        <input type="text" id="group-members" class="input-text" placeholder="DM ID (カンマ区切り)">
-        <button class="btn-full" onclick="startChat('GROUP')">結成</button>
-        <button class="btn-full btn-sub" onclick="closeModal('new-group-modal')">キャンセル</button>
+        <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 鉱山ダンジョン攻略組)">
+        <p style="font-size:0.75rem; color:var(--sub); margin:6px 0 2px 0;">招待メンバーDM ID (カンマ区切り)</p>
+        <input type="text" id="group-members-input" class="input-text" placeholder="user_a, user_b, user_c">
+        <button class="btn-full" onclick="createGroupRoom()">部屋を開設</button>
+        <button class="btn-full btn-outline" onclick="closeModal('new-group-modal')">キャンセル</button>
     </div>
 </div>
 
-<!-- モーダル: 設定 -->
+<!-- 3. チャット内 Gold 送金 -->
+<div class="modal" id="transfer-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">💰 チャット内 Gold 送金</h3>
+        <p style="font-size:0.75rem; color:var(--sub); margin:4px 0;">出金元ウォレット</p>
+        <select id="transfer-wallet-select"></select>
+        <p style="font-size:0.75rem; color:var(--sub); margin:4px 0;">送金額 (Gold)</p>
+        <input type="number" id="transfer-amount-input" class="input-text" min="1" placeholder="例: 100">
+        <button class="btn-full" onclick="executeChatTransfer()">送金を実行</button>
+        <button class="btn-full btn-outline" onclick="closeModal('transfer-modal')">キャンセル</button>
+    </div>
+</div>
+
+<!-- 4. スタンプ作成＆Cropper手動正方形切り取り -->
+<div class="modal" id="stamp-create-modal">
+    <div class="modal-content" style="max-width:440px;">
+        <h3 style="margin-top:0;">🎨 スタンプパック登録</h3>
+        <input type="text" id="stamp-pack-title" class="input-text" placeholder="パック名 (例: 奴隷の日常)">
+        <input type="number" id="stamp-pack-price" class="input-text" min="0" placeholder="販売価格 (0で無料配布)">
+        <p style="font-size:0.75rem; color:var(--sub); margin:6px 0 2px 0;">画像を選択（指やマウスで正方形に調整）</p>
+        <input type="file" id="crop-image-file" accept="image/*" onchange="initCrop(event)" style="margin-bottom:8px; color:var(--text); font-size:0.85rem;">
+        
+        <div style="width:100%; height:200px; background:#000; border-radius:8px; overflow:hidden; display:none;" id="cropper-container">
+            <img id="cropper-img" style="max-width:100%;">
+        </div>
+
+        <button class="btn-full" id="btn-save-stamp" style="display:none;" onclick="submitCroppedStamp()">この範囲で切り取って保存</button>
+        <button class="btn-full btn-outline" onclick="closeModal('stamp-create-modal')">閉じる</button>
+    </div>
+</div>
+
+<!-- 5. スタンプ市場モーダル -->
+<div class="modal" id="stamp-market-modal">
+    <div class="modal-content" style="max-width:440px;">
+        <h3 style="margin-top:0;">🛍️ 国民スタンプ市場</h3>
+        <div id="stamp-market-list" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+        <button class="btn-full btn-outline" style="margin-top:12px;" onclick="closeModal('stamp-market-modal')">閉じる</button>
+    </div>
+</div>
+
+<!-- 6. DM ID設定 -->
 <div class="modal" id="settings-modal">
     <div class="modal-content">
         <h3 style="margin-top:0;">DM ID設定</h3>
-        <input type="text" id="my-dm-id" class="input-text" placeholder="muraoka_king">
-        <button class="btn-full" onclick="saveDMID()">保存</button>
-        <button class="btn-full btn-sub" onclick="closeModal('settings-modal')">閉じる</button>
+        <p style="color:var(--sub); font-size:0.85rem;">相手に教えるための専用ID (@英数字) を設定します。</p>
+        <input type="text" id="my-dm-id-input" class="input-text" placeholder="例: muraoka_king">
+        <button class="btn-full" onclick="saveDMID()">設定保存</button>
+        <button class="btn-full btn-outline" onclick="closeModal('settings-modal')">閉じる</button>
     </div>
 </div>
 
 <script>
     const token = localStorage.getItem("access_token");
-    let currentUser = null, activeRoom = null, activeTarget = null, isAdmin = false, isGroup = false;
+    if (!token) window.location.href = "/";
+
+    let currentUser = null;
+    let activeConversation = null; // { type: 'DIRECT'|'GROUP', target_dm_id, room_id, name, avatar, target_user_id }
+    let isAdminMode = false;
+    let myWallets = [];
+    let cropperInstance = null;
+
+    // WebRTC用
+    let localStream = null;
+    let peerConnection = null;
+    let callTimer = null;
+    let callSeconds = 0;
+    const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
     async function init() {
-        const res = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
-        if(res.ok) { currentUser = await res.json(); if(currentUser.role==='king') document.getElementById('btn-admin-mode').style.display='block'; }
+        await loadMyProfile();
+        await loadMyWallets();
+        await loadMyStamps();
         fetchThreads();
-        setInterval(() => { if(activeTarget || activeRoom) fetchMessages(true); else fetchThreads(true); }, 3000);
+
+        // 3秒定期更新（メッセージ同期＆通話シグナリング受信）
+        setInterval(() => {
+            if (activeConversation) {
+                if (isAdminMode && activeConversation.admin_ids) {
+                    const [idA, idB] = activeConversation.admin_ids.split('/');
+                    fetchAdminMessages(idA, idB, true);
+                } else {
+                    fetchCurrentMessages(true);
+                    if (activeConversation.type === 'DIRECT') pollCallSignals();
+                }
+            } else {
+                fetchThreads(true);
+            }
+        }, 3000);
     }
 
+    function showToast(msg, isError = false) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.innerText = msg;
+        if(isError) t.style.borderLeftColor = 'var(--danger)';
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+    }
+
+    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function toggleDrawer(id) {
-        const el = document.getElementById(id);
-        const st = el.style.display;
-        document.querySelectorAll('.drawer-panel').forEach(d => d.style.display='none');
-        el.style.display = st === 'block' ? 'none' : 'block';
+    function showView(viewId) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(viewId).classList.add('active'); }
+
+    async function loadMyProfile() {
+        try {
+            const res = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                currentUser = await res.json();
+                if(!currentUser.dm_id) openModal('settings-modal');
+                if(currentUser.role === 'king') document.getElementById('btn-admin-mode').style.display = 'block';
+            }
+        } catch(e) {}
+    }
+
+    async function loadMyWallets() {
+        try {
+            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                myWallets = await res.json();
+                document.getElementById('transfer-wallet-select').innerHTML = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
+            }
+        } catch(e) {}
+    }
+
+    async function saveDMID() {
+        const id = document.getElementById('my-dm-id-input').value.trim();
+        if(!id) return showToast("IDを入力してください", true);
+        try {
+            const res = await fetch("/api/dm/set-id", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ dm_id: id })
+            });
+            const data = await res.json();
+            if(res.ok) { showToast(data.message); closeModal('settings-modal'); currentUser.dm_id = id; } 
+            else { showToast(data.detail, true); }
+        } catch(e) {}
+    }
+
+    // ==========================================
+    // スレッド一覧＆入室（1v1 & グループ & 国王監視）
+    // ==========================================
+    function toggleAdminMode() {
+        isAdminMode = !isAdminMode;
+        document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 王国検閲監視" : "密書 (DM)";
+        document.getElementById('btn-admin-mode').innerText = isAdminMode ? "◀ 通常モードに戻る" : "👁️ 王国検閲モードを開始";
+        fetchThreads();
+    }
+
+    async function fetchThreads(isBg = false) {
+        try {
+            const url = isAdminMode ? '/api/dm/admin/threads' : '/api/dm/conversations';
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) return;
+            const data = await res.json();
+            const listEl = document.getElementById('thread-list');
+            let html = '';
+
+            if (isAdminMode) {
+                (data.threads || []).forEach(t => {
+                    html += `
+                        <div class="thread-item" onclick="openAdminChat('${t.user_a_id}', '${t.user_b_id}', '${escapeHtml(t.user_a_name)}', '${escapeHtml(t.user_b_name)}')">
+                            <div class="avatar" style="background:var(--danger); font-size:1rem;">👁️</div>
+                            <div class="thread-info">
+                                <div class="thread-name"><div>${escapeHtml(t.user_a_name)} ⇄ ${escapeHtml(t.user_b_name)}</div></div>
+                                <div class="thread-msg">${escapeHtml(t.latest_message)}</div>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                (data.conversations || []).forEach(c => {
+                    const isGroup = c.type === "GROUP";
+                    const avatarImg = c.avatar ? `https://lh3.googleusercontent.com/u/0/d/${c.avatar}=w100` : '';
+                    const avatarTag = avatarImg ? `<img src="${avatarImg}" class="avatar">` : `<div class="avatar">${isGroup ? '👥' : escapeHtml(c.name.charAt(0))}</div>`;
+                    const subLabel = isGroup ? '密談部屋' : `@${escapeHtml(c.partner_dm_id)}`;
+
+                    html += `
+                        <div class="thread-item" onclick='openConversation(${JSON.stringify(c)})'>
+                            ${avatarTag}
+                            <div class="thread-info">
+                                <div class="thread-name">
+                                    <div>${escapeHtml(c.name)} <span style="font-size:0.75rem; color:var(--sub); font-weight:normal;">${subLabel}</span></div>
+                                </div>
+                                <div class="thread-msg">${escapeHtml(c.latest_message)}</div>
+                            </div>
+                        </div>`;
+                });
+            }
+            if(!html && !isBg) listEl.innerHTML = `<div style="text-align:center; color:var(--sub); padding:40px 0;">会話はありません</div>`;
+            else if(html) listEl.innerHTML = html;
+        } catch(e) {}
+    }
+
+    function openConversation(conv) {
+        if (isAdminMode) return;
+        activeConversation = conv;
+        
+        document.getElementById('chat-title').innerText = conv.name;
+        document.getElementById('chat-subtitle').innerText = conv.type === 'GROUP' ? 'グループ密談' : `@${conv.partner_dm_id}`;
+        
+        const avatarEl = document.getElementById('chat-header-avatar');
+        if(conv.avatar) {
+            avatarEl.src = `https://lh3.googleusercontent.com/u/0/d/${conv.avatar}=w100`;
+            avatarEl.style.display = 'block';
+        } else {
+            avatarEl.style.display = 'none';
+        }
+
+        // ブロック状態のUI切り替え
+        const isBlocked = conv.is_blocked;
+        document.getElementById('chat-input-area').style.display = isBlocked ? 'none' : 'flex';
+        document.getElementById('block-warning-bar').style.display = isBlocked ? 'block' : 'none';
+        document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
+
+        showView('view-chat');
+        closeDrawers();
+        document.getElementById('chat-messages').innerHTML = '<div style="text-align:center; color:var(--sub); padding:30px 0;">読み込み中...</div>';
+        fetchCurrentMessages(false);
+    }
+
+    async function openAdminChat(idA, idB, nameA, nameB) {
+        activeConversation = { admin_ids: `${idA}/${idB}`, name: `${nameA} ⇄ ${nameB}` };
+        document.getElementById('chat-title').innerText = `${nameA} ⇄ ${nameB}`;
+        document.getElementById('chat-subtitle').innerText = `王国検閲中`;
+        document.getElementById('chat-input-area').style.display = 'none';
+        document.getElementById('chat-header-actions').style.display = 'none';
+        document.getElementById('chat-header-avatar').style.display = 'none';
+        
+        showView('view-chat');
+        await fetchAdminMessages(idA, idB, false);
+    }
+
+    function closeChat() { 
+        showView('view-list'); activeConversation = null; closeDrawers(); fetchThreads(true); 
+    }
+
+    // ==========================================
+    // メッセージ取得・描画（スマホ最適化ツールバー搭載）
+    // ==========================================
+    async function fetchAdminMessages(idA, idB, isBg) {
+        try {
+            const res = await fetch(`/api/dm/admin/messages/${idA}/${idB}`, { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) { const data = await res.json(); renderMessageList(data.messages || [], isBg); }
+        } catch(e) {}
+    }
+
+    async function fetchCurrentMessages(isBg) {
+        if (!activeConversation) return;
+        const url = activeConversation.type === 'GROUP' 
+            ? `/api/dm/messages/group/${activeConversation.room_id}`
+            : `/api/dm/messages/direct/${activeConversation.partner_dm_id}`;
+        
+        try {
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) return;
+            const data = await res.json();
+            if (activeConversation.type === 'DIRECT') activeConversation.target_user_id = data.partner_user_id;
+            renderMessageList(data.messages || [], isBg);
+        } catch(e) {}
+    }
+
+    function renderMessageList(messages, isBg) {
+        const box = document.getElementById('chat-messages');
+        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 50;
+        let html = '';
+        let pinnedMsg = null;
+
+        messages.forEach(m => {
+            if(m.is_pinned) pinnedMsg = m;
+            const isMine = !isAdminMode && (String(m.sender_id) === String(currentUser?.id));
+            const timeStr = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const readStatus = (isMine && m.is_read) ? '<span class="read-status">✓✓ 既読</span>' : '';
+            
+            // 相手アイコン（グループ・検閲時）
+            let senderName = '';
+            let avatarTag = '';
+            if (!isMine) {
+                if (isAdminMode) senderName = `<div style="font-size:0.7rem; color:var(--sub); margin-bottom:2px;">${escapeHtml(m.sender?.nickname)}</div>`;
+                else if (activeConversation?.type === 'GROUP') senderName = `<div style="font-size:0.7rem; color:var(--sub); margin-bottom:2px;">${escapeHtml(m.profiles?.nickname)}</div>`;
+                
+                const avaDrive = m.profiles?.avatar_drive_id || m.sender?.avatar_drive_id;
+                avatarTag = avaDrive 
+                    ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar" style="width:28px; height:28px; margin:0;">`
+                    : `<div class="avatar" style="width:28px; height:28px; font-size:0.75rem; margin:0;">${escapeHtml((m.profiles?.nickname || m.sender?.nickname || '?').charAt(0))}</div>`;
+            }
+
+            // 本文レンダリング
+            let bodyHtml = '';
+            if (m.is_deleted) {
+                bodyHtml = `<i style="color:var(--sub);">このメッセージの送信は取り消されました。</i>`;
+            } else if (m.message_type === 'IMAGE') {
+                bodyHtml = `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w800" class="msg-image" onclick="window.open(this.src)">`;
+            } else if (m.message_type === 'STAMP') {
+                bodyHtml = `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w400" class="msg-stamp">`;
+            } else if (m.message_type === 'TRANSFER') {
+                bodyHtml = `<div class="msg-transfer-card ${isMine ? 'mine' : ''}">
+                    <span style="font-size:0.75rem; color:var(--primary); font-weight:bold;">💰 Gold 送金完了</span>
+                    <span style="font-size:1.15rem; font-weight:bold; color:#fff;">+${m.metadata.amount} G</span>
+                </div>`;
+            } else {
+                bodyHtml = escapeHtml(m.content);
+            }
+
+            // リアクションバッジ一覧
+            let reactBadgesHtml = '';
+            const reacts = m.dm_message_reactions || [];
+            if(reacts.length > 0) {
+                const countMap = {};
+                reacts.forEach(r => countMap[r.reaction_type] = (countMap[r.reaction_type] || 0) + 1);
+                reactBadgesHtml = '<div class="reactions-bar">' + Object.entries(countMap).map(([k, v]) => `
+                    <span class="react-badge" onclick="reactToMessage(${m.id}, '${k}')">${k} ${v}</span>
+                `).join('') + '</div>';
+            }
+
+            // 📱 スマホ最適化: 横スクロール型ツールバー
+            const deleteBtn = (isAdminMode || (isMine && !m.is_deleted)) ? `<button class="toolbar-btn" style="color:var(--danger);" onclick="deleteMessage(${m.id})" title="取消">🗑️</button>` : '';
+            const reportBtn = !isMine && !isAdminMode ? `<button class="toolbar-btn" onclick="reportMessage(${m.id})" title="密告">🚨</button>` : '';
+            const pinBtn = !m.is_deleted ? `<button class="toolbar-btn" onclick="togglePinMessage(${m.id})" title="ピン留め">📌</button>` : '';
+
+            const floatingToolbar = `
+                <div class="msg-floating-toolbar">
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '👍')">👍</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '❤️')">❤️</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '😂')">😂</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '🙏')">🙏</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '👀')">👀</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '🔥')">🔥</button>
+                    <div class="toolbar-divider"></div>
+                    ${pinBtn} ${deleteBtn} ${reportBtn}
+                </div>
+            `;
+
+            html += `
+                <div class="msg-row ${isMine ? 'msg-mine' : 'msg-other'}">
+                    ${senderName}
+                    <div class="msg-container">
+                        ${avatarTag}
+                        <div>
+                            <div class="msg-bubble">
+                                ${bodyHtml}
+                                ${!m.is_deleted ? floatingToolbar : ''}
+                            </div>
+                            ${reactBadgesHtml}
+                        </div>
+                    </div>
+                    <div class="msg-meta"><span>${timeStr}</span> ${readStatus}</div>
+                </div>
+            `;
+        });
+        
+        box.innerHTML = html || '<div style="text-align:center; color:var(--sub); padding:40px 0;">まだメッセージはありません</div>';
+
+        // ピン留めバナー表示
+        const pinBanner = document.getElementById("pin-banner");
+        if(pinnedMsg) {
+            document.getElementById("pin-content").innerText = `📌 ピン留め: ${pinnedMsg.content}`;
+            pinBanner.style.display = 'flex';
+        } else {
+            pinBanner.style.display = 'none';
+        }
+
+        if(!isBg || isAtBottom) setTimeout(() => box.scrollTop = box.scrollHeight, 10);
+    }
+
+    // ==========================================
+    // メッセージ送信・操作（文字・画像・スタンプ）
+    // ==========================================
+    async function sendTextMessage() {
+        const input = document.getElementById('chat-input');
+        const content = input.value.trim();
+        if (!content || !activeConversation) return;
+
+        input.value = ''; toggleSendBtn();
+        try {
+            await fetch('/api/dm/send', { 
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    target_dm_id: activeConversation.target_dm_id || null, 
+                    room_id: activeConversation.room_id || null, 
+                    message_type: "TEXT", 
+                    content 
+                }) 
+            });
+            await fetchCurrentMessages(false);
+            fetchThreads(true);
+        } catch(e) {}
     }
 
     function toggleSendBtn() {
-        const v = document.getElementById('chat-input').value.trim();
-        document.getElementById('btn-send-msg').classList.toggle('active', v.length > 0);
-        document.getElementById('btn-stamp').style.display = v.length > 0 ? 'none' : 'flex';
-    }
-
-    async function fetchThreads(bg=false) {
-        const res = await fetch("/api/dm/conversations", { headers: { "Authorization": `Bearer ${token}` } });
-        const data = await res.json();
-        let html = '';
-        (data.conversations||[]).forEach(c => {
-            const isGrp = c.type === "GROUP";
-            const idArg = isGrp ? c.room_id : `'${c.partner_dm_id}'`;
-            const ava = c.avatar ? `<img src="https://lh3.googleusercontent.com/u/0/d/${c.avatar}=w100" class="avatar">` : `<div class="avatar">${isGrp?'👥':c.name.charAt(0)}</div>`;
-            html += `
-                <div class="thread-item" onclick="openChat(${idArg}, '${c.name}', ${isGrp}, ${c.is_blocked||false})">
-                    ${ava}
-                    <div class="thread-info">
-                        <div class="thread-name">${c.name}</div>
-                        <div class="thread-msg">${c.latest_message}</div>
-                    </div>
-                </div>`;
-        });
-        document.getElementById('thread-list').innerHTML = html || '<div style="text-align:center; padding:40px; color:var(--sub);">何もないようだ...</div>';
-    }
-
-    async function openChat(id, name, grp, blocked) {
-        isGroup = grp;
-        if(isGroup) { activeRoom = id; activeTarget = null; document.getElementById('chat-subtitle').innerText = 'グループ密談'; }
-        else { activeTarget = id; activeRoom = null; document.getElementById('chat-subtitle').innerText = '@'+id; }
-        document.getElementById('chat-title').innerText = name;
-        
-        document.getElementById('chat-input-area').style.display = blocked ? 'none' : 'flex';
-        document.getElementById('block-warning').style.display = blocked ? 'block' : 'none';
-
-        document.getElementById('view-list').classList.remove('active');
-        document.getElementById('view-chat').classList.add('active');
-        fetchMessages();
-    }
-
-    function closeChat() { document.getElementById('view-chat').classList.remove('active'); document.getElementById('view-list').classList.add('active'); activeRoom = null; activeTarget = null; }
-
-    async function fetchMessages(bg=false) {
-        const url = isGroup ? `/api/dm/messages/group/${activeRoom}` : `/api/dm/messages/direct/${activeTarget}`;
-        const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
-        const data = await res.json();
-        
-        let html = '';
-        (data.messages||[]).forEach(m => {
-            const mine = String(m.sender_id) === String(currentUser.id);
-            const reactBadges = m.dm_message_reactions ? m.dm_message_reactions.map(r => `<span class="react-badge">${r.reaction_type}</span>`).join('') : '';
-            
-            // 📱 スマホ対応: 2行に折り返すツールバー
-            const tb = `
-                <div class="msg-floating-toolbar">
-                    <button class="toolbar-btn" onclick="react(${m.id},'👍')">👍</button>
-                    <button class="toolbar-btn" onclick="react(${m.id},'❤️')">❤️</button>
-                    <button class="toolbar-btn" onclick="react(${m.id},'😂')">😂</button>
-                    <button class="toolbar-btn" onclick="react(${m.id},'🙏')">🙏</button>
-                    <button class="toolbar-btn" onclick="react(${m.id},'👀')">👀</button>
-                    <button class="toolbar-btn" onclick="react(${m.id},'🔥')">🔥</button>
-                    <button class="toolbar-btn" style="color:var(--danger)" onclick="delMsg(${m.id})">🗑️</button>
-                </div>`;
-            
-            const cont = m.is_deleted ? `<i style="color:var(--sub)">取消済</i>` : (m.message_type==='IMAGE' ? `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w400" class="msg-image">` : m.content);
-
-            html += `
-                <div class="msg-row ${mine?'msg-mine':'msg-other'}">
-                    ${!mine && isGroup ? `<div style="font-size:0.7rem; color:var(--sub); margin:0 40px 2px;">${m.profiles?.nickname||''}</div>` : ''}
-                    <div class="msg-container">
-                        <div>
-                            <div class="msg-bubble">${cont}${!m.is_deleted ? tb : ''}</div>
-                            ${reactBadges ? `<div>${reactBadges}</div>` : ''}
-                        </div>
-                    </div>
-                    <div class="msg-meta">${new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
-                </div>`;
-        });
-        const box = document.getElementById('chat-messages');
-        const isBot = box.scrollHeight - box.scrollTop - box.clientHeight < 50;
-        box.innerHTML = html;
-        if(!bg || isBot) box.scrollTop = box.scrollHeight;
-    }
-
-    async function sendMsg() {
-        const inp = document.getElementById('chat-input');
-        if(!inp.value.trim()) return;
-        await fetch("/api/dm/send", {
-            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({ target_dm_id: activeTarget, room_id: activeRoom, content: inp.value })
-        });
-        inp.value = ''; toggleSendBtn(); fetchMessages(); fetchThreads();
-    }
-
-    async function startChat(type) {
-        if(type==='DM') {
-            const id = document.getElementById('target-dm-id').value;
-            if(id) { closeModal('new-dm-modal'); openChat(id, id, false, false); }
+        const input = document.getElementById('chat-input');
+        const btnSend = document.getElementById('btn-send-msg');
+        const btnStamp = document.getElementById('btn-stamp-icon');
+        if(input.value.trim().length > 0) {
+            btnSend.classList.add('active'); btnStamp.style.display = 'none';
         } else {
-            const name = document.getElementById('group-name').value;
-            const mems = document.getElementById('group-members').value.split(',').map(s=>s.trim());
-            const res = await fetch("/api/dm/groups", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ room_name: name, member_dm_ids: mems }) });
-            if(res.ok) { const d = await res.json(); closeModal('new-group-modal'); openChat(d.room_id, name, true, false); fetchThreads(); }
+            btnSend.classList.remove('active'); btnStamp.style.display = 'flex';
         }
     }
 
-    async function react(id, type) { await fetch(`/api/dm/messages/${id}/react`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ reaction_type: type }) }); fetchMessages(); }
-    async function delMsg(id) { if(confirm("削除しますか？")) { await fetch(`/api/dm/messages/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }); fetchMessages(); } }
+    async function uploadImage(e) {
+        const file = e.target.files[0];
+        if(!file || !activeConversation) return;
+        const formData = new FormData(); formData.append("file", file);
+        closeDrawers(); showToast("画像を送信中...");
+
+        const url = activeConversation.type === 'GROUP' 
+            ? `/api/dm/rooms/${activeConversation.room_id}/upload-image`
+            : `/api/dm/messages/${activeConversation.target_dm_id}/upload-image`;
+
+        try {
+            const res = await fetch(url, { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+            if(res.ok) await fetchCurrentMessages(false);
+            else showToast("画像送信に失敗しました", true);
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    async function deleteMessage(msgId) {
+        if (!confirm("このメッセージを取り消しますか？")) return;
+        try {
+            await fetch(`/api/dm/messages/${msgId}`, { method: 'DELETE', headers: { "Authorization": `Bearer ${token}` } });
+            await fetchCurrentMessages(false);
+        } catch (e) {}
+    }
+
+    async function reactToMessage(msgId, emoji) {
+        try {
+            await fetch(`/api/dm/messages/${msgId}/react`, {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ reaction_type: emoji })
+            });
+            fetchCurrentMessages(true);
+        } catch(e) {}
+    }
+
+    async function togglePinMessage(msgId) {
+        try {
+            await fetch(`/api/dm/messages/${msgId}/pin`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+            fetchCurrentMessages(false);
+        } catch(e) {}
+    }
+
+    async function reportMessage(msgId) {
+        const reason = prompt("国王へ密告する理由を入力してください:");
+        if(!reason) return;
+        try {
+            const res = await fetch("/api/dm/reports", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ message_id: msgId, reason })
+            });
+            const data = await res.json(); showToast(data.message);
+        } catch(e) {}
+    }
+
+    // ==========================================
+    // ドロワー ＆ Gold送金 ＆ ブロックメニュー
+    // ==========================================
+    function toggleDrawer(id) {
+        const el = document.getElementById(id);
+        const isOpen = el.style.display === "block";
+        closeDrawers();
+        if(!isOpen) el.style.display = "block";
+    }
+    function closeDrawers() { 
+        document.getElementById("launcher-drawer").style.display = "none"; 
+        document.getElementById("stamp-drawer").style.display = "none"; 
+    }
+
+    function openTransferModal() { 
+        closeDrawers(); 
+        if(!activeConversation.target_user_id && activeConversation.type === 'GROUP') {
+            return showToast("密談部屋全体への送金は準備中です。個人DMでご利用ください。", true);
+        }
+        openModal("transfer-modal"); 
+    }
+
+    async function executeChatTransfer() {
+        const walletId = document.getElementById("transfer-wallet-select").value;
+        const amount = parseInt(document.getElementById("transfer-amount-input").value);
+        if(!amount || amount <= 0) return showToast("正しい金額を入力してください", true);
+
+        try {
+            const res = await fetch("/api/dm/transfer-gold", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    target_user_id: activeConversation.target_user_id, 
+                    sender_wallet_id: walletId, 
+                    amount: amount 
+                })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message); closeModal("transfer-modal");
+                document.getElementById("transfer-amount-input").value = "";
+                await fetchCurrentMessages(false);
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("送金エラー", true); }
+    }
+
+    async function openChatMenu() {
+        if(!activeConversation || activeConversation.type !== 'DIRECT') return;
+        if(confirm(`🚫 ${activeConversation.name} をブロックしますか？\n（再度タップで解除できます）`)) {
+            try {
+                const res = await fetch("/api/dm/blocks/toggle", {
+                    method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ target_user_id: activeConversation.target_user_id })
+                });
+                const data = await res.json();
+                showToast(data.message);
+                closeChat();
+            } catch(e) {}
+        }
+    }
+
+    // ==========================================
+    // スタンプ作成（Cropper正方形切り取り）＆所持・送信
+    // ==========================================
+    function initCrop(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = document.getElementById("cropper-img");
+            img.src = event.target.result;
+            document.getElementById("cropper-container").style.display = "block";
+            document.getElementById("btn-save-stamp").style.display = "block";
+
+            if(cropperInstance) cropperInstance.destroy();
+            cropperInstance = new Cropper(img, { aspectRatio: 1, viewMode: 1, autoCropArea: 0.9, background: false });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function submitCroppedStamp() {
+        if(!cropperInstance) return;
+        const title = document.getElementById("stamp-pack-title").value.trim();
+        const price = parseInt(document.getElementById("stamp-pack-price").value) || 0;
+        if(!title) return showToast("スタンプ名を入力してください", true);
+
+        showToast("スタンプを登録中...");
+        let packId = null;
+        try {
+            const res = await fetch("/api/dm/stamps/packs", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ title, price })
+            });
+            const data = await res.json(); packId = data.pack_id;
+        } catch(e) { return showToast("パック作成失敗", true); }
+
+        cropperInstance.getCroppedCanvas({ width: 320, height: 320 }).toBlob(async (blob) => {
+            const formData = new FormData(); formData.append("file", blob, "stamp.png");
+            try {
+                const res = await fetch(`/api/dm/stamps/packs/${packId}/add-stamp`, { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+                if(res.ok) {
+                    showToast("自作スタンプを出品・保存しました！");
+                    closeModal("stamp-create-modal");
+                    await loadMyStamps();
+                }
+            } catch(e) { showToast("画像アップロード失敗", true); }
+        }, "image/png");
+    }
+
+    async function loadMyStamps() {
+        try {
+            const res = await fetch("/api/dm/stamps/my-stamps", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const picker = document.getElementById("my-stamps-picker");
+            let html = '';
+            (data.packs || []).forEach(p => {
+                (p.dm_stamps || []).forEach(s => {
+                    const src = `https://lh3.googleusercontent.com/u/0/d/${s.drive_file_id}=w400`;
+                    html += `<img src="${src}" class="stamp-pick-item" onclick="sendStamp('${s.drive_file_id}')">`;
+                });
+            });
+            picker.innerHTML = html || '<div style="grid-column:span 4; text-align:center; color:var(--sub); font-size:0.8rem; padding:20px 0;">所持スタンプがありません</div>';
+        } catch(e) {}
+    }
+
+    async function sendStamp(driveId) {
+        if(!activeConversation) return;
+        closeDrawers();
+        try {
+            await fetch("/api/dm/send", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    target_dm_id: activeConversation.target_dm_id || null, 
+                    room_id: activeConversation.room_id || null, 
+                    message_type: "STAMP", 
+                    content: "🎨 スタンプを送信しました", 
+                    metadata: { drive_file_id: driveId } 
+                })
+            });
+            await fetchCurrentMessages(false);
+        } catch(e) {}
+    }
+
+    // ==========================================
+    // WebRTC 音声・ビデオ通話
+    // ==========================================
+    async function startCall(isVideo = false) {
+        if(!activeConversation || !activeConversation.target_user_id) return showToast("個人DMで通話可能です", true);
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+            document.getElementById("local-video").srcObject = localStream;
+            if(isVideo) document.getElementById("video-pip-container").style.display = "block";
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = (event) => { document.getElementById("remote-video").srcObject = event.streams[0]; };
+            peerConnection.onicecandidate = (event) => { if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            sendSignal("OFFER", offer);
+
+            startCallTimer();
+            showToast(isVideo ? "ビデオ通話を発信中..." : "音声通話を発信中...");
+        } catch(e) { showToast("マイク・カメラの権限が拒絶されました", true); }
+    }
+
+    async function sendSignal(type, data) {
+        if(!activeConversation?.target_user_id) return;
+        try {
+            await fetch("/api/dm/call/signal", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ target_id: activeConversation.target_user_id, signal_type: type, signal_data: data })
+            });
+        } catch(e) {}
+    }
+
+    async function pollCallSignals() {
+        if(!activeConversation?.target_user_id) return;
+        try {
+            const res = await fetch(`/api/dm/call/signals/${activeConversation.target_user_id}`, { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            for (const s of (data.signals || [])) {
+                if(s.signal_type === "OFFER" && !peerConnection) {
+                    if(confirm("📞 密書通話の着信です。応答しますか？")) await answerCall(s.signal_data);
+                } else if(s.signal_type === "ANSWER" && peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(s.signal_data));
+                } else if(s.signal_type === "ICE_CANDIDATE" && peerConnection) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(s.signal_data));
+                } else if(s.signal_type === "LEAVE_CALL") {
+                    hangupCall(); showToast("通話が終了しました");
+                }
+            }
+        } catch(e) {}
+    }
+
+    async function answerCall(offerData) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            document.getElementById("local-video").srcObject = localStream;
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = (event) => { document.getElementById("remote-video").srcObject = event.streams[0]; };
+            peerConnection.onicecandidate = (event) => { if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); };
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            sendSignal("ANSWER", answer);
+            startCallTimer();
+        } catch(e) {}
+    }
+
+    function toggleMic() {
+        if(!localStream) return;
+        const track = localStream.getAudioTracks()[0];
+        if(track) { track.enabled = !track.enabled; document.getElementById("btn-toggle-mic").innerText = track.enabled ? "🎤 消音" : "🔇 ミュート中"; }
+    }
+    function toggleCam() {
+        const pip = document.getElementById("video-pip-container");
+        pip.style.display = pip.style.display === "block" ? "none" : "block";
+    }
+
+    function hangupCall() {
+        if(peerConnection) { peerConnection.close(); peerConnection = null; }
+        if(localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        sendSignal("LEAVE_CALL", {});
+        clearInterval(callTimer);
+        document.getElementById("call-bar").style.display = "none";
+        document.getElementById("video-pip-container").style.display = "none";
+    }
+
+    function startCallTimer() {
+        document.getElementById("call-bar").style.display = "flex";
+        callSeconds = 0; clearInterval(callTimer);
+        callTimer = setInterval(() => {
+            callSeconds++;
+            const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+            const s = String(callSeconds % 60).padStart(2, '0');
+            document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`;
+        }, 1000);
+    }
+
+    // ==========================================
+    // 新規会話モーダル操作
+    // ==========================================
+    function startDirectChat() {
+        const id = document.getElementById('target-dm-id').value.trim();
+        if(!id) return;
+        closeModal('new-dm-modal');
+        openConversation({ type: 'DIRECT', partner_dm_id: id, name: `@${id}`, is_blocked: false });
+    }
+
+    async function createGroupRoom() {
+        const name = document.getElementById('group-name-input').value.trim();
+        const mems = document.getElementById('group-members-input').value.split(',').map(s=>s.trim()).filter(s=>s.length > 0);
+        if(!name || mems.length === 0) return showToast("部屋名とメンバーを入力してください", true);
+
+        try {
+            const res = await fetch("/api/dm/groups", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ room_name: name, member_dm_ids: mems })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                closeModal('new-group-modal');
+                fetchThreads();
+                openConversation({ type: 'GROUP', room_id: data.room_id, name: name, is_blocked: false });
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("部屋作成エラー", true); }
+    }
 
     init();
 </script>
