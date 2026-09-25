@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>村岡王国 - 密書 (DM)</title>
+    <!-- Cropper.js (スタンプ手動正方形トリミング) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
@@ -17,6 +18,7 @@
             --text: #e7e9ea; 
             --sub: #71767b; 
             --danger: #ef4444;
+            --danger-hover: #dc2626;
             --success: #10b981;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -63,7 +65,7 @@
         .view.active { display: flex; animation: fadein 0.15s ease-out; }
         @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 通話ステータスバー & PIP小窓 */
+        /* 通話中スリムバー & PIP小窓 */
         #call-bar {
             display: none; background: #0c0e12; border-bottom: 1px solid var(--primary); padding: 8px 14px;
             font-size: 0.8rem; align-items: center; justify-content: space-between; z-index: 30;
@@ -87,9 +89,11 @@
         .avatar { width: 46px; height: 46px; border-radius: 50%; background: #333; margin-right: 14px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; object-fit: cover; border: 1px solid var(--border); }
         .thread-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
         .thread-name { font-weight: bold; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .thread-id { color: var(--sub); font-size: 0.85rem; font-weight: normal; margin-left: 6px; }
         .thread-msg { color: var(--sub); font-size: 0.85rem; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+        .unread-badge { background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
 
-        /* ピン留めバー */
+        /* ピン留め固定バー */
         #pin-banner { display: none; background: rgba(212,175,55,0.08); border-bottom: 1px solid rgba(212,175,55,0.3); padding: 8px 16px; font-size: 0.8rem; color: var(--primary); align-items: center; justify-content: space-between; z-index: 15; }
 
         /* チャット画面 */
@@ -141,7 +145,7 @@
 
         #block-warning-bar { display: none; padding: 12px 16px; background: #160a0a; border-top: 1px solid var(--danger); color: #ff9999; font-size: 0.85rem; text-align: center; font-weight: bold; flex-shrink: 0; }
 
-        /* ドロワー */
+        /* 拡張ドロワー */
         .drawer-panel { display: none; background: #0c0d10; border-top: 1px solid var(--border); padding: 14px; max-height: 220px; overflow-y: auto; flex-shrink: 0; animation: fadein 0.15s ease-out; }
         .launcher-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
         .launcher-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 0.75rem; }
@@ -156,8 +160,10 @@
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #000; padding: 24px; border-radius: 16px; width: 380px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
         .input-text, select { width: 100%; padding: 12px 14px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin: 8px 0; font-size: 0.9rem; }
-        .btn-full { width: 100%; padding: 12px; background: var(--primary); color: #000; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.92rem; }
+        .btn-full { width: 100%; padding: 12px; background: var(--text); color: var(--bg); border: none; border-radius: 24px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.95rem; }
         .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-primary-solid { background: var(--primary); color: #000; }
+        .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
         .nav-icon { background: transparent; border: none; color: var(--text); font-size: 1.25rem; padding: 6px; cursor: pointer; border-radius: 50%; }
 
         #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -184,12 +190,14 @@
             <div style="display:flex; gap: 4px; align-items:center;">
                 <button class="nav-icon" onclick="requestPushPermission()" title="通知設定">🔔</button>
                 <button class="nav-icon" onclick="openModal('settings-modal')" title="DM ID設定">⚙️</button>
-                <button class="nav-icon" onclick="location.href='/dashboard'" title="国民証に戻る">◀</button>
+                <button class="nav-btn" onclick="location.href='/dashboard'">◀ 国民証</button>
             </div>
         </div>
         <div class="action-bar">
-            <button class="btn-full" style="margin:0;" onclick="openModal('new-dm-modal')">＋ 新しい密書を送る</button>
-            <button class="btn-full btn-outline" style="margin:0;" onclick="openModal('new-group-modal')">👥 密談部屋を結成</button>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-full btn-primary-solid" style="margin:0; flex:1;" onclick="openModal('new-dm-modal')">＋ 新しい密書</button>
+                <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openModal('new-group-modal')">👥 密談部屋結成</button>
+            </div>
             <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
         </div>
         <div class="thread-list" id="thread-list">
@@ -272,7 +280,7 @@
             <span style="color:var(--sub); font-weight:bold;">@</span>
             <input type="text" id="target-dm-id" class="input-text" style="border:none; margin:0; background:transparent;" placeholder="muraoka_king">
         </div>
-        <button class="btn-full" onclick="startDirectChat()">密書を開始</button>
+        <button class="btn-full btn-primary-solid" onclick="startDirectChat()">密書を開始</button>
         <button class="btn-full btn-outline" onclick="closeModal('new-dm-modal')">キャンセル</button>
     </div>
 </div>
@@ -284,7 +292,7 @@
         <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 鉱山ダンジョン攻略組)">
         <p style="font-size:0.75rem; color:var(--sub); margin:6px 0 2px 0;">招待メンバーDM ID (カンマ区切り)</p>
         <input type="text" id="group-members-input" class="input-text" placeholder="user_a, user_b, user_c">
-        <button class="btn-full" onclick="createGroupRoom()">部屋を開設</button>
+        <button class="btn-full btn-primary-solid" onclick="createGroupRoom()">部屋を開設</button>
         <button class="btn-full btn-outline" onclick="closeModal('new-group-modal')">キャンセル</button>
     </div>
 </div>
@@ -295,7 +303,7 @@
         <h3 style="margin-top:0;">💰 Gold 送金</h3>
         <select id="transfer-wallet-select"></select>
         <input type="number" id="transfer-amount-input" class="input-text" min="1" placeholder="送金額 (Gold)">
-        <button class="btn-full" onclick="executeChatTransfer()">送金を実行</button>
+        <button class="btn-full btn-primary-solid" onclick="executeChatTransfer()">送金を実行</button>
         <button class="btn-full btn-outline" onclick="closeModal('transfer-modal')">キャンセル</button>
     </div>
 </div>
@@ -309,7 +317,7 @@
         <div style="width:100%; height:200px; background:#000; border-radius:8px; overflow:hidden; display:none;" id="cropper-container">
             <img id="cropper-img" style="max-width:100%;">
         </div>
-        <button class="btn-full" id="btn-save-stamp" style="display:none;" onclick="submitCroppedStamp()">この正方形で切り取って保存</button>
+        <button class="btn-full btn-primary-solid" id="btn-save-stamp" style="display:none;" onclick="submitCroppedStamp()">この正方形で切り取って保存</button>
         <button class="btn-full btn-outline" onclick="closeModal('stamp-create-modal')">閉じる</button>
     </div>
 </div>
@@ -319,7 +327,7 @@
     <div class="modal-content">
         <h3 style="margin-top:0;">DM ID設定</h3>
         <input type="text" id="my-dm-id-input" class="input-text" placeholder="例: muraoka_king">
-        <button class="btn-full" onclick="saveDMID()">設定保存</button>
+        <button class="btn-full btn-primary-solid" onclick="saveDMID()">設定保存</button>
         <button class="btn-full btn-outline" onclick="closeModal('settings-modal')">閉じる</button>
     </div>
 </div>
@@ -441,14 +449,16 @@
                     const isGroup = c.type === "GROUP";
                     const avatarImg = c.avatar ? `https://lh3.googleusercontent.com/u/0/d/${c.avatar}=w100` : '';
                     const avatarTag = avatarImg ? `<img src="${avatarImg}" class="avatar">` : `<div class="avatar">${isGroup ? '👥' : escapeHtml(c.name.charAt(0))}</div>`;
-                    const subLabel = isGroup ? '密談部屋' : `@${escapeHtml(c.partner_dm_id)}`;
+                    const subLabel = isGroup ? '' : `<span class="thread-id">@${escapeHtml(c.partner_dm_id)}</span>`;
+                    const badge = c.unread_count > 0 ? `<div class="unread-badge">${c.unread_count}</div>` : '';
 
                     html += `
                         <div class="thread-item" onclick='openConversation(${JSON.stringify(c)})'>
                             ${avatarTag}
                             <div class="thread-info">
                                 <div class="thread-name">
-                                    <div>${escapeHtml(c.name)} <span style="font-size:0.75rem; color:var(--sub); font-weight:normal;">${subLabel}</span></div>
+                                    <div>${escapeHtml(c.name)} ${subLabel}</div>
+                                    ${badge}
                                 </div>
                                 <div class="thread-msg">${escapeHtml(c.latest_message)}</div>
                             </div>
@@ -530,13 +540,13 @@
             let senderName = '';
             let avatarTag = '';
             if (!isMine) {
-                if (isAdminMode) senderName = `<div style="font-size:0.7rem; color:var(--sub); margin-bottom:2px;">${escapeHtml(m.sender?.nickname)}</div>`;
-                else if (activeConversation?.type === 'GROUP') senderName = `<div style="font-size:0.7rem; color:var(--sub); margin-bottom:2px;">${escapeHtml(m.sender?.nickname)}</div>`;
+                if (isAdminMode) senderName = `<div style="font-size:0.75rem; color:var(--primary); margin-bottom:4px; font-weight:bold;">${escapeHtml(m.sender?.nickname)}</div>`;
+                else if (activeConversation?.type === 'GROUP') senderName = `<div style="font-size:0.75rem; color:var(--primary); margin-bottom:4px; font-weight:bold;">${escapeHtml(m.sender?.nickname)}</div>`;
                 
                 const avaDrive = m.sender?.avatar_drive_id;
                 avatarTag = avaDrive 
-                    ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar" style="width:28px; height:28px; margin:0;">`
-                    : `<div class="avatar" style="width:28px; height:28px; font-size:0.75rem; margin:0;">${escapeHtml((m.sender?.nickname || '?').charAt(0))}</div>`;
+                    ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar" style="width:28px; height:28px; margin:0 6px 0 0;">`
+                    : `<div class="avatar" style="width:28px; height:28px; font-size:0.75rem; margin:0 6px 0 0;">${escapeHtml((m.sender?.nickname || '?').charAt(0))}</div>`;
             }
 
             let bodyHtml = '';
@@ -583,6 +593,8 @@
                 </div>
             `;
 
+            const roleTag = isMine ? '<span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; background:#2f3336; color:#aaa;">自分</span>' : '<span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; background:#2f3336; color:#aaa;">相手</span>';
+
             html += `
                 <div class="msg-row ${isMine ? 'msg-mine' : 'msg-other'}">
                     ${senderName}
@@ -596,7 +608,11 @@
                             ${reactBadgesHtml}
                         </div>
                     </div>
-                    <div class="msg-meta"><span>${timeStr}</span> ${readStatus}</div>
+                    <div class="msg-meta">
+                        <span>${timeStr}</span>
+                        ${!isAdminMode ? roleTag : ''}
+                        ${readStatus}
+                    </div>
                 </div>
             `;
         });
@@ -757,7 +773,6 @@
         }
     }
 
-    // --- スタンプ (Cropper正方形切り取り) ---
     function initCrop(e) {
         const file = e.target.files[0];
         if(!file) return;
@@ -832,7 +847,6 @@
         } catch(e) {}
     }
 
-    // --- WebRTC 通話 ---
     async function startCall(isVideo = false) {
         if(!activeConversation) return;
         try {
@@ -893,6 +907,7 @@
             document.getElementById("local-video").srcObject = localStream;
             peerConnection = new RTCPeerConnection(rtcConfig);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
             peerConnection.ontrack = (event) => { document.getElementById("remote-video").srcObject = event.streams[0]; };
             peerConnection.onicecandidate = (event) => { if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); };
 
@@ -934,7 +949,37 @@
         }, 1000);
     }
 
-    // --- 新規会話 ---
+    async function requestPushPermission() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return showToast("通知非対応のブラウザです", true);
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return showToast("通知が許可されませんでした", true);
+
+        try {
+            const swReg = await navigator.serviceWorker.register('/sw.js');
+            const keyRes = await fetch('/api/dm/vapid-public-key');
+            const keyData = await keyRes.json();
+            const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
+
+            const subscription = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+            const subData = JSON.parse(JSON.stringify(subscription));
+            
+            await fetch('/api/dm/push-subscribe', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth })
+            });
+            showToast("通知設定を有効化しました");
+        } catch (e) { showToast("通知設定エラー", true); }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+        return outputArray;
+    }
+
     function startDirectChat() {
         const id = document.getElementById('target-dm-id').value.trim();
         if(!id) return;
