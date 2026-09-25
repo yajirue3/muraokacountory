@@ -294,7 +294,6 @@
     let localVideoTrack = null;
     let callTimer = null;
     let callSeconds = 0;
-    let processedSignalIds = new Set();
 
     function showToast(msg, isError = false) {
         const c = document.getElementById('toast-container');
@@ -337,7 +336,6 @@
                         fetchAdminMessages(ids[0], ids[1], true);
                     } else {
                         fetchMessages(true);
-                        pollCallSignals();
                     }
                 } else {
                     fetchThreads(true);
@@ -532,6 +530,14 @@
                 bodyHtml = `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w400" class="msg-stamp">`;
             } else if (m.message_type === 'TRANSFER') {
                 bodyHtml = `<div class="msg-transfer-card ${isMine ? 'mine' : ''}"><span style="font-size:0.75rem; color:var(--primary); font-weight:bold;">💰 Gold 送金完了</span><span style="font-size:1.15rem; font-weight:bold; color:#fff;">+${m.metadata.amount} G</span></div>`;
+            } else if (m.message_type === 'CALL_INVITE') {
+                const cName = m.metadata.channelName || '';
+                const isVid = m.metadata.isVideo || false;
+                const callTypeStr = isVid ? '🎥 ビデオ' : '📞 音声';
+                bodyHtml = `<div class="msg-transfer-card ${isMine ? 'mine' : ''}" style="border-color:var(--success);">
+                    <span style="font-size:0.85rem; font-weight:bold;">${callTypeStr}通話</span>
+                    ${!isMine ? `<button class="btn-call-ctrl" style="margin-top:8px; background:var(--success); color:#fff; border:none;" onclick="answerAgoraCall('${cName}',${isVid})">参加する</button>` : '<span style="font-size:0.75rem; color:var(--sub); margin-top:4px;">発信しました</span>'}
+                </div>`;
             } else {
                 bodyHtml = escapeHtml(m.content);
             }
@@ -822,18 +828,20 @@
     }
 
     // =====================================================================
-    // Agora 通話エンジン
+    // Agora 通話エンジン (チャット連動型に最適化)
     // =====================================================================
-    function getAgoraChannelName() {
+    async function getAgoraChannelName() {
         if (!activeConversation) return null;
         if (activeConversation.type === 'GROUP') {
             return `room_${activeConversation.room_id}`;
         }
-        // UUIDのハイフンを除去して短縮し、64バイト以内に収める
-        const idA = String(currentUser.id).replace(/-/g, '').slice(0, 24);
-        const idB = String(activeConversation.target_user_id).replace(/-/g, '').slice(0, 24);
-        const ids = [idA, idB].sort();
-        return `c_${ids[0]}_${ids[1]}`;
+        // UUIDを結合し、SHA-256でハッシュ化して64バイト制限を安全にクリア
+        const idA = String(currentUser.id).replace(/-/g, '');
+        const idB = String(activeConversation.target_user_id).replace(/-/g, '');
+        const ids = [idA, idB].sort().join('_');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ids));
+        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return `c_${hashHex.substring(0, 32)}`;
     }
 
     async function startCall(isVideo = false) {
@@ -849,20 +857,27 @@
         }
 
         try {
-            const channelName = getAgoraChannelName();
+            const channelName = await getAgoraChannelName();
             await joinAgoraChannel(channelName, isVideo);
 
             document.getElementById("call-status-text").innerText = "📞 呼び出し中...";
             document.getElementById("call-status-text").style.color = "var(--primary)";
             document.getElementById("call-bar").style.display = "flex";
 
-            await sendSignal("OFFER", {
-                channelName: channelName,
-                isVideo: isVideo,
-                target_dm_id: activeConversation.partner_dm_id
+            // シグナル専用テーブルではなく、通常のチャットメッセージ(着信履歴)として送信
+            await fetch('/api/dm/send', { 
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    target_dm_id: activeConversation.partner_dm_id || null, 
+                    room_id: activeConversation.room_id || null, 
+                    message_type: 'CALL_INVITE',
+                    content: isVideo ? '🎥 ビデオ通話を開始しました' : '📞 音声通話を開始しました',
+                    metadata: { channelName: channelName, isVideo: isVideo }
+                }) 
             });
-
-            showToast("発信を開始しました");
+            
+            fetchMessages(false);
+            showToast("通話を開始しました");
         } catch (e) {
             console.error(e);
             showToast(`発信失敗: ${e.message}`, true);
@@ -873,7 +888,6 @@
     async function joinAgoraChannel(channelName, isVideo) {
         agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
-        // サーバーから動的トークンを取得
         const tokenRes = await fetch(`/api/dm/agora-token?channel_name=${encodeURIComponent(channelName)}`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
@@ -914,7 +928,6 @@
             showToast("相手が通話を終了しました");
         });
 
-        // 取得したトークンを渡して接続
         await agoraClient.join(tokenData.app_id, channelName, tokenData.token, null);
 
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
@@ -932,56 +945,6 @@
         }
 
         await agoraClient.publish(tracksToPublish);
-    }
-
-    async function sendSignal(type, data) {
-        if (!activeConversation) return;
-        try { 
-            await fetch("/api/dm/call/signal", { 
-                method: "POST", 
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
-                body: JSON.stringify({ 
-                    target_id: activeConversation.target_user_id || null, 
-                    room_id: activeConversation.room_id || null, 
-                    signal_type: type, 
-                    signal_data: data 
-                }) 
-            }); 
-        } catch(e) {}
-    }
-
-    async function pollCallSignals() {
-        if (!activeConversation) return;
-        const q = activeConversation.type === 'GROUP' 
-            ? `room_id=${activeConversation.room_id}` 
-            : `target_user_id=${activeConversation.target_user_id}`;
-        if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) return;
-
-        try {
-            const res = await fetch(`/api/dm/call/signals?${q}`, { headers: { "Authorization": `Bearer ${token}` } });
-            if (!res.ok) return;
-            const data = await res.json();
-
-            for (const s of (data.signals || [])) {
-                if (processedSignalIds.has(s.id)) continue;
-                processedSignalIds.add(s.id);
-
-                if (s.signal_type === "OFFER" && !agoraClient) {
-                    const isVideo = !!s.signal_data?.isVideo;
-                    const channelName = s.signal_data?.channelName;
-                    
-                    if (confirm(`📞 ${isVideo ? 'ビデオ' : '音声'}通話の着信です。応答しますか？`)) {
-                        await answerAgoraCall(channelName, isVideo);
-                    } else {
-                        sendSignal("LEAVE_CALL", {});
-                    }
-                } 
-                else if (s.signal_type === "LEAVE_CALL") {
-                    hangupCall();
-                    showToast("通話が終了しました");
-                }
-            }
-        } catch(e) {}
     }
 
     async function answerAgoraCall(channelName, isVideo) {
@@ -1009,12 +972,6 @@
     }
 
     async function hangupCall() {
-        try {
-            if (agoraClient) {
-                sendSignal("LEAVE_CALL", {});
-            }
-        } catch(e) {}
-
         if (localAudioTrack) {
             localAudioTrack.stop();
             localAudioTrack.close();
