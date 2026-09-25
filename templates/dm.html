@@ -21,7 +21,7 @@
         .view.active { display: flex; animation: fadein 0.15s ease-out; }
         @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* WebRTC */
+        /* WebRTC 通話バー & PIP小窓 */
         #call-bar { display: none; background: #0c0e12; border-bottom: 1px solid var(--primary); padding: 8px 16px; font-size: 0.85rem; align-items: center; justify-content: space-between; flex-shrink: 0; }
         .btn-call-ctrl { background: var(--card-bg); border: 1px solid var(--border); color: #fff; padding: 4px 12px; border-radius: 14px; cursor: pointer; font-weight: bold; font-size:0.8rem; }
         .btn-call-hangup { background: var(--danger); border-color: var(--danger); }
@@ -167,7 +167,7 @@
         </div>
 
         <div id="call-bar">
-            <span id="call-status-text" style="color:var(--success); font-weight:bold;">🟢 通話中 (00:00)</span>
+            <span id="call-status-text" style="color:var(--primary); font-weight:bold;">📞 呼び出し中...</span>
             <div class="call-controls">
                 <button class="btn-call-ctrl" id="btn-toggle-mic" onclick="toggleMic()">🎤</button>
                 <button class="btn-call-ctrl" id="btn-toggle-cam" onclick="toggleCam()">📷</button>
@@ -288,6 +288,8 @@
     let peerConnection = null;
     let callTimer = null;
     let callSeconds = 0;
+    let isCallConnected = false;
+    let candidateQueue = [];
     const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
     function showToast(msg, isError = false) {
@@ -295,7 +297,7 @@
         if(!c) return;
         const t = document.createElement('div'); t.className = 'toast'; t.innerText = msg;
         if(isError) t.style.borderLeftColor = 'var(--danger)';
-        c.appendChild(t); setTimeout(() => t.remove(), 5000);
+        c.appendChild(t); setTimeout(() => t.remove(), 4000);
     }
     function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
@@ -316,16 +318,20 @@
         fetchThreads();
         
         setInterval(() => {
-            if (activeConversation) {
-                if (isAdminMode && activeConversation.admin_ids) {
-                    const ids = activeConversation.admin_ids.split('/');
-                    fetchAdminMessages(ids[0], ids[1], true);
+            try {
+                if (activeConversation) {
+                    if (isAdminMode && activeConversation.admin_ids) {
+                        const ids = activeConversation.admin_ids.split('/');
+                        fetchAdminMessages(ids[0], ids[1], true);
+                    } else {
+                        fetchMessages(true);
+                        pollCallSignals();
+                    }
                 } else {
-                    fetchMessages(true);
-                    pollCallSignals();
+                    fetchThreads(true);
                 }
-            } else {
-                fetchThreads(true);
+            } catch(e) {
+                console.error("ループ処理例外", e);
             }
         }, 3000);
     }
@@ -447,7 +453,15 @@
         await fetchAdminMessages(idA, idB, false);
     }
 
-    function closeChat() { showView('view-list'); activeConversation = null; closeDrawers(); fetchThreads(true); }
+    function closeChat() { 
+        if (peerConnection || localStream) {
+            hangupCall();
+        }
+        showView('view-list'); 
+        activeConversation = null; 
+        closeDrawers(); 
+        fetchThreads(true); 
+    }
 
     async function fetchAdminMessages(idA, idB, isBg) {
         try {
@@ -463,7 +477,7 @@
             const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
             if(res.ok) {
                 const data = await res.json();
-                if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
+                if (activeConversation.type === 'DIRECT' && data.partner_user_id) {
                     activeConversation.target_user_id = data.partner_user_id;
                 }
                 renderMessagesList(data.messages || [], isBg);
@@ -795,87 +809,231 @@
         } catch(e) {}
     }
 
-    // --- WebRTC ---
+    // --- WebRTC 通話完全修正 ---
     async function startCall(isVideo = false) {
         if(!activeConversation) return;
         
+        // 相手のIDが取れていなければ強制フェッチ
         if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
-            showToast("相手の接続情報を確認中です。少々お待ちください...");
+            showToast("接続情報を確認中...");
             await fetchMessages(false);
             if (!activeConversation.target_user_id) {
-                showToast("通話相手の特定に失敗しました", true);
+                showToast("相手の接続先IDが見つかりません", true);
                 return;
             }
         }
 
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo ? { width: 320, height: 240 } : false });
+            candidateQueue = [];
+            isCallConnected = false;
+
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: true, 
+                video: isVideo ? { width: 320, height: 240 } : false 
+            });
             document.getElementById("local-video").srcObject = localStream;
             if(isVideo) document.getElementById("video-pip-container").style.display = "block";
 
             peerConnection = new RTCPeerConnection(rtcConfig);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            peerConnection.ontrack = (event) => { document.getElementById("remote-video").srcObject = event.streams[0]; };
-            peerConnection.onicecandidate = (event) => { if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); };
+            
+            peerConnection.ontrack = (event) => { 
+                document.getElementById("remote-video").srcObject = event.streams[0]; 
+            };
+            
+            peerConnection.onicecandidate = (event) => { 
+                if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); 
+            };
 
-            const offer = await peerConnection.createOffer(); await peerConnection.setLocalDescription(offer);
-            sendSignal("OFFER", offer); startCallTimer(); showToast("発信中...");
-        } catch(e) { showToast("マイク・カメラの権限エラー", true); }
+            const offer = await peerConnection.createOffer(); 
+            await peerConnection.setLocalDescription(offer);
+            
+            // 呼び出し中表示
+            document.getElementById("call-status-text").innerText = "📞 呼び出し中...";
+            document.getElementById("call-status-text").style.color = "var(--primary)";
+            document.getElementById("call-bar").style.display = "flex";
+
+            await sendSignal("OFFER", { 
+                offer: offer, 
+                isVideo: isVideo, 
+                target_dm_id: activeConversation.partner_dm_id 
+            }); 
+            
+            showToast("発信を開始しました");
+        } catch(e) { 
+            console.error(e);
+            showToast(`発信失敗: ${e.name || e.message}`, true); 
+            hangupCall();
+        }
     }
 
     async function sendSignal(type, data) {
         if(!activeConversation) return;
-        try { await fetch("/api/dm/call/signal", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ target_id: activeConversation.target_user_id || null, room_id: activeConversation.room_id || null, signal_type: type, signal_data: data }) }); } catch(e) {}
+        try { 
+            await fetch("/api/dm/call/signal", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    target_id: activeConversation.target_user_id || null, 
+                    room_id: activeConversation.room_id || null, 
+                    signal_type: type, 
+                    signal_data: data 
+                }) 
+            }); 
+        } catch(e) {}
     }
 
     async function pollCallSignals() {
         if(!activeConversation) return;
         const q = activeConversation.type === 'GROUP' ? `room_id=${activeConversation.room_id}` : `target_user_id=${activeConversation.target_user_id}`;
+        if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) return;
+
         try {
             const res = await fetch(`/api/dm/call/signals?${q}`, { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) return;
             const data = await res.json();
+            
             for (const s of (data.signals || [])) {
-                if(s.signal_type === "OFFER" && !peerConnection) { if(confirm("📞 着信です。応答しますか？")) await answerCall(s.signal_data); }
-                else if(s.signal_type === "ANSWER" && peerConnection) { await peerConnection.setRemoteDescription(new RTCSessionDescription(s.signal_data)); }
-                else if(s.signal_type === "ICE_CANDIDATE" && peerConnection) { await peerConnection.addIceCandidate(new RTCIceCandidate(s.signal_data)); }
-                else if(s.signal_type === "LEAVE_CALL") { hangupCall(); showToast("通話終了"); }
+                if(s.signal_type === "OFFER" && !peerConnection) { 
+                    const isVideo = s.signal_data?.isVideo || false;
+                    if(confirm(`📞 ${isVideo ? 'ビデオ' : '音声'}通話の着信です。応答しますか？`)) {
+                        await answerCall(s.signal_data.offer || s.signal_data, isVideo);
+                    } else {
+                        sendSignal("LEAVE_CALL", {});
+                    }
+                } 
+                else if(s.signal_type === "ANSWER" && peerConnection && !isCallConnected) { 
+                    const desc = new RTCSessionDescription(s.signal_data);
+                    await peerConnection.setRemoteDescription(desc);
+                    
+                    // キューイングされたICE候補を流し込む
+                    while(candidateQueue.length > 0) {
+                        const cand = candidateQueue.shift();
+                        await peerConnection.addIceCandidate(cand).catch(()=>{});
+                    }
+                    
+                    // 応答確認：ここで初めて「通話中」に遷移
+                    isCallConnected = true;
+                    startCallTimer();
+                    showToast("通話が接続されました！");
+                } 
+                else if(s.signal_type === "ICE_CANDIDATE" && peerConnection) { 
+                    const candidate = new RTCIceCandidate(s.signal_data);
+                    if(peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                        await peerConnection.addIceCandidate(candidate).catch(()=>{});
+                    } else {
+                        candidateQueue.push(candidate);
+                    }
+                } 
+                else if(s.signal_type === "LEAVE_CALL") { 
+                    hangupCall(); 
+                    showToast("相手が通話を終了しました"); 
+                }
             }
         } catch(e) {}
     }
 
-    async function answerCall(offerData) {
+    async function answerCall(offerData, isVideo) {
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            candidateQueue = [];
+            isCallConnected = false;
+
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: true, 
+                video: isVideo ? { width: 320, height: 240 } : false 
+            });
             document.getElementById("local-video").srcObject = localStream;
+            if(isVideo) document.getElementById("video-pip-container").style.display = "block";
+
             peerConnection = new RTCPeerConnection(rtcConfig);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            peerConnection.ontrack = (event) => { document.getElementById("remote-video").srcObject = event.streams[0]; };
-            peerConnection.onicecandidate = (event) => { if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); };
+            
+            peerConnection.ontrack = (event) => { 
+                document.getElementById("remote-video").srcObject = event.streams[0]; 
+            };
+            peerConnection.onicecandidate = (event) => { 
+                if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); 
+            };
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
-            const answer = await peerConnection.createAnswer(); await peerConnection.setLocalDescription(answer);
-            sendSignal("ANSWER", answer); startCallTimer();
-        } catch(e) {}
+            
+            // キュー内の候補を処理
+            while(candidateQueue.length > 0) {
+                const cand = candidateQueue.shift();
+                await peerConnection.addIceCandidate(cand).catch(()=>{});
+            }
+
+            const answer = await peerConnection.createAnswer(); 
+            await peerConnection.setLocalDescription(answer);
+            await sendSignal("ANSWER", answer); 
+            
+            isCallConnected = true;
+            startCallTimer();
+            showToast("通話を開始しました");
+        } catch(e) {
+            console.error(e);
+            showToast(`応答エラー: ${e.name || e.message}`, true);
+            hangupCall();
+        }
     }
 
     function toggleMic() {
         if(!localStream) return;
         const t = localStream.getAudioTracks()[0];
-        if(t) { t.enabled = !t.enabled; document.getElementById("btn-toggle-mic").innerText = t.enabled ? "🎤" : "🔇"; }
+        if(t) { 
+            t.enabled = !t.enabled; 
+            document.getElementById("btn-toggle-mic").innerText = t.enabled ? "🎤" : "🔇"; 
+        }
+    }
+    
+    function toggleCam() { 
+        const p = document.getElementById("video-pip-container"); 
+        p.style.display = p.style.display === "block" ? "none" : "block"; 
     }
 
-    function toggleCam() { const p = document.getElementById("video-pip-container"); p.style.display = p.style.display === "block" ? "none" : "block"; }
-
     function hangupCall() {
-        if(peerConnection) { peerConnection.close(); peerConnection = null; }
-        if(localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-        sendSignal("LEAVE_CALL", {}); clearInterval(callTimer);
-        document.getElementById("call-bar").style.display = "none"; document.getElementById("video-pip-container").style.display = "none";
+        try {
+            if (peerConnection) {
+                sendSignal("LEAVE_CALL", {});
+            }
+        } catch(e) {}
+
+        if (peerConnection) { 
+            peerConnection.ontrack = null;
+            peerConnection.onicecandidate = null;
+            peerConnection.close(); 
+            peerConnection = null; 
+        }
+        if (localStream) { 
+            localStream.getTracks().forEach(t => t.stop()); 
+            localStream = null; 
+        }
+        
+        clearInterval(callTimer);
+        isCallConnected = false;
+        candidateQueue = [];
+
+        const remoteVid = document.getElementById("remote-video");
+        const localVid = document.getElementById("local-video");
+        if(remoteVid) remoteVid.srcObject = null;
+        if(localVid) localVid.srcObject = null;
+
+        document.getElementById("call-bar").style.display = "none"; 
+        document.getElementById("video-pip-container").style.display = "none";
     }
 
     function startCallTimer() {
-        document.getElementById("call-bar").style.display = "flex"; callSeconds = 0; clearInterval(callTimer);
-        callTimer = setInterval(() => { callSeconds++; const m = String(Math.floor(callSeconds/60)).padStart(2,'0'); const s = String(callSeconds%60).padStart(2,'0'); document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`; }, 1000);
+        document.getElementById("call-bar").style.display = "flex"; 
+        document.getElementById("call-status-text").style.color = "var(--success)";
+        callSeconds = 0; 
+        clearInterval(callTimer);
+        
+        callTimer = setInterval(() => { 
+            callSeconds++; 
+            const m = String(Math.floor(callSeconds/60)).padStart(2,'0'); 
+            const s = String(callSeconds%60).padStart(2,'0'); 
+            document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`; 
+        }, 1000);
     }
     
     async function requestPushPermission() {
@@ -893,7 +1051,6 @@
             showToast("通知設定を有効化しました");
         } catch (e) {}
     }
-
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
         const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
