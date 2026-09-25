@@ -469,3 +469,33 @@ async def get_my_sales(page: int = Query(1, ge=1), authorization: str = Header(N
         print("[MALL ERROR /my-sales]:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"販売履歴の取得に失敗しました: {str(e)}")
+
+
+class MallItemCancel(BaseModel):
+    target_account_id: Optional[str] = None
+
+@router.post("/items/{item_id}/cancel")
+async def cancel_item(item_id: int, data: Optional[MallItemCancel] = None, authorization: str = Header(None)):
+    try:
+        user = await get_user_from_token(authorization)
+        enforce_mall_rate_limit(user.id)
+        client = await get_supabase()
+
+        target_acc_id = data.target_account_id if data else None
+
+        res = await client.rpc("execute_mall_cancel_item", {
+            "p_user_id": str(user.id),
+            "p_item_id": item_id,
+            "p_target_account_id": target_acc_id
+        }).execute()
+
+        result = res.data or {}
+        ret_qty = result.get("returned_quantity", 0)
+        msg = f"商品の出品を取り消しました。（残在庫 {ret_qty} 個を手元に戻しました）" if ret_qty > 0 else "商品の出品を取り消しました。"
+        return {"message": msg, "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[MALL ERROR /items/{item_id}/cancel]:")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
