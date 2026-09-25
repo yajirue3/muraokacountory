@@ -1110,3 +1110,120 @@ async def vote_poll(poll_id: int, data: PollVote, authorization: str = Header(No
             "user_id": user.id
         }).execute()
         return {"message": "投票しました！"}
+
+# ==================================================
+# ウォレット・ギフトリンク機能 API
+# ==================================================
+class GiftCreateRequest(BaseModel):
+    sender_wallet_id: str
+    amount: int = Field(..., gt=0, le=100_000_000, description="1Gold以上1億Gold以下")
+    expires_in_hours: int = Field(24, ge=1, le=720, description="有効期限（1時間〜30日）")
+
+class GiftClaimRequest(BaseModel):
+    receiver_wallet_id: str
+
+def generate_gift_code() -> str:
+    return "GIFT-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+
+@app.post("/api/wallets/gifts")
+async def create_wallet_gift(data: GiftCreateRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    gift_code = generate_gift_code()
+
+    try:
+        res = await client.rpc("execute_create_wallet_gift", {
+            "p_user_id": str(user.id),
+            "p_sender_wallet_id": data.sender_wallet_id,
+            "p_amount": data.amount,
+            "p_expires_in_hours": data.expires_in_hours,
+            "p_gift_code": gift_code
+        }).execute()
+        return {
+            "message": f"{data.amount} Goldのギフトリンクを発行しました！",
+            "gift_code": gift_code,
+            "data": res.data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.get("/api/wallets/gifts/{gift_code}")
+async def get_wallet_gift_info(gift_code: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    res = await client.table("wallet_gifts").select("*").eq("id", gift_code).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ギフトリンクが見つかりません。")
+
+    gift = res.data[0]
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 期限切れ自動判定
+    if gift["status"] == "ACTIVE" and gift["expires_at"] < now_iso:
+        gift["status"] = "EXPIRED"
+
+    # 作成者のニックネーム取得
+    prof_res = await client.table("profiles").select("nickname").eq("id", gift["creator_user_id"]).execute()
+    creator_name = prof_res.data[0]["nickname"] if prof_res.data else "名無し"
+
+    return {
+        "gift_code": gift["id"],
+        "amount": gift["amount"],
+        "status": gift["status"],
+        "expires_at": gift["expires_at"],
+        "creator_nickname": creator_name,
+        "is_creator": (gift["creator_user_id"] == str(user.id))
+    }
+
+@app.post("/api/wallets/gifts/{gift_code}/claim")
+async def claim_wallet_gift(gift_code: str, data: GiftClaimRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    try:
+        res = await client.rpc("execute_claim_wallet_gift", {
+            "p_user_id": str(user.id),
+            "p_gift_code": gift_code,
+            "p_receiver_wallet_id": data.receiver_wallet_id
+        }).execute()
+        result = res.data or {}
+        return {
+            "message": f"{result.get('amount', '')} Gold のギフトを受け取りました！",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.post("/api/wallets/gifts/{gift_code}/cancel")
+async def cancel_wallet_gift(gift_code: str, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    try:
+        res = await client.rpc("execute_cancel_wallet_gift", {
+            "p_user_id": str(user.id),
+            "p_gift_code": gift_code
+        }).execute()
+        result = res.data or {}
+        return {
+            "message": f"ギフトリンクを無効化し、{result.get('refund_amount', 0)} Gold を口座（{result.get('refund_wallet_id', '')}）に払い戻しました。",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+@app.get("/api/wallets/my-gifts")
+async def get_my_created_gifts(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    res = await client.table("wallet_gifts").select("*").eq("creator_user_id", user.id).order("created_at", desc=True).limit(20).execute()
+    gifts = res.data or []
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    for g in gifts:
+        if g["status"] == "ACTIVE" and g["expires_at"] < now_iso:
+            g["status"] = "EXPIRED"
+
+    return {"gifts": gifts}
