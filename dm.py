@@ -3,7 +3,7 @@ import json
 import re
 import traceback
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
 from pydantic import BaseModel, Field
 import httpx
@@ -116,7 +116,7 @@ async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
     except Exception: pass
 
 # =====================================================================
-# API: ユーザー情報・通知設定 (既存維持)
+# API: ユーザー情報・設定
 # =====================================================================
 @router.get("/me")
 async def get_my_dm_info(authorization: str = Header(None)):
@@ -176,7 +176,7 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
         await client.table("direct_messages").insert({
             "sender_id": user.id, "room_id": data.room_id, "message_type": data.message_type, "content": data.content.strip(), "metadata": data.metadata
         }).execute()
-        await client.table("dm_rooms").update({"updated_at": datetime.utcnow().isoformat()}).eq("id", data.room_id).execute()
+        await client.table("dm_rooms").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", data.room_id).execute()
         return {"message": "送信完了しました。"}
     else:
         target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
@@ -202,7 +202,7 @@ async def get_conversations(authorization: str = Header(None)):
     client = await get_supabase()
     
     filter_str = f"sender_id.eq.{user.id},receiver_id.eq.{user.id}"
-    msgs_1v1 = await client.table("direct_messages").select("id, sender_id, receiver_id, content, is_read, is_deleted, created_at").is_("room_id", "null").or_(filter_str).order("created_at", desc=True).execute()
+    msgs_1v1 = await client.table("direct_messages").select("id, sender_id, receiver_id, content, is_read, is_deleted, created_at").is_("room_id", "null").or_(filter_str).order("created_at", desc=True).limit(500).execute()
 
     my_groups_res = await client.table("dm_room_members").select("room_id").eq("user_id", user.id).execute()
     group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
@@ -216,7 +216,6 @@ async def get_conversations(authorization: str = Header(None)):
 
     convs = {}
     
-    # 1v1の処理
     if msgs_1v1.data:
         partner_ids = {m["receiver_id"] if m["sender_id"] == user.id else m["sender_id"] for m in msgs_1v1.data}
         profiles_res = await client.table("profiles").select("id, nickname, dm_id, avatar_drive_id").in_("id", list(partner_ids)).execute()
@@ -248,7 +247,6 @@ async def get_conversations(authorization: str = Header(None)):
 
     result_list = list(convs.values())
 
-    # グループの処理
     for r in groups_data:
         l_msg = await client.table("direct_messages").select("content, is_deleted").eq("room_id", r["id"]).order("created_at", desc=True).limit(1).execute()
         txt = (l_msg.data[0]["content"] if not l_msg.data[0]["is_deleted"] else "送信取り消し済") if l_msg.data else "メッセージなし"
@@ -274,11 +272,16 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
     if not tgt.data: return {"messages": [], "partner_user_id": None}
     partner_id = tgt.data[0]["id"]
     
+    # 既読更新
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).is_("room_id", "null").eq("is_read", False).execute()
 
     cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
-    res = await client.table("direct_messages").select("id, sender_id, receiver_id, message_type, content, metadata, is_pinned, is_deleted, is_read, created_at").is_("room_id", "null").or_(cond).order("created_at", desc=False).limit(200).execute()
+    # 最新から200件取得して反転（古い順）
+    res = await client.table("direct_messages").select(
+        "id, sender_id, receiver_id, message_type, content, metadata, is_pinned, is_deleted, is_read, created_at"
+    ).is_("room_id", "null").or_(cond).order("created_at", desc=True).limit(200).execute()
     msgs = res.data or []
+    msgs.reverse()
 
     msg_ids = [m["id"] for m in msgs]
     r_map = {}
@@ -296,8 +299,11 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
 async def get_group_messages(room_id: int, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
-    res = await client.table("direct_messages").select("id, sender_id, room_id, message_type, content, metadata, is_pinned, is_deleted, created_at").eq("room_id", room_id).order("created_at", desc=False).limit(200).execute()
+    res = await client.table("direct_messages").select(
+        "id, sender_id, room_id, message_type, content, metadata, is_pinned, is_deleted, created_at"
+    ).eq("room_id", room_id).order("created_at", desc=True).limit(200).execute()
     msgs = res.data or []
+    msgs.reverse()
 
     u_ids = list({m["sender_id"] for m in msgs})
     p_map = {}
@@ -395,7 +401,7 @@ async def upload_img(file: UploadFile = File(...), target_dm_id: str = Form(None
     return {"success": True}
 
 # =====================================================================
-# API: スタンプ機能（市場・購入含む完全版）
+# API: スタンプ機能
 # =====================================================================
 @router.post("/stamps/packs")
 async def create_stamp_pack(title: str = Form(...), price: int = Form(...), file: UploadFile = File(...), authorization: str = Header(None)):
@@ -453,7 +459,6 @@ async def purchase_stamp(data: StampPurchaseReq, authorization: str = Header(Non
             raise HTTPException(400, detail="残高不足です")
         await client.table("wallets").update({"balance": w.data[0]["balance"] - price}).eq("id", w.data[0]["id"]).execute()
         
-        # クリエイターへ還元
         c_w = await client.table("wallets").select("id, balance").eq("user_id", pack.data[0]["creator_user_id"]).order("created_at").limit(1).execute()
         if c_w.data:
             await client.table("wallets").update({"balance": c_w.data[0]["balance"] + price}).eq("id", c_w.data[0]["id"]).execute()
@@ -472,13 +477,26 @@ async def get_my_stamps(authorization: str = Header(None)):
     return {"stamps": stamps.data or []}
 
 # =====================================================================
-# API: WebRTC
+# API: WebRTC (タイムゾーン対応・確実なシグナル取得)
 # =====================================================================
 @router.post("/call/signal")
 async def send_call_signal(data: CallSignalReq, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
-    await (await get_supabase()).table("dm_call_signals").insert({
-        "sender_id": user.id, "target_id": data.target_id, "room_id": data.room_id, "signal_type": data.signal_type, "signal_data": data.signal_data
+    client = await get_supabase()
+
+    target_uid = data.target_id
+    # 宛先IDが未解決で target_dm_id のみある場合のフォールバック
+    if not target_uid and not data.room_id and data.signal_data.get("target_dm_id"):
+        t_res = await client.table("profiles").select("id").eq("dm_id", data.signal_data["target_dm_id"]).execute()
+        if t_res.data:
+            target_uid = t_res.data[0]["id"]
+
+    await client.table("dm_call_signals").insert({
+        "sender_id": user.id, 
+        "target_id": target_uid, 
+        "room_id": data.room_id, 
+        "signal_type": data.signal_type, 
+        "signal_data": data.signal_data
     }).execute()
     return {"success": True}
 
@@ -486,9 +504,20 @@ async def send_call_signal(data: CallSignalReq, authorization: str = Header(None
 async def poll_call_signals(target_user_id: Optional[str] = None, room_id: Optional[int] = None, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
-    now_30s = datetime.fromtimestamp(datetime.utcnow().timestamp() - 30).isoformat()
-    if room_id: res = await client.table("dm_call_signals").select("*").eq("room_id", room_id).neq("sender_id", user.id).gt("created_at", now_30s).order("created_at").execute()
-    else: res = await client.table("dm_call_signals").select("*").eq("target_id", user.id).eq("sender_id", target_user_id).gt("created_at", now_30s).order("created_at").execute()
+    
+    # タイムゾーン付きUTC（過去35秒以内の有効シグナルのみ抽出）
+    now_35s_ago = datetime.now(timezone.utc).timestamp() - 35
+    time_limit_str = datetime.fromtimestamp(now_35s_ago, tz=timezone.utc).isoformat()
+    
+    query = client.table("dm_call_signals").select("*").gt("created_at", time_limit_str).order("created_at")
+    
+    if room_id: 
+        res = await query.eq("room_id", room_id).neq("sender_id", user.id).execute()
+    else: 
+        if not target_user_id:
+            return {"signals": []}
+        res = await query.eq("target_id", user.id).eq("sender_id", target_user_id).execute()
+        
     return {"signals": res.data or []}
 
 # =====================================================================
