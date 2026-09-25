@@ -40,6 +40,20 @@
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; }
         .modal-content { background: #222; border: 2px solid #555; border-radius: 12px; width: 90%; max-width: 360px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); text-align: center; }
+
+        /* ギフト用スタイル */
+        .btn-gift-action { background: #d4af37; color: #1a1a1a; }
+        .btn-gift-action:hover { background: #f39c12; }
+        .btn-cancel { background: #e74c3c; color: #fff; width: auto; padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; }
+        .btn-cancel:hover { background: #c0392b; }
+        .btn-copy { background: #3498db; color: #fff; width: auto; padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; }
+        .btn-copy:hover { background: #2980b9; }
+        .gift-item { background: #202020; border: 1px solid #444; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 0.8rem; text-align: left; }
+        .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+        .badge-active { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid #2ecc71; }
+        .badge-claimed { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid #3498db; }
+        .badge-cancelled { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid #e74c3c; }
+        .badge-expired { background: rgba(149, 165, 166, 0.2); color: #95a5a6; border: 1px solid #95a5a6; }
     </style>
 </head>
 <body>
@@ -77,6 +91,31 @@
         <button onclick="sendGold()">送金を実行する</button>
     </div>
 
+    <!-- ギフトリンク作成 -->
+    <div class="card">
+        <div class="header">🎁 ギフトリンク作成（ポチ袋）</div>
+        <div class="label">出金元ウォレット</div>
+        <select id="gift-sender-wallet"></select>
+
+        <div class="label">ギフト金額 (Gold)</div>
+        <input type="number" id="gift-amount" min="1" placeholder="例: 100">
+
+        <div class="label">有効期限</div>
+        <select id="gift-expires-hours">
+            <option value="1">1時間</option>
+            <option value="6">6時間</option>
+            <option value="24" selected>24時間（1日）</option>
+            <option value="72">3日間</option>
+            <option value="168">7日間（1週間）</option>
+            <option value="720">30日間</option>
+        </select>
+
+        <button class="btn-gift-action" onclick="createGiftLink()">🎁 ギフトリンクを発行する</button>
+
+        <div class="label" style="margin-top: 15px; margin-bottom: 6px;">📋 あなたが発行したギフトリンク</div>
+        <div id="my-gifts-list" style="font-size: 0.8rem; color: #888;">読み込み中...</div>
+    </div>
+
     <!-- 送金履歴（通帳） -->
     <div class="card">
         <div class="header">📖 送金履歴 (通帳)</div>
@@ -84,6 +123,22 @@
     </div>
 
     <button class="btn-back" onclick="location.href='/dashboard'">◀ 国民証に戻る</button>
+</div>
+
+<!-- ================= ギフト受取モーダル ================= -->
+<div id="gift-claim-modal" class="modal-overlay">
+    <div class="modal-content" style="border-color: #d4af37;">
+        <h3 style="color: #d4af37; margin-top: 0;">🎁 ギフトが届いています！</h3>
+        <div id="gift-claim-info" style="font-size: 0.85rem; color: #ccc; margin-bottom: 15px; text-align: left; background: #151515; padding: 10px; border-radius: 6px;"></div>
+        
+        <div id="gift-claim-action-area">
+            <div class="label" style="text-align: left;">受取先ウォレット</div>
+            <select id="gift-claim-target-wallet"></select>
+            <button class="btn-gift-action" onclick="submitClaimGift()" style="margin-top: 6px;">💰 ギフトを受け取る</button>
+        </div>
+        
+        <button onclick="closeGiftClaimModal()" style="background: #444; margin-top: 10px;">閉じる</button>
+    </div>
 </div>
 
 <!-- ================= 受取用QR表示モーダル ================= -->
@@ -113,11 +168,16 @@
 
 <script>
     const token = localStorage.getItem("access_token");
+    let currentGiftCode = null;
+
     if (!token) {
         window.location.href = "/";
     } else {
-        loadWallets();
+        loadWallets().then(() => {
+            checkUrlGiftParam();
+        });
         loadTransferLogs();
+        loadMyGifts();
     }
 
     async function loadWallets() {
@@ -140,9 +200,13 @@
                 </div>
             `).join('');
 
-            document.getElementById("sender-wallet").innerHTML = wallets.map(w => `
+            const walletOptions = wallets.map(w => `
                 <option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (${w.wallet_id}) - 残高:${w.balance}G</option>
             `).join('');
+
+            document.getElementById("sender-wallet").innerHTML = walletOptions;
+            document.getElementById("gift-sender-wallet").innerHTML = walletOptions;
+            document.getElementById("gift-claim-target-wallet").innerHTML = walletOptions;
 
         } catch (e) {
             console.error(e);
@@ -232,6 +296,207 @@
         } catch (e) {
             console.error(e);
         }
+    }
+
+    /* ================= ギフトリンク機能 ================= */
+    async function createGiftLink() {
+        const sender_wallet_id = document.getElementById("gift-sender-wallet").value;
+        const amount = parseInt(document.getElementById("gift-amount").value, 10);
+        const expires_in_hours = parseInt(document.getElementById("gift-expires-hours").value, 10);
+
+        if (!sender_wallet_id || !amount || amount <= 0) {
+            return alert("出金元ウォレットと正の金額を入力してください");
+        }
+
+        try {
+            const res = await fetch("/api/wallets/gifts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ sender_wallet_id, amount, expires_in_hours })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const giftUrl = `${window.location.origin}/wallet?gift=${data.gift_code}`;
+                navigator.clipboard.writeText(giftUrl).catch(() => {});
+                alert(`${data.message}\n\nリンクをクリップボードにコピーしました:\n${giftUrl}`);
+                document.getElementById("gift-amount").value = "";
+                loadWallets();
+                loadMyGifts();
+            } else {
+                alert("発行失敗: " + (data.detail || "エラーが発生しました"));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+        }
+    }
+
+    async function loadMyGifts() {
+        try {
+            const res = await fetch("/api/wallets/my-gifts", { headers: { "Authorization": `Bearer ${token}` } });
+            if (!res.ok) return;
+            const data = await res.json();
+            const gifts = data.gifts || [];
+
+            if (gifts.length === 0) {
+                document.getElementById("my-gifts-list").innerText = "発行したギフトリンクはありません";
+                return;
+            }
+
+            document.getElementById("my-gifts-list").innerHTML = gifts.map(g => {
+                let badgeClass = 'badge-active';
+                let badgeText = '有効';
+                let canCancel = false;
+
+                if (g.status === 'CLAIMED') {
+                    badgeClass = 'badge-claimed';
+                    badgeText = '受取済';
+                } else if (g.status === 'CANCELLED') {
+                    badgeClass = 'badge-cancelled';
+                    badgeText = '取消済';
+                } else if (g.status === 'EXPIRED') {
+                    badgeClass = 'badge-expired';
+                    badgeText = '期限切れ';
+                    canCancel = true; // 期限切れ時の払い戻し回収
+                } else if (g.status === 'ACTIVE') {
+                    canCancel = true;
+                }
+
+                const expiresStr = new Date(g.expires_at).toLocaleString('ja-JP');
+                const giftUrl = `${window.location.origin}/wallet?gift=${g.id}`;
+
+                return `
+                    <div class="gift-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-weight: bold; color: #d4af37;">${g.amount} Gold</span>
+                            <span class="status-badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #888; font-family: monospace;">コード: ${g.id}</div>
+                        <div style="font-size: 0.7rem; color: #aaa;">期限: ${expiresStr}</div>
+                        <div style="margin-top: 6px; display: flex; gap: 6px;">
+                            ${g.status === 'ACTIVE' ? `<button class="btn-copy" onclick="copyGiftUrl('${giftUrl}')">🔗 リンクコピー</button>` : ''}
+                            ${canCancel ? `<button class="btn-cancel" onclick="cancelGift('${g.id}')">🚫 無効化・返金</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function copyGiftUrl(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            alert("ギフトリンクをコピーしました！");
+        }).catch(() => {
+            prompt("以下のURLをコピーしてください:", url);
+        });
+    }
+
+    async function cancelGift(giftCode) {
+        if (!confirm("このギフトリンクを無効化し、出金元口座へ全額払い戻しますか？")) return;
+
+        try {
+            const res = await fetch(`/api/wallets/gifts/${giftCode}/cancel`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                loadWallets();
+                loadMyGifts();
+            } else {
+                alert("キャンセル失敗: " + (data.detail || "エラーが発生しました"));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+        }
+    }
+
+    async function checkUrlGiftParam() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const giftCode = urlParams.get("gift");
+        if (!giftCode) return;
+
+        currentGiftCode = giftCode;
+
+        try {
+            const res = await fetch(`/api/wallets/gifts/${giftCode}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert("ギフトリンクエラー: " + (data.detail || "見つかりません"));
+                cleanGiftUrl();
+                return;
+            }
+
+            const infoEl = document.getElementById("gift-claim-info");
+            const actionArea = document.getElementById("gift-claim-action-area");
+            const expiresStr = new Date(data.expires_at).toLocaleString('ja-JP');
+
+            let html = `
+                <div><b>発行者:</b> ${escapeHtml(data.creator_nickname)}</div>
+                <div><b>金額:</b> <span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">${data.amount} Gold</span></div>
+                <div><b>有効期限:</b> ${expiresStr}</div>
+                <div><b>状態:</b> ${escapeHtml(data.status)}</div>
+            `;
+
+            if (data.is_creator) {
+                html += `<div style="color: #e74c3c; margin-top: 6px;">※あなたが作成したギフトです。自分で受け取ることはできません。</div>`;
+                actionArea.style.display = "none";
+            } else if (data.status !== "ACTIVE") {
+                html += `<div style="color: #e74c3c; margin-top: 6px;">※このギフトリンクは受け取ることができません（${escapeHtml(data.status)}）。</div>`;
+                actionArea.style.display = "none";
+            } else {
+                actionArea.style.display = "block";
+            }
+
+            infoEl.innerHTML = html;
+            document.getElementById("gift-claim-modal").style.display = "flex";
+
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function submitClaimGift() {
+        if (!currentGiftCode) return;
+        const targetWalletId = document.getElementById("gift-claim-target-wallet").value;
+        if (!targetWalletId) return alert("受取先ウォレットを選択してください");
+
+        try {
+            const res = await fetch(`/api/wallets/gifts/${currentGiftCode}/claim`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ receiver_wallet_id: targetWalletId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                closeGiftClaimModal();
+                loadWallets();
+                loadTransferLogs();
+            } else {
+                alert("受取失敗: " + (data.detail || "エラーが発生しました"));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+        }
+    }
+
+    function closeGiftClaimModal() {
+        document.getElementById("gift-claim-modal").style.display = "none";
+        cleanGiftUrl();
+    }
+
+    function cleanGiftUrl() {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("gift");
+        window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
     }
 
     function escapeHtml(str) { return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; }
