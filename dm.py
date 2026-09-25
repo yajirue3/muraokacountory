@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 import traceback
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 import httpx
 from pywebpush import webpush, WebPushException
 from postgrest.exceptions import APIError
+from agora_token_builder import RtcTokenBuilder
 from db import get_supabase
 
 router = APIRouter()
@@ -21,6 +23,7 @@ VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "YOUR_PUBLIC_KEY_HERE")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "YOUR_PRIVATE_KEY_HERE")
 VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
 AGORA_APP_ID = os.environ.get("AGORA_APP_ID", "")
+AGORA_APP_CERTIFICATE = os.environ.get("AGORA_APP_CERTIFICATE", "")
 
 http_client = httpx.AsyncClient(timeout=60.0)
 
@@ -145,6 +148,22 @@ async def get_vapid_public_key():
 @router.get("/agora-app-id")
 async def get_agora_app_id():
     return {"app_id": AGORA_APP_ID}
+
+@router.get("/agora-token")
+async def get_agora_token(channel_name: str, authorization: str = Header(None)):
+    user = await get_user_auth(authorization)
+    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
+        raise HTTPException(status_code=500, detail="Agora設定が不足しています")
+    expire_time = int(time.time()) + 86400
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        channel_name,
+        0,
+        RtcTokenBuilder.Role_Publisher,
+        expire_time
+    )
+    return {"token": token, "app_id": AGORA_APP_ID}
 
 @router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
