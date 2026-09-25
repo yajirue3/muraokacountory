@@ -838,10 +838,6 @@
 
     async function startCall(isVideo = false) {
         if (!activeConversation) return;
-        if (!AGORA_APP_ID) {
-            showToast("通話サービスに接続できません (App ID未設定)", true);
-            return;
-        }
 
         if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
             showToast("接続情報を確認中...");
@@ -852,9 +848,6 @@
             }
         }
 
-
-
-        
         try {
             const channelName = getAgoraChannelName();
             await joinAgoraChannel(channelName, isVideo);
@@ -879,6 +872,15 @@
 
     async function joinAgoraChannel(channelName, isVideo) {
         agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+        // サーバーから動的トークンを取得
+        const tokenRes = await fetch(`/api/dm/agora-token?channel_name=${encodeURIComponent(channelName)}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!tokenRes.ok) {
+            throw new Error("通話トークンの取得に失敗しました");
+        }
+        const tokenData = await tokenRes.json();
 
         agoraClient.on("user-published", async (user, mediaType) => {
             await agoraClient.subscribe(user, mediaType);
@@ -910,7 +912,8 @@
             showToast("相手が通話を終了しました");
         });
 
-        await agoraClient.join(AGORA_APP_ID, channelName, null, String(currentUser.id));
+        // 取得したトークンを渡して接続
+        await agoraClient.join(tokenData.app_id, channelName, tokenData.token, null);
 
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
         const tracksToPublish = [localAudioTrack];
