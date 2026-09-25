@@ -13,13 +13,14 @@ from db import get_supabase
 
 router = APIRouter()
 
-# --- VAPIDキー設定 ---
+# --- VAPIDキー・外部設定 ---
 CLIENT_ID = os.environ.get("GDRIVE_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("GDRIVE_CLIENT_SECRET", "")
 REFRESH_TOKEN = os.environ.get("GDRIVE_REFRESH_TOKEN", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "YOUR_PUBLIC_KEY_HERE")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "YOUR_PRIVATE_KEY_HERE")
 VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
+AGORA_APP_ID = os.environ.get("AGORA_APP_ID", "")
 
 http_client = httpx.AsyncClient(timeout=60.0)
 
@@ -140,6 +141,10 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
 @router.get("/vapid-public-key")
 async def get_vapid_public_key():
     return {"public_key": VAPID_PUBLIC_KEY}
+
+@router.get("/agora-app-id")
+async def get_agora_app_id():
+    return {"app_id": AGORA_APP_ID}
 
 @router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
@@ -477,10 +482,10 @@ async def get_my_stamps(authorization: str = Header(None)):
     return {"stamps": stamps.data or []}
 
 # =====================================================================
-# API: WebRTC (タイムゾーン対応・確実なシグナル取得)
+# API: WebRTC シグナリング & 着信プッシュ通知
 # =====================================================================
 @router.post("/call/signal")
-async def send_call_signal(data: CallSignalReq, authorization: str = Header(None)):
+async def send_call_signal(data: CallSignalReq, background_tasks: BackgroundTasks, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
 
@@ -498,6 +503,19 @@ async def send_call_signal(data: CallSignalReq, authorization: str = Header(None
         "signal_type": data.signal_type, 
         "signal_data": data.signal_data
     }).execute()
+
+    # 発信（OFFER）時に相手へWeb Push通知を送信
+    if data.signal_type == "OFFER" and target_uid:
+        prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
+        sender_name = prof.data[0]["nickname"] if prof.data else "不明な国民"
+        call_type = "ビデオ通話" if data.signal_data.get("isVideo") else "音声通話"
+        background_tasks.add_task(
+            send_web_push, 
+            target_uid, 
+            sender_name, 
+            f"📞 {call_type}の着信があります！"
+        )
+
     return {"success": True}
 
 @router.get("/call/signals")
