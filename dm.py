@@ -63,12 +63,6 @@ class ReportReq(BaseModel):
     message_id: int
     reason: str
 
-class CallSignalReq(BaseModel):
-    target_id: Optional[str] = None
-    room_id: Optional[int] = None
-    signal_type: str
-    signal_data: Dict[str, Any]
-
 class StampPurchaseReq(BaseModel):
     pack_id: int
     wallet_id: str
@@ -500,63 +494,6 @@ async def get_my_stamps(authorization: str = Header(None)):
     p_ids = [o["pack_id"] for o in owned.data]
     stamps = await client.table("dm_stamps").select("id, drive_file_id").in_("pack_id", p_ids).execute()
     return {"stamps": stamps.data or []}
-
-# =====================================================================
-# API: WebRTC シグナリング & 着信プッシュ通知
-# =====================================================================
-@router.post("/call/signal")
-async def send_call_signal(data: CallSignalReq, background_tasks: BackgroundTasks, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-
-    target_uid = data.target_id
-    # 宛先IDが未解決で target_dm_id のみある場合のフォールバック
-    if not target_uid and not data.room_id and data.signal_data.get("target_dm_id"):
-        t_res = await client.table("profiles").select("id").eq("dm_id", data.signal_data["target_dm_id"]).execute()
-        if t_res.data:
-            target_uid = t_res.data[0]["id"]
-
-    await client.table("dm_call_signals").insert({
-        "sender_id": user.id, 
-        "target_id": target_uid, 
-        "room_id": data.room_id, 
-        "signal_type": data.signal_type, 
-        "signal_data": data.signal_data
-    }).execute()
-
-    # 発信（OFFER）時に相手へWeb Push通知を送信
-    if data.signal_type == "OFFER" and target_uid:
-        prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-        sender_name = prof.data[0]["nickname"] if prof.data else "不明な国民"
-        call_type = "ビデオ通話" if data.signal_data.get("isVideo") else "音声通話"
-        background_tasks.add_task(
-            send_web_push, 
-            target_uid, 
-            sender_name, 
-            f"📞 {call_type}の着信があります！"
-        )
-
-    return {"success": True}
-
-@router.get("/call/signals")
-async def poll_call_signals(target_user_id: Optional[str] = None, room_id: Optional[int] = None, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    # タイムゾーン付きUTC（過去35秒以内の有効シグナルのみ抽出）
-    now_35s_ago = datetime.now(timezone.utc).timestamp() - 35
-    time_limit_str = datetime.fromtimestamp(now_35s_ago, tz=timezone.utc).isoformat()
-    
-    query = client.table("dm_call_signals").select("*").gt("created_at", time_limit_str).order("created_at")
-    
-    if room_id: 
-        res = await query.eq("room_id", room_id).neq("sender_id", user.id).execute()
-    else: 
-        if not target_user_id:
-            return {"signals": []}
-        res = await query.eq("target_id", user.id).eq("sender_id", target_user_id).execute()
-        
-    return {"signals": res.data or []}
 
 # =====================================================================
 # API: 国王専用 監視ツール (完全維持)
