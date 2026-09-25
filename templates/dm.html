@@ -6,6 +6,7 @@
     <title>村岡王国 - 密書 (DM)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
     <style>
         :root { 
             --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
@@ -21,13 +22,13 @@
         .view.active { display: flex; animation: fadein 0.15s ease-out; }
         @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* WebRTC 通話バー & PIP小窓 */
+        /* WebRTC / Agora 通話バー & PIP小窓 */
         #call-bar { display: none; background: #0c0e12; border-bottom: 1px solid var(--primary); padding: 8px 16px; font-size: 0.85rem; align-items: center; justify-content: space-between; flex-shrink: 0; }
         .btn-call-ctrl { background: var(--card-bg); border: 1px solid var(--border); color: #fff; padding: 4px 12px; border-radius: 14px; cursor: pointer; font-weight: bold; font-size:0.8rem; }
         .btn-call-hangup { background: var(--danger); border-color: var(--danger); }
         #video-pip-container { display: none; position: fixed; top: 70px; right: 16px; width: 120px; height: 160px; background: #000; border: 2px solid var(--primary); border-radius: 8px; overflow: hidden; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
-        #remote-video { width: 100%; height: 100%; object-fit: cover; }
-        #local-video { position: absolute; bottom: 4px; right: 4px; width: 36px; height: 48px; border-radius: 4px; border: 1px solid #fff; object-fit: cover; }
+        #remote-video-container { width: 100%; height: 100%; }
+        #local-video-container { position: absolute; bottom: 4px; right: 4px; width: 36px; height: 48px; border-radius: 4px; border: 1px solid #fff; overflow: hidden; }
 
         /* リスト画面 */
         .action-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
@@ -124,7 +125,10 @@
 <body>
 
 <div id="toast-container"></div>
-<div id="video-pip-container"><video id="remote-video" autoplay playsinline></video><video id="local-video" autoplay playsinline muted></video></div>
+<div id="video-pip-container">
+    <div id="remote-video-container"></div>
+    <div id="local-video-container"></div>
+</div>
 
 <div class="container">
     
@@ -283,14 +287,14 @@
     let cropperInstance = null;
     let lastRenderedHash = "";
 
-    // WebRTC
-    let localStream = null;
-    let peerConnection = null;
+    // Agora 通話設定・状態
+    let AGORA_APP_ID = "";
+    let agoraClient = null;
+    let localAudioTrack = null;
+    let localVideoTrack = null;
     let callTimer = null;
     let callSeconds = 0;
-    let isCallConnected = false;
-    let candidateQueue = [];
-    const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    let processedSignalIds = new Set();
 
     function showToast(msg, isError = false) {
         const c = document.getElementById('toast-container');
@@ -314,6 +318,14 @@
             }
         } catch(e) {}
         
+        try {
+            const agoraRes = await fetch("/api/dm/agora-app-id");
+            if (agoraRes.ok) {
+                const aData = await agoraRes.json();
+                AGORA_APP_ID = aData.app_id;
+            }
+        } catch(e) {}
+
         await fetchWallets();
         fetchThreads();
         
@@ -454,7 +466,7 @@
     }
 
     function closeChat() { 
-        if (peerConnection || localStream) {
+        if (agoraClient) {
             hangupCall();
         }
         showView('view-list'); 
@@ -809,11 +821,25 @@
         } catch(e) {}
     }
 
-    // --- WebRTC 通話完全修正 ---
+    // =====================================================================
+    // Agora 通話エンジン
+    // =====================================================================
+    function getAgoraChannelName() {
+        if (!activeConversation) return null;
+        if (activeConversation.type === 'GROUP') {
+            return `room_${activeConversation.room_id}`;
+        }
+        const ids = [String(currentUser.id), String(activeConversation.target_user_id)].sort();
+        return `dm_${ids[0]}_${ids[1]}`;
+    }
+
     async function startCall(isVideo = false) {
-        if(!activeConversation) return;
-        
-        // 相手のIDが取れていなければ強制フェッチ
+        if (!activeConversation) return;
+        if (!AGORA_APP_ID) {
+            showToast("通話サービスに接続できません (App ID未設定)", true);
+            return;
+        }
+
         if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
             showToast("接続情報を確認中...");
             await fetchMessages(false);
@@ -824,51 +850,81 @@
         }
 
         try {
-            candidateQueue = [];
-            isCallConnected = false;
+            const channelName = getAgoraChannelName();
+            await joinAgoraChannel(channelName, isVideo);
 
-            localStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: true, 
-                video: isVideo ? { width: 320, height: 240 } : false 
-            });
-            document.getElementById("local-video").srcObject = localStream;
-            if(isVideo) document.getElementById("video-pip-container").style.display = "block";
-
-            peerConnection = new RTCPeerConnection(rtcConfig);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            
-            peerConnection.ontrack = (event) => { 
-                document.getElementById("remote-video").srcObject = event.streams[0]; 
-            };
-            
-            peerConnection.onicecandidate = (event) => { 
-                if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); 
-            };
-
-            const offer = await peerConnection.createOffer(); 
-            await peerConnection.setLocalDescription(offer);
-            
-            // 呼び出し中表示
             document.getElementById("call-status-text").innerText = "📞 呼び出し中...";
             document.getElementById("call-status-text").style.color = "var(--primary)";
             document.getElementById("call-bar").style.display = "flex";
 
-            await sendSignal("OFFER", { 
-                offer: offer, 
-                isVideo: isVideo, 
-                target_dm_id: activeConversation.partner_dm_id 
-            }); 
-            
+            await sendSignal("OFFER", {
+                channelName: channelName,
+                isVideo: isVideo,
+                target_dm_id: activeConversation.partner_dm_id
+            });
+
             showToast("発信を開始しました");
-        } catch(e) { 
+        } catch (e) {
             console.error(e);
-            showToast(`発信失敗: ${e.name || e.message}`, true); 
+            showToast(`発信失敗: ${e.message}`, true);
             hangupCall();
         }
     }
 
+    async function joinAgoraChannel(channelName, isVideo) {
+        agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+        agoraClient.on("user-published", async (user, mediaType) => {
+            await agoraClient.subscribe(user, mediaType);
+            
+            if (mediaType === "video") {
+                const remoteContainer = document.getElementById("remote-video-container");
+                if (remoteContainer) {
+                    remoteContainer.innerHTML = "";
+                    user.videoTrack.play(remoteContainer);
+                    document.getElementById("video-pip-container").style.display = "block";
+                }
+            }
+            if (mediaType === "audio") {
+                user.audioTrack.play();
+            }
+
+            startCallTimer();
+        });
+
+        agoraClient.on("user-unpublished", (user, mediaType) => {
+            if (mediaType === "video") {
+                const remoteContainer = document.getElementById("remote-video-container");
+                if (remoteContainer) remoteContainer.innerHTML = "";
+            }
+        });
+
+        agoraClient.on("user-left", () => {
+            hangupCall();
+            showToast("相手が通話を終了しました");
+        });
+
+        await agoraClient.join(AGORA_APP_ID, channelName, null, String(currentUser.id));
+
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        const tracksToPublish = [localAudioTrack];
+
+        if (isVideo) {
+            localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                encoderConfig: { width: 320, height: 240, frameRate: 15 }
+            });
+            document.getElementById("video-pip-container").style.display = "block";
+            const localBox = document.getElementById("local-video-container");
+            localBox.innerHTML = "";
+            localVideoTrack.play(localBox);
+            tracksToPublish.push(localVideoTrack);
+        }
+
+        await agoraClient.publish(tracksToPublish);
+    }
+
     async function sendSignal(type, data) {
-        if(!activeConversation) return;
+        if (!activeConversation) return;
         try { 
             await fetch("/api/dm/call/signal", { 
                 method: "POST", 
@@ -884,155 +940,103 @@
     }
 
     async function pollCallSignals() {
-        if(!activeConversation) return;
-        const q = activeConversation.type === 'GROUP' ? `room_id=${activeConversation.room_id}` : `target_user_id=${activeConversation.target_user_id}`;
+        if (!activeConversation) return;
+        const q = activeConversation.type === 'GROUP' 
+            ? `room_id=${activeConversation.room_id}` 
+            : `target_user_id=${activeConversation.target_user_id}`;
         if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) return;
 
         try {
             const res = await fetch(`/api/dm/call/signals?${q}`, { headers: { "Authorization": `Bearer ${token}` } });
-            if(!res.ok) return;
+            if (!res.ok) return;
             const data = await res.json();
-            
+
             for (const s of (data.signals || [])) {
-                if(s.signal_type === "OFFER" && !peerConnection) { 
-                    const isVideo = s.signal_data?.isVideo || false;
-                    if(confirm(`📞 ${isVideo ? 'ビデオ' : '音声'}通話の着信です。応答しますか？`)) {
-                        await answerCall(s.signal_data.offer || s.signal_data, isVideo);
+                if (processedSignalIds.has(s.id)) continue;
+                processedSignalIds.add(s.id);
+
+                if (s.signal_type === "OFFER" && !agoraClient) {
+                    const isVideo = !!s.signal_data?.isVideo;
+                    const channelName = s.signal_data?.channelName;
+                    
+                    if (confirm(`📞 ${isVideo ? 'ビデオ' : '音声'}通話の着信です。応答しますか？`)) {
+                        await answerAgoraCall(channelName, isVideo);
                     } else {
                         sendSignal("LEAVE_CALL", {});
                     }
                 } 
-                else if(s.signal_type === "ANSWER" && peerConnection && !isCallConnected) { 
-                    const desc = new RTCSessionDescription(s.signal_data);
-                    await peerConnection.setRemoteDescription(desc);
-                    
-                    // キューイングされたICE候補を流し込む
-                    while(candidateQueue.length > 0) {
-                        const cand = candidateQueue.shift();
-                        await peerConnection.addIceCandidate(cand).catch(()=>{});
-                    }
-                    
-                    // 応答確認：ここで初めて「通話中」に遷移
-                    isCallConnected = true;
-                    startCallTimer();
-                    showToast("通話が接続されました！");
-                } 
-                else if(s.signal_type === "ICE_CANDIDATE" && peerConnection) { 
-                    const candidate = new RTCIceCandidate(s.signal_data);
-                    if(peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-                        await peerConnection.addIceCandidate(candidate).catch(()=>{});
-                    } else {
-                        candidateQueue.push(candidate);
-                    }
-                } 
-                else if(s.signal_type === "LEAVE_CALL") { 
-                    hangupCall(); 
-                    showToast("相手が通話を終了しました"); 
+                else if (s.signal_type === "LEAVE_CALL") {
+                    hangupCall();
+                    showToast("通話が終了しました");
                 }
             }
         } catch(e) {}
     }
 
-    async function answerCall(offerData, isVideo) {
+    async function answerAgoraCall(channelName, isVideo) {
         try {
-            candidateQueue = [];
-            isCallConnected = false;
-
-            localStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: true, 
-                video: isVideo ? { width: 320, height: 240 } : false 
-            });
-            document.getElementById("local-video").srcObject = localStream;
-            if(isVideo) document.getElementById("video-pip-container").style.display = "block";
-
-            peerConnection = new RTCPeerConnection(rtcConfig);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            
-            peerConnection.ontrack = (event) => { 
-                document.getElementById("remote-video").srcObject = event.streams[0]; 
-            };
-            peerConnection.onicecandidate = (event) => { 
-                if(event.candidate) sendSignal("ICE_CANDIDATE", event.candidate); 
-            };
-
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
-            
-            // キュー内の候補を処理
-            while(candidateQueue.length > 0) {
-                const cand = candidateQueue.shift();
-                await peerConnection.addIceCandidate(cand).catch(()=>{});
-            }
-
-            const answer = await peerConnection.createAnswer(); 
-            await peerConnection.setLocalDescription(answer);
-            await sendSignal("ANSWER", answer); 
-            
-            isCallConnected = true;
+            await joinAgoraChannel(channelName, isVideo);
             startCallTimer();
             showToast("通話を開始しました");
-        } catch(e) {
-            console.error(e);
-            showToast(`応答エラー: ${e.name || e.message}`, true);
+        } catch (e) {
+            console.error("応答エラー:", e);
+            showToast(`応答エラー: ${e.message}`, true);
             hangupCall();
         }
     }
 
     function toggleMic() {
-        if(!localStream) return;
-        const t = localStream.getAudioTracks()[0];
-        if(t) { 
-            t.enabled = !t.enabled; 
-            document.getElementById("btn-toggle-mic").innerText = t.enabled ? "🎤" : "🔇"; 
-        }
-    }
-    
-    function toggleCam() { 
-        const p = document.getElementById("video-pip-container"); 
-        p.style.display = p.style.display === "block" ? "none" : "block"; 
+        if (!localAudioTrack) return;
+        const isMuted = localAudioTrack.isMuted();
+        localAudioTrack.setMuted(!isMuted);
+        document.getElementById("btn-toggle-mic").innerText = !isMuted ? "🔇" : "🎤";
     }
 
-    function hangupCall() {
+    function toggleCam() {
+        const p = document.getElementById("video-pip-container");
+        p.style.display = p.style.display === "block" ? "none" : "block";
+    }
+
+    async function hangupCall() {
         try {
-            if (peerConnection) {
+            if (agoraClient) {
                 sendSignal("LEAVE_CALL", {});
             }
         } catch(e) {}
 
-        if (peerConnection) { 
-            peerConnection.ontrack = null;
-            peerConnection.onicecandidate = null;
-            peerConnection.close(); 
-            peerConnection = null; 
+        if (localAudioTrack) {
+            localAudioTrack.stop();
+            localAudioTrack.close();
+            localAudioTrack = null;
         }
-        if (localStream) { 
-            localStream.getTracks().forEach(t => t.stop()); 
-            localStream = null; 
+        if (localVideoTrack) {
+            localVideoTrack.stop();
+            localVideoTrack.close();
+            localVideoTrack = null;
         }
-        
+        if (agoraClient) {
+            await agoraClient.leave();
+            agoraClient = null;
+        }
+
         clearInterval(callTimer);
-        isCallConnected = false;
-        candidateQueue = [];
-
-        const remoteVid = document.getElementById("remote-video");
-        const localVid = document.getElementById("local-video");
-        if(remoteVid) remoteVid.srcObject = null;
-        if(localVid) localVid.srcObject = null;
-
-        document.getElementById("call-bar").style.display = "none"; 
+        document.getElementById("call-bar").style.display = "none";
         document.getElementById("video-pip-container").style.display = "none";
+        document.getElementById("local-video-container").innerHTML = "";
+        document.getElementById("remote-video-container").innerHTML = "";
     }
 
     function startCallTimer() {
-        document.getElementById("call-bar").style.display = "flex"; 
+        document.getElementById("call-bar").style.display = "flex";
         document.getElementById("call-status-text").style.color = "var(--success)";
-        callSeconds = 0; 
+        callSeconds = 0;
         clearInterval(callTimer);
-        
-        callTimer = setInterval(() => { 
-            callSeconds++; 
-            const m = String(Math.floor(callSeconds/60)).padStart(2,'0'); 
-            const s = String(callSeconds%60).padStart(2,'0'); 
-            document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`; 
+
+        callTimer = setInterval(() => {
+            callSeconds++;
+            const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+            const s = String(callSeconds % 60).padStart(2, '0');
+            document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`;
         }, 1000);
     }
     
