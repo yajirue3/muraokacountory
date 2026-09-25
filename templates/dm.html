@@ -878,8 +878,8 @@
             headers: { "Authorization": `Bearer ${token}` }
         });
         if (!tokenRes.ok) {
-            const errData = await tokenRes.json().catch(() => ({}));
-            throw new Error(errData.detail || "通話トークンの取得に失敗しました");
+            const errText = await tokenRes.text().catch(() => "");
+            throw new Error(errText || `HTTPエラー: ${tokenRes.status}`);
         }
 
         const tokenData = await tokenRes.json();
