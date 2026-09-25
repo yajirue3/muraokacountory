@@ -534,13 +534,15 @@
 
     function renderMyItems(items) {
         const listEl = document.getElementById("my-items-list");
-        if(items.length === 0) {
+        const activeItems = items.filter(it => it.status !== "HIDDEN");
+
+        if(activeItems.length === 0) {
             listEl.innerHTML = '<div style="text-align:center; color:#888;">商品棚は空です</div>';
             return;
         }
 
         let html = '';
-        items.forEach(it => {
+        activeItems.forEach(it => {
             const isItem = it.category === 'ITEM';
             const badgeCat = isItem ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般</span>';
             const badgeStock = it.is_unlimited ? '<span class="type-badge badge-unlimited">無制限</span>' : `<span class="type-badge">在庫: ${it.stock_quantity}個</span>`;
@@ -566,6 +568,10 @@
                 }
             }
 
+            const cancelBtnHtml = `
+                <button class="btn-danger" style="margin-top:8px; padding:6px 12px; font-size:0.8rem;" onclick="cancelMallItem(${it.id}, '${escapeHtml(it.title)}')">🗑️ 出品を取り消す</button>
+            `;
+
             html += `
                 <div class="item-row">
                     <div style="display:flex; justify-content:space-between;">
@@ -576,10 +582,33 @@
                     <div style="font-size:0.8rem; color:#bbb;">${escapeHtml(it.description || '')}</div>
                     ${it.secret_content ? `<div style="font-size:0.75rem; color:var(--purple); background:#0f1115; padding:6px; border-radius:4px;">共通情報: ${escapeHtml(it.secret_content)}</div>` : ''}
                     ${controlHtml}
+                    ${cancelBtnHtml}
                 </div>
             `;
         });
         listEl.innerHTML = html;
+    }
+
+    async function cancelMallItem(itemId, itemTitle) {
+        if (!confirm(`「${itemTitle}」の出品を取り消しますか？\n（残っている在庫は手元に戻ります）`)) return;
+
+        try {
+            const res = await fetch(`/api/mall/items/${itemId}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message);
+                await loadInventory();
+                await loadMyShop();
+            } else {
+                showToast(data.detail || "出品取消に失敗しました", true);
+            }
+        } catch(e) {
+            showToast("通信エラーが発生しました", true);
+        }
     }
 
     async function restockItemItem(itemId) {
