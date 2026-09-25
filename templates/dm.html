@@ -878,8 +878,10 @@
             headers: { "Authorization": `Bearer ${token}` }
         });
         if (!tokenRes.ok) {
-            throw new Error("通話トークンの取得に失敗しました");
+            const errData = await tokenRes.json().catch(() => ({}));
+            throw new Error(errData.detail || "通話トークンの取得に失敗しました");
         }
+
         const tokenData = await tokenRes.json();
 
         agoraClient.on("user-published", async (user, mediaType) => {
