@@ -31,6 +31,7 @@
         .type-badge { padding: 3px 6px; border-radius: 6px; font-size: 0.65rem; font-weight: bold; }
         .badge-item { background: rgba(59,130,246,0.2); color: var(--blue); border: 1px solid var(--blue); }
         .badge-general { background: rgba(142,68,173,0.2); color: var(--purple); border: 1px solid var(--purple); }
+        .badge-physical { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
         .badge-unlimited { background: rgba(16,185,129,0.2); color: var(--success); border: 1px solid var(--success); }
         .badge-soldout { background: rgba(239,68,68,0.2); color: var(--danger); border: 1px solid var(--danger); }
         .badge-escrow { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
@@ -110,6 +111,7 @@
                 <select id="item-cat-select" onchange="toggleItemCatForm()">
                     <option value="ITEM">🎒 手持ちアイテムを出品 (インベントリ連動)</option>
                     <option value="GENERAL">📜 一般・デジタル情報・サービス等</option>
+                    <option value="PHYSICAL">📦 現物・物品 (エスクロー取引)</option>
                 </select>
 
                 <div id="cat-item-area">
@@ -118,6 +120,14 @@
 
                     <label style="font-size:0.75rem; color:#94a3b8;">出品数量</label>
                     <input type="number" id="item-stock-input" min="1" value="1">
+                </div>
+
+                <div id="cat-physical-area" style="display:none;">
+                    <label style="font-size:0.75rem; color:#94a3b8;">商品タイトル</label>
+                    <input type="text" id="item-physical-title-input" placeholder="タイトル (例: 自作同人誌、ハンドメイド雑貨)" maxlength="60">
+
+                    <label style="font-size:0.75rem; color:#94a3b8;">在庫数量</label>
+                    <input type="number" id="item-physical-stock-input" min="1" value="1">
                 </div>
 
                 <div id="cat-general-area" style="display:none;">
@@ -142,7 +152,7 @@
                 </div>
 
                 <label style="font-size:0.75rem; color:#94a3b8;">商品説明</label>
-                <textarea id="item-desc-input" placeholder="商品の特徴・注意点" rows="2" maxlength="500"></textarea>
+                <textarea id="item-desc-input" placeholder="商品の特徴・発送/受渡方法・注意点" rows="2" maxlength="500"></textarea>
 
                 <label style="font-size:0.75rem; color:#94a3b8;">販売単価 (1個あたり Gold)</label>
                 <input type="number" id="item-price-input" min="1" placeholder="価格 (G)">
@@ -327,7 +337,11 @@
                 let html = '';
                 items.forEach(it => {
                     const isItem = it.category === 'ITEM';
-                    const badgeCat = isItem ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般</span>';
+                    const isPhysical = it.category === 'PHYSICAL';
+                    let badgeCat = '<span class="type-badge badge-general">📜 一般</span>';
+                    if (isItem) badgeCat = '<span class="type-badge badge-item">🎒 アイテム</span>';
+                    if (isPhysical) badgeCat = '<span class="type-badge badge-physical">📦 物品(現物)</span>';
+
                     const badgeStock = it.is_unlimited ? '<span class="type-badge badge-unlimited">無制限</span>' : (it.stock_quantity > 0 ? `<span class="type-badge" style="background:#262932;">残り ${it.stock_quantity}個</span>` : '<span class="type-badge badge-soldout">売り切れ</span>');
                     const canBuy = (it.is_unlimited || it.stock_quantity > 0) && (shop.owner_user_id !== currentUser?.id);
 
@@ -460,14 +474,10 @@
 
     function toggleItemCatForm() {
         const cat = document.getElementById("item-cat-select").value;
-        if(cat === "ITEM") {
-            document.getElementById("cat-item-area").style.display = "block";
-            document.getElementById("cat-general-area").style.display = "none";
-        } else {
-            document.getElementById("cat-item-area").style.display = "none";
-            document.getElementById("cat-general-area").style.display = "block";
-            toggleUnlimited();
-        }
+        document.getElementById("cat-item-area").style.display = (cat === "ITEM") ? "block" : "none";
+        document.getElementById("cat-general-area").style.display = (cat === "GENERAL") ? "block" : "none";
+        document.getElementById("cat-physical-area").style.display = (cat === "PHYSICAL") ? "block" : "none";
+        if (cat === "GENERAL") toggleUnlimited();
     }
 
     function toggleUnlimited() {
@@ -498,6 +508,11 @@
             payload.title = "インベントリ出品";
             if(!payload.user_inventory_id) return showToast("出品するアイテムを選択してください", true);
             if(!payload.stock_quantity || payload.stock_quantity <= 0) return showToast("出品数を1個以上にしてください", true);
+        } else if(cat === "PHYSICAL") {
+            payload.title = document.getElementById("item-physical-title-input").value.trim();
+            payload.stock_quantity = parseInt(document.getElementById("item-physical-stock-input").value);
+            if(!payload.title) return showToast("商品タイトルを入力してください", true);
+            if(!payload.stock_quantity || payload.stock_quantity <= 0) return showToast("在庫数を1個以上にしてください", true);
         } else {
             payload.title = document.getElementById("item-title-input").value.trim();
             payload.is_unlimited = document.getElementById("item-unlimited-select").value === "true";
@@ -522,6 +537,7 @@
             if(res.ok) {
                 showToast(data.message);
                 document.getElementById("item-title-input").value = "";
+                document.getElementById("item-physical-title-input").value = "";
                 document.getElementById("item-desc-input").value = "";
                 document.getElementById("item-secret-input").value = "";
                 document.getElementById("item-secrets-multi").value = "";
@@ -546,7 +562,11 @@
         let html = '';
         activeItems.forEach(it => {
             const isItem = it.category === 'ITEM';
-            const badgeCat = isItem ? '<span class="type-badge badge-item">🎒 アイテム</span>' : '<span class="type-badge badge-general">📜 一般</span>';
+            const isPhysical = it.category === 'PHYSICAL';
+            let badgeCat = '<span class="type-badge badge-general">📜 一般</span>';
+            if (isItem) badgeCat = '<span class="type-badge badge-item">🎒 アイテム</span>';
+            if (isPhysical) badgeCat = '<span class="type-badge badge-physical">📦 物品(現物)</span>';
+
             const badgeStock = it.is_unlimited ? '<span class="type-badge badge-unlimited">無制限</span>' : `<span class="type-badge">在庫: ${it.stock_quantity}個</span>`;
 
             let controlHtml = '';
@@ -557,6 +577,13 @@
                             <input type="number" id="ctrl-qty-${it.id}" value="1" min="1" style="width:70px; margin:0;">
                             <button class="btn-sub" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="restockItemItem(${it.id})">＋補充</button>
                             <button class="btn-danger" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="withdrawItem(${it.id})">－引戻し</button>
+                        </div>
+                    `;
+                } else if(isPhysical) {
+                    controlHtml = `
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <input type="number" id="ctrl-qty-${it.id}" value="1" min="1" style="width:70px; margin:0;">
+                            <button class="btn-sub" style="margin:0; padding:6px 12px; font-size:0.8rem;" onclick="restockPhysicalItem(${it.id})">＋在庫補充</button>
                         </div>
                     `;
                 } else {
@@ -627,6 +654,26 @@
             if(res.ok) {
                 showToast(data.message);
                 await loadInventory();
+                await loadMyShop();
+            } else {
+                showToast(data.detail, true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    async function restockPhysicalItem(itemId) {
+        const qty = parseInt(document.getElementById(`ctrl-qty-${itemId}`).value);
+        if(!qty || qty <= 0) return showToast("数量を入力してください", true);
+
+        try {
+            const res = await fetch(`/api/mall/items/${itemId}/restock`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ quantity: qty, secret_lines: [] })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast(data.message);
                 await loadMyShop();
             } else {
                 showToast(data.detail, true);
