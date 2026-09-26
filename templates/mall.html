@@ -33,6 +33,8 @@
         .badge-general { background: rgba(142,68,173,0.2); color: var(--purple); border: 1px solid var(--purple); }
         .badge-unlimited { background: rgba(16,185,129,0.2); color: var(--success); border: 1px solid var(--success); }
         .badge-soldout { background: rgba(239,68,68,0.2); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-escrow { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
+        .badge-shipped { background: rgba(59,130,246,0.2); color: var(--blue); border: 1px solid var(--blue); }
 
         .price-text { font-size: 1.2rem; font-weight: bold; color: var(--gold); }
 
@@ -692,6 +694,30 @@
                 const it = o.mall_items || {};
                 const shop = o.mall_shops || {};
                 const dateStr = new Date(o.created_at).toLocaleString('ja-JP');
+                const status = o.status || 'COMPLETED';
+
+                let statusBadge = '<span class="type-badge badge-unlimited">完了</span>';
+                let actionHtml = '';
+
+                if (status === 'ESCROW_HELD') {
+                    statusBadge = '<span class="type-badge badge-escrow">代金預かり中 (発送待ち)</span>';
+                    actionHtml = `
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button class="btn-action" style="margin:0; padding:8px;" onclick="completeOrderBuyer(${o.id})">受取完了（代金を店主に支払う）</button>
+                            <button class="btn-danger" style="margin:0; padding:8px; width:100px;" onclick="refundOrderBuyer(${o.id})">キャンセル</button>
+                        </div>
+                    `;
+                } else if (status === 'SHIPPED') {
+                    statusBadge = '<span class="type-badge badge-shipped">発送・引渡済 (受取待ち)</span>';
+                    actionHtml = `
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button class="btn-action" style="margin:0; padding:8px;" onclick="completeOrderBuyer(${o.id})">受取完了（代金を店主に支払う）</button>
+                            <button class="btn-danger" style="margin:0; padding:8px; width:100px;" onclick="refundOrderBuyer(${o.id})">キャンセル</button>
+                        </div>
+                    `;
+                } else if (status === 'REFUNDED') {
+                    statusBadge = '<span class="type-badge badge-soldout">キャンセル・返金済</span>';
+                }
 
                 html += `
                     <div class="item-row">
@@ -699,14 +725,19 @@
                             <span>🏬 ${escapeHtml(shop.shop_name || '店舗')}</span>
                             <span>${dateStr}</span>
                         </div>
-                        <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${o.quantity}個</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${o.quantity}個</div>
+                            <div>${statusBadge}</div>
+                        </div>
                         <div style="font-size:0.85rem;">支払総額: <b>${o.total_price} G</b></div>
+                        ${o.tracking_note ? `<div style="font-size:0.8rem; color:var(--blue); background:#15171a; padding:6px; border-radius:4px; border:1px solid #333842;">連絡・追跡情報: ${escapeHtml(o.tracking_note)}</div>` : ''}
                         ${o.distributed_content ? `
                             <div style="background:#0f1115; border:1px solid var(--purple); padding:8px; border-radius:6px; margin-top:4px;">
                                 <div style="font-size:0.7rem; color:var(--purple); font-weight:bold;">🔑 あなたに割り当てられたデータ / 秘密情報</div>
                                 <div style="font-size:0.85rem; color:#fff; white-space:pre-wrap; word-break:break-all;">${escapeHtml(o.distributed_content)}</div>
                             </div>
                         ` : ''}
+                        ${actionHtml}
                     </div>
                 `;
             });
@@ -714,6 +745,44 @@
         } catch(e) {
             listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
         }
+    }
+
+    async function completeOrderBuyer(orderId) {
+        if (!confirm("商品を受け取りましたか？\n店主へ代金が支払われます。")) return;
+        try {
+            const res = await fetch(`/api/mall/orders/${orderId}/complete`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message);
+                await loadMyPurchases();
+                await loadWallets();
+            } else {
+                showToast(data.detail || "処理に失敗しました", true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
+    }
+
+    async function refundOrderBuyer(orderId) {
+        const walletId = prompt("返金先のウォレットIDを入力してください:\n" + myWallets.map(w => `${w.wallet_id} (${w.wallet_name})`).join("\n"));
+        if (!walletId) return;
+        try {
+            const res = await fetch(`/api/mall/orders/${orderId}/refund`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ buyer_refund_wallet_id: walletId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message);
+                await loadMyPurchases();
+                await loadWallets();
+            } else {
+                showToast(data.detail || "返金処理に失敗しました", true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
     }
 
     // 販売履歴（店主側）
@@ -733,6 +802,24 @@
                 const it = s.mall_items || {};
                 const buyer = s.buyer || {};
                 const dateStr = new Date(s.created_at).toLocaleString('ja-JP');
+                const status = s.status || 'COMPLETED';
+
+                let statusBadge = '<span class="type-badge badge-unlimited">売上確定</span>';
+                let actionHtml = '';
+
+                if (status === 'ESCROW_HELD') {
+                    statusBadge = '<span class="type-badge badge-escrow">エスクロー預かり中 (発送待ち)</span>';
+                    actionHtml = `
+                        <div style="margin-top:8px; border-top:1px dashed var(--border); padding-top:6px;">
+                            <input type="text" id="ship-note-${s.id}" placeholder="追跡番号・引渡連絡メモ (任意)" style="margin-bottom:6px; font-size:0.8rem;">
+                            <button class="btn-sub" style="margin:0; padding:8px;" onclick="shipOrderSeller(${s.id})">🚚 発送・引渡完了を通知</button>
+                        </div>
+                    `;
+                } else if (status === 'SHIPPED') {
+                    statusBadge = '<span class="type-badge badge-shipped">受取確認待ち</span>';
+                } else if (status === 'REFUNDED') {
+                    statusBadge = '<span class="type-badge badge-soldout">キャンセル・返金済</span>';
+                }
 
                 html += `
                     <div class="item-row">
@@ -740,13 +827,17 @@
                             <span>購入者: [${escapeHtml(buyer.equipped_title || '奴隷')}] ${escapeHtml(buyer.nickname || '不明')}</span>
                             <span>${dateStr}</span>
                         </div>
-                        <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${s.quantity}個</div>
-                        <div style="font-size:0.85rem;">売上受取額: <b>+${s.total_price} G</b> (単価:${s.unit_price}G)</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-weight:bold; font-size:1rem; color:var(--gold);">${escapeHtml(it.title || '商品')} × ${s.quantity}個</div>
+                            <div>${statusBadge}</div>
+                        </div>
+                        <div style="font-size:0.85rem;">売上金額: <b>+${s.total_price} G</b> (単価:${s.unit_price}G)</div>
                         ${s.distributed_content ? `
                             <div style="background:#0f1115; border:1px solid #333842; padding:6px; border-radius:4px; margin-top:4px; font-size:0.75rem; color:#aaa;">
                                 <span>引渡済データ: </span><span style="color:#fff; white-space:pre-wrap;">${escapeHtml(s.distributed_content)}</span>
                             </div>
                         ` : ''}
+                        ${actionHtml}
                     </div>
                 `;
             });
@@ -754,6 +845,25 @@
         } catch(e) {
             listEl.innerHTML = '<div style="text-align:center; color:var(--danger);">通信エラーが発生しました</div>';
         }
+    }
+
+    async function shipOrderSeller(orderId) {
+        const noteEl = document.getElementById(`ship-note-${orderId}`);
+        const note = noteEl ? noteEl.value.trim() : "";
+        try {
+            const res = await fetch(`/api/mall/orders/${orderId}/ship`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ tracking_note: note })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.message);
+                await loadMySales();
+            } else {
+                showToast(data.detail || "発送連絡に失敗しました", true);
+            }
+        } catch(e) { showToast("通信エラー", true); }
     }
 
     init();
