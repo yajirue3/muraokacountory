@@ -499,3 +499,90 @@ async def cancel_item(item_id: int, data: Optional[MallItemCancel] = None, autho
         print(f"[MALL ERROR /items/{item_id}/cancel]:")
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+# ========================================================
+# エスクロー物品売買用 追加エンドポイント
+# （mall.py の最下部に追記してください）
+# ========================================================
+
+# MallItemCreate の category バリデーションに PHYSICAL を追加
+MallItemCreate.model_fields["category"].metadata[0].pattern = "^(ITEM|GENERAL|PHYSICAL)$"
+
+class MallOrderShip(BaseModel):
+    tracking_note: Optional[str] = Field(None, max_length=200)
+
+class MallOrderRefund(BaseModel):
+    buyer_refund_wallet_id: str
+
+
+# 1. 店主用：発送・受渡連絡
+@router.post("/orders/{order_id}/ship")
+async def ship_order(order_id: int, data: Optional[MallOrderShip] = None, authorization: str = Header(None)):
+    try:
+        user = await get_user_from_token(authorization)
+        enforce_mall_rate_limit(user.id)
+        client = await get_supabase()
+
+        note = data.tracking_note.strip() if (data and data.tracking_note) else None
+
+        res = await client.rpc("execute_mall_ship_order", {
+            "p_seller_user_id": str(user.id),
+            "p_order_id": order_id,
+            "p_tracking_note": note
+        }).execute()
+
+        return {"message": "発送・受渡連絡を完了しました！", "data": res.data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[MALL ERROR /orders/{order_id}/ship]:")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+
+# 2. 買い手用：受取確認＆売上着金（エスクロー解除）
+@router.post("/orders/{order_id}/complete")
+async def complete_order(order_id: int, authorization: str = Header(None)):
+    try:
+        user = await get_user_from_token(authorization)
+        enforce_mall_rate_limit(user.id)
+        client = await get_supabase()
+
+        res = await client.rpc("execute_mall_complete_order", {
+            "p_buyer_user_id": str(user.id),
+            "p_order_id": order_id
+        }).execute()
+
+        result = res.data or {}
+        return {"message": f"受取を確定し、店主に {result.get('released_price', 0)}G が支払われました！", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[MALL ERROR /orders/{order_id}/complete]:")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
+
+# 3. 双方用：取引キャンセル＆返金
+@router.post("/orders/{order_id}/refund")
+async def refund_order(order_id: int, data: MallOrderRefund, authorization: str = Header(None)):
+    try:
+        user = await get_user_from_token(authorization)
+        enforce_mall_rate_limit(user.id)
+        client = await get_supabase()
+
+        res = await client.rpc("execute_mall_refund_order", {
+            "p_user_id": str(user.id),
+            "p_order_id": order_id,
+            "p_buyer_refund_wallet_id": data.buyer_refund_wallet_id
+        }).execute()
+
+        result = res.data or {}
+        return {"message": f"注文をキャンセルし、購入者に {result.get('refunded_price', 0)}G 返金しました。", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[MALL ERROR /orders/{order_id}/refund]:")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
+
