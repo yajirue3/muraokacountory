@@ -133,7 +133,7 @@ def enforce_mall_rate_limit(user_id: str):
 router = APIRouter(prefix="/api/mall", tags=["mall"])
 
 class MallItemCreate(BaseModel):
-    category: str = Field(..., pattern="^(ITEM|GENERAL)$")
+    category: str = Field(..., pattern="^(ITEM|GENERAL|PHYSICAL)$")
     user_inventory_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=60)
     description: str = Field("", max_length=500)
@@ -502,11 +502,7 @@ async def cancel_item(item_id: int, data: Optional[MallItemCancel] = None, autho
 
 # ========================================================
 # エスクロー物品売買用 追加エンドポイント
-# （mall.py の最下部に追記してください）
 # ========================================================
-
-# MallItemCreate の category バリデーションに PHYSICAL を追加
-MallItemCreate.model_fields["category"].metadata[0].pattern = "^(ITEM|GENERAL|PHYSICAL)$"
 
 class MallOrderShip(BaseModel):
     tracking_note: Optional[str] = Field(None, max_length=200)
@@ -585,4 +581,3 @@ async def refund_order(order_id: int, data: MallOrderRefund, authorization: str 
         print(f"[MALL ERROR /orders/{order_id}/refund]:")
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(getattr(e, "message", e)))
-
