@@ -542,3 +542,33 @@ async def admin_delete_msg(message_id: int, authorization: str = Header(None)):
     if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
     await (await get_supabase()).rpc("cancel_dm_message", {"p_user_id": str(user.id), "p_message_id": message_id}).execute()
     return {"success": True}
+
+# =====================================================================
+# API: 部屋削除（運営・部屋作成者専用）
+# =====================================================================
+@router.delete("/rooms/{room_id}")
+async def delete_group_room(room_id: int, authorization: str = Header(None)):
+    user = await get_user_auth(authorization)
+    client = await get_supabase()
+
+    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", room_id).execute()
+    if not room_res.data:
+        raise HTTPException(status_code=404, detail="部屋が見つかりません。")
+
+    owner_id = str(room_res.data[0].get("owner_user_id"))
+    is_king = await is_king_user(user.id)
+
+    if not is_king and str(user.id) != owner_id:
+        raise HTTPException(status_code=403, detail="部屋を削除する権限がありません。")
+
+    msgs = await client.table("direct_messages").select("id").eq("room_id", room_id).execute()
+    msg_ids = [m["id"] for m in (msgs.data or [])]
+    if msg_ids:
+        await client.table("dm_message_reactions").delete().in_("message_id", msg_ids).execute()
+        await client.table("dm_reports").delete().in_("message_id", msg_ids).execute()
+        await client.table("direct_messages").delete().eq("room_id", room_id).execute()
+
+    await client.table("dm_room_members").delete().eq("room_id", room_id).execute()
+    await client.table("dm_rooms").delete().eq("id", room_id).execute()
+
+    return {"message": "部屋を完全に削除しました。"}
