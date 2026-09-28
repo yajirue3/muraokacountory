@@ -119,6 +119,11 @@
         .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 4.7s forwards; }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
 
+        /* メンバー選択用アイテム */
+        .member-pick-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+        .member-pick-item:hover { background: var(--card-bg); }
+        .member-pick-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); margin-right: 12px; cursor: pointer; pointer-events: none; }
+
         @media (max-width: 768px) { .header { height: 50px; font-size: 1rem; } .avatar { width: 40px; height: 40px; font-size: 1rem; } .modal-content { padding: 20px; } }
     </style>
 </head>
@@ -145,7 +150,7 @@
         <div class="action-bar">
             <div class="action-row">
                 <button class="btn-full btn-primary-solid" style="margin:0; flex:1;" onclick="openModal('new-modal')">＋ 新しい密書</button>
-                <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openModal('new-group-modal')">👥 部屋結成</button>
+                <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openGroupCreateModal()">👥 部屋結成</button>
             </div>
             <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
         </div>
@@ -166,7 +171,8 @@
             <div id="chat-header-actions" style="display:flex; gap: 2px;">
                 <button class="nav-icon" onclick="startCall(false)">📞</button>
                 <button class="nav-icon" onclick="startCall(true)">🎥</button>
-                <button class="nav-icon" onclick="toggleBlock()">🚫</button>
+                <button class="nav-icon" id="btn-block-action" onclick="toggleBlock()">🚫</button>
+                <button class="nav-icon" id="btn-delete-room-action" style="display:none; color:var(--danger);" onclick="deleteCurrentRoom()" title="部屋を解体">🗑️</button>
             </div>
         </div>
 
@@ -233,11 +239,18 @@
     </div>
 </div>
 
+<!-- グループ作成モーダル (チェックボックス選択方式) -->
 <div class="modal" id="new-group-modal">
     <div class="modal-content">
-        <h2>密談部屋を結成</h2>
-        <input type="text" id="group-name-input" class="input-text" placeholder="部屋名">
-        <input type="text" id="group-members-input" class="input-text" placeholder="招待ID (カンマ区切り)">
+        <h2>👥 密談部屋を結成</h2>
+        <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 作戦本部)">
+        <div style="font-size:0.85rem; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>招待する国民を選択</span>
+            <span id="group-selected-count" style="color:var(--primary); font-weight:bold;">0人選択中</span>
+        </div>
+        <div id="group-candidate-list" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
+            <div class="empty-state" style="padding:20px 10px;">候補を読み込み中...</div>
+        </div>
         <button class="btn-full btn-primary-solid" onclick="createGroupRoom()">開設</button>
         <button class="btn-full btn-outline" onclick="closeModal('new-group-modal')">キャンセル</button>
     </div>
@@ -286,6 +299,7 @@
     let myWallets = [];
     let cropperInstance = null;
     let lastRenderedHash = "";
+    let rawConversations = []; // メンバー選定用キャッシュ
 
     // Agora 通話設定・状態
     let AGORA_APP_ID = "";
@@ -397,7 +411,8 @@
                         </div>`;
                 });
             } else {
-                (data.conversations || []).forEach(c => {
+                rawConversations = data.conversations || [];
+                rawConversations.forEach(c => {
                     const isGroup = c.type === "GROUP";
                     const avaDrive = c.avatar;
                     const avatarTag = avaDrive ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar">` : `<div class="avatar">${isGroup ? '👥' : escapeHtml((c.partner_name || '?').charAt(0))}</div>`;
@@ -436,6 +451,22 @@
         document.getElementById('chat-input-wrapper').style.display = isBlocked ? 'none' : 'flex';
         document.getElementById('block-warning-bar').style.display = isBlocked ? 'block' : 'none';
         document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
+
+        // 部屋削除ボタン・ブロックボタンの表示制御
+        const btnBlock = document.getElementById('btn-block-action');
+        const btnDelRoom = document.getElementById('btn-delete-room-action');
+        if (conv.type === 'GROUP') {
+            btnBlock.style.display = 'none';
+            // 国王(運営) または 部屋作成者の場合は削除可能
+            if (currentUser?.role === 'king') {
+                btnDelRoom.style.display = 'inline-block';
+            } else {
+                btnDelRoom.style.display = 'none';
+            }
+        } else {
+            btnBlock.style.display = 'inline-block';
+            btnDelRoom.style.display = 'none';
+        }
 
         showView('view-chat'); closeDrawers();
         lastRenderedHash = "";
@@ -690,6 +721,29 @@
         }
     }
 
+    // --- 部屋削除（運営・部屋作成者） ---
+    async function deleteCurrentRoom() {
+        if (!activeConversation || activeConversation.type !== 'GROUP') return;
+        if (!confirm(`密談部屋「${activeConversation.partner_name}」を完全に削除・解体しますか？\n※中のメッセージも全て消去されます。`)) return;
+        
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast(data.message || "部屋を削除しました。");
+                closeChat();
+                fetchThreads();
+            } else {
+                showToast(data.detail || "部屋の削除に失敗しました", true);
+            }
+        } catch (e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
     // --- 送金・グループ・画像 ---
     function openTransferModal() { closeDrawers(); openModal("transfer-modal"); }
     async function executeChatTransfer() {
@@ -707,16 +761,90 @@
         } catch(e) {}
     }
 
+    // --- グループ結成 (パターンB: チェックボックス方式) ---
+    function openGroupCreateModal() {
+        document.getElementById('group-name-input').value = '';
+        renderGroupCandidateList();
+        openModal('new-group-modal');
+    }
+
+    function renderGroupCandidateList() {
+        const listContainer = document.getElementById('group-candidate-list');
+        const directPartners = rawConversations.filter(c => c.type === 'DIRECT' && c.partner_dm_id);
+        
+        if (directPartners.length === 0) {
+            listContainer.innerHTML = '<div class="empty-state" style="padding:20px 10px; font-size:0.85rem;">交信相手が見つかりません。<br>先に1対1の密書を開始してください。</div>';
+            updateGroupSelectedCount();
+            return;
+        }
+
+        let html = '';
+        directPartners.forEach(p => {
+            const avaDrive = p.avatar;
+            const avatarTag = avaDrive 
+                ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" style="width:34px; height:34px; border-radius:50%; margin-right:10px; object-fit:cover;">` 
+                : `<div style="width:34px; height:34px; border-radius:50%; background:#333; margin-right:10px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.9rem;">${escapeHtml((p.partner_name||'?').charAt(0))}</div>`;
+
+            html += `
+                <div class="member-pick-item" onclick="toggleCandidateCheck(this)">
+                    <input type="checkbox" class="group-member-checkbox" value="${escapeHtml(p.partner_dm_id)}">
+                    ${avatarTag}
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-weight:bold; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(p.partner_name)}</div>
+                        <div style="font-size:0.75rem; color:var(--sub);">@${escapeHtml(p.partner_dm_id)}</div>
+                    </div>
+                </div>
+            `;
+        });
+        listContainer.innerHTML = html;
+        updateGroupSelectedCount();
+    }
+
+    function toggleCandidateCheck(itemElement) {
+        const chk = itemElement.querySelector('.group-member-checkbox');
+        if (chk) {
+            chk.checked = !chk.checked;
+            updateGroupSelectedCount();
+        }
+    }
+
+    function updateGroupSelectedCount() {
+        const chks = document.querySelectorAll('.group-member-checkbox:checked');
+        const counter = document.getElementById('group-selected-count');
+        if (counter) counter.innerText = `${chks.length}人選択中`;
+    }
+
     async function createGroupRoom() {
         const name = document.getElementById('group-name-input').value.trim();
-        const mems = document.getElementById('group-members-input').value.split(',').map(s=>s.trim()).filter(s=>s);
-        if(!name || !mems.length) return showToast("入力が不足しています", true);
+        const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
+        const mems = Array.from(checkedBoxes).map(cb => cb.value.trim()).filter(s => s);
+
+        if (!name) return showToast("部屋名を入力してください", true);
+        if (mems.length === 0) return showToast("招待するメンバーを1人以上選択してください", true);
+
         try {
-            const res = await fetch("/api/dm/groups", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ room_name: name, member_dm_ids: mems }) });
-            const data = await res.json();
-            if(res.ok) { closeModal('new-group-modal'); fetchThreads(); openConversation({ type: 'GROUP', room_id: data.room_id, partner_name: name, is_blocked: false }); }
-            else showToast(data.detail, true);
-        } catch(e) {}
+            const res = await fetch("/api/dm/groups", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ room_name: name, member_dm_ids: mems }) 
+            });
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {
+                return showToast(`サーバーエラー (${res.status}): ${text.substring(0, 60)}`, true);
+            }
+
+            if (res.ok) {
+                closeModal('new-group-modal'); 
+                fetchThreads(); 
+                openConversation({ type: 'GROUP', room_id: data.room_id, partner_name: name, is_blocked: false }); 
+            } else {
+                const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                showToast(msg || "グループ作成に失敗しました", true);
+            }
+        } catch(e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
     }
 
     async function uploadImage(e) {
