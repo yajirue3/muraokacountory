@@ -139,22 +139,22 @@ class MallItemCreate(BaseModel):
     description: str = Field("", max_length=500)
     secret_content: Optional[str] = Field(None, max_length=1000)
     price: int = Field(..., gt=0, le=100_000_000)
-    stock_quantity: int = Field(0, ge=0, le=9999)
+    stock_quantity: int = Field(0, ge=0)
     is_unlimited: bool = False
     secret_lines: List[str] = []
 
 class MallItemRestock(BaseModel):
-    quantity: int = Field(0, ge=0, le=9999)
+    quantity: int = Field(0, ge=0)
     source_inventory_id: Optional[int] = None
     secret_lines: List[str] = []
 
 class MallItemWithdraw(BaseModel):
-    quantity: int = Field(..., gt=0, le=9999)
+    quantity: int = Field(..., gt=0)
     target_account_id: Optional[str] = None
 
 class MallItemBuy(BaseModel):
     buyer_wallet_id: str
-    quantity: int = Field(..., gt=0, le=9999)
+    quantity: int = Field(..., gt=0)
     target_account_id: Optional[str] = None
 
 @router.get("/shops")
@@ -292,6 +292,8 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
             raise HTTPException(status_code=400, detail="商品を出品する前に店舗を開設してください")
         shop_id = shop_res.data[0]["id"]
 
+        stock_qty = len(clean_lines) if (data.category == "GENERAL" and not data.is_unlimited) else data.stock_quantity
+
         res = await client.rpc("execute_mall_create_item", {
             "p_shop_id": shop_id,
             "p_user_id": str(user.id),
@@ -301,7 +303,7 @@ async def create_item(data: MallItemCreate, authorization: str = Header(None)):
             "p_description": data.description.strip(),
             "p_secret_content": data.secret_content.strip() if data.secret_content else None,
             "p_price": data.price,
-            "p_stock_quantity": data.stock_quantity if data.category == "ITEM" else len(clean_lines),
+            "p_stock_quantity": stock_qty,
             "p_is_unlimited": data.is_unlimited,
             "p_secret_lines": clean_lines
         }).execute()
