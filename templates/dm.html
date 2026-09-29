@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
-    <!-- Supabase JS SDK を追加 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
@@ -126,6 +125,10 @@
         .member-pick-item:hover { background: var(--card-bg); }
         .member-pick-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); margin-right: 12px; cursor: pointer; pointer-events: none; }
 
+        /* メンバー管理行 */
+        .member-manage-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .btn-kick { background: var(--card-bg); border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
+
         @media (max-width: 768px) { .header { height: 50px; font-size: 1rem; } .avatar { width: 40px; height: 40px; font-size: 1rem; } .modal-content { padding: 20px; } }
     </style>
 </head>
@@ -154,6 +157,8 @@
                 <button class="btn-full btn-primary-solid" style="margin:0; flex:1;" onclick="openModal('new-modal')">＋ 新しい密書</button>
                 <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openGroupCreateModal()">👥 部屋結成</button>
             </div>
+            <!-- 合言葉で入室ボタン -->
+            <button class="btn-full btn-outline" style="margin:0; border-color:var(--primary); color:var(--primary);" onclick="openModal('passcode-join-modal')">🔑 合言葉で入室</button>
             <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁️ 王国検閲モードを開始</button>
         </div>
         <div class="thread-list" id="thread-list"><div class="empty-state">読み込み中...</div></div>
@@ -171,6 +176,8 @@
                 </div>
             </div>
             <div id="chat-header-actions" style="display:flex; gap: 2px;">
+                <!-- グループ用メンバー管理ボタン -->
+                <button class="nav-icon" id="btn-group-members-action" style="display:none;" onclick="openGroupMembersModal()" title="メンバー一覧・管理">👥</button>
                 <button class="nav-icon" onclick="startCall(false)">📞</button>
                 <button class="nav-icon" onclick="startCall(true)">🎥</button>
                 <button class="nav-icon" id="btn-block-action" onclick="toggleBlock()">🚫</button>
@@ -241,20 +248,43 @@
     </div>
 </div>
 
-<!-- グループ作成モーダル (チェックボックス選択方式) -->
+<!-- グループ作成モーダル (1人作成対応 & 合言葉設定) -->
 <div class="modal" id="new-group-modal">
     <div class="modal-content">
         <h2>👥 密談部屋を結成</h2>
         <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 作戦本部)">
+        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意: 知っている同志だけが入室可)">
         <div style="font-size:0.85rem; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-            <span>招待する国民を選択</span>
+            <span>招待する国民を選択 (後から合言葉でも呼べます)</span>
             <span id="group-selected-count" style="color:var(--primary); font-weight:bold;">0人選択中</span>
         </div>
-        <div id="group-candidate-list" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
+        <div id="group-candidate-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
             <div class="empty-state" style="padding:20px 10px;">候補を読み込み中...</div>
         </div>
         <button class="btn-full btn-primary-solid" onclick="createGroupRoom()">開設</button>
         <button class="btn-full btn-outline" onclick="closeModal('new-group-modal')">キャンセル</button>
+    </div>
+</div>
+
+<!-- 合言葉入室モーダル -->
+<div class="modal" id="passcode-join-modal">
+    <div class="modal-content">
+        <h2>🔑 合言葉で密談部屋に入室</h2>
+        <p style="color:var(--sub); font-size:0.85rem; margin-bottom:12px;">共有された合言葉を入力して地下会合に参加します。</p>
+        <input type="text" id="join-passcode-input" class="input-text" placeholder="合言葉 (例: himitsu123)">
+        <button class="btn-full btn-primary-solid" onclick="executeJoinByPasscode()">入室</button>
+        <button class="btn-full btn-outline" onclick="closeModal('passcode-join-modal')">閉じる</button>
+    </div>
+</div>
+
+<!-- グループメンバー一覧 & 除名モーダル -->
+<div class="modal" id="group-members-modal">
+    <div class="modal-content">
+        <h2>👥 部屋の国民一覧</h2>
+        <div id="group-members-list-box" style="max-height: 280px; overflow-y: auto; margin-bottom: 16px;">
+            <div class="empty-state">読み込み中...</div>
+        </div>
+        <button class="btn-full btn-outline" onclick="closeModal('group-members-modal')">閉じる</button>
     </div>
 </div>
 
@@ -349,7 +379,7 @@
         await fetchWallets();
         await fetchThreads();
         
-        // WebSocket の一時切断時に対する安全なフォールバック（15秒ごとの穏やかな同期）
+        // 15秒ごとの穏やかなフォールバック同期
         setInterval(() => {
             try {
                 if (activeConversation) {
@@ -368,9 +398,6 @@
         }, 15000);
     }
 
-    // =====================================================================
-    // Supabase Realtime 初期化 & 購読
-    // =====================================================================
     async function initSupabaseRealtime() {
         try {
             let sbUrl = window.SUPABASE_URL || localStorage.getItem("supabase_url");
@@ -476,7 +503,8 @@
                 rawConversations.forEach(c => {
                     const isGroup = c.type === "GROUP";
                     const avaDrive = c.avatar;
-                    const avatarTag = avaDrive ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar">` : `<div class="avatar">${isGroup ? '👥' : escapeHtml((c.partner_name || '?').charAt(0))}</div>`;
+                    const lockIcon = (isGroup && c.has_passcode) ? '🔒 ' : '';
+                    const avatarTag = avaDrive ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar">` : `<div class="avatar">${isGroup ? (c.has_passcode ? '🔒' : '👥') : escapeHtml((c.partner_name || '?').charAt(0))}</div>`;
                     const subLabel = isGroup ? '' : `<span class="thread-id">@${escapeHtml(c.partner_dm_id)}</span>`;
                     const badge = c.unread_count > 0 ? `<div class="unread-badge">${c.unread_count}</div>` : '';
                     
@@ -485,7 +513,7 @@
                             ${avatarTag}
                             <div class="thread-info">
                                 <div class="thread-name">
-                                    <div>${escapeHtml(c.partner_name)} ${subLabel}</div>
+                                    <div>${lockIcon}${escapeHtml(c.partner_name)} ${subLabel}</div>
                                     ${badge}
                                 </div>
                                 <div class="thread-msg">${escapeHtml(c.latest_message)}</div>
@@ -502,7 +530,7 @@
         if (isAdminMode) return;
         activeConversation = conv;
         document.getElementById('chat-title').innerText = conv.partner_name;
-        document.getElementById('chat-subtitle').innerText = conv.type === 'GROUP' ? 'グループ密談' : `@${conv.partner_dm_id}`;
+        document.getElementById('chat-subtitle').innerText = conv.type === 'GROUP' ? (conv.has_passcode ? '🔒 密談部屋 (合言葉)' : '👥 密談部屋') : `@${conv.partner_dm_id}`;
         
         const avatarEl = document.getElementById('chat-header-avatar');
         if(conv.avatar) { avatarEl.src = `https://lh3.googleusercontent.com/u/0/d/${conv.avatar}=w100`; avatarEl.style.display = 'block'; }
@@ -513,13 +541,15 @@
         document.getElementById('block-warning-bar').style.display = isBlocked ? 'block' : 'none';
         document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
 
-        // 部屋削除ボタン・ブロックボタンの表示制御
+        // 部屋削除ボタン・メンバー管理ボタン・ブロックボタンの表示制御
         const btnBlock = document.getElementById('btn-block-action');
         const btnDelRoom = document.getElementById('btn-delete-room-action');
+        const btnGroupMems = document.getElementById('btn-group-members-action');
         const transferLauncher = document.getElementById('launcher-transfer-item');
 
         if (conv.type === 'GROUP') {
             btnBlock.style.display = 'none';
+            btnGroupMems.style.display = 'inline-block';
             if (transferLauncher) transferLauncher.style.display = 'none';
 
             const isOwner = conv.owner_user_id && String(conv.owner_user_id) === String(currentUser?.id);
@@ -531,6 +561,7 @@
         } else {
             btnBlock.style.display = 'inline-block';
             btnDelRoom.style.display = 'none';
+            btnGroupMems.style.display = 'none';
             if (transferLauncher) transferLauncher.style.display = 'flex';
         }
 
@@ -844,9 +875,10 @@
         } catch(e) {}
     }
 
-    // --- グループ結成 (パターンB: チェックボックス方式) ---
+    // --- グループ結成 (1人作成 & パスコード設定対応) ---
     function openGroupCreateModal() {
         document.getElementById('group-name-input').value = '';
+        document.getElementById('group-passcode-input').value = '';
         renderGroupCandidateList();
         openModal('new-group-modal');
     }
@@ -856,7 +888,7 @@
         const directPartners = rawConversations.filter(c => c.type === 'DIRECT' && c.partner_dm_id);
         
         if (directPartners.length === 0) {
-            listContainer.innerHTML = '<div class="empty-state" style="padding:20px 10px; font-size:0.85rem;">交信相手が見つかりません。<br>先に1対1の密書を開始してください。</div>';
+            listContainer.innerHTML = '<div class="empty-state" style="padding:20px 10px; font-size:0.85rem;">交信相手がいません。<br>招待なし（自分1人）でも結成可能です。</div>';
             updateGroupSelectedCount();
             return;
         }
@@ -899,17 +931,22 @@
 
     async function createGroupRoom() {
         const name = document.getElementById('group-name-input').value.trim();
+        const passcode = document.getElementById('group-passcode-input').value.trim();
         const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
         const mems = Array.from(checkedBoxes).map(cb => cb.value.trim()).filter(s => s);
 
         if (!name) return showToast("部屋名を入力してください", true);
-        if (mems.length === 0) return showToast("招待するメンバーを1人以上選択してください", true);
+        // メンバーが0人でも自分1人の部屋として作成可能！
 
         try {
             const res = await fetch("/api/dm/groups", { 
                 method: "POST", 
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
-                body: JSON.stringify({ room_name: name, member_dm_ids: mems }) 
+                body: JSON.stringify({ 
+                    room_name: name, 
+                    member_dm_ids: mems,
+                    passcode: passcode || null
+                }) 
             });
             const text = await res.text();
             let data = {};
@@ -920,12 +957,132 @@
             if (res.ok) {
                 closeModal('new-group-modal'); 
                 fetchThreads(); 
-                openConversation({ type: 'GROUP', room_id: data.room_id, partner_name: name, owner_user_id: currentUser?.id, is_blocked: false }); 
+                openConversation({ 
+                    type: 'GROUP', 
+                    room_id: data.room_id, 
+                    partner_name: name, 
+                    owner_user_id: currentUser?.id, 
+                    has_passcode: !!passcode,
+                    is_blocked: false 
+                }); 
             } else {
                 const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
                 showToast(msg || "グループ作成に失敗しました", true);
             }
         } catch(e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    // --- 合言葉で入室 ---
+    async function executeJoinByPasscode() {
+        const input = document.getElementById('join-passcode-input');
+        const code = input.value.trim();
+        if (!code) return showToast("合言葉を入力してください", true);
+
+        try {
+            const res = await fetch("/api/dm/rooms/join-by-passcode", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ passcode: code })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast(data.message);
+                input.value = '';
+                closeModal('passcode-join-modal');
+                fetchThreads();
+                openConversation({
+                    type: 'GROUP',
+                    room_id: data.room_id,
+                    partner_name: data.room_name,
+                    owner_user_id: data.owner_user_id,
+                    has_passcode: true,
+                    is_blocked: false
+                });
+            } else {
+                showToast(data.detail || "入室に失敗しました", true);
+            }
+        } catch (e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    // --- メンバー管理 (一覧 & 除名) ---
+    async function openGroupMembersModal() {
+        if (!activeConversation || activeConversation.type !== 'GROUP') return;
+        openModal('group-members-modal');
+        const box = document.getElementById('group-members-list-box');
+        box.innerHTML = '<div class="empty-state">読み込み中...</div>';
+
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}/members`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                box.innerHTML = '<div class="empty-state">メンバー情報の取得に失敗しました</div>';
+                return;
+            }
+            const data = await res.json();
+            const members = data.members || [];
+            const canManage = data.can_manage; // 作成者 or 国王
+
+            if (members.length === 0) {
+                box.innerHTML = '<div class="empty-state">メンバーがいません</div>';
+                return;
+            }
+
+            let html = '';
+            members.forEach(m => {
+                const avaDrive = m.avatar_drive_id;
+                const avatarTag = avaDrive 
+                    ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" style="width:34px; height:34px; border-radius:50%; margin-right:10px; object-fit:cover;">` 
+                    : `<div style="width:34px; height:34px; border-radius:50%; background:#333; margin-right:10px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.9rem;">${escapeHtml(m.nickname.charAt(0))}</div>`;
+
+                const ownerBadge = m.is_owner ? `<span style="font-size:0.7rem; background:var(--primary); color:#000; padding:1px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">結成者</span>` : '';
+                
+                // 作成者本人以外のメンバーは、権限者（オーナー/国王）が除名可能
+                let kickBtn = '';
+                if (canManage && !m.is_owner && String(m.id) !== String(currentUser?.id)) {
+                    kickBtn = `<button class="btn-kick" onclick="kickMember('${m.id}', '${escapeHtml(m.nickname)}')">除名</button>`;
+                }
+
+                html += `
+                    <div class="member-manage-row">
+                        <div style="display:flex; align-items:center; overflow:hidden;">
+                            ${avatarTag}
+                            <div style="overflow:hidden;">
+                                <div style="font-weight:bold; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    ${escapeHtml(m.nickname)} ${ownerBadge}
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--sub);">@${escapeHtml(m.dm_id || "ID未設定")}</div>
+                            </div>
+                        </div>
+                        ${kickBtn}
+                    </div>
+                `;
+            });
+            box.innerHTML = html;
+        } catch (e) {
+            box.innerHTML = `<div class="empty-state">通信エラー: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function kickMember(userId, name) {
+        if (!confirm(`国民「${name}」をこの密談部屋から除名（追放）しますか？`)) return;
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}/members/${userId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast(data.message || "除名しました。");
+                openGroupMembersModal(); // リストを再読込
+            } else {
+                showToast(data.detail || "除名に失敗しました", true);
+            }
+        } catch (e) {
             showToast(`通信エラー: ${e.message}`, true);
         }
     }
