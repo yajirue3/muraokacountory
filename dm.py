@@ -102,7 +102,7 @@ async def is_room_member(user_id: str, room_id: int) -> bool:
         if room_res.data and str(room_res.data[0].get("owner_user_id")) == str(user_id):
             return True
 
-        res = await client.table("dm_room_members").select("id").eq("room_id", int(room_id)).eq("user_id", str(user_id)).execute()
+        res = await client.table("dm_room_members").select("user_id").eq("room_id", int(room_id)).eq("user_id", str(user_id)).execute()
         return bool(res.data)
     except Exception as e:
         print(f"is_room_member check error: {e}")
@@ -439,7 +439,6 @@ async def report_msg(data: ReportReq, authorization: str = Header(None)):
 # =====================================================================
 @router.post("/groups")
 async def create_group(data: GroupReq, authorization: str = Header(None)):
-    """1人でも部屋結成可能。合言葉（passcode）を確実にDBへ保存"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
@@ -471,7 +470,7 @@ async def create_group(data: GroupReq, authorization: str = Header(None)):
 
 @router.post("/rooms/join-by-passcode")
 async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Header(None)):
-    """合言葉を入力して密談部屋に参加（型安全・重複安全版）"""
+    """合言葉を入力して密談部屋に参加（dm_room_members に id カラムが存在しない構造に対応）"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     code = (data.passcode or "").strip()
@@ -489,7 +488,8 @@ async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Head
         owner_uid = str(room.get("owner_user_id", ""))
 
         if current_uid != owner_uid:
-            mem_check = await client.table("dm_room_members").select("id").eq("room_id", r_id).eq("user_id", current_uid).execute()
+            # id ではなく user_id を照合
+            mem_check = await client.table("dm_room_members").select("user_id").eq("room_id", r_id).eq("user_id", current_uid).execute()
             if not mem_check.data:
                 await client.table("dm_room_members").insert({
                     "room_id": r_id,
@@ -510,7 +510,6 @@ async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Head
 
 @router.get("/rooms/{room_id}/members")
 async def get_room_members(room_id: int, authorization: str = Header(None)):
-    """部屋のメンバー一覧を取得（作成者・国王判定付き）"""
     user = await get_user_auth(authorization)
     if not await is_room_member(user.id, room_id):
         raise HTTPException(status_code=403, detail="権限がありません。")
@@ -547,7 +546,6 @@ async def get_room_members(room_id: int, authorization: str = Header(None)):
 
 @router.delete("/rooms/{room_id}/members/{target_user_id}")
 async def kick_room_member(room_id: int, target_user_id: str, authorization: str = Header(None)):
-    """部屋作成者 or 国王によるメンバー除名（追放）"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
 
