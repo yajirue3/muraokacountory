@@ -802,3 +802,199 @@ async def derby_scheduler():
 @router.on_event("startup")
 async def start_derby_task():
     asyncio.create_task(derby_scheduler())
+
+# ==================================================
+# 王国クラッシュ（Crash）モジュール
+# ==================================================
+
+class CrashBetRequest(BaseModel):
+    round_id: str
+    wallet_id: str
+    amount: int
+    target_multiplier: float
+
+
+# 画面配信ルート
+@router.get("/crash", response_class=HTMLResponse)
+async def get_crash(request: Request):
+    return templates.TemplateResponse(request=request, name="crash.html")
+
+
+# クラッシュ倍率の乱数生成（RTP 96.0%、約4%で1.00x即死、上限100.00x）
+def generate_crash_multiplier() -> float:
+    r = random.random()
+    if r < 0.04:
+        return 1.00
+    multiplier = 0.96 / (1.0 - r)
+    return round(min(multiplier, 100.00), 2)
+
+
+# クラッシュ倍率に応じた飛行秒数の計算（指数関数的加速: 1.00x=0秒、2.00x=約3.5秒、100x=約14秒）
+def calculate_flying_duration(crash_point: float) -> float:
+    import math
+    if crash_point <= 1.00:
+        return 0.5
+    # duration = 5 * ln(multiplier) + 0.5
+    sec = 5.0 * math.log(crash_point) + 0.5
+    return round(min(max(sec, 1.0), 20.0), 2)
+
+
+# 現在の有効なラウンドを取得、無ければ新規生成
+async def get_or_create_current_crash_round():
+    client = await get_supabase()
+    now = datetime.now(timezone.utc)
+
+    # 1. 進行中（BETTING または FLYING）の最新ラウンドを確認
+    res = await client.table("crash_rounds") \
+        .select("*") \
+        .in_("status", ["BETTING", "FLYING"]) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if res.data:
+        return res.data[0]
+
+    # 2. 進行中が無ければ新規ラウンドを生成（15秒のベット猶予）
+    crash_point = generate_crash_multiplier()
+    flying_duration = calculate_flying_duration(crash_point)
+
+    bet_close_at = now + timedelta(seconds=15)
+    crash_at = bet_close_at + timedelta(seconds=flying_duration)
+
+    new_round = {
+        "crash_point": crash_point,
+        "status": "BETTING",
+        "bet_close_at": bet_close_at.isoformat(),
+        "crash_at": crash_at.isoformat(),
+        "created_at": now.isoformat()
+    }
+    insert_res = await client.table("crash_rounds").insert(new_round).execute()
+    return insert_res.data[0]
+
+
+# --- カジノAPI：現在のクラッシュ状況取得 ---
+@router.get("/api/crash/current")
+async def get_crash_current(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    round_data = await get_or_create_current_crash_round()
+    now_utc = datetime.now(timezone.utc)
+
+    # ノントラスト防壁: CRASHEDになるまで crash_point はフロントに返却しない
+    is_crashed = (round_data["status"] == "CRASHED")
+    exposed_crash_point = float(round_data["crash_point"]) if is_crashed else None
+
+    # 直近のクラッシュ履歴（最新10件の確定倍率のみ）
+    history_res = await client.table("crash_rounds") \
+        .select("crash_point") \
+        .eq("status", "CRASHED") \
+        .order("created_at", desc=True) \
+        .limit(10) \
+        .execute()
+    history = [float(h["crash_point"]) for h in (history_res.data or [])]
+
+    # このラウンドへの自分のベット状況
+    my_bet_res = await client.table("crash_bets") \
+        .select("*") \
+        .eq("round_id", round_data["id"]) \
+        .eq("user_id", user.id) \
+        .execute()
+    my_bet = my_bet_res.data[0] if my_bet_res.data else None
+
+    return {
+        "round_id": round_data["id"],
+        "status": round_data["status"],
+        "bet_close_at": round_data["bet_close_at"],
+        "crash_at": round_data["crash_at"] if round_data["status"] != "BETTING" else None,
+        "crash_point": exposed_crash_point,
+        "server_time": now_utc.isoformat(),
+        "history": history,
+        "my_bet": my_bet
+    }
+
+
+# --- カジノAPI：事前予約ベット実行（RPC完全制御） ---
+@router.post("/api/crash/bet")
+async def bet_crash(data: CrashBetRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    try:
+        res = await client.rpc("execute_crash_bet", {
+            "p_round_id": data.round_id,
+            "p_user_id": str(user.id),
+            "p_wallet_id": data.wallet_id,
+            "p_amount": data.amount,
+            "p_target_multiplier": data.target_multiplier
+        }).execute()
+        return res.data
+    except Exception as e:
+        error_msg = getattr(e, "message", str(e))
+        raise HTTPException(status_code=400, detail=error_msg)
+
+
+# --- バックグラウンドループ：状態遷移 ＆ 精算 ＆ 自動救済 ---
+async def crash_scheduler():
+    # 起動直後のウェイト
+    await asyncio.sleep(2)
+    while True:
+        try:
+            client = await get_supabase()
+            now_utc = datetime.now(timezone.utc)
+
+            # 1. 異常放置ラウンドの自動救済・全額返金（60秒超えスタック監視）
+            try:
+                await client.rpc("execute_crash_rescue_cancelled", {}).execute()
+            except Exception:
+                pass
+
+            # 2. 現在アクティブなラウンドを取得
+            active_rounds_res = await client.table("crash_rounds") \
+                .select("*") \
+                .in_("status", ["BETTING", "FLYING"]) \
+                .order("created_at", desc=True) \
+                .limit(1) \
+                .execute()
+
+            if not active_rounds_res.data:
+                # 稼働中のラウンドが無ければ即生成
+                await get_or_create_current_crash_round()
+                await asyncio.sleep(1)
+                continue
+
+            current_round = active_rounds_res.data[0]
+            r_id = current_round["id"]
+            status = current_round["status"]
+
+            # ISO文字列のUTC日時パース
+            close_time = datetime.fromisoformat(current_round["bet_close_at"].replace("Z", "+00:00"))
+            crash_time = datetime.fromisoformat(current_round["crash_at"].replace("Z", "+00:00"))
+
+            # 3. 状態遷移: BETTING -> FLYING（15秒経過）
+            if status == "BETTING" and now_utc >= close_time:
+                await client.table("crash_rounds") \
+                    .update({"status": "FLYING"}) \
+                    .eq("id", r_id) \
+                    .eq("status", "BETTING") \
+                    .execute()
+
+            # 4. 状態遷移: FLYING -> CRASHED（爆発時刻到達） & アトミック一括精算
+            elif status == "FLYING" and now_utc >= crash_time:
+                await client.rpc("execute_crash_settle", {"p_round_id": r_id}).execute()
+                # 爆発演出・結果確認の余韻タイム（3秒）待機後、次ラウンドを生成
+                await asyncio.sleep(3)
+                await get_or_create_current_crash_round()
+
+        except Exception as e:
+            print(f"[Crash Scheduler Error] {e}")
+
+        # 0.5秒間隔で軽快にTickを監視（DB負荷は極小）
+        await asyncio.sleep(0.5)
+
+
+# FastAPI起動イベントにクラッシュスケジューラーを追加
+@router.on_event("startup")
+async def start_crash_task():
+    asyncio.create_task(crash_scheduler())
