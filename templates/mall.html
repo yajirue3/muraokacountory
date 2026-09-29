@@ -217,14 +217,41 @@
         ]);
     }
 
+    function formatErrorMessage(msg) {
+        if (!msg) return "エラーが発生しました";
+        if (typeof msg === "string") return msg;
+        if (Array.isArray(msg)) {
+            return msg.map(err => {
+                if (typeof err === "string") return err;
+                const field = err.loc ? err.loc[err.loc.length - 1] : "";
+                return field ? `${field}: ${err.msg}` : (err.msg || JSON.stringify(err));
+            }).join("\n");
+        }
+        if (typeof msg === "object") {
+            if (msg.message) return msg.message;
+            if (msg.msg) return msg.msg;
+            if (msg.error) return msg.error;
+            if (msg.detail) return formatErrorMessage(msg.detail);
+            try {
+                return JSON.stringify(msg);
+            } catch (e) {
+                return "エラーが発生しました";
+            }
+        }
+        return String(msg);
+    }
+
     function showToast(message, isError = false) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = 'toast';
-        toast.innerText = message;
-        if (isError) toast.style.borderLeftColor = 'var(--danger)';
+        toast.innerText = isError ? formatErrorMessage(message) : String(message || '');
+        if (isError) {
+            toast.style.borderLeftColor = 'var(--danger)';
+            toast.style.whiteSpace = 'pre-line';
+        }
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(() => toast.remove(), 4000);
     }
 
     function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
