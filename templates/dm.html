@@ -204,7 +204,7 @@
         <!-- 拡張ドロワー -->
         <div class="drawer-panel" id="launcher-drawer">
             <div class="launcher-grid">
-                <div class="launcher-item" onclick="openTransferModal()"><span class="launcher-icon">💰</span><span>送金</span></div>
+                <div class="launcher-item" id="launcher-transfer-item" onclick="openTransferModal()"><span class="launcher-icon">💰</span><span>送金</span></div>
                 <div class="launcher-item" onclick="document.getElementById('img-file-input').click()"><span class="launcher-icon">🖼️</span><span>画像</span></div>
                 <div class="launcher-item" onclick="openModal('stamp-create-modal')"><span class="launcher-icon">🎨</span><span>スタンプ自作</span></div>
                 <div class="launcher-item" onclick="openMarketModal()"><span class="launcher-icon">🏪</span><span>市場(購入)</span></div>
@@ -455,10 +455,16 @@
         // 部屋削除ボタン・ブロックボタンの表示制御
         const btnBlock = document.getElementById('btn-block-action');
         const btnDelRoom = document.getElementById('btn-delete-room-action');
+        const transferLauncher = document.getElementById('launcher-transfer-item');
+
         if (conv.type === 'GROUP') {
             btnBlock.style.display = 'none';
+            // グループチャットでは送金アイコンを非表示にして誤操作を防止
+            if (transferLauncher) transferLauncher.style.display = 'none';
+
             // 国王(運営) または 部屋作成者の場合は削除可能
-            if (currentUser?.role === 'king') {
+            const isOwner = conv.owner_user_id && String(conv.owner_user_id) === String(currentUser?.id);
+            if (currentUser?.role === 'king' || isOwner) {
                 btnDelRoom.style.display = 'inline-block';
             } else {
                 btnDelRoom.style.display = 'none';
@@ -466,6 +472,7 @@
         } else {
             btnBlock.style.display = 'inline-block';
             btnDelRoom.style.display = 'none';
+            if (transferLauncher) transferLauncher.style.display = 'flex';
         }
 
         showView('view-chat'); closeDrawers();
@@ -513,13 +520,25 @@
 
     async function fetchMessages(isBg) {
         if(!activeConversation) return;
-        const url = activeConversation.type === 'GROUP' ? `/api/dm/messages/group/${activeConversation.room_id}` : `/api/dm/messages/${activeConversation.partner_dm_id}`;
+        // UUID が既にあればそれを用い、なければ partner_dm_id で取得
+        const ident = activeConversation.target_user_id || activeConversation.partner_dm_id;
+        const url = activeConversation.type === 'GROUP' 
+            ? `/api/dm/messages/group/${activeConversation.room_id}` 
+            : `/api/dm/messages/${ident}`;
         try {
             const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
             if(res.ok) {
                 const data = await res.json();
-                if (activeConversation.type === 'DIRECT' && data.partner_user_id) {
-                    activeConversation.target_user_id = data.partner_user_id;
+                if (activeConversation.type === 'DIRECT') {
+                    if (data.partner_user_id) activeConversation.target_user_id = data.partner_user_id;
+                    if (data.partner_dm_id) {
+                        activeConversation.partner_dm_id = data.partner_dm_id;
+                        document.getElementById('chat-subtitle').innerText = `@${data.partner_dm_id}`;
+                    }
+                    if (data.partner_name) {
+                        activeConversation.partner_name = data.partner_name;
+                        document.getElementById('chat-title').innerText = data.partner_name;
+                    }
                 }
                 renderMessagesList(data.messages || [], isBg);
             }
@@ -637,10 +656,12 @@
         const content = input.value.trim();
         if (!content || !activeConversation || isAdminMode) return;
         
-        const targetDmId = activeConversation.partner_dm_id || activeConversation.target_dm_id || null;
-        const roomId = activeConversation.room_id || null;
+        const isGroup = activeConversation.type === 'GROUP';
+        const roomId = isGroup ? activeConversation.room_id : null;
+        const targetUserId = !isGroup ? activeConversation.target_user_id || null : null;
+        const targetDmId = !isGroup ? activeConversation.partner_dm_id || null : null;
         
-        if (!targetDmId && !roomId) {
+        if (!roomId && !targetUserId && !targetDmId) {
             showToast("送信先が見つかりません", true);
             return;
         }
@@ -651,6 +672,7 @@
             const res = await fetch('/api/dm/send', { 
                 method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
                 body: JSON.stringify({ 
+                    target_user_id: targetUserId,
                     target_dm_id: targetDmId, 
                     room_id: roomId, 
                     content: content 
@@ -747,13 +769,16 @@
     // --- 送金・グループ・画像 ---
     function openTransferModal() { closeDrawers(); openModal("transfer-modal"); }
     async function executeChatTransfer() {
+        if (!activeConversation || activeConversation.type !== 'DIRECT' || !activeConversation.target_user_id) {
+            return showToast("送金相手を特定できません", true);
+        }
         const walletId = document.getElementById("transfer-wallet-select").value;
         const amount = parseInt(document.getElementById("transfer-amount-input").value);
         if(!amount || amount <= 0) return showToast("正しい金額を入力", true);
         try {
             const res = await fetch("/api/dm/transfer-gold", {
                 method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ target_user_id: activeConversation.target_user_id, sender_wallet_id: walletId, amount: amount, room_id: activeConversation.room_id || null })
+                body: JSON.stringify({ target_user_id: activeConversation.target_user_id, sender_wallet_id: walletId, amount: amount, room_id: null })
             });
             const data = await res.json();
             if(res.ok) { showToast(data.message); closeModal("transfer-modal"); fetchMessages(false); } 
@@ -837,7 +862,7 @@
             if (res.ok) {
                 closeModal('new-group-modal'); 
                 fetchThreads(); 
-                openConversation({ type: 'GROUP', room_id: data.room_id, partner_name: name, is_blocked: false }); 
+                openConversation({ type: 'GROUP', room_id: data.room_id, partner_name: name, owner_user_id: currentUser?.id, is_blocked: false }); 
             } else {
                 const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
                 showToast(msg || "グループ作成に失敗しました", true);
@@ -850,10 +875,18 @@
     async function uploadImage(e) {
         const file = e.target.files[0];
         if(!file || !activeConversation) return;
-        const formData = new FormData(); formData.append("file", file);
-        if(activeConversation.type === 'GROUP') formData.append("room_id", activeConversation.room_id);
-        else formData.append("target_dm_id", activeConversation.partner_dm_id);
-        closeDrawers(); showToast("画像送信中...");
+        const formData = new FormData(); 
+        formData.append("file", file);
+
+        if(activeConversation.type === 'GROUP') {
+            formData.append("room_id", activeConversation.room_id);
+        } else {
+            if (activeConversation.target_user_id) formData.append("target_user_id", activeConversation.target_user_id);
+            if (activeConversation.partner_dm_id) formData.append("target_dm_id", activeConversation.partner_dm_id);
+        }
+
+        closeDrawers(); 
+        showToast("画像送信中...");
         try {
             const res = await fetch(`/api/dm/upload-image`, { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
             if(res.ok) fetchMessages(false);
@@ -909,10 +942,18 @@
     async function sendStamp(driveId) {
         if(!activeConversation) return;
         closeDrawers();
+        const isGroup = activeConversation.type === 'GROUP';
         try {
             await fetch("/api/dm/send", {
                 method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ target_dm_id: activeConversation.partner_dm_id || null, room_id: activeConversation.room_id || null, message_type: "STAMP", content: "スタンプ", metadata: { drive_file_id: driveId } })
+                body: JSON.stringify({ 
+                    target_user_id: !isGroup ? activeConversation.target_user_id || null : null,
+                    target_dm_id: !isGroup ? activeConversation.partner_dm_id || null : null, 
+                    room_id: isGroup ? activeConversation.room_id || null : null, 
+                    message_type: "STAMP", 
+                    content: "スタンプ", 
+                    metadata: { drive_file_id: driveId } 
+                })
             });
             fetchMessages(false);
         } catch(e) {}
@@ -963,7 +1004,6 @@
         if (activeConversation.type === 'GROUP') {
             return `room_${activeConversation.room_id}`;
         }
-        // UUIDを結合し、SHA-256でハッシュ化して64バイト制限を安全にクリア
         const idA = String(currentUser.id).replace(/-/g, '');
         const idB = String(activeConversation.target_user_id).replace(/-/g, '');
         const ids = [idA, idB].sort().join('_');
@@ -992,12 +1032,13 @@
             document.getElementById("call-status-text").style.color = "var(--primary)";
             document.getElementById("call-bar").style.display = "flex";
 
-            // シグナル専用テーブルではなく、通常のチャットメッセージ(着信履歴)として送信
+            const isGroup = activeConversation.type === 'GROUP';
             await fetch('/api/dm/send', { 
                 method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
                 body: JSON.stringify({ 
-                    target_dm_id: activeConversation.partner_dm_id || null, 
-                    room_id: activeConversation.room_id || null, 
+                    target_user_id: !isGroup ? activeConversation.target_user_id || null : null,
+                    target_dm_id: !isGroup ? activeConversation.partner_dm_id || null : null, 
+                    room_id: isGroup ? activeConversation.room_id || null : null, 
                     message_type: 'CALL_INVITE',
                     content: isVideo ? '🎥 ビデオ通話を開始しました' : '📞 音声通話を開始しました',
                     metadata: { channelName: channelName, isVideo: isVideo }
@@ -1053,7 +1094,7 @@
 
         agoraClient.on("user-left", () => {
             hangupCall();
-            showToast("相手が通話を終了しました");
+            showToast("通話を終了しました");
         });
 
         await agoraClient.join(tokenData.app_id, channelName, tokenData.token, null);
