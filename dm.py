@@ -46,7 +46,11 @@ class PushSubscription(BaseModel):
 
 class GroupReq(BaseModel):
     room_name: str
-    member_dm_ids: List[str]
+    member_dm_ids: List[str] = Field(default_factory=list)
+    passcode: Optional[str] = None
+
+class JoinPasscodeReq(BaseModel):
+    passcode: str
 
 class ReactReq(BaseModel):
     reaction_type: str
@@ -89,24 +93,21 @@ async def is_king_user(user_id: str) -> bool:
         return False
 
 async def is_room_member(user_id: str, room_id: int) -> bool:
-    """グループの所属メンバー判定（国王・作成者は常にアクセス許可、型変換エラーを回避）"""
+    """グループの所属メンバー判定（国王・作成者は常にアクセス許可）"""
     try:
         client = await get_supabase()
-        # 国王アカウントは全室アクセス可能
         if await is_king_user(user_id):
             return True
 
-        # 作成者本人か確認
         room_res = await client.table("dm_rooms").select("owner_user_id").eq("id", int(room_id)).execute()
         if room_res.data and str(room_res.data[0].get("owner_user_id")) == str(user_id):
             return True
 
-        # メンバーリストに入っているか確認
         res = await client.table("dm_room_members").select("id").eq("room_id", int(room_id)).eq("user_id", str(user_id)).execute()
         return bool(res.data)
     except Exception as e:
         print(f"is_room_member check error: {e}")
-        return True  # 判定処理で例外が出た場合は既存ユーザーの利用を止めないようフォールバック
+        return True
 
 async def upload_image_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
     res = await http_client.post("https://oauth2.googleapis.com/token", data={
@@ -256,7 +257,6 @@ async def get_conversations(authorization: str = Header(None)):
     my_groups_res = await client.table("dm_room_members").select("room_id").eq("user_id", str(user.id)).execute()
     group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
     
-    # 自分が作成した部屋も漏れなく取得対象に含める
     owned_rooms = await client.table("dm_rooms").select("id").eq("owner_user_id", str(user.id)).execute()
     for o in (owned_rooms.data or []):
         if o["id"] not in group_ids:
@@ -264,7 +264,7 @@ async def get_conversations(authorization: str = Header(None)):
 
     groups_data = []
     if group_ids:
-        r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, updated_at").in_("id", group_ids).execute()
+        r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, passcode, updated_at").in_("id", group_ids).execute()
         groups_data = r_res.data or []
 
     blocks_res = await client.table("dm_blocks").select("*").or_(f"blocker_user_id.eq.{user.id},blocked_user_id.eq.{user.id}").execute()
@@ -311,6 +311,7 @@ async def get_conversations(authorization: str = Header(None)):
             "room_id": r["id"],
             "partner_name": r["room_name"],
             "owner_user_id": str(r.get("owner_user_id", "")),
+            "has_passcode": bool(r.get("passcode")),
             "latest_message": txt,
             "latest_time": r["updated_at"],
             "unread_count": 0,
@@ -435,19 +436,124 @@ async def report_msg(data: ReportReq, authorization: str = Header(None)):
     return {"message": "国王へ密告しました。"}
 
 # =====================================================================
-# API: グループ結成・送金・画像アップロード
+# API: グループ結成・合言葉入室・メンバー管理・送金・画像アップロード
 # =====================================================================
 @router.post("/groups")
 async def create_group(data: GroupReq, authorization: str = Header(None)):
+    """1人でも部屋結成可能。合言葉（passcode）も登録可能"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
-    p_res = await client.table("profiles").select("id").in_("dm_id", data.member_dm_ids).execute()
-    m_ids = [p["id"] for p in (p_res.data or []) if str(p["id"]) != str(user.id)]
-    r = await client.table("dm_rooms").insert({"room_name": data.room_name, "owner_user_id": user.id}).execute()
+    
+    m_ids = []
+    if data.member_dm_ids:
+        p_res = await client.table("profiles").select("id").in_("dm_id", data.member_dm_ids).execute()
+        m_ids = [p["id"] for p in (p_res.data or []) if str(p["id"]) != str(user.id)]
+    
+    clean_passcode = data.passcode.strip() if data.passcode and data.passcode.strip() else None
+
+    # 重複する合言葉のチェック
+    if clean_passcode:
+        exist = await client.table("dm_rooms").select("id").eq("passcode", clean_passcode).execute()
+        if exist.data:
+            raise HTTPException(status_code=400, detail="その合言葉はすでに他の部屋で使用されています。別の合言葉を設定してください。")
+
+    r = await client.table("dm_rooms").insert({
+        "room_name": data.room_name.strip(),
+        "owner_user_id": user.id,
+        "passcode": clean_passcode
+    }).execute()
+    
     r_id = r.data[0]["id"]
     ins_data = [{"room_id": r_id, "user_id": user.id}] + [{"room_id": r_id, "user_id": mid} for mid in m_ids]
     await client.table("dm_room_members").insert(ins_data).execute()
     return {"room_id": r_id}
+
+@router.post("/rooms/join-by-passcode")
+async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Header(None)):
+    """合言葉を入力して密談部屋に参加"""
+    user = await get_user_auth(authorization)
+    client = await get_supabase()
+    code = data.passcode.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="合言葉を入力してください。")
+
+    room_res = await client.table("dm_rooms").select("id, room_name, owner_user_id").eq("passcode", code).execute()
+    if not room_res.data:
+        raise HTTPException(status_code=404, detail="該当する密談部屋が見つかりません。合言葉を確認してください。")
+
+    room = room_res.data[0]
+    r_id = room["id"]
+
+    # 既にメンバーに入っているか確認
+    mem_check = await client.table("dm_room_members").select("id").eq("room_id", r_id).eq("user_id", str(user.id)).execute()
+    if not mem_check.data:
+        await client.table("dm_room_members").insert({"room_id": r_id, "user_id": user.id}).execute()
+
+    return {
+        "message": f"密談部屋「{room['room_name']}」に入室しました！",
+        "room_id": r_id,
+        "room_name": room["room_name"],
+        "owner_user_id": str(room.get("owner_user_id", ""))
+    }
+
+@router.get("/rooms/{room_id}/members")
+async def get_room_members(room_id: int, authorization: str = Header(None)):
+    """部屋のメンバー一覧を取得（作成者・国王判定付き）"""
+    user = await get_user_auth(authorization)
+    if not await is_room_member(user.id, room_id):
+        raise HTTPException(status_code=403, detail="権限がありません。")
+
+    client = await get_supabase()
+    room_res = await client.table("dm_rooms").select("owner_user_id").eq("id", int(room_id)).execute()
+    owner_id = str(room_res.data[0].get("owner_user_id")) if room_res.data else ""
+
+    mems_res = await client.table("dm_room_members").select("user_id").eq("room_id", int(room_id)).execute()
+    u_ids = [m["user_id"] for m in (mems_res.data or [])]
+    if owner_id and owner_id not in u_ids:
+        u_ids.append(owner_id)
+
+    profs = await client.table("profiles").select("id, nickname, dm_id, avatar_drive_id, role").in_("id", u_ids).execute()
+    members_list = []
+    for p in (profs.data or []):
+        members_list.append({
+            "id": p["id"],
+            "nickname": p.get("nickname") or "名無し国民",
+            "dm_id": p.get("dm_id") or "",
+            "avatar_drive_id": p.get("avatar_drive_id"),
+            "role": p.get("role", "user"),
+            "is_owner": str(p["id"]) == owner_id
+        })
+
+    is_king = await is_king_user(user.id)
+    can_manage = is_king or (str(user.id) == owner_id)
+
+    return {
+        "members": members_list,
+        "owner_user_id": owner_id,
+        "can_manage": can_manage
+    }
+
+@router.delete("/rooms/{room_id}/members/{target_user_id}")
+async def kick_room_member(room_id: int, target_user_id: str, authorization: str = Header(None)):
+    """部屋作成者 or 国王によるメンバー除名（追放）"""
+    user = await get_user_auth(authorization)
+    client = await get_supabase()
+
+    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", int(room_id)).execute()
+    if not room_res.data:
+        raise HTTPException(status_code=404, detail="部屋が見つかりません。")
+
+    owner_id = str(room_res.data[0].get("owner_user_id"))
+    is_king = await is_king_user(user.id)
+
+    if not is_king and str(user.id) != owner_id:
+        raise HTTPException(status_code=403, detail="メンバーを除名する権限がありません。")
+
+    if target_user_id == owner_id:
+        raise HTTPException(status_code=400, detail="部屋の作成者を除名することはできません。部屋自体を解体してください。")
+
+    await client.table("dm_room_members").delete().eq("room_id", int(room_id)).eq("user_id", target_user_id).execute()
+    return {"message": "国民を部屋から除名しました。"}
 
 @router.post("/transfer-gold")
 async def transfer_gold(data: TransferReq, authorization: str = Header(None)):
