@@ -33,6 +33,7 @@ class DMIDUpdate(BaseModel):
 
 class DMRequest(BaseModel):
     target_dm_id: Optional[str] = None
+    target_user_id: Optional[str] = None  # ID変更対策: UUID指定にも対応
     room_id: Optional[int] = None
     message_type: str = "TEXT"
     content: str = Field(..., min_length=1, max_length=1000)
@@ -86,6 +87,12 @@ async def is_king_user(user_id: str) -> bool:
         return bool(res.data and res.data[0].get("role") == "king")
     except Exception:
         return False
+
+async def is_room_member(user_id: str, room_id: int) -> bool:
+    """グループの覗き見防止: 部屋の所属メンバーか判定"""
+    client = await get_supabase()
+    res = await client.table("dm_room_members").select("id").eq("room_id", room_id).eq("user_id", user_id).execute()
+    return bool(res.data)
 
 async def upload_image_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
     res = await http_client.post("https://oauth2.googleapis.com/token", data={
@@ -159,7 +166,6 @@ async def get_agora_token(channel_name: str, authorization: str = Header(None)):
     )
     return {"token": token, "app_id": AGORA_APP_ID}
 
-
 @router.post("/push-subscribe")
 async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
@@ -192,15 +198,27 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
     client = await get_supabase()
     
     if data.room_id:
+        # グループ所属チェック（部外者書き込み遮断）
+        if not await is_room_member(user.id, data.room_id):
+            raise HTTPException(status_code=403, detail="この部屋のメンバーではありません。")
+
         await client.table("direct_messages").insert({
             "sender_id": user.id, "room_id": data.room_id, "message_type": data.message_type, "content": data.content.strip(), "metadata": data.metadata
         }).execute()
         await client.table("dm_rooms").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", data.room_id).execute()
         return {"message": "送信完了しました。"}
     else:
-        target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
-        if not target_res.data: raise HTTPException(status_code=404, detail="ユーザーが見つかりません。")
-        target_id = target_res.data[0]["id"]
+        target_id = None
+        # target_user_id (UUID) または target_dm_id のどちらからでも宛先を特定可能（ID変更に強い構造）
+        if data.target_user_id:
+            target_id = data.target_user_id
+        elif data.target_dm_id:
+            target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
+            if not target_res.data: raise HTTPException(status_code=404, detail="ユーザーが見つかりません。")
+            target_id = target_res.data[0]["id"]
+        else:
+            raise HTTPException(status_code=400, detail="送信先が指定されていません。")
+
         if str(user.id) == str(target_id): raise HTTPException(status_code=400, detail="自分自身には送信できません。")
 
         blk = await client.table("dm_blocks").select("*").eq("blocker_user_id", target_id).eq("blocked_user_id", user.id).execute()
@@ -227,7 +245,8 @@ async def get_conversations(authorization: str = Header(None)):
     group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
     groups_data = []
     if group_ids:
-        r_res = await client.table("dm_rooms").select("id, room_name, updated_at").in_("id", group_ids).execute()
+        # owner_user_id も取得してフロントで削除ボタンの表示判定を可能に
+        r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, updated_at").in_("id", group_ids).execute()
         groups_data = r_res.data or []
 
     blocks_res = await client.table("dm_blocks").select("*").or_(f"blocker_user_id.eq.{user.id},blocked_user_id.eq.{user.id}").execute()
@@ -244,7 +263,7 @@ async def get_conversations(authorization: str = Header(None)):
             is_sender = (msg["sender_id"] == user.id)
             partner_id = msg["receiver_id"] if is_sender else msg["sender_id"]
             p_info = prof_map.get(partner_id)
-            if not p_info or not p_info.get("dm_id"): continue
+            if not p_info: continue
 
             is_b_by = any(b["blocker_user_id"] == partner_id and b["blocked_user_id"] == user.id for b in blocks)
             is_b_ing = any(b["blocker_user_id"] == user.id and b["blocked_user_id"] == partner_id for b in blocks)
@@ -252,7 +271,7 @@ async def get_conversations(authorization: str = Header(None)):
             if partner_id not in convs:
                 convs[partner_id] = {
                     "type": "DIRECT",
-                    "partner_dm_id": p_info.get("dm_id"),
+                    "partner_dm_id": p_info.get("dm_id") or "",
                     "partner_user_id": partner_id,
                     "partner_name": p_info.get("nickname") or "名無し国民",
                     "avatar": p_info.get("avatar_drive_id"),
@@ -273,6 +292,7 @@ async def get_conversations(authorization: str = Header(None)):
             "type": "GROUP",
             "room_id": r["id"],
             "partner_name": r["room_name"],
+            "owner_user_id": str(r.get("owner_user_id", "")),
             "latest_message": txt,
             "latest_time": r["updated_at"],
             "unread_count": 0,
@@ -282,20 +302,29 @@ async def get_conversations(authorization: str = Header(None)):
     result_list.sort(key=lambda x: x["latest_time"], reverse=True)
     return {"conversations": result_list}
 
-@router.get("/messages/{partner_dm_id}")
-async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
+@router.get("/messages/{partner_identifier}")
+async def get_messages(partner_identifier: str, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
-    tgt = await client.table("profiles").select("id").eq("dm_id", partner_dm_id).execute()
-    if not tgt.data: return {"messages": [], "partner_user_id": None}
-    partner_id = tgt.data[0]["id"]
+    # partner_identifier が UUID 形式か dm_id（英数）か両方判定して特定
+    partner_id = None
+    is_uuid = bool(re.match(r"^[0-9a-fA-F-]{36}$", partner_identifier))
+    if is_uuid:
+        partner_id = partner_identifier
+    else:
+        tgt = await client.table("profiles").select("id").eq("dm_id", partner_identifier).execute()
+        if not tgt.data: return {"messages": [], "partner_user_id": None}
+        partner_id = tgt.data[0]["id"]
     
+    # 相手の最新プロフィールも取得（dm_id変更時もフロントに最新を同期）
+    p_res = await client.table("profiles").select("dm_id, nickname, avatar_drive_id").eq("id", partner_id).execute()
+    p_info = p_res.data[0] if p_res.data else {}
+
     # 既読更新
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).is_("room_id", "null").eq("is_read", False).execute()
 
     cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
-    # 最新から200件取得して反転（古い順）
     res = await client.table("direct_messages").select(
         "id, sender_id, receiver_id, message_type, content, metadata, is_pinned, is_deleted, is_read, created_at"
     ).is_("room_id", "null").or_(cond).order("created_at", desc=True).limit(200).execute()
@@ -312,11 +341,21 @@ async def get_messages(partner_dm_id: str, authorization: str = Header(None)):
             r_map[mid].append(r)
 
     for m in msgs: m["reactions"] = r_map.get(m["id"], [])
-    return {"messages": msgs, "partner_user_id": partner_id}
+    return {
+        "messages": msgs, 
+        "partner_user_id": partner_id,
+        "partner_dm_id": p_info.get("dm_id"),
+        "partner_name": p_info.get("nickname")
+    }
 
 @router.get("/messages/group/{room_id}")
 async def get_group_messages(room_id: int, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
+    
+    # グループの覗き見防止（部屋の所属メンバー以外は403遮断）
+    if not await is_room_member(user.id, room_id):
+        raise HTTPException(status_code=403, detail="この密談部屋を閲覧する権限がありません。")
+
     client = await get_supabase()
     res = await client.table("direct_messages").select(
         "id, sender_id, room_id, message_type, content, metadata, is_pinned, is_deleted, created_at"
@@ -407,16 +446,39 @@ async def transfer_gold(data: TransferReq, authorization: str = Header(None)):
     except Exception as e: raise HTTPException(400, detail=str(getattr(e, "message", e)))
 
 @router.post("/upload-image")
-async def upload_img(file: UploadFile = File(...), target_dm_id: str = Form(None), room_id: int = Form(None), authorization: str = Header(None)):
+async def upload_img(
+    file: UploadFile = File(...), 
+    target_dm_id: str = Form(None), 
+    target_user_id: str = Form(None), 
+    room_id: int = Form(None), 
+    authorization: str = Header(None)
+):
     user = await get_user_auth(authorization)
+    client = await get_supabase()
+
+    if room_id and not await is_room_member(user.id, room_id):
+        raise HTTPException(status_code=403, detail="この部屋に画像を送信する権限がありません。")
+
     file.file.seek(0, os.SEEK_END); size = file.file.tell(); file.file.seek(0)
     drive_id = await upload_image_to_drive(file.file, file.filename, file.content_type or "image/jpeg", size)
-    client = await get_supabase()
+    
     if room_id:
-        await client.table("direct_messages").insert({"sender_id": user.id, "room_id": room_id, "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}}).execute()
+        await client.table("direct_messages").insert({
+            "sender_id": user.id, "room_id": room_id, "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
+        }).execute()
     else:
-        tgt = await client.table("profiles").select("id").eq("dm_id", target_dm_id).execute()
-        await client.table("direct_messages").insert({"sender_id": user.id, "receiver_id": tgt.data[0]["id"], "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}}).execute()
+        receiver_id = target_user_id
+        if not receiver_id and target_dm_id:
+            tgt = await client.table("profiles").select("id").eq("dm_id", target_dm_id).execute()
+            if tgt.data: receiver_id = tgt.data[0]["id"]
+        
+        if not receiver_id:
+            raise HTTPException(status_code=400, detail="送信先の相手が不明です。")
+
+        await client.table("direct_messages").insert({
+            "sender_id": user.id, "receiver_id": receiver_id, "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
+        }).execute()
+        
     return {"success": True}
 
 # =====================================================================
