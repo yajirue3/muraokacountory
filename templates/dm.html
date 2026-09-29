@@ -176,7 +176,6 @@
                 </div>
             </div>
             <div id="chat-header-actions" style="display:flex; gap: 2px;">
-                <!-- グループ用メンバー管理ボタン -->
                 <button class="nav-icon" id="btn-group-members-action" style="display:none;" onclick="openGroupMembersModal()" title="メンバー一覧・管理">👥</button>
                 <button class="nav-icon" onclick="startCall(false)">📞</button>
                 <button class="nav-icon" onclick="startCall(true)">🎥</button>
@@ -248,15 +247,15 @@
     </div>
 </div>
 
-<!-- グループ作成モーダル (1人作成対応 & 合言葉設定) -->
+<!-- グループ作成モーダル (1人作成 & パスコード設定対応) -->
 <div class="modal" id="new-group-modal">
     <div class="modal-content">
         <h2>👥 密談部屋を結成</h2>
         <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 作戦本部)">
-        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意: 知っている同志だけが入室可)">
+        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意 / 空欄で通常部屋)">
         <div style="font-size:0.85rem; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-            <span>招待する国民を選択 (後から合言葉でも呼べます)</span>
-            <span id="group-selected-count" style="color:var(--primary); font-weight:bold;">0人選択中</span>
+            <span>招待する国民 (任意)</span>
+            <span id="group-selected-count" style="color:var(--primary); font-weight:bold; white-space:nowrap; margin-left:8px;">0人選択中</span>
         </div>
         <div id="group-candidate-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
             <div class="empty-state" style="padding:20px 10px;">候補を読み込み中...</div>
@@ -379,7 +378,6 @@
         await fetchWallets();
         await fetchThreads();
         
-        // 15秒ごとの穏やかなフォールバック同期
         setInterval(() => {
             try {
                 if (activeConversation) {
@@ -936,7 +934,6 @@
         const mems = Array.from(checkedBoxes).map(cb => cb.value.trim()).filter(s => s);
 
         if (!name) return showToast("部屋名を入力してください", true);
-        // メンバーが0人でも自分1人の部屋として作成可能！
 
         try {
             const res = await fetch("/api/dm/groups", { 
@@ -948,15 +945,11 @@
                     passcode: passcode || null
                 }) 
             });
-            const text = await res.text();
-            let data = {};
-            try { data = JSON.parse(text); } catch (_) {
-                return showToast(`サーバーエラー (${res.status}): ${text.substring(0, 60)}`, true);
-            }
+            const data = await res.json().catch(() => ({}));
 
             if (res.ok) {
                 closeModal('new-group-modal'); 
-                fetchThreads(); 
+                await fetchThreads(); 
                 openConversation({ 
                     type: 'GROUP', 
                     room_id: data.room_id, 
@@ -966,15 +959,14 @@
                     is_blocked: false 
                 }); 
             } else {
-                const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
-                showToast(msg || "グループ作成に失敗しました", true);
+                showToast(data.detail || "グループ作成に失敗しました", true);
             }
         } catch(e) {
             showToast(`通信エラー: ${e.message}`, true);
         }
     }
 
-    // --- 合言葉で入室 ---
+    // --- 合言葉で入室（完全改修） ---
     async function executeJoinByPasscode() {
         const input = document.getElementById('join-passcode-input');
         const code = input.value.trim();
@@ -988,10 +980,10 @@
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
-                showToast(data.message);
+                showToast(data.message || "入室しました！");
                 input.value = '';
                 closeModal('passcode-join-modal');
-                fetchThreads();
+                await fetchThreads();
                 openConversation({
                     type: 'GROUP',
                     room_id: data.room_id,
@@ -1001,7 +993,7 @@
                     is_blocked: false
                 });
             } else {
-                showToast(data.detail || "入室に失敗しました", true);
+                showToast(data.detail || "該当する密談部屋が見つかりません。", true);
             }
         } catch (e) {
             showToast(`通信エラー: ${e.message}`, true);
@@ -1025,7 +1017,7 @@
             }
             const data = await res.json();
             const members = data.members || [];
-            const canManage = data.can_manage; // 作成者 or 国王
+            const canManage = data.can_manage;
 
             if (members.length === 0) {
                 box.innerHTML = '<div class="empty-state">メンバーがいません</div>';
@@ -1041,7 +1033,6 @@
 
                 const ownerBadge = m.is_owner ? `<span style="font-size:0.7rem; background:var(--primary); color:#000; padding:1px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">結成者</span>` : '';
                 
-                // 作成者本人以外のメンバーは、権限者（オーナー/国王）が除名可能
                 let kickBtn = '';
                 if (canManage && !m.is_owner && String(m.id) !== String(currentUser?.id)) {
                     kickBtn = `<button class="btn-kick" onclick="kickMember('${m.id}', '${escapeHtml(m.nickname)}')">除名</button>`;
@@ -1078,7 +1069,7 @@
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
                 showToast(data.message || "除名しました。");
-                openGroupMembersModal(); // リストを再読込
+                openGroupMembersModal();
             } else {
                 showToast(data.detail || "除名に失敗しました", true);
             }
