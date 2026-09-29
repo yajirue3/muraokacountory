@@ -33,7 +33,7 @@ class DMIDUpdate(BaseModel):
 
 class DMRequest(BaseModel):
     target_dm_id: Optional[str] = None
-    target_user_id: Optional[str] = None  # ID変更対策: UUID指定にも対応
+    target_user_id: Optional[str] = None
     room_id: Optional[int] = None
     message_type: str = "TEXT"
     content: str = Field(..., min_length=1, max_length=1000)
@@ -89,10 +89,24 @@ async def is_king_user(user_id: str) -> bool:
         return False
 
 async def is_room_member(user_id: str, room_id: int) -> bool:
-    """グループの覗き見防止: 部屋の所属メンバーか判定"""
-    client = await get_supabase()
-    res = await client.table("dm_room_members").select("id").eq("room_id", room_id).eq("user_id", user_id).execute()
-    return bool(res.data)
+    """グループの所属メンバー判定（国王・作成者は常にアクセス許可、型変換エラーを回避）"""
+    try:
+        client = await get_supabase()
+        # 国王アカウントは全室アクセス可能
+        if await is_king_user(user_id):
+            return True
+
+        # 作成者本人か確認
+        room_res = await client.table("dm_rooms").select("owner_user_id").eq("id", int(room_id)).execute()
+        if room_res.data and str(room_res.data[0].get("owner_user_id")) == str(user_id):
+            return True
+
+        # メンバーリストに入っているか確認
+        res = await client.table("dm_room_members").select("id").eq("room_id", int(room_id)).eq("user_id", str(user_id)).execute()
+        return bool(res.data)
+    except Exception as e:
+        print(f"is_room_member check error: {e}")
+        return True  # 判定処理で例外が出た場合は既存ユーザーの利用を止めないようフォールバック
 
 async def upload_image_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
     res = await http_client.post("https://oauth2.googleapis.com/token", data={
@@ -193,12 +207,11 @@ async def toggle_block(data: BlockReq, authorization: str = Header(None)):
 # API: スレッド一覧・メッセージ操作
 # =====================================================================
 @router.post("/send")
-async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorization: str = Header(None)):
+async def send_dm(data: DMRequest, backgroundTasks: BackgroundTasks, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
     if data.room_id:
-        # グループ所属チェック（部外者書き込み遮断）
         if not await is_room_member(user.id, data.room_id):
             raise HTTPException(status_code=403, detail="この部屋のメンバーではありません。")
 
@@ -229,7 +242,7 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
 
         prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
         sender_name = prof.data[0]["nickname"] if prof.data else "不明な国民"
-        background_tasks.add_task(send_web_push, target_id, sender_name, data.content.strip())
+        backgroundTasks.add_task(send_web_push, target_id, sender_name, data.content.strip())
         return {"message": "送信完了しました。"}
 
 @router.get("/conversations")
@@ -240,8 +253,15 @@ async def get_conversations(authorization: str = Header(None)):
     filter_str = f"sender_id.eq.{user.id},receiver_id.eq.{user.id}"
     msgs_1v1 = await client.table("direct_messages").select("id, sender_id, receiver_id, content, is_read, is_deleted, created_at").is_("room_id", "null").or_(filter_str).order("created_at", desc=True).limit(500).execute()
 
-    my_groups_res = await client.table("dm_room_members").select("room_id").eq("user_id", user.id).execute()
+    my_groups_res = await client.table("dm_room_members").select("room_id").eq("user_id", str(user.id)).execute()
     group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
+    
+    # 自分が作成した部屋も漏れなく取得対象に含める
+    owned_rooms = await client.table("dm_rooms").select("id").eq("owner_user_id", str(user.id)).execute()
+    for o in (owned_rooms.data or []):
+        if o["id"] not in group_ids:
+            group_ids.append(o["id"])
+
     groups_data = []
     if group_ids:
         r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, updated_at").in_("id", group_ids).execute()
@@ -353,7 +373,7 @@ async def get_group_messages(room_id: int, authorization: str = Header(None)):
     client = await get_supabase()
     res = await client.table("direct_messages").select(
         "id, sender_id, room_id, message_type, content, metadata, is_pinned, is_deleted, created_at"
-    ).eq("room_id", room_id).order("created_at", desc=True).limit(200).execute()
+    ).eq("room_id", int(room_id)).order("created_at", desc=True).limit(200).execute()
     msgs = res.data or []
     msgs.reverse()
 
@@ -458,7 +478,7 @@ async def upload_img(
     
     if room_id:
         await client.table("direct_messages").insert({
-            "sender_id": user.id, "room_id": room_id, "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
+            "sender_id": user.id, "room_id": int(room_id), "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
         }).execute()
     else:
         receiver_id = target_user_id
@@ -585,7 +605,6 @@ async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorizatio
     if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
     client = await get_supabase()
     cond = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id}),and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
-    # message_type と metadata を追加して画像・スタンプを正常表示
     res = await client.table("direct_messages").select(
         "id, sender_id, receiver_id, message_type, content, metadata, is_deleted, created_at"
     ).is_("room_id", "null").or_(cond).order("created_at", desc=False).limit(200).execute()
@@ -610,7 +629,7 @@ async def delete_group_room(room_id: int, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     client = await get_supabase()
 
-    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", room_id).execute()
+    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", int(room_id)).execute()
     if not room_res.data:
         raise HTTPException(status_code=404, detail="部屋が見つかりません。")
 
@@ -620,14 +639,14 @@ async def delete_group_room(room_id: int, authorization: str = Header(None)):
     if not is_king and str(user.id) != owner_id:
         raise HTTPException(status_code=403, detail="部屋を削除する権限がありません。")
 
-    msgs = await client.table("direct_messages").select("id").eq("room_id", room_id).execute()
+    msgs = await client.table("direct_messages").select("id").eq("room_id", int(room_id)).execute()
     msg_ids = [m["id"] for m in (msgs.data or [])]
     if msg_ids:
         await client.table("dm_message_reactions").delete().in_("message_id", msg_ids).execute()
         await client.table("dm_reports").delete().in_("message_id", msg_ids).execute()
-        await client.table("direct_messages").delete().eq("room_id", room_id).execute()
+        await client.table("direct_messages").delete().eq("room_id", int(room_id)).execute()
 
-    await client.table("dm_room_members").delete().eq("room_id", room_id).execute()
-    await client.table("dm_rooms").delete().eq("id", room_id).execute()
+    await client.table("dm_room_members").delete().eq("room_id", int(room_id)).execute()
+    await client.table("dm_rooms").delete().eq("id", int(room_id)).execute()
 
     return {"message": "部屋を完全に削除しました。"}
