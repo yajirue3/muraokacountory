@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+    <!-- Supabase JS SDK を追加 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
             --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
@@ -299,7 +301,11 @@
     let myWallets = [];
     let cropperInstance = null;
     let lastRenderedHash = "";
-    let rawConversations = []; // メンバー選定用キャッシュ
+    let rawConversations = [];
+
+    // Supabase Realtime クライアント管理
+    let supabaseClient = null;
+    let realtimeChannel = null;
 
     // Agora 通話設定・状態
     let AGORA_APP_ID = "";
@@ -339,9 +345,11 @@
             }
         } catch(e) {}
 
+        await initSupabaseRealtime();
         await fetchWallets();
-        fetchThreads();
+        await fetchThreads();
         
+        // WebSocket の一時切断時に対する安全なフォールバック（15秒ごとの穏やかな同期）
         setInterval(() => {
             try {
                 if (activeConversation) {
@@ -355,9 +363,62 @@
                     fetchThreads(true);
                 }
             } catch(e) {
-                console.error("ループ処理例外", e);
+                console.error("定期同期例外", e);
             }
-        }, 3000);
+        }, 15000);
+    }
+
+    // =====================================================================
+    // Supabase Realtime 初期化 & 購読
+    // =====================================================================
+    async function initSupabaseRealtime() {
+        try {
+            let sbUrl = window.SUPABASE_URL || localStorage.getItem("supabase_url");
+            let sbKey = window.SUPABASE_ANON_KEY || localStorage.getItem("supabase_anon_key");
+
+            if (!sbUrl || !sbKey) {
+                const cfgRes = await fetch("/api/dm/supabase-config", { headers: { "Authorization": `Bearer ${token}` } }).catch(() => null);
+                if (cfgRes && cfgRes.ok) {
+                    const cfg = await cfgRes.json();
+                    sbUrl = cfg.url;
+                    sbKey = cfg.anon_key;
+                }
+            }
+
+            if (sbUrl && sbKey && window.supabase) {
+                supabaseClient = window.supabase.createClient(sbUrl, sbKey);
+                subscribeRealtime();
+            }
+        } catch (e) {
+            console.warn("Realtime初期化フォールバック稼働:", e);
+        }
+    }
+
+    function subscribeRealtime() {
+        if (!supabaseClient) return;
+        if (realtimeChannel) {
+            supabaseClient.removeChannel(realtimeChannel);
+        }
+
+        realtimeChannel = supabaseClient
+            .channel('realtime-direct-messages')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'direct_messages' },
+                (payload) => {
+                    if (activeConversation) {
+                        if (isAdminMode && activeConversation.admin_ids) {
+                            const ids = activeConversation.admin_ids.split('/');
+                            fetchAdminMessages(ids[0], ids[1], true);
+                        } else {
+                            fetchMessages(true);
+                        }
+                    } else {
+                        fetchThreads(true);
+                    }
+                }
+            )
+            .subscribe();
     }
 
     async function fetchWallets() {
@@ -459,10 +520,8 @@
 
         if (conv.type === 'GROUP') {
             btnBlock.style.display = 'none';
-            // グループチャットでは送金アイコンを非表示にして誤操作を防止
             if (transferLauncher) transferLauncher.style.display = 'none';
 
-            // 国王(運営) または 部屋作成者の場合は削除可能
             const isOwner = conv.owner_user_id && String(conv.owner_user_id) === String(currentUser?.id);
             if (currentUser?.role === 'king' || isOwner) {
                 btnDelRoom.style.display = 'inline-block';
@@ -520,7 +579,6 @@
 
     async function fetchMessages(isBg) {
         if(!activeConversation) return;
-        // UUID が既にあればそれを用い、なければ partner_dm_id で取得
         const ident = activeConversation.target_user_id || activeConversation.partner_dm_id;
         const url = activeConversation.type === 'GROUP' 
             ? `/api/dm/messages/group/${activeConversation.room_id}` 
