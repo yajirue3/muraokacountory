@@ -252,10 +252,10 @@
     <div class="modal-content">
         <h2>👥 密談部屋を結成</h2>
         <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 作戦本部)">
-        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意 / 空欄で通常部屋)">
+        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意: 知っている同志だけが入室可)">
         <div style="font-size:0.85rem; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-            <span>招待する国民 (任意)</span>
-            <span id="group-selected-count" style="color:var(--primary); font-weight:bold; white-space:nowrap; margin-left:8px;">0人選択中</span>
+            <span>招待する国民を選択 (後から合言葉でも呼べます)</span>
+            <span id="group-selected-count" style="color:var(--primary); font-weight:bold;">0人選択中</span>
         </div>
         <div id="group-candidate-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
             <div class="empty-state" style="padding:20px 10px;">候補を読み込み中...</div>
@@ -539,7 +539,6 @@
         document.getElementById('block-warning-bar').style.display = isBlocked ? 'block' : 'none';
         document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
 
-        // 部屋削除ボタン・メンバー管理ボタン・ブロックボタンの表示制御
         const btnBlock = document.getElementById('btn-block-action');
         const btnDelRoom = document.getElementById('btn-delete-room-action');
         const btnGroupMems = document.getElementById('btn-group-members-action');
@@ -966,7 +965,7 @@
         }
     }
 
-    // --- 合言葉で入室（完全改修） ---
+    // --- 合言葉で入室 ---
     async function executeJoinByPasscode() {
         const input = document.getElementById('join-passcode-input');
         const code = input.value.trim();
@@ -978,7 +977,11 @@
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ passcode: code })
             });
-            const data = await res.json().catch(() => ({}));
+            
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {}
+
             if (res.ok) {
                 showToast(data.message || "入室しました！");
                 input.value = '';
@@ -993,7 +996,8 @@
                     is_blocked: false
                 });
             } else {
-                showToast(data.detail || "該当する密談部屋が見つかりません。", true);
+                const msg = typeof data.detail === 'string' ? data.detail : (data.detail ? JSON.stringify(data.detail) : text);
+                showToast(msg || `入室失敗 (${res.status})`, true);
             }
         } catch (e) {
             showToast(`通信エラー: ${e.message}`, true);
