@@ -209,7 +209,6 @@ async def send_dm(data: DMRequest, background_tasks: BackgroundTasks, authorizat
         return {"message": "送信完了しました。"}
     else:
         target_id = None
-        # target_user_id (UUID) または target_dm_id のどちらからでも宛先を特定可能（ID変更に強い構造）
         if data.target_user_id:
             target_id = data.target_user_id
         elif data.target_dm_id:
@@ -245,7 +244,6 @@ async def get_conversations(authorization: str = Header(None)):
     group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
     groups_data = []
     if group_ids:
-        # owner_user_id も取得してフロントで削除ボタンの表示判定を可能に
         r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, updated_at").in_("id", group_ids).execute()
         groups_data = r_res.data or []
 
@@ -307,7 +305,6 @@ async def get_messages(partner_identifier: str, authorization: str = Header(None
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
-    # partner_identifier が UUID 形式か dm_id（英数）か両方判定して特定
     partner_id = None
     is_uuid = bool(re.match(r"^[0-9a-fA-F-]{36}$", partner_identifier))
     if is_uuid:
@@ -317,11 +314,9 @@ async def get_messages(partner_identifier: str, authorization: str = Header(None
         if not tgt.data: return {"messages": [], "partner_user_id": None}
         partner_id = tgt.data[0]["id"]
     
-    # 相手の最新プロフィールも取得（dm_id変更時もフロントに最新を同期）
     p_res = await client.table("profiles").select("dm_id, nickname, avatar_drive_id").eq("id", partner_id).execute()
     p_info = p_res.data[0] if p_res.data else {}
 
-    # 既読更新
     await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).is_("room_id", "null").eq("is_read", False).execute()
 
     cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
@@ -352,7 +347,6 @@ async def get_messages(partner_identifier: str, authorization: str = Header(None
 async def get_group_messages(room_id: int, authorization: str = Header(None)):
     user = await get_user_auth(authorization)
     
-    # グループの覗き見防止（部屋の所属メンバー以外は403遮断）
     if not await is_room_member(user.id, room_id):
         raise HTTPException(status_code=403, detail="この密談部屋を閲覧する権限がありません。")
 
@@ -558,7 +552,7 @@ async def get_my_stamps(authorization: str = Header(None)):
     return {"stamps": stamps.data or []}
 
 # =====================================================================
-# API: 国王専用 監視ツール (完全維持)
+# API: 国王専用 監視ツール
 # =====================================================================
 @router.get("/admin/threads")
 async def admin_get_all_threads(authorization: str = Header(None)):
@@ -591,7 +585,10 @@ async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorizatio
     if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
     client = await get_supabase()
     cond = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id}),and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
-    res = await client.table("direct_messages").select("id, sender_id, receiver_id, content, is_deleted, created_at").is_("room_id", "null").or_(cond).order("created_at", desc=False).limit(200).execute()
+    # message_type と metadata を追加して画像・スタンプを正常表示
+    res = await client.table("direct_messages").select(
+        "id, sender_id, receiver_id, message_type, content, metadata, is_deleted, created_at"
+    ).is_("room_id", "null").or_(cond).order("created_at", desc=False).limit(200).execute()
     msgs = res.data or []
     profs = await client.table("profiles").select("id, nickname").in_("id", [user_a_id, user_b_id]).execute()
     p_map = {p["id"]: p["nickname"] for p in (profs.data or [])}
