@@ -93,7 +93,6 @@ async def is_king_user(user_id: str) -> bool:
         return False
 
 async def is_room_member(user_id: str, room_id: int) -> bool:
-    """グループの所属メンバー判定（国王・作成者は常にアクセス許可）"""
     try:
         client = await get_supabase()
         if await is_king_user(user_id):
@@ -440,7 +439,7 @@ async def report_msg(data: ReportReq, authorization: str = Header(None)):
 # =====================================================================
 @router.post("/groups")
 async def create_group(data: GroupReq, authorization: str = Header(None)):
-    """1人でも部屋結成可能。合言葉（passcode）も登録可能"""
+    """1人でも部屋結成可能。合言葉（passcode）を確実にDBへ保存"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
     
@@ -449,7 +448,8 @@ async def create_group(data: GroupReq, authorization: str = Header(None)):
         p_res = await client.table("profiles").select("id").in_("dm_id", data.member_dm_ids).execute()
         m_ids = [p["id"] for p in (p_res.data or []) if str(p["id"]) != str(user.id)]
     
-    clean_passcode = data.passcode.strip() if data.passcode and data.passcode.strip() else None
+    # 前後の空白を除去。空文字は明確に None (NULL) に統一
+    clean_passcode = data.passcode.strip() if (data.passcode and data.passcode.strip()) else None
 
     # 重複する合言葉のチェック
     if clean_passcode:
@@ -457,37 +457,43 @@ async def create_group(data: GroupReq, authorization: str = Header(None)):
         if exist.data:
             raise HTTPException(status_code=400, detail="その合言葉はすでに他の部屋で使用されています。別の合言葉を設定してください。")
 
-    r = await client.table("dm_rooms").insert({
+    insert_payload = {
         "room_name": data.room_name.strip(),
-        "owner_user_id": user.id,
-        "passcode": clean_passcode
-    }).execute()
-    
+        "owner_user_id": str(user.id)
+    }
+    if clean_passcode:
+        insert_payload["passcode"] = clean_passcode
+
+    r = await client.table("dm_rooms").insert(insert_payload).execute()
     r_id = r.data[0]["id"]
-    ins_data = [{"room_id": r_id, "user_id": user.id}] + [{"room_id": r_id, "user_id": mid} for mid in m_ids]
+
+    ins_data = [{"room_id": r_id, "user_id": str(user.id)}] + [{"room_id": r_id, "user_id": str(mid)} for mid in m_ids]
     await client.table("dm_room_members").insert(ins_data).execute()
     return {"room_id": r_id}
 
 @router.post("/rooms/join-by-passcode")
 async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Header(None)):
-    """合言葉を入力して密談部屋に参加"""
+    """合言葉を入力して密談部屋に参加（存在確認・所属チェックを徹底）"""
     user = await get_user_auth(authorization)
     client = await get_supabase()
-    code = data.passcode.strip()
+    code = data.passcode.strip() if data.passcode else ""
     if not code:
         raise HTTPException(status_code=400, detail="合言葉を入力してください。")
 
+    # パスコードで部屋を完全一致検索
     room_res = await client.table("dm_rooms").select("id, room_name, owner_user_id").eq("passcode", code).execute()
     if not room_res.data:
         raise HTTPException(status_code=404, detail="該当する密談部屋が見つかりません。合言葉を確認してください。")
 
     room = room_res.data[0]
-    r_id = room["id"]
+    r_id = int(room["id"])
 
-    # 既にメンバーに入っているか確認
-    mem_check = await client.table("dm_room_members").select("id").eq("room_id", r_id).eq("user_id", str(user.id)).execute()
-    if not mem_check.data:
-        await client.table("dm_room_members").insert({"room_id": r_id, "user_id": user.id}).execute()
+    # 既にメンバー（または作成者本人）であるか確認し、未参加なら追加
+    is_owner = (str(room.get("owner_user_id")) == str(user.id))
+    if not is_owner:
+        mem_check = await client.table("dm_room_members").select("id").eq("room_id", r_id).eq("user_id", str(user.id)).execute()
+        if not mem_check.data:
+            await client.table("dm_room_members").insert({"room_id": r_id, "user_id": str(user.id)}).execute()
 
     return {
         "message": f"密談部屋「{room['room_name']}」に入室しました！",
