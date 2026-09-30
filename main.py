@@ -273,6 +273,9 @@ def get_mall(request: Request):
 def get_koneko(request: Request):
     return templates.TemplateResponse(request=request, name="koneko.html")
 
+@app.get("/ai", response_class=HTMLResponse)
+def get_ai(request: Request):
+    return templates.TemplateResponse(request=request, name="ai.html")
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
