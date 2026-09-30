@@ -22,6 +22,7 @@ from auction import router as auction_router
 from fastapi.responses import FileResponse
 from dm import router as dm_router
 from mall import router as mall_router
+from ai import router as ai_router
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -715,6 +716,7 @@ app.include_router(video_router)
 app.include_router(auction_router)
 app.include_router(dm_router, prefix="/api/dm", tags=["dm"])
 app.include_router(mall_router)
+app.include_router(ai_router)
 
 # ==================================================
 # 資産保有税（所得税・保管料）処理モジュール (main.py用)
