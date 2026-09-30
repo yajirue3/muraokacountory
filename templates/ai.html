@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>村岡王国 - AI相談室</title>
+    <style>
+        :root { 
+            --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
+            --primary: #d4af37; --primary-hover: #b8962e; 
+            --text: #e7e9ea; --sub: #71767b; --danger: #ef4444; --success: #10b981;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
+            background: var(--bg); color: var(--text); margin: 0; 
+            display: flex; justify-content: center; height: 100vh; height: 100dvh; overflow: hidden; 
+        }
+        .container { 
+            width: 100%; max-width: 600px; display: flex; flex-direction: column; 
+            border-left: 1px solid var(--border); border-right: 1px solid var(--border); 
+            height: 100%; position: relative; box-sizing: border-box; 
+        }
+        
+        .header { 
+            height: 60px; display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 16px; border-bottom: 1px solid var(--border); 
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; 
+            font-weight: bold; font-size: 1.1rem; flex-shrink: 0; 
+        }
+        .nav-btn { 
+            background: var(--card-bg); border: 1px solid var(--border); color: var(--text); 
+            cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; 
+        }
+        .nav-icon { 
+            background: transparent; border: none; color: var(--text); cursor: pointer; 
+            font-size: 1.2rem; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        }
+        .nav-icon:hover { background: var(--card-bg); }
+
+        .chat-messages { 
+            flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; 
+            display: flex; flex-direction: column; gap: 16px; 
+        }
+        .msg-row { display: flex; flex-direction: column; width: 100%; position: relative; }
+        .msg-mine { align-items: flex-end; }
+        .msg-other { align-items: flex-start; }
+        .msg-sender-label { font-size: 0.75rem; color: var(--primary); margin-bottom: 4px; font-weight: bold; }
+        .msg-bubble-wrapper { display: flex; align-items: flex-start; gap: 8px; max-width: 85%; }
+        .msg-mine .msg-bubble-wrapper { flex-direction: row-reverse; }
+        
+        .msg-bubble { 
+            padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; 
+            word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+            white-space: pre-wrap;
+        }
+        .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 18px 18px 2px 18px; font-weight: 500; }
+        .msg-other .msg-bubble { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 18px 18px 18px 2px; }
+        
+        .msg-meta { font-size: 0.7rem; color: var(--sub); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+
+        /* 入力エリア */
+        .input-bar-container {
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .char-counter {
+            font-size: 0.75rem;
+            color: var(--sub);
+            text-align: right;
+            padding: 6px 16px 0 16px;
+        }
+        .chat-input-wrapper { 
+            padding: 8px 16px 12px 16px; 
+            display: flex; gap: 10px; align-items: center; 
+        }
+        .chat-input-wrapper input { 
+            flex: 1; background: var(--card-bg); border: 1px solid transparent; 
+            padding: 14px 16px; border-radius: 24px; color: var(--text); 
+            font-size: 0.95rem; outline: none; 
+        }
+        .chat-input-wrapper input:focus { border-color: var(--primary); background: #000; }
+        .btn-send { 
+            background: var(--primary); border: none; color: #000; 
+            padding: 0 18px; height: 44px; border-radius: 22px; 
+            font-weight: bold; flex-shrink: 0; cursor: pointer; display: none; 
+        }
+        .btn-send.active { display: block; }
+        .btn-send:disabled { background: var(--sub); cursor: not-allowed; }
+
+        .empty-state { 
+            flex: 1; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            color: var(--sub); text-align: center; padding: 40px 20px; line-height: 1.6; 
+        }
+        
+        #toast-container { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; 
+        }
+        .toast { 
+            background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); 
+            padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 3.7s forwards; 
+        }
+        @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+        /* 思考中ローディング */
+        .typing-dots span {
+            display: inline-block; width: 6px; height: 6px; background: var(--sub); 
+            border-radius: 50%; margin: 0 2px; animation: bounce 1.2s infinite ease-in-out;
+        }
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="container">
+    <div class="header">
+        <div style="display:flex; align-items:center; gap: 8px;">
+            <button class="nav-icon" onclick="location.href='/dashboard'">←</button>
+            <div style="display:flex; flex-direction:column;">
+                <span style="font-size: 1.05rem;">AI相談室</span>
+                <span style="font-size: 0.75rem; color: var(--sub); font-weight: normal;">Gemini 2.5 Flash Lite</span>
+            </div>
+        </div>
+        <div style="display:flex; gap: 6px; align-items:center;">
+            <button class="nav-icon" onclick="clearHistory()" title="会話をリセット">🗑️</button>
+            <button class="nav-btn" onclick="location.href='/dashboard'">国民証</button>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+        <div class="empty-state">読み込み中...</div>
+    </div>
+
+    <div class="input-bar-container">
+        <div class="char-counter" id="char-counter">0 / 255</div>
+        <div class="chat-input-wrapper">
+            <input type="text" id="chat-input" maxlength="255" placeholder="AIに質問・相談を入力 (最大255文字)..." oninput="handleInput()" onkeypress="if(event.key==='Enter') sendChatMessage()">
+            <button class="btn-send" id="btn-send-msg" onclick="sendChatMessage()">送信</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let isSending = false;
+
+    function showToast(msg, isError = false) {
+        const c = document.getElementById('toast-container');
+        if(!c) return;
+        const t = document.createElement('div'); 
+        t.className = 'toast'; 
+        t.innerText = msg;
+        if(isError) t.style.borderLeftColor = 'var(--danger)';
+        c.appendChild(t); 
+        setTimeout(() => t.remove(), 4000);
+    }
+
+    function escapeHtml(str) { 
+        return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); 
+    }
+
+    function handleInput() {
+        const input = document.getElementById('chat-input');
+        const btnSend = document.getElementById('btn-send-msg');
+        const counter = document.getElementById('char-counter');
+        const val = input.value;
+
+        counter.innerText = `${val.length} / 255`;
+        if (val.length >= 250) {
+            counter.style.color = "var(--danger)";
+        } else {
+            counter.style.color = "var(--sub)";
+        }
+
+        if(val.trim().length > 0 && !isSending) {
+            btnSend.classList.add('active');
+        } else {
+            btnSend.classList.remove('active');
+        }
+    }
+
+    function renderMessage(role, content, time = null) {
+        const box = document.getElementById('chat-messages');
+        const isMine = role === 'user';
+        const cls = isMine ? 'msg-mine' : 'msg-other';
+        const senderLabel = !isMine ? `<div class="msg-sender-label">AI アシスタント</div>` : '';
+        const timeStr = time ? new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        const html = `
+            <div class="msg-row ${cls}">
+                ${senderLabel}
+                <div class="msg-bubble-wrapper">
+                    <div class="msg-bubble">${escapeHtml(content)}</div>
+                </div>
+                <div class="msg-meta">${timeStr}</div>
+            </div>`;
+        
+        box.insertAdjacentHTML('beforeend', html);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function loadHistory() {
+        const box = document.getElementById('chat-messages');
+        try {
+            const res = await fetch("/api/ai/history", {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error("履歴の取得に失敗しました");
+            const data = await res.json();
+            const msgs = data.messages || [];
+
+            box.innerHTML = '';
+            if (msgs.length === 0) {
+                box.innerHTML = `
+                    <div class="empty-state">
+                        <div>🤖</div>
+                        <div style="font-weight:bold; margin-top:8px;">AI相談室へようこそ</div>
+                        <div style="font-size:0.85rem; margin-top:4px;">日常の疑問や雑談など、何でも気軽に入力してください。</div>
+                    </div>`;
+                return;
+            }
+
+            msgs.forEach(m => {
+                renderMessage(m.role, m.content, m.created_at);
+            });
+            box.scrollTop = box.scrollHeight;
+        } catch (e) {
+            box.innerHTML = `<div class="empty-state">${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function sendChatMessage() {
+        if (isSending) return;
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        isSending = true;
+        input.value = '';
+        handleInput();
+
+        const box = document.getElementById('chat-messages');
+        const emptyState = box.querySelector('.empty-state');
+        if (emptyState) emptyState.remove();
+
+        renderMessage('user', message);
+
+        // 思考中インジケータ
+        const loadingId = 'loading-' + Date.now();
+        const loadingHtml = `
+            <div class="msg-row msg-other" id="${loadingId}">
+                <div class="msg-sender-label">AI アシスタント</div>
+                <div class="msg-bubble-wrapper">
+                    <div class="msg-bubble">
+                        <div class="typing-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        box.insertAdjacentHTML('beforeend', loadingHtml);
+        box.scrollTop = box.scrollHeight;
+
+        try {
+            const res = await fetch("/api/ai/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ message: message })
+            });
+
+            const loadingEl = document.getElementById(loadingId);
+            if (loadingEl) loadingEl.remove();
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.detail || "エラーが発生しました", true);
+                return;
+            }
+
+            const data = await res.json();
+            renderMessage('model', data.reply);
+
+        } catch (e) {
+            const loadingEl = document.getElementById(loadingId);
+            if (loadingEl) loadingEl.remove();
+            showToast("通信エラーが発生しました", true);
+        } finally {
+            isSending = false;
+            handleInput();
+        }
+    }
+
+    async function clearHistory() {
+        if (!confirm("これまでのAIとの会話履歴をすべて消去しますか？")) return;
+        try {
+            const res = await fetch("/api/ai/history", {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                showToast("会話履歴をリセットしました");
+                loadHistory();
+            } else {
+                showToast("リセットに失敗しました", true);
+            }
+        } catch (e) {
+            showToast("通信エラー", true);
+        }
+    }
+
+    loadHistory();
+</script>
+</body>
+</html>
