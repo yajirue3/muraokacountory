@@ -6,3 +6,4 @@ jinja2
 python-multipart
 pywebpush
 agora-token-builder
+google-genai
