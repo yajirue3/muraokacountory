@@ -1,768 +1,1520 @@
-import os
-import json
-import re
-import time
-import traceback
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
-from fastapi import APIRouter, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
-from pydantic import BaseModel, Field
-import httpx
-from pywebpush import webpush, WebPushException
-from postgrest.exceptions import APIError
-from agora_token_builder import RtcTokenBuilder
-from db import get_supabase
-
-router = APIRouter()
-
-# --- VAPIDキー・外部設定 ---
-CLIENT_ID = os.environ.get("GDRIVE_CLIENT_ID", "")
-CLIENT_SECRET = os.environ.get("GDRIVE_CLIENT_SECRET", "")
-REFRESH_TOKEN = os.environ.get("GDRIVE_REFRESH_TOKEN", "")
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "YOUR_PUBLIC_KEY_HERE")
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "YOUR_PRIVATE_KEY_HERE")
-VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
-AGORA_APP_ID = os.environ.get("AGORA_APP_ID", "")
-AGORA_APP_CERTIFICATE = os.environ.get("AGORA_APP_CERTIFICATE", "")
-
-http_client = httpx.AsyncClient(timeout=60.0)
-
-# --- Models ---
-class DMIDUpdate(BaseModel):
-    dm_id: str = Field(..., min_length=3, max_length=20, description="3文字以上20文字以内")
-
-class DMRequest(BaseModel):
-    target_dm_id: Optional[str] = None
-    target_user_id: Optional[str] = None
-    room_id: Optional[int] = None
-    message_type: str = "TEXT"
-    content: str = Field(..., min_length=1, max_length=1000)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-class PushSubscription(BaseModel):
-    endpoint: str
-    p256dh: str
-    auth: str
-
-class GroupReq(BaseModel):
-    room_name: str
-    member_dm_ids: List[str] = Field(default_factory=list)
-    passcode: Optional[str] = None
-
-class JoinPasscodeReq(BaseModel):
-    passcode: str
-
-class ReactReq(BaseModel):
-    reaction_type: str
-
-class TransferReq(BaseModel):
-    target_user_id: str
-    sender_wallet_id: str
-    amount: int
-    room_id: Optional[int] = None
-
-class BlockReq(BaseModel):
-    target_user_id: str
-
-class ReportReq(BaseModel):
-    message_id: int
-    reason: str
-
-class StampPurchaseReq(BaseModel):
-    pack_id: int
-    wallet_id: str
-
-# --- Helpers ---
-async def get_user_auth(authorization: str):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="認証トークンがありません")
-    token = authorization.split(" ")[1]
-    client = await get_supabase()
-    try:
-        res = await client.auth.get_user(token)
-        return res.user
-    except Exception:
-        raise HTTPException(status_code=401, detail="無効なトークンです")
-
-async def is_king_user(user_id: str) -> bool:
-    try:
-        client = await get_supabase()
-        res = await client.table("profiles").select("role").eq("id", user_id).execute()
-        return bool(res.data and res.data[0].get("role") == "king")
-    except Exception:
-        return False
-
-async def is_room_member(user_id: str, room_id: int) -> bool:
-    try:
-        client = await get_supabase()
-        if await is_king_user(user_id):
-            return True
-
-        room_res = await client.table("dm_rooms").select("owner_user_id").eq("id", int(room_id)).execute()
-        if room_res.data and str(room_res.data[0].get("owner_user_id")) == str(user_id):
-            return True
-
-        res = await client.table("dm_room_members").select("user_id").eq("room_id", int(room_id)).eq("user_id", str(user_id)).execute()
-        return bool(res.data)
-    except Exception as e:
-        print(f"is_room_member check error: {e}")
-        return True
-
-async def upload_image_to_drive(file_obj, filename: str, mime_type: str, file_size: int) -> str:
-    res = await http_client.post("https://oauth2.googleapis.com/token", data={
-        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "refresh_token": REFRESH_TOKEN, "grant_type": "refresh_token"
-    })
-    token = res.json().get("access_token")
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": mime_type, "X-Upload-Content-Length": str(file_size)}
-    init_res = await http_client.post("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable", headers=headers, json={"name": filename})
-    session_url = init_res.headers.get("Location")
-    file_obj.seek(0)
-    upload_res = await http_client.put(session_url, headers={"Content-Length": str(file_size)}, content=file_obj.read())
-    file_id = upload_res.json().get("id")
-    await http_client.post(f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions", headers={"Authorization": f"Bearer {token}"}, json={"role": "reader", "type": "anyone"})
-    return file_id
-
-async def send_web_push(receiver_id: str, sender_name: str, message_text: str):
-    if VAPID_PRIVATE_KEY in ["YOUR_PRIVATE_KEY_HERE", "YOUR_PUBLIC_KEY_HERE", ""]: return
-    try:
-        client = await get_supabase()
-        subs_res = await client.table("push_subscriptions").select("*").eq("user_id", receiver_id).execute()
-        if not subs_res.data: return
-        payload = {"title": f"村岡王国: {sender_name} からの密書", "body": message_text[:50], "icon": "/templates/icon.png", "url": "/dm"}
-        for sub in subs_res.data:
-            try: webpush(subscription_info={"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}}, data=json.dumps(payload), vapid_private_key=VAPID_PRIVATE_KEY, vapid_claims=VAPID_CLAIMS)
-            except Exception: pass
-    except Exception: pass
-
-# =====================================================================
-# API: ユーザー情報・設定
-# =====================================================================
-@router.get("/me")
-async def get_my_dm_info(authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    res = await client.table("profiles").select("id, dm_id, nickname, avatar_drive_id, role").eq("id", user.id).execute()
-    return res.data[0] if res.data else {"id": user.id, "dm_id": None, "role": "user"}
-
-@router.post("/set-id")
-async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not re.match(r"^[a-zA-Z0-9_]+$", data.dm_id):
-        raise HTTPException(status_code=400, detail="DM IDは半角英数字とアンダースコア(_)のみ使用可能です。")
-    client = await get_supabase()
-    exist = await client.table("profiles").select("id").eq("dm_id", data.dm_id).neq("id", user.id).execute()
-    if exist.data:
-        raise HTTPException(status_code=400, detail="そのIDは既に他の国民が使用しています。")
-    await client.table("profiles").update({"dm_id": data.dm_id}).eq("id", user.id).execute()
-    return {"message": f"DM IDを @{data.dm_id} に設定しました！"}
-
-@router.get("/vapid-public-key")
-async def get_vapid_public_key():
-    return {"public_key": VAPID_PUBLIC_KEY}
-
-@router.get("/agora-app-id")
-async def get_agora_app_id():
-    return {"app_id": AGORA_APP_ID}
-
-@router.get("/agora-token")
-async def get_agora_token(channel_name: str, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
-        raise HTTPException(status_code=500, detail="Agora設定が不足しています")
-    expire_time = int(time.time()) + 86400
-    token = RtcTokenBuilder.buildTokenWithUid(
-        AGORA_APP_ID,
-        AGORA_APP_CERTIFICATE,
-        channel_name,
-        0,
-        1,
-        expire_time
-    )
-    return {"token": token, "app_id": AGORA_APP_ID}
-
-@router.post("/push-subscribe")
-async def subscribe_push(sub: PushSubscription, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    exist = await client.table("push_subscriptions").select("id").eq("endpoint", sub.endpoint).execute()
-    if exist.data:
-        await client.table("push_subscriptions").update({"user_id": user.id, "p256dh": sub.p256dh, "auth": sub.auth}).eq("id", exist.data[0]["id"]).execute()
-    else:
-        await client.table("push_subscriptions").insert({"user_id": user.id, "endpoint": sub.endpoint, "p256dh": sub.p256dh, "auth": sub.auth}).execute()
-    return {"message": "通知設定を有効化しました。"}
-
-@router.post("/blocks/toggle")
-async def toggle_block(data: BlockReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    exist = await client.table("dm_blocks").select("*").eq("blocker_user_id", user.id).eq("blocked_user_id", data.target_user_id).execute()
-    if exist.data:
-        await client.table("dm_blocks").delete().eq("blocker_user_id", user.id).eq("blocked_user_id", data.target_user_id).execute()
-        return {"message": "ブロックを解除しました。"}
-    else:
-        await client.table("dm_blocks").insert({"blocker_user_id": user.id, "blocked_user_id": data.target_user_id}).execute()
-        return {"message": "この国民をブロックしました。"}
-
-# =====================================================================
-# API: スレッド一覧・メッセージ操作
-# =====================================================================
-@router.post("/send")
-async def send_dm(data: DMRequest, backgroundTasks: BackgroundTasks, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    if data.room_id:
-        if not await is_room_member(user.id, data.room_id):
-            raise HTTPException(status_code=403, detail="この部屋のメンバーではありません。")
-
-        await client.table("direct_messages").insert({
-            "sender_id": user.id, "room_id": data.room_id, "message_type": data.message_type, "content": data.content.strip(), "metadata": data.metadata
-        }).execute()
-        await client.table("dm_rooms").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", data.room_id).execute()
-        return {"message": "送信完了しました。"}
-    else:
-        target_id = None
-        if data.target_user_id:
-            target_id = data.target_user_id
-        elif data.target_dm_id:
-            target_res = await client.table("profiles").select("id").eq("dm_id", data.target_dm_id).execute()
-            if not target_res.data: raise HTTPException(status_code=404, detail="ユーザーが見つかりません。")
-            target_id = target_res.data[0]["id"]
-        else:
-            raise HTTPException(status_code=400, detail="送信先が指定されていません。")
-
-        if str(user.id) == str(target_id): raise HTTPException(status_code=400, detail="自分自身には送信できません。")
-
-        blk = await client.table("dm_blocks").select("*").eq("blocker_user_id", target_id).eq("blocked_user_id", user.id).execute()
-        if blk.data: raise HTTPException(status_code=403, detail="この国民には拒絶（ブロック）されています。")
-
-        await client.table("direct_messages").insert({
-            "sender_id": user.id, "receiver_id": target_id, "message_type": data.message_type, "content": data.content.strip(), "metadata": data.metadata
-        }).execute()
-
-        prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-        sender_name = prof.data[0]["nickname"] if prof.data else "不明な国民"
-        backgroundTasks.add_task(send_web_push, target_id, sender_name, data.content.strip())
-        return {"message": "送信完了しました。"}
-
-@router.get("/conversations")
-async def get_conversations(authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    filter_str = f"sender_id.eq.{user.id},receiver_id.eq.{user.id}"
-    msgs_1v1 = await client.table("direct_messages").select("id, sender_id, receiver_id, content, is_read, is_deleted, created_at").is_("room_id", "null").or_(filter_str).order("created_at", desc=True).limit(500).execute()
-
-    my_groups_res = await client.table("dm_room_members").select("room_id").eq("user_id", str(user.id)).execute()
-    group_ids = [g["room_id"] for g in (my_groups_res.data or [])]
-    
-    owned_rooms = await client.table("dm_rooms").select("id").eq("owner_user_id", str(user.id)).execute()
-    for o in (owned_rooms.data or []):
-        if o["id"] not in group_ids:
-            group_ids.append(o["id"])
-
-    groups_data = []
-    if group_ids:
-        r_res = await client.table("dm_rooms").select("id, room_name, owner_user_id, passcode, updated_at").in_("id", group_ids).execute()
-        groups_data = r_res.data or []
-
-    blocks_res = await client.table("dm_blocks").select("*").or_(f"blocker_user_id.eq.{user.id},blocked_user_id.eq.{user.id}").execute()
-    blocks = blocks_res.data or []
-
-    convs = {}
-    
-    if msgs_1v1.data:
-        partner_ids = {m["receiver_id"] if m["sender_id"] == user.id else m["sender_id"] for m in msgs_1v1.data}
-        profiles_res = await client.table("profiles").select("id, nickname, dm_id, avatar_drive_id").in_("id", list(partner_ids)).execute()
-        prof_map = {p["id"]: p for p in (profiles_res.data or [])}
-
-        for msg in msgs_1v1.data:
-            is_sender = (msg["sender_id"] == user.id)
-            partner_id = msg["receiver_id"] if is_sender else msg["sender_id"]
-            p_info = prof_map.get(partner_id)
-            if not p_info: continue
-
-            is_b_by = any(b["blocker_user_id"] == partner_id and b["blocked_user_id"] == user.id for b in blocks)
-            is_b_ing = any(b["blocker_user_id"] == user.id and b["blocked_user_id"] == partner_id for b in blocks)
-
-            if partner_id not in convs:
-                convs[partner_id] = {
-                    "type": "DIRECT",
-                    "partner_dm_id": p_info.get("dm_id") or "",
-                    "partner_user_id": partner_id,
-                    "partner_name": p_info.get("nickname") or "名無し国民",
-                    "avatar": p_info.get("avatar_drive_id"),
-                    "latest_message": "送信取り消し済" if msg.get("is_deleted") else msg["content"],
-                    "latest_time": msg["created_at"],
-                    "unread_count": 0,
-                    "is_blocked": is_b_by or is_b_ing
-                }
-            if not is_sender and not msg.get("is_read", False):
-                convs[partner_id]["unread_count"] += 1
-
-    result_list = list(convs.values())
-
-    for r in groups_data:
-        l_msg = await client.table("direct_messages").select("content, is_deleted").eq("room_id", r["id"]).order("created_at", desc=True).limit(1).execute()
-        txt = (l_msg.data[0]["content"] if not l_msg.data[0]["is_deleted"] else "送信取り消し済") if l_msg.data else "メッセージなし"
-        result_list.append({
-            "type": "GROUP",
-            "room_id": r["id"],
-            "partner_name": r["room_name"],
-            "owner_user_id": str(r.get("owner_user_id", "")),
-            "has_passcode": bool(r.get("passcode")),
-            "latest_message": txt,
-            "latest_time": r["updated_at"],
-            "unread_count": 0,
-            "is_blocked": False
-        })
-
-    result_list.sort(key=lambda x: x["latest_time"], reverse=True)
-    return {"conversations": result_list}
-
-@router.get("/messages/{partner_identifier}")
-async def get_messages(partner_identifier: str, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    partner_id = None
-    is_uuid = bool(re.match(r"^[0-9a-fA-F-]{36}$", partner_identifier))
-    if is_uuid:
-        partner_id = partner_identifier
-    else:
-        tgt = await client.table("profiles").select("id").eq("dm_id", partner_identifier).execute()
-        if not tgt.data: return {"messages": [], "partner_user_id": None}
-        partner_id = tgt.data[0]["id"]
-    
-    p_res = await client.table("profiles").select("dm_id, nickname, avatar_drive_id").eq("id", partner_id).execute()
-    p_info = p_res.data[0] if p_res.data else {}
-
-    await client.table("direct_messages").update({"is_read": True}).eq("sender_id", partner_id).eq("receiver_id", user.id).is_("room_id", "null").eq("is_read", False).execute()
-
-    cond = f"and(sender_id.eq.{user.id},receiver_id.eq.{partner_id}),and(sender_id.eq.{partner_id},receiver_id.eq.{user.id})"
-    res = await client.table("direct_messages").select(
-        "id, sender_id, receiver_id, message_type, content, metadata, is_pinned, is_deleted, is_read, created_at"
-    ).is_("room_id", "null").or_(cond).order("created_at", desc=True).limit(200).execute()
-    msgs = res.data or []
-    msgs.reverse()
-
-    msg_ids = [m["id"] for m in msgs]
-    r_map = {}
-    if msg_ids:
-        r_res = await client.table("dm_message_reactions").select("message_id, reaction_type, user_id").in_("message_id", msg_ids).execute()
-        for r in (r_res.data or []):
-            mid = r["message_id"]
-            if mid not in r_map: r_map[mid] = []
-            r_map[mid].append(r)
-
-    for m in msgs: m["reactions"] = r_map.get(m["id"], [])
-    return {
-        "messages": msgs, 
-        "partner_user_id": partner_id,
-        "partner_dm_id": p_info.get("dm_id"),
-        "partner_name": p_info.get("nickname")
-    }
-
-@router.get("/messages/group/{room_id}")
-async def get_group_messages(room_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    
-    if not await is_room_member(user.id, room_id):
-        raise HTTPException(status_code=403, detail="この密談部屋を閲覧する権限がありません。")
-
-    client = await get_supabase()
-    res = await client.table("direct_messages").select(
-        "id, sender_id, room_id, message_type, content, metadata, is_pinned, is_deleted, created_at"
-    ).eq("room_id", int(room_id)).order("created_at", desc=True).limit(200).execute()
-    msgs = res.data or []
-    msgs.reverse()
-
-    u_ids = list({m["sender_id"] for m in msgs})
-    p_map = {}
-    if u_ids:
-        profs = await client.table("profiles").select("id, nickname, avatar_drive_id").in_("id", u_ids).execute()
-        p_map = {p["id"]: p for p in (profs.data or [])}
-
-    msg_ids = [m["id"] for m in msgs]
-    r_map = {}
-    if msg_ids:
-        r_res = await client.table("dm_message_reactions").select("message_id, reaction_type, user_id").in_("message_id", msg_ids).execute()
-        for r in (r_res.data or []):
-            mid = r["message_id"]
-            if mid not in r_map: r_map[mid] = []
-            r_map[mid].append(r)
-
-    for m in msgs:
-        m["sender"] = p_map.get(m["sender_id"], {"nickname": "不明"})
-        m["reactions"] = r_map.get(m["id"], [])
-    return {"messages": msgs}
-
-@router.delete("/messages/{message_id}")
-async def delete_msg(message_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    try:
-        await (await get_supabase()).rpc("cancel_dm_message", {"p_user_id": str(user.id), "p_message_id": message_id}).execute()
-        return {"success": True}
-    except Exception as e: raise HTTPException(400, detail=str(getattr(e, "message", e)))
-
-@router.post("/messages/{message_id}/react")
-async def toggle_react(message_id: int, data: ReactReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    exist = await client.table("dm_message_reactions").select("id").eq("message_id", message_id).eq("user_id", user.id).eq("reaction_type", data.reaction_type).execute()
-    if exist.data:
-        await client.table("dm_message_reactions").delete().eq("id", exist.data[0]["id"]).execute()
-    else:
-        await client.table("dm_message_reactions").insert({"message_id": message_id, "user_id": user.id, "reaction_type": data.reaction_type}).execute()
-    return {"success": True}
-
-@router.post("/messages/{message_id}/pin")
-async def toggle_pin(message_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    m = await client.table("direct_messages").select("is_pinned").eq("id", message_id).execute()
-    if not m.data: raise HTTPException(404, detail="Not Found")
-    await client.table("direct_messages").update({"is_pinned": not m.data[0]["is_pinned"]}).eq("id", message_id).execute()
-    return {"success": True}
-
-@router.post("/reports")
-async def report_msg(data: ReportReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    m = await client.table("direct_messages").select("sender_id").eq("id", data.message_id).execute()
-    if not m.data: raise HTTPException(404, detail="Not Found")
-    await client.table("dm_reports").insert({"message_id": data.message_id, "reporter_id": user.id, "reported_user_id": m.data[0]["sender_id"], "reason": data.reason}).execute()
-    return {"message": "国王へ密告しました。"}
-
-# =====================================================================
-# API: グループ結成・合言葉入室・メンバー管理・送金・画像アップロード
-# =====================================================================
-@router.post("/groups")
-async def create_group(data: GroupReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    m_ids = []
-    if data.member_dm_ids:
-        p_res = await client.table("profiles").select("id").in_("dm_id", data.member_dm_ids).execute()
-        m_ids = [p["id"] for p in (p_res.data or []) if str(p["id"]) != str(user.id)]
-    
-    clean_passcode = data.passcode.strip() if (data.passcode and data.passcode.strip()) else None
-
-    if clean_passcode:
-        exist = await client.table("dm_rooms").select("id").eq("passcode", clean_passcode).execute()
-        if exist.data:
-            raise HTTPException(status_code=400, detail="その合言葉はすでに他の部屋で使用されています。別の合言葉を設定してください。")
-
-    insert_payload = {
-        "room_name": data.room_name.strip(),
-        "owner_user_id": str(user.id)
-    }
-    if clean_passcode:
-        insert_payload["passcode"] = clean_passcode
-
-    r = await client.table("dm_rooms").insert(insert_payload).execute()
-    r_id = r.data[0]["id"]
-
-    ins_data = [{"room_id": r_id, "user_id": str(user.id)}] + [{"room_id": r_id, "user_id": str(mid)} for mid in m_ids]
-    await client.table("dm_room_members").insert(ins_data).execute()
-    return {"room_id": r_id}
-
-@router.post("/rooms/join-by-passcode")
-async def join_room_by_passcode(data: JoinPasscodeReq, authorization: str = Header(None)):
-    """合言葉を入力して密談部屋に参加（dm_room_members に id カラムが存在しない構造に対応）"""
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    code = (data.passcode or "").strip()
-    if not code:
-        raise HTTPException(status_code=400, detail="合言葉を入力してください。")
-
-    try:
-        room_res = await client.table("dm_rooms").select("id, room_name, owner_user_id").eq("passcode", code).execute()
-        if not room_res.data:
-            raise HTTPException(status_code=404, detail="合言葉が一致する密談部屋が見つかりません。")
-
-        room = room_res.data[0]
-        r_id = int(room["id"])
-        current_uid = str(user.id)
-        owner_uid = str(room.get("owner_user_id", ""))
-
-        if current_uid != owner_uid:
-            # id ではなく user_id を照合
-            mem_check = await client.table("dm_room_members").select("user_id").eq("room_id", r_id).eq("user_id", current_uid).execute()
-            if not mem_check.data:
-                await client.table("dm_room_members").insert({
-                    "room_id": r_id,
-                    "user_id": current_uid
-                }).execute()
-
-        return {
-            "message": f"密談部屋「{room['room_name']}」に入室しました！",
-            "room_id": r_id,
-            "room_name": room["room_name"],
-            "owner_user_id": owner_uid
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>村岡王国 - 密書 (DM)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { 
+            --bg: #000000; --card-bg: #16181c; --border: #2f3336; 
+            --primary: #d4af37; --primary-hover: #b8962e; 
+            --text: #e7e9ea; --sub: #71767b; --danger: #ef4444; --success: #10b981;
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"入室エラー詳細: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"DB処理エラー: {str(e)}")
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; height: 100dvh; overflow: hidden; }
+        .container { width: 100%; max-width: 600px; display: flex; flex-direction: column; border-left: 1px solid var(--border); border-right: 1px solid var(--border); height: 100%; position: relative; box-sizing: border-box; }
+        
+        .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
+        .view { display: none; flex-direction: column; height: 100%; width: 100%; min-height: 0; }
+        .view.active { display: flex; animation: fadein 0.15s ease-out; }
+        @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* WebRTC / Agora 通話バー & PIP小窓 */
+        #call-bar { display: none; background: #0c0e12; border-bottom: 1px solid var(--primary); padding: 8px 16px; font-size: 0.85rem; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .btn-call-ctrl { background: var(--card-bg); border: 1px solid var(--border); color: #fff; padding: 4px 12px; border-radius: 14px; cursor: pointer; font-weight: bold; font-size:0.8rem; }
+        .btn-call-hangup { background: var(--danger); border-color: var(--danger); }
+        #video-pip-container { display: none; position: fixed; top: 70px; right: 16px; width: 120px; height: 160px; background: #000; border: 2px solid var(--primary); border-radius: 8px; overflow: hidden; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
+        #remote-video-container { width: 100%; height: 100%; }
+        #local-video-container { position: absolute; bottom: 4px; right: 4px; width: 36px; height: 48px; border-radius: 4px; border: 1px solid #fff; overflow: hidden; }
 
-@router.get("/rooms/{room_id}/members")
-async def get_room_members(room_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not await is_room_member(user.id, room_id):
-        raise HTTPException(status_code=403, detail="権限がありません。")
+        /* リスト画面 */
+        .action-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .action-row { display: flex; gap: 8px; }
+        .thread-list { flex: 1; overflow-y: auto; }
+        .thread-item { padding: 16px; display: flex; cursor: pointer; border-bottom: 1px solid var(--border); align-items: center; }
+        .thread-item:hover { background: var(--card-bg); }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; background: #333; margin-right: 14px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0; object-fit: cover; }
+        .thread-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .thread-name { font-weight: bold; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .thread-id { color: var(--sub); font-size: 0.85rem; font-weight: normal; margin-left: 6px; }
+        .thread-msg { color: var(--sub); font-size: 0.9rem; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+        .unread-badge { background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
 
-    client = await get_supabase()
-    room_res = await client.table("dm_rooms").select("owner_user_id").eq("id", int(room_id)).execute()
-    owner_id = str(room_res.data[0].get("owner_user_id")) if room_res.data else ""
+        /* ピン留め */
+        #pin-banner { display: none; background: rgba(212,175,55,0.08); border-bottom: 1px solid rgba(212,175,55,0.3); padding: 8px 16px; font-size: 0.85rem; color: var(--primary); align-items: center; justify-content: space-between; flex-shrink: 0; }
 
-    mems_res = await client.table("dm_room_members").select("user_id").eq("room_id", int(room_id)).execute()
-    u_ids = [m["user_id"] for m in (mems_res.data or [])]
-    if owner_id and owner_id not in u_ids:
-        u_ids.append(owner_id)
+        /* チャット画面 */
+        .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        .msg-row { display: flex; flex-direction: column; width: 100%; position: relative; }
+        .msg-mine { align-items: flex-end; }
+        .msg-other { align-items: flex-start; }
+        .msg-sender-label { font-size: 0.75rem; color: var(--primary); margin-bottom: 4px; font-weight: bold; }
+        .msg-bubble-wrapper { display: flex; align-items: flex-start; gap: 8px; max-width: 85%; }
+        .msg-mine .msg-bubble-wrapper { flex-direction: row-reverse; }
+        
+        .msg-bubble { padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .msg-mine .msg-bubble { background: var(--primary); color: #000; border-radius: 18px 18px 2px 18px; font-weight: 500; }
+        .msg-other .msg-bubble { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 18px 18px 18px 2px; }
+        
+        .msg-image { max-width: 220px; border-radius: 12px; border: 1px solid var(--border); }
+        .msg-stamp { width: 140px; }
+        .msg-transfer-card { background: #111419; border: 1px solid var(--primary); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px; }
+        .msg-transfer-card.mine { background: rgba(0,0,0,0.1); border-color: #000; }
+        
+        .msg-meta { font-size: 0.7rem; color: var(--sub); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+        .msg-role-tag { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; background: #2f3336; color: #aaa; }
+        .read-status { color: var(--primary); font-weight: bold; }
 
-    profs = await client.table("profiles").select("id, nickname, dm_id, avatar_drive_id, role").in_("id", u_ids).execute()
-    members_list = []
-    for p in (profs.data or []):
-        members_list.append({
-            "id": p["id"],
-            "nickname": p.get("nickname") or "名無し国民",
-            "dm_id": p.get("dm_id") or "",
-            "avatar_drive_id": p.get("avatar_drive_id"),
-            "role": p.get("role", "user"),
-            "is_owner": str(p["id"]) == owner_id
-        })
+        /* リアクションバッジ */
+        .reactions-bar { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .react-badge { background: #111317; border: 1px solid var(--border); border-radius: 10px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; }
 
-    is_king = await is_king_user(user.id)
-    can_manage = is_king or (str(user.id) == owner_id)
+        /* スマホ安全 インラインアクションパネル */
+        .btn-msg-menu { background: transparent; border: none; color: var(--sub); font-size: 1.2rem; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .msg-action-panel { display: none; flex-wrap: wrap; gap: 6px; margin-top: 4px; background: #0c0e12; border: 1px solid var(--border); padding: 6px 8px; border-radius: 8px; width: max-content; max-width: 100%; }
+        .msg-action-panel.show { display: flex; animation: fadein 0.15s ease-out; }
+        .toolbar-btn { background: var(--card-bg); border: 1px solid var(--border); cursor: pointer; font-size: 1.1rem; padding: 4px 8px; border-radius: 6px; color: var(--text); }
+        .toolbar-btn:active { background: var(--border); }
 
-    return {
-        "members": members_list,
-        "owner_user_id": owner_id,
-        "can_manage": can_manage
+        /* 入力エリア */
+        .chat-input-wrapper { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+        .btn-circle-icon { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.3rem; flex-shrink: 0; }
+        .btn-circle-icon:hover { background: var(--card-bg); }
+        .chat-input-wrapper input { flex: 1; background: var(--card-bg); border: 1px solid transparent; padding: 14px 16px; border-radius: 24px; color: var(--text); font-size: 0.95rem; outline: none; }
+        .chat-input-wrapper input:focus { border-color: var(--primary); background: #000; }
+        .btn-send { background: var(--primary); border: none; color: #000; padding: 0 16px; height: 40px; border-radius: 20px; font-weight: bold; flex-shrink: 0; cursor: pointer; display: none; }
+        .btn-send.active { display: block; }
+        
+        #block-warning-bar { display: none; padding: 12px 16px; background: #160a0a; border-top: 1px solid var(--danger); color: #ff9999; font-size: 0.85rem; text-align: center; font-weight: bold; flex-shrink: 0; }
+
+        /* ドロワー */
+        .drawer-panel { display: none; background: #0c0d10; border-top: 1px solid var(--border); padding: 16px; max-height: 240px; overflow-y: auto; flex-shrink: 0; }
+        .launcher-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center; }
+        .launcher-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 0.8rem; }
+        
+        .stamp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .stamp-pick-item { width: 100%; aspect-ratio: 1; object-fit: contain; cursor: pointer; border-radius: 8px; }
+        
+        /* モーダル */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #000; padding: 24px; border-radius: 16px; width: 400px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto; }
+        .modal-content h2 { margin-top: 0; font-size: 1.2rem; margin-bottom: 16px; }
+        .input-text, select { width: 100%; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-bottom: 12px; box-sizing: border-box; font-size: 0.95rem; }
+        .input-text:focus, select:focus { outline: none; border-color: var(--primary); }
+        .btn-full { width: 100%; padding: 14px; border: none; border-radius: 24px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 0.95rem; }
+        .btn-primary-solid { background: var(--primary); color: #000; }
+        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .nav-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 0.9rem; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+        .nav-icon { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1.3rem; padding: 8px; border-radius: 50%; }
+
+        .market-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: center; }
+        .market-img { width: 60px; height: 60px; object-fit: contain; background: #111; border-radius: 8px; }
+
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sub); text-align: center; padding: 40px 20px; line-height: 1.6; }
+        
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast { background: rgba(22, 24, 28, 0.95); border-left: 4px solid var(--primary); padding: 14px 24px; border-radius: 8px; color: #fff; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: fadein 0.3s, fadeout 0.3s 4.7s forwards; }
+        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+        /* メンバー選択用アイテム */
+        .member-pick-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+        .member-pick-item:hover { background: var(--card-bg); }
+        .member-pick-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); margin-right: 12px; cursor: pointer; pointer-events: none; }
+
+        /* メンバー管理行 */
+        .member-manage-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .btn-kick { background: var(--card-bg); border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
+
+        /* 着信アニメーション */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(212, 175, 55, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+        }
+        .call-pulse { animation: pulse-ring 1.5s infinite; }
+
+        @media (max-width: 768px) { .header { height: 50px; font-size: 1rem; } .avatar { width: 40px; height: 40px; font-size: 1rem; } .modal-content { padding: 20px; } }
+    </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+<div id="video-pip-container">
+    <div id="remote-video-container"></div>
+    <div id="local-video-container"></div>
+</div>
+
+<!-- 着信モーダル (電話・ビデオ共通) -->
+<div class="modal" id="incoming-call-modal" style="z-index: 2000;">
+    <div class="modal-content call-pulse" style="text-align: center; border-color: var(--primary);">
+        <div style="font-size: 3.5rem; margin-bottom: 10px;">📞</div>
+        <h2 id="incoming-caller-name" style="margin-bottom: 6px;">国民から着信</h2>
+        <p id="incoming-call-type" style="color: var(--primary); font-weight: bold; margin-bottom: 20px; font-size:0.95rem;">音声通話の着信...</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button class="btn-full btn-primary-solid" style="background: var(--success); color: #fff; margin:0;" id="btn-answer-incoming">応答する</button>
+            <button class="btn-full btn-outline" style="border-color: var(--danger); color: var(--danger); margin:0;" onclick="declineIncomingCall()">拒否</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+    <!-- リスト画面 -->
+    <div id="view-list" class="view active">
+        <div class="header">
+            <span id="sidebar-title">密書 (DM)</span>
+            <div style="display:flex; gap: 4px;">
+                <button class="nav-icon" onclick="requestPushPermission()" title="通知">🔔</button>
+                <button class="nav-icon" onclick="openModal('settings-modal')" title="設定">⚙️</button>
+                <button class="nav-btn" onclick="location.href='/dashboard'">◀ 国民証</button>
+            </div>
+        </div>
+        <div class="action-bar">
+            <div class="action-row">
+                <button class="btn-full btn-primary-solid" style="margin:0; flex:1;" onclick="openModal('new-modal')">＋ 新しい密書</button>
+                <button class="btn-full btn-outline" style="margin:0; flex:1;" onclick="openGroupCreateModal()">👥 部屋結成</button>
+            </div>
+            <!-- 合言葉で入室ボタン -->
+            <button class="btn-full btn-outline" style="margin:0; border-color:var(--primary); color:var(--primary);" onclick="openModal('passcode-join-modal')">🔑 合言葉で入室</button>
+            <button class="btn-full btn-outline" id="btn-admin-mode" style="margin:0; display:none;" onclick="toggleAdminMode()">👁 王国検閲モードを開始</button>
+        </div>
+        <div class="thread-list" id="thread-list"><div class="empty-state">読み込み中...</div></div>
+    </div>
+
+    <!-- チャット画面 -->
+    <div id="view-chat" class="view">
+        <div class="header">
+            <div style="display:flex; align-items:center; gap: 4px; overflow:hidden;">
+                <button class="nav-icon" onclick="closeChat()">←</button>
+                <img id="chat-header-avatar" class="avatar" style="width:34px; height:34px; margin:0 8px 0 0; display:none;">
+                <div style="display:flex; flex-direction:column; overflow:hidden;">
+                    <span id="chat-title" style="line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">名前</span>
+                    <span id="chat-subtitle" style="font-size:0.75rem; color:var(--sub); font-weight:normal;"></span>
+                </div>
+            </div>
+            <div id="chat-header-actions" style="display:flex; gap: 2px;">
+                <button class="nav-icon" id="btn-group-members-action" style="display:none;" onclick="openGroupMembersModal()" title="メンバー一覧・管理">👥</button>
+                <button class="nav-icon" onclick="startCall(false)">📞</button>
+                <button class="nav-icon" onclick="startCall(true)">🎥</button>
+                <button class="nav-icon" id="btn-block-action" onclick="toggleBlock()">🚫</button>
+                <button class="nav-icon" id="btn-delete-room-action" style="display:none; color:var(--danger);" onclick="deleteCurrentRoom()" title="部屋を解体">🗑️</button>
+            </div>
+        </div>
+
+        <div id="call-bar">
+            <span id="call-status-text" style="color:var(--primary); font-weight:bold;">📞 呼び出し中...</span>
+            <div class="call-controls">
+                <button class="btn-call-ctrl" id="btn-toggle-mic" onclick="toggleMic()">🎤</button>
+                <button class="btn-call-ctrl" id="btn-toggle-cam" onclick="toggleCam()">📷</button>
+                <button class="btn-call-ctrl btn-call-hangup" onclick="hangupCall()">切断</button>
+            </div>
+        </div>
+
+        <div id="pin-banner">
+            <span id="pin-content" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📌 </span>
+            <button style="background:transparent; border:none; color:var(--primary); cursor:pointer; font-weight:bold;" onclick="document.getElementById('pin-banner').style.display='none'">✕</button>
+        </div>
+
+        <div class="chat-messages" id="chat-messages"><div class="empty-state">読み込み中...</div></div>
+        
+        <div id="block-warning-bar">⛔ この国民とは交信が制限されています</div>
+
+        <div class="chat-input-wrapper" id="chat-input-wrapper">
+            <button class="btn-circle-icon" onclick="toggleDrawer('launcher-drawer')">＋</button>
+            <input type="text" id="chat-input" placeholder="メッセージを入力..." oninput="toggleSendBtn()" onkeypress="if(event.key==='Enter') sendMessage()">
+            <button class="btn-circle-icon" id="btn-stamp-icon" onclick="toggleDrawer('stamp-drawer')">☺</button>
+            <button class="btn-send" id="btn-send-msg" onclick="sendMessage()">➤</button>
+        </div>
+
+        <!-- 拡張ドロワー -->
+        <div class="drawer-panel" id="launcher-drawer">
+            <div class="launcher-grid">
+                <div class="launcher-item" id="launcher-transfer-item" onclick="openTransferModal()"><span class="launcher-icon">💰</span><span>送金</span></div>
+                <div class="launcher-item" onclick="document.getElementById('img-file-input').click()"><span class="launcher-icon">🖼️</span><span>画像</span></div>
+                <div class="launcher-item" onclick="openModal('stamp-create-modal')"><span class="launcher-icon">🎨</span><span>スタンプ自作</span></div>
+                <div class="launcher-item" onclick="openMarketModal()"><span class="launcher-icon">🏪</span><span>市場(購入)</span></div>
+            </div>
+            <input type="file" id="img-file-input" accept="image/*" style="display:none;" onchange="uploadImage(event)">
+        </div>
+
+        <div class="drawer-panel" id="stamp-drawer">
+            <div class="stamp-grid" id="my-stamps-picker"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- モーダル群 -->
+<div class="modal" id="settings-modal">
+    <div class="modal-content">
+        <h2>DM IDの設定</h2>
+        <p style="color:var(--sub); font-size:0.9rem;">専用ID (@英数字) を設定します。</p>
+        <input type="text" id="my-dm-id" class="input-text" placeholder="例: muraoka_king">
+        <button class="btn-full btn-primary-solid" onclick="saveDMID()">保存</button>
+        <button class="btn-full btn-outline" onclick="closeModal('settings-modal')">閉じる</button>
+    </div>
+</div>
+
+<div class="modal" id="new-modal">
+    <div class="modal-content">
+        <h2>新しい密書</h2>
+        <input type="text" id="target-dm-id" class="input-text" placeholder="相手のDM ID (例: user_a)">
+        <button class="btn-full btn-primary-solid" onclick="startNewChat()">開始</button>
+        <button class="btn-full btn-outline" onclick="closeModal('new-modal')">キャンセル</button>
+    </div>
+</div>
+
+<!-- グループ作成モーダル (1人作成 & パスコード設定対応) -->
+<div class="modal" id="new-group-modal">
+    <div class="modal-content">
+        <h2>👥 密談部屋を結成</h2>
+        <input type="text" id="group-name-input" class="input-text" placeholder="部屋名 (例: 作戦本部)">
+        <input type="text" id="group-passcode-input" class="input-text" placeholder="🔒 合言葉 (任意: 知っている同志だけが入室可)">
+        <div style="font-size:0.85rem; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>招待する国民を選択 (後から合言葉でも呼べます)</span>
+            <span id="group-selected-count" style="color:var(--primary); font-weight:bold;">0人選択中</span>
+        </div>
+        <div id="group-candidate-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: #0c0e12;">
+            <div class="empty-state" style="padding:20px 10px;">候補を読み込み中...</div>
+        </div>
+        <button class="btn-full btn-primary-solid" onclick="createGroupRoom()">開設</button>
+        <button class="btn-full btn-outline" onclick="closeModal('new-group-modal')">キャンセル</button>
+    </div>
+</div>
+
+<!-- 合言葉入室モーダル -->
+<div class="modal" id="passcode-join-modal">
+    <div class="modal-content">
+        <h2>🔑 合言葉で密談部屋に入室</h2>
+        <p style="color:var(--sub); font-size:0.85rem; margin-bottom:12px;">共有された合言葉を入力して地下会合に参加します。</p>
+        <input type="text" id="join-passcode-input" class="input-text" placeholder="合言葉 (例: himitsu123)">
+        <button class="btn-full btn-primary-solid" onclick="executeJoinByPasscode()">入室</button>
+        <button class="btn-full btn-outline" onclick="closeModal('passcode-join-modal')">閉じる</button>
+    </div>
+</div>
+
+<!-- グループメンバー一覧 & 除名モーダル -->
+<div class="modal" id="group-members-modal">
+    <div class="modal-content">
+        <h2>👥 部屋の国民一覧</h2>
+        <div id="group-members-list-box" style="max-height: 280px; overflow-y: auto; margin-bottom: 16px;">
+            <div class="empty-state">読み込み中...</div>
+        </div>
+        <button class="btn-full btn-outline" onclick="closeModal('group-members-modal')">閉じる</button>
+    </div>
+</div>
+
+<div class="modal" id="transfer-modal">
+    <div class="modal-content">
+        <h2>💰 Gold 送金</h2>
+        <select id="transfer-wallet-select"></select>
+        <input type="number" id="transfer-amount-input" class="input-text" min="1" placeholder="金額 (Gold)">
+        <button class="btn-full btn-primary-solid" onclick="executeChatTransfer()">送金</button>
+        <button class="btn-full btn-outline" onclick="closeModal('transfer-modal')">キャンセル</button>
+    </div>
+</div>
+
+<div class="modal" id="stamp-create-modal">
+    <div class="modal-content">
+        <h2>🎨 スタンプ登録 (Cropper)</h2>
+        <input type="text" id="stamp-pack-title" class="input-text" placeholder="スタンプ名">
+        <input type="number" id="stamp-pack-price" class="input-text" placeholder="販売価格 (0で無料)" value="0">
+        <input type="file" id="crop-image-file" accept="image/*" onchange="initCrop(event)" style="margin-bottom:12px; color:var(--text);">
+        <div style="width:100%; height:240px; background:#111; border-radius:8px; display:none;" id="cropper-container">
+            <img id="cropper-img" style="max-width:100%; max-height:100%;">
+        </div>
+        <button class="btn-full btn-primary-solid" id="btn-save-stamp" style="display:none;" onclick="submitCroppedStamp()">市場に出品・保存</button>
+        <button class="btn-full btn-outline" onclick="closeModal('stamp-create-modal')">閉じる</button>
+    </div>
+</div>
+
+<div class="modal" id="market-modal">
+    <div class="modal-content">
+        <h2>🏪 スタンプ市場</h2>
+        <select id="market-wallet-select"></select>
+        <div id="market-list" style="max-height: 300px; overflow-y:auto; display:flex; flex-direction:column;"></div>
+        <button class="btn-full btn-outline" onclick="closeModal('market-modal')">閉じる</button>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
+
+    let currentUser = null;
+    let activeConversation = null; 
+    let isAdminMode = false;
+    let myWallets = [];
+    let cropperInstance = null;
+    let lastRenderedHash = "";
+    let rawConversations = [];
+
+    // 着信処理状態
+    let handledCallMsgIds = new Set();
+    let activeIncomingCall = null;
+    let ringtoneAudioCtx = null;
+    let ringtoneInterval = null;
+
+    // Supabase Realtime クライアント管理
+    let supabaseClient = null;
+    let realtimeChannel = null;
+
+    // Agora 通話設定・状態
+    let AGORA_APP_ID = "";
+    let agoraClient = null;
+    let localAudioTrack = null;
+    let localVideoTrack = null;
+    let callTimer = null;
+    let callSeconds = 0;
+
+    function showToast(msg, isError = false) {
+        const c = document.getElementById('toast-container');
+        if(!c) return;
+        const t = document.createElement('div'); t.className = 'toast'; t.innerText = msg;
+        if(isError) t.style.borderLeftColor = 'var(--danger)';
+        c.appendChild(t); setTimeout(() => t.remove(), 4000);
+    }
+    function escapeHtml(str) { return String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function showView(viewId) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(viewId).classList.add('active'); }
+
+    // 着信音鳴動制御 (Web Audio API)
+    function startRingtone() {
+        try {
+            stopRingtone();
+            if (!ringtoneAudioCtx) ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ringtoneAudioCtx.state === 'suspended') ringtoneAudioCtx.resume();
+            
+            let toggle = false;
+            ringtoneInterval = setInterval(() => {
+                if (!ringtoneAudioCtx) return;
+                const osc = ringtoneAudioCtx.createOscillator();
+                const gain = ringtoneAudioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(toggle ? 880 : 700, ringtoneAudioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, ringtoneAudioCtx.currentTime);
+                osc.connect(gain);
+                gain.connect(ringtoneAudioCtx.destination);
+                osc.start();
+                osc.stop(ringtoneAudioCtx.currentTime + 0.18);
+                toggle = !toggle;
+            }, 350);
+        } catch(e) {}
     }
 
-@router.delete("/rooms/{room_id}/members/{target_user_id}")
-async def kick_room_member(room_id: int, target_user_id: str, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
+    function stopRingtone() {
+        if (ringtoneInterval) {
+            clearInterval(ringtoneInterval);
+            ringtoneInterval = null;
+        }
+    }
 
-    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", int(room_id)).execute()
-    if not room_res.data:
-        raise HTTPException(status_code=404, detail="部屋が見つかりません。")
-
-    owner_id = str(room_res.data[0].get("owner_user_id"))
-    is_king = await is_king_user(user.id)
-
-    if not is_king and str(user.id) != owner_id:
-        raise HTTPException(status_code=403, detail="メンバーを除名する権限がありません。")
-
-    if target_user_id == owner_id:
-        raise HTTPException(status_code=400, detail="部屋の作成者を除名することはできません。部屋自体を解体してください。")
-
-    await client.table("dm_room_members").delete().eq("room_id", int(room_id)).eq("user_id", target_user_id).execute()
-    return {"message": "国民を部屋から除名しました。"}
-
-@router.post("/transfer-gold")
-async def transfer_gold(data: TransferReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    try:
-        await (await get_supabase()).rpc("execute_dm_transfer", {
-            "p_sender_id": str(user.id), "p_sender_wallet_id": data.sender_wallet_id, "p_target_user_id": data.target_user_id, "p_amount": data.amount, "p_room_id": data.room_id
-        }).execute()
-        return {"message": f"{data.amount} Gold を送金しました！"}
-    except Exception as e: raise HTTPException(400, detail=str(getattr(e, "message", e)))
-
-@router.post("/upload-image")
-async def upload_img(
-    file: UploadFile = File(...), 
-    target_dm_id: str = Form(None), 
-    target_user_id: str = Form(None), 
-    room_id: int = Form(None), 
-    authorization: str = Header(None)
-):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-
-    if room_id and not await is_room_member(user.id, room_id):
-        raise HTTPException(status_code=403, detail="この部屋に画像を送信する権限がありません。")
-
-    file.file.seek(0, os.SEEK_END); size = file.file.tell(); file.file.seek(0)
-    drive_id = await upload_image_to_drive(file.file, file.filename, file.content_type or "image/jpeg", size)
-    
-    if room_id:
-        await client.table("direct_messages").insert({
-            "sender_id": user.id, "room_id": int(room_id), "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
-        }).execute()
-    else:
-        receiver_id = target_user_id
-        if not receiver_id and target_dm_id:
-            tgt = await client.table("profiles").select("id").eq("dm_id", target_dm_id).execute()
-            if tgt.data: receiver_id = tgt.data[0]["id"]
-        
-        if not receiver_id:
-            raise HTTPException(status_code=400, detail="送信先の相手が不明です。")
-
-        await client.table("direct_messages").insert({
-            "sender_id": user.id, "receiver_id": receiver_id, "message_type": "IMAGE", "content": "🖼️ 画像を受信しました", "metadata": {"drive_file_id": drive_id}
-        }).execute()
-        
-    return {"success": True}
-
-# =====================================================================
-# API: スタンプ機能
-# =====================================================================
-@router.post("/stamps/packs")
-async def create_stamp_pack(title: str = Form(...), price: int = Form(...), file: UploadFile = File(...), authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    file.file.seek(0, os.SEEK_END); size = file.file.tell(); file.file.seek(0)
-    drive_id = await upload_image_to_drive(file.file, file.filename, "image/png", size)
-
-    r = await client.table("dm_stamp_packs").insert({"creator_user_id": user.id, "title": title.strip(), "price": price}).execute()
-    pack_id = r.data[0]["id"]
-    await client.table("dm_stamps").insert({"pack_id": pack_id, "drive_file_id": drive_id}).execute()
-    await client.table("user_dm_stamps").insert({"user_id": user.id, "pack_id": pack_id}).execute()
-    return {"success": True}
-
-@router.get("/stamps/market")
-async def get_stamp_market(authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    packs = await client.table("dm_stamp_packs").select("id, title, price, creator_user_id").execute()
-    p_data = packs.data or []
-    
-    owned = await client.table("user_dm_stamps").select("pack_id").eq("user_id", user.id).execute()
-    owned_ids = [o["pack_id"] for o in (owned.data or [])]
-
-    if p_data:
-        pack_ids = [p["id"] for p in p_data]
-        stamps = await client.table("dm_stamps").select("pack_id, drive_file_id").in_("pack_id", pack_ids).execute()
-        s_map = {}
-        for s in (stamps.data or []):
-            if s["pack_id"] not in s_map: s_map[s["pack_id"]] = s["drive_file_id"]
-        
-        profs = await client.table("profiles").select("id, nickname").in_("id", [p["creator_user_id"] for p in p_data]).execute()
-        prof_map = {pr["id"]: pr["nickname"] for pr in (profs.data or [])}
-
-        for p in p_data:
-            p["cover_file_id"] = s_map.get(p["id"])
-            p["creator_name"] = prof_map.get(p["creator_user_id"], "不明")
-            p["is_owned"] = p["id"] in owned_ids
-
-    return {"market": p_data}
-
-@router.post("/stamps/purchase")
-async def purchase_stamp(data: StampPurchaseReq, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    
-    pack = await client.table("dm_stamp_packs").select("price, creator_user_id").eq("id", data.pack_id).execute()
-    if not pack.data: raise HTTPException(404, detail="パックが見つかりません")
-    price = pack.data[0]["price"]
-    
-    if price > 0:
-        w = await client.table("wallets").select("id, balance").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-        if not w.data or w.data[0]["balance"] < price:
-            raise HTTPException(400, detail="残高不足です")
-        await client.table("wallets").update({"balance": w.data[0]["balance"] - price}).eq("id", w.data[0]["id"]).execute()
-        
-        c_w = await client.table("wallets").select("id, balance").eq("user_id", pack.data[0]["creator_user_id"]).order("created_at").limit(1).execute()
-        if c_w.data:
-            await client.table("wallets").update({"balance": c_w.data[0]["balance"] + price}).eq("id", c_w.data[0]["id"]).execute()
-
-    await client.table("user_dm_stamps").insert({"user_id": user.id, "pack_id": data.pack_id}).execute()
-    return {"message": "スタンプを購入しました！"}
-
-@router.get("/stamps/my-stamps")
-async def get_my_stamps(authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
-    owned = await client.table("user_dm_stamps").select("pack_id").eq("user_id", user.id).execute()
-    if not owned.data: return {"stamps": []}
-    p_ids = [o["pack_id"] for o in owned.data]
-    stamps = await client.table("dm_stamps").select("id, drive_file_id").in_("pack_id", p_ids).execute()
-    return {"stamps": stamps.data or []}
-
-# =====================================================================
-# API: 国王専用 監視ツール
-# =====================================================================
-@router.get("/admin/threads")
-async def admin_get_all_threads(authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
-    client = await get_supabase()
-    msgs = await client.table("direct_messages").select("id, sender_id, receiver_id, content, created_at").is_("room_id", "null").order("created_at", desc=True).limit(500).execute()
-    if not msgs.data: return {"threads": []}
-    u_ids = list({m["sender_id"] for m in msgs.data} | {m["receiver_id"] for m in msgs.data})
-    profs = await client.table("profiles").select("id, nickname, dm_id").in_("id", u_ids).execute()
-    prof_map = {p["id"]: p for p in (profs.data or [])}
-    threads = {}
-    for msg in msgs.data:
-        users = sorted([msg["sender_id"], msg["receiver_id"]])
-        thread_key = f"{users[0]}_{users[1]}"
-        if thread_key not in threads:
-            p_a = prof_map.get(msg["sender_id"], {})
-            p_b = prof_map.get(msg["receiver_id"], {})
-            threads[thread_key] = {
-                "user_a_id": msg["sender_id"], "user_a_name": p_a.get("nickname", "不明"), "user_a_dm_id": p_a.get("dm_id", ""),
-                "user_b_id": msg["receiver_id"], "user_b_name": p_b.get("nickname", "不明"), "user_b_dm_id": p_b.get("dm_id", ""),
-                "latest_message": msg["content"], "latest_time": msg["created_at"], "msg_count": 1
+    async function init() {
+        try {
+            const res = await fetch("/api/dm/me", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                currentUser = await res.json();
+                if(!currentUser.dm_id) openModal('settings-modal');
+                if(currentUser.role === 'king') document.getElementById('btn-admin-mode').style.display = 'block';
             }
-        else: threads[thread_key]["msg_count"] += 1
-    return {"threads": list(threads.values())}
+        } catch(e) {}
+        
+        try {
+            const agoraRes = await fetch("/api/dm/agora-app-id");
+            if (agoraRes.ok) {
+                const aData = await agoraRes.json();
+                AGORA_APP_ID = aData.app_id;
+            }
+        } catch(e) {}
 
-@router.get("/admin/messages/{user_a_id}/{user_b_id}")
-async def admin_get_thread_messages(user_a_id: str, user_b_id: str, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
-    client = await get_supabase()
-    cond = f"and(sender_id.eq.{user_a_id},receiver_id.eq.{user_b_id}),and(sender_id.eq.{user_b_id},receiver_id.eq.{user_a_id})"
-    res = await client.table("direct_messages").select(
-        "id, sender_id, receiver_id, message_type, content, metadata, is_deleted, created_at"
-    ).is_("room_id", "null").or_(cond).order("created_at", desc=False).limit(200).execute()
-    msgs = res.data or []
-    profs = await client.table("profiles").select("id, nickname").in_("id", [user_a_id, user_b_id]).execute()
-    p_map = {p["id"]: p["nickname"] for p in (profs.data or [])}
-    for m in msgs: m["sender"] = {"nickname": p_map.get(m["sender_id"], "不明")}
-    return {"messages": msgs}
+        await initSupabaseRealtime();
+        await fetchWallets();
+        await fetchThreads();
+        
+        setInterval(() => {
+            try {
+                if (activeConversation) {
+                    if (isAdminMode && activeConversation.admin_ids) {
+                        const ids = activeConversation.admin_ids.split('/');
+                        fetchAdminMessages(ids[0], ids[1], true);
+                    } else {
+                        fetchMessages(true);
+                    }
+                } else {
+                    fetchThreads(true);
+                }
+            } catch(e) {
+                console.error("定期同期例外", e);
+            }
+        }, 8000);
+    }
 
-@router.delete("/admin/messages/{message_id}")
-async def admin_delete_msg(message_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    if not await is_king_user(user.id): raise HTTPException(status_code=403, detail="権限がありません。")
-    await (await get_supabase()).rpc("cancel_dm_message", {"p_user_id": str(user.id), "p_message_id": message_id}).execute()
-    return {"success": True}
+    async function initSupabaseRealtime() {
+        try {
+            let sbUrl = window.SUPABASE_URL || localStorage.getItem("supabase_url");
+            let sbKey = window.SUPABASE_ANON_KEY || localStorage.getItem("supabase_anon_key");
 
-# =====================================================================
-# API: 部屋削除（運営・部屋作成者専用）
-# =====================================================================
-@router.delete("/rooms/{room_id}")
-async def delete_group_room(room_id: int, authorization: str = Header(None)):
-    user = await get_user_auth(authorization)
-    client = await get_supabase()
+            if (!sbUrl || !sbKey) {
+                const cfgRes = await fetch("/api/dm/supabase-config", { headers: { "Authorization": `Bearer ${token}` } }).catch(() => null);
+                if (cfgRes && cfgRes.ok) {
+                    const cfg = await cfgRes.json();
+                    sbUrl = cfg.url;
+                    sbKey = cfg.anon_key;
+                }
+            }
 
-    room_res = await client.table("dm_rooms").select("id, owner_user_id").eq("id", int(room_id)).execute()
-    if not room_res.data:
-        raise HTTPException(status_code=404, detail="部屋が見つかりません。")
+            if (sbUrl && sbKey && window.supabase) {
+                supabaseClient = window.supabase.createClient(sbUrl, sbKey);
+                subscribeRealtime();
+            }
+        } catch (e) {
+            console.warn("Realtime初期化フォールバック稼働:", e);
+        }
+    }
 
-    owner_id = str(room_res.data[0].get("owner_user_id"))
-    is_king = await is_king_user(user.id)
+    function subscribeRealtime() {
+        if (!supabaseClient) return;
+        if (realtimeChannel) {
+            supabaseClient.removeChannel(realtimeChannel);
+        }
 
-    if not is_king and str(user.id) != owner_id:
-        raise HTTPException(status_code=403, detail="部屋を削除する権限がありません。")
+        realtimeChannel = supabaseClient
+            .channel('realtime-direct-messages')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'direct_messages' },
+                (payload) => {
+                    if (activeConversation) {
+                        if (isAdminMode && activeConversation.admin_ids) {
+                            const ids = activeConversation.admin_ids.split('/');
+                            fetchAdminMessages(ids[0], ids[1], true);
+                        } else {
+                            fetchMessages(true);
+                        }
+                    } else {
+                        fetchThreads(true);
+                    }
+                }
+            )
+            .subscribe();
+    }
 
-    msgs = await client.table("direct_messages").select("id").eq("room_id", int(room_id)).execute()
-    msg_ids = [m["id"] for m in (msgs.data or [])]
-    if msg_ids:
-        await client.table("dm_message_reactions").delete().in_("message_id", msg_ids).execute()
-        await client.table("dm_reports").delete().in_("message_id", msg_ids).execute()
-        await client.table("direct_messages").delete().eq("room_id", int(room_id)).execute()
+    async function fetchWallets() {
+        try {
+            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                myWallets = await res.json();
+                const opts = myWallets.map(w => `<option value="${w.wallet_id}">${escapeHtml(w.wallet_name)} (残:${w.balance}G)</option>`).join('');
+                document.getElementById('transfer-wallet-select').innerHTML = opts;
+                document.getElementById('market-wallet-select').innerHTML = opts;
+            }
+        } catch(e) {}
+    }
 
-    await client.table("dm_room_members").delete().eq("room_id", int(room_id)).execute()
-    await client.table("dm_rooms").delete().eq("id", int(room_id)).execute()
+    async function saveDMID() {
+        const id = document.getElementById('my-dm-id').value.trim();
+        if(!id) return showToast("IDを入力してください", true);
+        try {
+            const res = await fetch("/api/dm/set-id", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ dm_id: id }) });
+            const data = await res.json();
+            if(res.ok) { showToast(data.message); closeModal('settings-modal'); currentUser.dm_id = id; } 
+            else showToast(data.detail, true);
+        } catch(e) {}
+    }
 
-    return {"message": "部屋を完全に削除しました。"}
+    function toggleAdminMode() {
+        isAdminMode = !isAdminMode;
+        document.getElementById('sidebar-title').innerText = isAdminMode ? "👁️ 全スレッド監視" : "密書 (DM)";
+        document.getElementById('btn-admin-mode').innerText = isAdminMode ? "◀ 通常モードに戻る" : "👁️ 王国検閲モードを開始";
+        fetchThreads();
+    }
+
+    async function fetchThreads(isBackground = false) {
+        const listBox = document.getElementById('thread-list');
+        try {
+            const url = isAdminMode ? '/api/dm/admin/threads' : '/api/dm/conversations';
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            if(!res.ok) return;
+            const data = await res.json();
+            let html = '';
+            
+            if (isAdminMode) {
+                (data.threads || []).forEach(t => {
+                    html += `
+                        <div class="thread-item" onclick="openAdminChat('${t.user_a_id}', '${t.user_b_id}', '${escapeHtml(t.user_a_name)}', '${escapeHtml(t.user_b_name)}')">
+                            <div class="avatar" style="background:var(--danger);">👁️</div>
+                            <div class="thread-info">
+                                <div class="thread-name"><div>${escapeHtml(t.user_a_name)} ⇄ ${escapeHtml(t.user_b_name)}</div></div>
+                                <div class="thread-msg">${escapeHtml(t.latest_message)}</div>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                rawConversations = data.conversations || [];
+                rawConversations.forEach(c => {
+                    const isGroup = c.type === "GROUP";
+                    const avaDrive = c.avatar;
+                    const lockIcon = (isGroup && c.has_passcode) ? '🔒 ' : '';
+                    const avatarTag = avaDrive ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" class="avatar">` : `<div class="avatar">${isGroup ? (c.has_passcode ? '🔒' : '👥') : escapeHtml((c.partner_name || '?').charAt(0))}</div>`;
+                    const subLabel = isGroup ? '' : `<span class="thread-id">@${escapeHtml(c.partner_dm_id)}</span>`;
+                    const badge = c.unread_count > 0 ? `<div class="unread-badge">${c.unread_count}</div>` : '';
+                    
+                    html += `
+                        <div class="thread-item" onclick='openConversation(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
+                            ${avatarTag}
+                            <div class="thread-info">
+                                <div class="thread-name">
+                                    <div>${lockIcon}${escapeHtml(c.partner_name)} ${subLabel}</div>
+                                    ${badge}
+                                </div>
+                                <div class="thread-msg">${escapeHtml(c.latest_message)}</div>
+                            </div>
+                        </div>`;
+                });
+            }
+            if(!html && !isBackground) listBox.innerHTML = `<div class="empty-state">何もないようだ...</div>`;
+            else if(html) listBox.innerHTML = html;
+        } catch(e) {}
+    }
+
+    function openConversation(conv) {
+        if (isAdminMode) return;
+        activeConversation = conv;
+        document.getElementById('chat-title').innerText = conv.partner_name;
+        document.getElementById('chat-subtitle').innerText = conv.type === 'GROUP' ? (conv.has_passcode ? '🔒 密談部屋 (合言葉)' : '👥 密談部屋') : `@${conv.partner_dm_id}`;
+        
+        const avatarEl = document.getElementById('chat-header-avatar');
+        if(conv.avatar) { avatarEl.src = `https://lh3.googleusercontent.com/u/0/d/${conv.avatar}=w100`; avatarEl.style.display = 'block'; }
+        else avatarEl.style.display = 'none';
+
+        const isBlocked = conv.is_blocked;
+        document.getElementById('chat-input-wrapper').style.display = isBlocked ? 'none' : 'flex';
+        document.getElementById('block-warning-bar').style.display = isBlocked ? 'block' : 'none';
+        document.getElementById('chat-header-actions').style.display = isBlocked ? 'none' : 'flex';
+
+        const btnBlock = document.getElementById('btn-block-action');
+        const btnDelRoom = document.getElementById('btn-delete-room-action');
+        const btnGroupMems = document.getElementById('btn-group-members-action');
+        const transferLauncher = document.getElementById('launcher-transfer-item');
+
+        if (conv.type === 'GROUP') {
+            btnBlock.style.display = 'none';
+            btnGroupMems.style.display = 'inline-block';
+            if (transferLauncher) transferLauncher.style.display = 'none';
+
+            const isOwner = conv.owner_user_id && String(conv.owner_user_id) === String(currentUser?.id);
+            if (currentUser?.role === 'king' || isOwner) {
+                btnDelRoom.style.display = 'inline-block';
+            } else {
+                btnDelRoom.style.display = 'none';
+            }
+        } else {
+            btnBlock.style.display = 'inline-block';
+            btnDelRoom.style.display = 'none';
+            btnGroupMems.style.display = 'none';
+            if (transferLauncher) transferLauncher.style.display = 'flex';
+        }
+
+        showView('view-chat'); closeDrawers();
+        lastRenderedHash = "";
+        document.getElementById('chat-messages').innerHTML = '<div class="empty-state">読み込み中...</div>';
+        fetchMessages(false);
+    }
+
+    function startNewChat() {
+        const id = document.getElementById('target-dm-id').value.trim();
+        if(id) { 
+            closeModal('new-modal'); 
+            openConversation({ type: 'DIRECT', partner_dm_id: id, partner_name: `@${id}`, is_blocked: false }); 
+        }
+    }
+
+    async function openAdminChat(idA, idB, nameA, nameB) {
+        activeConversation = { admin_ids: `${idA}/${idB}` };
+        document.getElementById('chat-title').innerText = `${nameA} ⇄ ${nameB}`;
+        document.getElementById('chat-subtitle').innerText = `王国検閲中`;
+        document.getElementById('chat-input-wrapper').style.display = 'none';
+        document.getElementById('chat-header-actions').style.display = 'none';
+        document.getElementById('chat-header-avatar').style.display = 'none';
+        showView('view-chat');
+        lastRenderedHash = "";
+        await fetchAdminMessages(idA, idB, false);
+    }
+
+    function closeChat() { 
+        if (agoraClient) {
+            hangupCall();
+        }
+        showView('view-list'); 
+        activeConversation = null; 
+        closeDrawers(); 
+        fetchThreads(true); 
+    }
+
+    async function fetchAdminMessages(idA, idB, isBg) {
+        try {
+            const res = await fetch(`/api/dm/admin/messages/${idA}/${idB}`, { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) { const data = await res.json(); renderMessagesList(data.messages || [], isBg); }
+        } catch(e) {}
+    }
+
+    async function fetchMessages(isBg) {
+        if(!activeConversation) return;
+        const ident = activeConversation.target_user_id || activeConversation.partner_dm_id;
+        const url = activeConversation.type === 'GROUP' 
+            ? `/api/dm/messages/group/${activeConversation.room_id}` 
+            : `/api/dm/messages/${ident}`;
+        try {
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            if(res.ok) {
+                const data = await res.json();
+                if (activeConversation.type === 'DIRECT') {
+                    if (data.partner_user_id) activeConversation.target_user_id = data.partner_user_id;
+                    if (data.partner_dm_id) {
+                        activeConversation.partner_dm_id = data.partner_dm_id;
+                        document.getElementById('chat-subtitle').innerText = `@${data.partner_dm_id}`;
+                    }
+                    if (data.partner_name) {
+                        activeConversation.partner_name = data.partner_name;
+                        document.getElementById('chat-title').innerText = data.partner_name;
+                    }
+                }
+                const msgs = data.messages || [];
+                checkIncomingCallFromMessages(msgs);
+                renderMessagesList(msgs, isBg);
+            }
+        } catch(e) {}
+    }
+
+    // メッセージ配列から最新の着信要求を検知
+    function checkIncomingCallFromMessages(messages) {
+        if (agoraClient || activeIncomingCall) return;
+        const now = Date.now();
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.message_type === 'CALL_INVITE' && !m.is_deleted) {
+                const isMine = String(m.sender_id) === String(currentUser?.id);
+                if (isMine) continue;
+                
+                const msgTime = new Date(m.created_at).getTime();
+                // 45秒以内の呼び出しで未処理の場合に呼び出し画面を表示
+                if (now - msgTime < 45000 && !handledCallMsgIds.has(m.id)) {
+                    showIncomingCall(m);
+                    break;
+                }
+            }
+        }
+    }
+
+    function showIncomingCall(m) {
+        activeIncomingCall = m;
+        handledCallMsgIds.add(m.id);
+        const callerName = m.sender?.nickname || "国民";
+        const isVideo = m.metadata?.isVideo || false;
+        const channelName = m.metadata?.channelName;
+
+        document.getElementById('incoming-caller-name').innerText = callerName;
+        document.getElementById('incoming-call-type').innerText = isVideo ? "🎥 ビデオ通話からの着信" : "📞 音声通話からの着信";
+        
+        const ansBtn = document.getElementById('btn-answer-incoming');
+        ansBtn.onclick = async () => {
+            stopRingtone();
+            closeModal('incoming-call-modal');
+            activeIncomingCall = null;
+            if (channelName) {
+                await answerAgoraCall(channelName, isVideo);
+            }
+        };
+
+        openModal('incoming-call-modal');
+        startRingtone();
+    }
+
+    function declineIncomingCall() {
+        stopRingtone();
+        closeModal('incoming-call-modal');
+        activeIncomingCall = null;
+    }
+
+    function renderMessagesList(messages, isBackground) {
+        const box = document.getElementById('chat-messages');
+        if(!box) return;
+
+        const currentHash = messages.map(m => `${m.id}_${m.is_read}_${m.is_deleted}_${(m.reactions||[]).length}`).join('|');
+        if (isBackground && currentHash === lastRenderedHash) return;
+        lastRenderedHash = currentHash;
+
+        const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 50;
+        let html = '';
+        let pinnedMsg = null;
+
+        messages.forEach(m => {
+            if(m.is_pinned && !m.is_deleted) pinnedMsg = m;
+            const isMine = !isAdminMode && (String(m.sender_id) === String(currentUser?.id));
+            const cls = isMine ? 'msg-mine' : 'msg-other';
+            const timeStr = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            let senderLabel = '';
+            if (!isMine && (isAdminMode || activeConversation?.type === 'GROUP')) {
+                senderLabel = `<div class="msg-sender-label">${escapeHtml(m.sender?.nickname || "不明")}</div>`;
+            }
+
+            const roleTag = !isAdminMode ? (isMine ? '<span class="msg-role-tag">自分</span>' : '<span class="msg-role-tag">相手</span>') : '';
+            const readStatus = (isMine && m.is_read) ? '<span class="read-status">既読</span>' : '';
+
+            let bodyHtml = '';
+            if (m.is_deleted) {
+                bodyHtml = `<i style="color:var(--sub);">このメッセージの送信は取り消されました。</i>`;
+            } else if (m.message_type === 'IMAGE') {
+                bodyHtml = `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w800" class="msg-image" onclick="window.open(this.src)">`;
+            } else if (m.message_type === 'STAMP') {
+                bodyHtml = `<img src="https://lh3.googleusercontent.com/u/0/d/${m.metadata.drive_file_id}=w400" class="msg-stamp">`;
+            } else if (m.message_type === 'TRANSFER') {
+                bodyHtml = `<div class="msg-transfer-card ${isMine ? 'mine' : ''}"><span style="font-size:0.75rem; color:var(--primary); font-weight:bold;">💰 Gold 送金完了</span><span style="font-size:1.15rem; font-weight:bold; color:#fff;">+${m.metadata.amount} G</span></div>`;
+            } else if (m.message_type === 'CALL_INVITE') {
+                const cName = m.metadata.channelName || '';
+                const isVid = m.metadata.isVideo || false;
+                const callTypeStr = isVid ? '🎥 ビデオ' : '📞 音声';
+                bodyHtml = `<div class="msg-transfer-card ${isMine ? 'mine' : ''}" style="border-color:var(--success);">
+                    <span style="font-size:0.85rem; font-weight:bold;">${callTypeStr}通話</span>
+                    ${!isMine ? `<button class="btn-call-ctrl" style="margin-top:8px; background:var(--success); color:#fff; border:none;" onclick="answerAgoraCall('${cName}',${isVid})">参加する</button>` : '<span style="font-size:0.75rem; color:var(--sub); margin-top:4px;">発信しました</span>'}
+                </div>`;
+            } else {
+                bodyHtml = escapeHtml(m.content);
+            }
+
+            let reactHtml = '';
+            const reacts = m.reactions || [];
+            if(reacts.length > 0) {
+                const countMap = {};
+                reacts.forEach(r => countMap[r.reaction_type] = (countMap[r.reaction_type] || 0) + 1);
+                reactHtml = '<div class="reactions-bar">' + Object.entries(countMap).map(([k, v]) => `<span class="react-badge" onclick="reactToMessage(${m.id}, '${k}')">${k} ${v}</span>`).join('') + '</div>';
+            }
+
+            const canDelete = isAdminMode || (isMine && !m.is_deleted);
+            const panelHtml = !m.is_deleted ? `
+                <div class="msg-action-panel" id="action-panel-${m.id}">
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '👍')">👍</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '❤️')">❤️</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '😂')">😂</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '🙏')">🙏</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '👀')">👀</button>
+                    <button class="toolbar-btn" onclick="reactToMessage(${m.id}, '🔥')">🔥</button>
+                    ${!isMine && !isAdminMode ? `<button class="toolbar-btn" onclick="reportMessage(${m.id})" title="通報">🚨</button>` : ''}
+                    <button class="toolbar-btn" onclick="togglePinMessage(${m.id})" title="ピン">📌</button>
+                    ${canDelete ? `<button class="toolbar-btn" style="color:var(--danger);" onclick="deleteMessage(${m.id})" title="取消">🗑️️</button>` : ''}
+                </div>
+            ` : '';
+            const toggleBtn = !m.is_deleted ? `<button class="btn-msg-menu" onclick="document.getElementById('action-panel-${m.id}').classList.toggle('show')">⋮</button>` : '';
+
+            html += `
+                <div class="msg-row ${cls}">
+                    ${senderLabel}
+                    <div class="msg-bubble-wrapper">
+                        ${!isMine ? toggleBtn : ''}
+                        <div>
+                            <div class="msg-bubble">${bodyHtml}</div>
+                            ${panelHtml}
+                            ${reactHtml}
+                        </div>
+                        ${isMine ? toggleBtn : ''}
+                    </div>
+                    <div class="msg-meta">${timeStr} ${roleTag} ${readStatus}</div>
+                </div>`;
+        });
+        
+        if(!html) html = `<div class="empty-state">まだメッセージがありません</div>`;
+        box.innerHTML = html;
+        if(!isBackground || isAtBottom) setTimeout(() => box.scrollTop = box.scrollHeight, 10);
+
+        const pinBanner = document.getElementById("pin-banner");
+        if(pinnedMsg) {
+            document.getElementById("pin-content").innerText = `📌 ピン留め: ${pinnedMsg.content}`;
+            pinBanner.style.display = 'flex';
+        } else pinBanner.style.display = 'none';
+    }
+
+    function toggleSendBtn() {
+        const input = document.getElementById('chat-input');
+        const btnSend = document.getElementById('btn-send-msg');
+        const btnStamp = document.getElementById('btn-stamp-icon');
+        if(input.value.trim().length > 0) { btnSend.classList.add('active'); btnStamp.style.display = 'none'; } 
+        else { btnSend.classList.remove('active'); btnStamp.style.display = 'flex'; }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const content = input.value.trim();
+        if (!content || !activeConversation || isAdminMode) return;
+        
+        const isGroup = activeConversation.type === 'GROUP';
+        const roomId = isGroup ? activeConversation.room_id : null;
+        const targetUserId = !isGroup ? activeConversation.target_user_id || null : null;
+        const targetDmId = !isGroup ? activeConversation.partner_dm_id || null : null;
+        
+        if (!roomId && !targetUserId && !targetDmId) {
+            showToast("送信先が見つかりません", true);
+            return;
+        }
+        
+        input.value = ''; toggleSendBtn();
+        
+        try {
+            const res = await fetch('/api/dm/send', { 
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    target_user_id: targetUserId,
+                    target_dm_id: targetDmId, 
+                    room_id: roomId, 
+                    content: content 
+                }) 
+            });
+            
+            if(res.ok) {
+                fetchMessages(false); fetchThreads(true);
+            } else {
+                const err = await res.json().catch(()=>({}));
+                showToast(`送信失敗: ${err.detail || res.statusText}`, true);
+            }
+        } catch(e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    async function deleteMessage(msgId) {
+        if (!confirm("このメッセージを取り消しますか？")) return;
+        try {
+            const url = isAdminMode ? `/api/dm/admin/messages/${msgId}` : `/api/dm/messages/${msgId}`;
+            await fetch(url, { method: 'DELETE', headers: { "Authorization": `Bearer ${token}` } });
+            if (isAdminMode) {
+                const ids = activeConversation.admin_ids.split('/');
+                fetchAdminMessages(ids[0], ids[1], false);
+            } else { fetchMessages(false); }
+        } catch(e) {}
+    }
+
+    async function reactToMessage(msgId, emoji) {
+        try {
+            await fetch(`/api/dm/messages/${msgId}/react`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ reaction_type: emoji }) });
+            fetchMessages(true);
+        } catch(e) {}
+    }
+
+    async function togglePinMessage(msgId) {
+        try {
+            await fetch(`/api/dm/messages/${msgId}/pin`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
+            fetchMessages(false);
+        } catch(e) {}
+    }
+
+    async function reportMessage(msgId) {
+        const reason = prompt("通報理由を入力:");
+        if(!reason) return;
+        try {
+            const res = await fetch("/api/dm/reports", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ message_id: msgId, reason }) });
+            const data = await res.json(); showToast(data.message);
+        } catch(e) {}
+    }
+
+    function toggleDrawer(id) {
+        const el = document.getElementById(id);
+        const isOpen = el.style.display === "block";
+        closeDrawers();
+        if(!isOpen) { el.style.display = "block"; if(id === 'stamp-drawer') loadMyStamps(); }
+    }
+    function closeDrawers() { document.getElementById("launcher-drawer").style.display = "none"; document.getElementById("stamp-drawer").style.display = "none"; }
+
+    async function toggleBlock() {
+        if(!activeConversation || activeConversation.type !== 'DIRECT') return;
+        if(confirm("🚫 この国民をブロック(または解除)しますか？")) {
+            try {
+                const res = await fetch("/api/dm/blocks/toggle", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ target_user_id: activeConversation.target_user_id }) });
+                const data = await res.json(); showToast(data.message); closeChat();
+            } catch(e) {}
+        }
+    }
+
+    async function deleteCurrentRoom() {
+        if (!activeConversation || activeConversation.type !== 'GROUP') return;
+        if (!confirm(`密談部屋「${activeConversation.partner_name}」を完全に削除・解体しますか？\n※中のメッセージも全て消去されます。`)) return;
+        
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast(data.message || "部屋を削除しました。");
+                closeChat();
+                fetchThreads();
+            } else {
+                showToast(data.detail || "部屋の削除に失敗しました", true);
+            }
+        } catch (e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    function openTransferModal() { closeDrawers(); openModal("transfer-modal"); }
+    async function executeChatTransfer() {
+        if (!activeConversation || activeConversation.type !== 'DIRECT' || !activeConversation.target_user_id) {
+            return showToast("送金相手を特定できません", true);
+        }
+        const walletId = document.getElementById("transfer-wallet-select").value;
+        const amount = parseInt(document.getElementById("transfer-amount-input").value);
+        if(!amount || amount <= 0) return showToast("正しい金額を入力", true);
+        try {
+            const res = await fetch("/api/dm/transfer-gold", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ target_user_id: activeConversation.target_user_id, sender_wallet_id: walletId, amount: amount, room_id: null })
+            });
+            const data = await res.json();
+            if(res.ok) { showToast(data.message); closeModal("transfer-modal"); fetchMessages(false); } 
+            else showToast(data.detail, true);
+        } catch(e) {}
+    }
+
+    function openGroupCreateModal() {
+        document.getElementById('group-name-input').value = '';
+        document.getElementById('group-passcode-input').value = '';
+        renderGroupCandidateList();
+        openModal('new-group-modal');
+    }
+
+    function renderGroupCandidateList() {
+        const listContainer = document.getElementById('group-candidate-list');
+        const directPartners = rawConversations.filter(c => c.type === 'DIRECT' && c.partner_dm_id);
+        
+        if (directPartners.length === 0) {
+            listContainer.innerHTML = '<div class="empty-state" style="padding:20px 10px; font-size:0.85rem;">交信相手がいません。<br>招待なし（自分1人）でも結成可能です。</div>';
+            updateGroupSelectedCount();
+            return;
+        }
+
+        let html = '';
+        directPartners.forEach(p => {
+            const avaDrive = p.avatar;
+            const avatarTag = avaDrive 
+                ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" style="width:34px; height:34px; border-radius:50%; margin-right:10px; object-fit:cover;">` 
+                : `<div style="width:34px; height:34px; border-radius:50%; background:#333; margin-right:10px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.9rem;">${escapeHtml((p.partner_name||'?').charAt(0))}</div>`;
+
+            html += `
+                <div class="member-pick-item" onclick="toggleCandidateCheck(this)">
+                    <input type="checkbox" class="group-member-checkbox" value="${escapeHtml(p.partner_dm_id)}">
+                    ${avatarTag}
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-weight:bold; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(p.partner_name)}</div>
+                        <div style="font-size:0.75rem; color:var(--sub);">@${escapeHtml(p.partner_dm_id)}</div>
+                    </div>
+                </div>
+            `;
+        });
+        listContainer.innerHTML = html;
+        updateGroupSelectedCount();
+    }
+
+    function toggleCandidateCheck(itemElement) {
+        const chk = itemElement.querySelector('.group-member-checkbox');
+        if (chk) {
+            chk.checked = !chk.checked;
+            updateGroupSelectedCount();
+        }
+    }
+
+    function updateGroupSelectedCount() {
+        const chks = document.querySelectorAll('.group-member-checkbox:checked');
+        const counter = document.getElementById('group-selected-count');
+        if (counter) counter.innerText = `${chks.length}人選択中`;
+    }
+
+    async function createGroupRoom() {
+        const name = document.getElementById('group-name-input').value.trim();
+        const passcode = document.getElementById('group-passcode-input').value.trim();
+        const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
+        const mems = Array.from(checkedBoxes).map(cb => cb.value.trim()).filter(s => s);
+
+        if (!name) return showToast("部屋名を入力してください", true);
+
+        try {
+            const res = await fetch("/api/dm/groups", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    room_name: name, 
+                    member_dm_ids: mems,
+                    passcode: passcode || null
+                }) 
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok) {
+                closeModal('new-group-modal'); 
+                await fetchThreads(); 
+                openConversation({ 
+                    type: 'GROUP', 
+                    room_id: data.room_id, 
+                    partner_name: name, 
+                    owner_user_id: currentUser?.id, 
+                    has_passcode: !!passcode,
+                    is_blocked: false 
+                }); 
+            } else {
+                showToast(data.detail || "グループ作成に失敗しました", true);
+            }
+        } catch(e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    async function executeJoinByPasscode() {
+        const input = document.getElementById('join-passcode-input');
+        const code = input.value.trim();
+        if (!code) return showToast("合言葉を入力してください", true);
+
+        try {
+            const res = await fetch("/api/dm/rooms/join-by-passcode", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ passcode: code })
+            });
+            
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch (_) {}
+
+            if (res.ok) {
+                showToast(data.message || "入室しました！");
+                input.value = '';
+                closeModal('passcode-join-modal');
+                await fetchThreads();
+                openConversation({
+                    type: 'GROUP',
+                    room_id: data.room_id,
+                    partner_name: data.room_name,
+                    owner_user_id: data.owner_user_id,
+                    has_passcode: true,
+                    is_blocked: false
+                });
+            } else {
+                const msg = typeof data.detail === 'string' ? data.detail : (data.detail ? JSON.stringify(data.detail) : text);
+                showToast(msg || `入室失敗 (${res.status})`, true);
+            }
+        } catch (e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    async function openGroupMembersModal() {
+        if (!activeConversation || activeConversation.type !== 'GROUP') return;
+        openModal('group-members-modal');
+        const box = document.getElementById('group-members-list-box');
+        box.innerHTML = '<div class="empty-state">読み込み中...</div>';
+
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}/members`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                box.innerHTML = '<div class="empty-state">メンバー情報の取得に失敗しました</div>';
+                return;
+            }
+            const data = await res.json();
+            const members = data.members || [];
+            const canManage = data.can_manage;
+
+            if (members.length === 0) {
+                box.innerHTML = '<div class="empty-state">メンバーがいません</div>';
+                return;
+            }
+
+            let html = '';
+            members.forEach(m => {
+                const avaDrive = m.avatar_drive_id;
+                const avatarTag = avaDrive 
+                    ? `<img src="https://lh3.googleusercontent.com/u/0/d/${avaDrive}=w100" style="width:34px; height:34px; border-radius:50%; margin-right:10px; object-fit:cover;">` 
+                    : `<div style="width:34px; height:34px; border-radius:50%; background:#333; margin-right:10px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.9rem;">${escapeHtml(m.nickname.charAt(0))}</div>`;
+
+                const ownerBadge = m.is_owner ? `<span style="font-size:0.7rem; background:var(--primary); color:#000; padding:1px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">結成者</span>` : '';
+                
+                let kickBtn = '';
+                if (canManage && !m.is_owner && String(m.id) !== String(currentUser?.id)) {
+                    kickBtn = `<button class="btn-kick" onclick="kickMember('${m.id}', '${escapeHtml(m.nickname)}')">除名</button>`;
+                }
+
+                html += `
+                    <div class="member-manage-row">
+                        <div style="display:flex; align-items:center; overflow:hidden;">
+                            ${avatarTag}
+                            <div style="overflow:hidden;">
+                                <div style="font-weight:bold; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    ${escapeHtml(m.nickname)} ${ownerBadge}
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--sub);">@${escapeHtml(m.dm_id || "ID未設定")}</div>
+                            </div>
+                        </div>
+                        ${kickBtn}
+                    </div>
+                `;
+            });
+            box.innerHTML = html;
+        } catch (e) {
+            box.innerHTML = `<div class="empty-state">通信エラー: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    async function kickMember(userId, name) {
+        if (!confirm(`国民「${name}」をこの密談部屋から除名（追放）しますか？`)) return;
+        try {
+            const res = await fetch(`/api/dm/rooms/${activeConversation.room_id}/members/${userId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast(data.message || "除名しました。");
+                openGroupMembersModal();
+            } else {
+                showToast(data.detail || "除名に失敗しました", true);
+            }
+        } catch (e) {
+            showToast(`通信エラー: ${e.message}`, true);
+        }
+    }
+
+    async function uploadImage(e) {
+        const file = e.target.files[0];
+        if(!file || !activeConversation) return;
+        const formData = new FormData(); 
+        formData.append("file", file);
+
+        if(activeConversation.type === 'GROUP') {
+            formData.append("room_id", activeConversation.room_id);
+        } else {
+            if (activeConversation.target_user_id) formData.append("target_user_id", activeConversation.target_user_id);
+            if (activeConversation.partner_dm_id) formData.append("target_dm_id", activeConversation.partner_dm_id);
+        }
+
+        closeDrawers(); 
+        showToast("画像送信中...");
+        try {
+            const res = await fetch(`/api/dm/upload-image`, { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+            if(res.ok) fetchMessages(false);
+            else showToast("失敗しました", true);
+        } catch(e) {}
+    }
+
+    function initCrop(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = document.getElementById("cropper-img"); img.src = event.target.result;
+            document.getElementById("cropper-container").style.display = "block";
+            document.getElementById("btn-save-stamp").style.display = "block";
+            if(cropperInstance) cropperInstance.destroy();
+            cropperInstance = new Cropper(img, { aspectRatio: 1, viewMode: 1, autoCropArea: 0.9, background: false });
+        };
+        reader.readAsDataURL(file);
+    }
+    async function submitCroppedStamp() {
+        if(!cropperInstance) return;
+        const title = document.getElementById("stamp-pack-title").value.trim();
+        const price = parseInt(document.getElementById("stamp-pack-price").value) || 0;
+        if(!title) return showToast("名前を入力してください", true);
+        showToast("登録中...");
+        cropperInstance.getCroppedCanvas({ width: 320, height: 320 }).toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append("file", blob, "stamp.png");
+            formData.append("title", title);
+            formData.append("price", price);
+            try {
+                const res = await fetch(`/api/dm/stamps/packs`, { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+                if(res.ok) { showToast("出品しました"); closeModal("stamp-create-modal"); loadMyStamps(); }
+            } catch(e) {}
+        }, "image/png");
+    }
+
+    async function loadMyStamps() {
+        try {
+            const res = await fetch("/api/dm/stamps/my-stamps", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const picker = document.getElementById("my-stamps-picker");
+            let html = '';
+            (data.stamps || []).forEach(s => {
+                html += `<img src="https://lh3.googleusercontent.com/u/0/d/${s.drive_file_id}=w400" class="stamp-pick-item" onclick="sendStamp('${s.drive_file_id}')">`;
+            });
+            picker.innerHTML = html || '<div style="grid-column:span 4; text-align:center; color:var(--sub); font-size:0.8rem;">スタンプなし</div>';
+        } catch(e) {}
+    }
+
+    async function sendStamp(driveId) {
+        if(!activeConversation) return;
+        closeDrawers();
+        const isGroup = activeConversation.type === 'GROUP';
+        try {
+            await fetch("/api/dm/send", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    target_user_id: !isGroup ? activeConversation.target_user_id || null : null,
+                    target_dm_id: !isGroup ? activeConversation.partner_dm_id || null : null, 
+                    room_id: isGroup ? activeConversation.room_id || null : null, 
+                    message_type: "STAMP", 
+                    content: "スタンプ", 
+                    metadata: { drive_file_id: driveId } 
+                })
+            });
+            fetchMessages(false);
+        } catch(e) {}
+    }
+
+    async function openMarketModal() {
+        closeDrawers();
+        openModal('market-modal');
+        const list = document.getElementById('market-list'); list.innerHTML = "読み込み中...";
+        try {
+            const res = await fetch("/api/dm/stamps/market", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            let html = '';
+            (data.market || []).forEach(p => {
+                const btn = p.is_owned ? `<button class="btn-call-ctrl" disabled style="background:#333;border:none;">所持済</button>` : `<button class="btn-call-ctrl" style="background:var(--primary);color:#000;" onclick="purchaseStamp(${p.id})">${p.price}Gで購入</button>`;
+                html += `
+                    <div class="market-item">
+                        <img src="https://lh3.googleusercontent.com/u/0/d/${p.cover_file_id}=w100" class="market-img">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;">${escapeHtml(p.title)}</div>
+                            <div style="font-size:0.75rem; color:var(--sub);">作: ${escapeHtml(p.creator_name)}</div>
+                        </div>
+                        ${btn}
+                    </div>`;
+            });
+            list.innerHTML = html || "出品がありません";
+        } catch(e) {}
+    }
+
+    async function purchaseStamp(packId) {
+        const walletId = document.getElementById("market-wallet-select").value;
+        if(!walletId) return showToast("ウォレットを選択してください", true);
+        try {
+            const res = await fetch("/api/dm/stamps/purchase", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ pack_id: packId, wallet_id: walletId })
+            });
+            const data = await res.json();
+            if(res.ok) { showToast(data.message); openMarketModal(); } else showToast(data.detail, true);
+        } catch(e) {}
+    }
+
+    // Agora 通話エンジン
+    async function getAgoraChannelName() {
+        if (!activeConversation) return null;
+        if (activeConversation.type === 'GROUP') {
+            return `room_${activeConversation.room_id}`;
+        }
+        const idA = String(currentUser.id).replace(/-/g, '');
+        const idB = String(activeConversation.target_user_id).replace(/-/g, '');
+        const ids = [idA, idB].sort().join('_');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ids));
+        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return `c_${hashHex.substring(0, 32)}`;
+    }
+
+    async function startCall(isVideo = false) {
+        if (!activeConversation) return;
+
+        if (activeConversation.type === 'DIRECT' && !activeConversation.target_user_id) {
+            showToast("接続情報を確認中...");
+            await fetchMessages(false);
+            if (!activeConversation.target_user_id) {
+                showToast("相手の接続先IDが見つかりません", true);
+                return;
+            }
+        }
+
+        try {
+            const channelName = await getAgoraChannelName();
+            await joinAgoraChannel(channelName, isVideo);
+
+            document.getElementById("call-status-text").innerText = "📞 呼び出し中...";
+            document.getElementById("call-status-text").style.color = "var(--primary)";
+            document.getElementById("call-bar").style.display = "flex";
+
+            const isGroup = activeConversation.type === 'GROUP';
+            await fetch('/api/dm/send', { 
+                method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    target_user_id: !isGroup ? activeConversation.target_user_id || null : null,
+                    target_dm_id: !isGroup ? activeConversation.partner_dm_id || null : null, 
+                    room_id: isGroup ? activeConversation.room_id || null : null, 
+                    message_type: 'CALL_INVITE',
+                    content: isVideo ? '🎥 ビデオ通話を開始しました' : '📞 音声通話を開始しました',
+                    metadata: { channelName: channelName, isVideo: isVideo }
+                }) 
+            });
+            
+            fetchMessages(false);
+            showToast("通話を開始しました");
+        } catch (e) {
+            console.error(e);
+            showToast(`発信失敗: ${e.message}`, true);
+            hangupCall();
+        }
+    }
+
+    async function joinAgoraChannel(channelName, isVideo) {
+        agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+        const tokenRes = await fetch(`/api/dm/agora-token?channel_name=${encodeURIComponent(channelName)}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!tokenRes.ok) {
+            const errText = await tokenRes.text().catch(() => "");
+            throw new Error(errText || `HTTPエラー: ${tokenRes.status}`);
+        }
+
+        const tokenData = await tokenRes.json();
+
+        agoraClient.on("user-published", async (user, mediaType) => {
+            await agoraClient.subscribe(user, mediaType);
+            
+            if (mediaType === "video") {
+                const remoteContainer = document.getElementById("remote-video-container");
+                if (remoteContainer) {
+                    remoteContainer.innerHTML = "";
+                    user.videoTrack.play(remoteContainer);
+                    document.getElementById("video-pip-container").style.display = "block";
+                }
+            }
+            if (mediaType === "audio") {
+                user.audioTrack.play();
+            }
+
+            startCallTimer();
+        });
+
+        agoraClient.on("user-unpublished", (user, mediaType) => {
+            if (mediaType === "video") {
+                const remoteContainer = document.getElementById("remote-video-container");
+                if (remoteContainer) remoteContainer.innerHTML = "";
+            }
+        });
+
+        agoraClient.on("user-left", () => {
+            hangupCall();
+            showToast("通話を終了しました");
+        });
+
+        await agoraClient.join(tokenData.app_id, channelName, tokenData.token, null);
+
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        const tracksToPublish = [localAudioTrack];
+
+        if (isVideo) {
+            localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                encoderConfig: { width: 320, height: 240, frameRate: 15 }
+            });
+            document.getElementById("video-pip-container").style.display = "block";
+            const localBox = document.getElementById("local-video-container");
+            localBox.innerHTML = "";
+            localVideoTrack.play(localBox);
+            tracksToPublish.push(localVideoTrack);
+        }
+
+        await agoraClient.publish(tracksToPublish);
+    }
+
+    async function answerAgoraCall(channelName, isVideo) {
+        try {
+            await joinAgoraChannel(channelName, isVideo);
+            startCallTimer();
+            showToast("通話を開始しました");
+        } catch (e) {
+            console.error("応答エラー:", e);
+            showToast(`応答エラー: ${e.message}`, true);
+            hangupCall();
+        }
+    }
+
+    function toggleMic() {
+        if (!localAudioTrack) return;
+        const isMuted = localAudioTrack.isMuted();
+        localAudioTrack.setMuted(!isMuted);
+        document.getElementById("btn-toggle-mic").innerText = !isMuted ? "🔇" : "🎤";
+    }
+
+    function toggleCam() {
+        const p = document.getElementById("video-pip-container");
+        p.style.display = p.style.display === "block" ? "none" : "block";
+    }
+
+    async function hangupCall() {
+        stopRingtone();
+        if (localAudioTrack) {
+            localAudioTrack.stop();
+            localAudioTrack.close();
+            localAudioTrack = null;
+        }
+        if (localVideoTrack) {
+            localVideoTrack.stop();
+            localVideoTrack.close();
+            localVideoTrack = null;
+        }
+        if (agoraClient) {
+            await agoraClient.leave();
+            agoraClient = null;
+        }
+
+        clearInterval(callTimer);
+        document.getElementById("call-bar").style.display = "none";
+        document.getElementById("video-pip-container").style.display = "none";
+        document.getElementById("local-video-container").innerHTML = "";
+        document.getElementById("remote-video-container").innerHTML = "";
+    }
+
+    function startCallTimer() {
+        stopRingtone();
+        document.getElementById("call-bar").style.display = "flex";
+        document.getElementById("call-status-text").style.color = "var(--success)";
+        callSeconds = 0;
+        clearInterval(callTimer);
+
+        callTimer = setInterval(() => {
+            callSeconds++;
+            const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+            const s = String(callSeconds % 60).padStart(2, '0');
+            document.getElementById("call-status-text").innerText = `🟢 通話中 (${m}:${s})`;
+        }, 1000);
+    }
+    
+    async function requestPushPermission() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return showToast("通知非対応のブラウザです", true);
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return showToast("通知が許可されませんでした", true);
+        try {
+            const swReg = await navigator.serviceWorker.register('/sw.js');
+            const keyRes = await fetch('/api/dm/vapid-public-key');
+            const keyData = await keyRes.json();
+            const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
+            const subscription = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+            const subData = JSON.parse(JSON.stringify(subscription));
+            await fetch('/api/dm/push-subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": `Bearer ${token}` }, body: JSON.stringify({ endpoint: subData.endpoint, p256dh: subData.keys.p256dh, auth: subData.keys.auth }) });
+            showToast("通知設定を有効化しました");
+        } catch (e) {}
+    }
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64); const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+        return outputArray;
+    }
+
+    init();
+</script>
+</body>
+</html>
