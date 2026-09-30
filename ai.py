@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal
+from typing import List
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 from google import genai
@@ -12,7 +12,6 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 MODEL_NAME = "gemini-2.5-flash-lite"
 
-# クライアント初期化
 ai_client = None
 if GEMINI_API_KEY:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -40,14 +39,8 @@ async def get_user_from_token(authorization: str):
 # --------------------------------------------------
 # リクエスト / レスポンス モデル
 # --------------------------------------------------
-class ChatMessage(BaseModel):
-    role: Literal["user", "model"]
-    content: str = Field(..., min_length=1, max_length=255)
-
-
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=255)
-    history: List[ChatMessage] = Field(default_factory=list)
+    message: str = Field(..., min_length=1, max_length=255, description="1〜255文字")
 
 
 class ChatResponse(BaseModel):
@@ -55,38 +48,44 @@ class ChatResponse(BaseModel):
 
 
 # --------------------------------------------------
-# チャットAPIエンドポイント
+# チャットAPIエンドポイント（DB連携版）
 # --------------------------------------------------
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None)):
-    await get_user_from_token(authorization)
+    user = await get_user_from_token(authorization)
 
     if not ai_client:
-        raise HTTPException(
-            status_code=500,
-            detail="GEMINI_API_KEY が設定されていません。"
-        )
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY が設定されていません。")
 
     clean_message = data.message.strip()
     if not clean_message:
         raise HTTPException(status_code=400, detail="メッセージを入力してください。")
 
-    # 直近最大10件の履歴を抽出
-    recent_history = data.history[-10:] if data.history else []
+    client = await get_supabase()
 
-    # Gemini 向けコンテンツ構築
+    # 1. DBから直近10件の会話履歴を取得（古い順にソートし直す）
+    history_res = await (
+        client.table("ai_chat_messages")
+        .select("role, content")
+        .eq("user_id", user.id)
+        .order("created_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+    raw_history = history_res.data or []
+    raw_history.reverse()  # Geminiに渡すため時系列順に戻す
+
+    # 2. Gemini用のコンテンツリストを構築
     contents = []
-    for item in recent_history:
-        text = item.content.strip()
-        if text:
-            contents.append(
-                types.Content(
-                    role=item.role,
-                    parts=[types.Part.from_text(text=text)]
-                )
+    for item in raw_history:
+        contents.append(
+            types.Content(
+                role=item["role"],
+                parts=[types.Part.from_text(text=item["content"])]
             )
+        )
 
-    # 現在の入力を追加
+    # 今回の入力を追加
     contents.append(
         types.Content(
             role="user",
@@ -94,18 +93,60 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         )
     )
 
+    # 3. Gemini へリクエスト送信
     try:
-        # SDK標準の非同期クライアント (aio) を使用
         response = await ai_client.aio.models.generate_content(
             model=MODEL_NAME,
             contents=contents
         )
-
         reply_text = getattr(response, "text", None)
         if not reply_text:
             reply_text = "（応答が空または安全フィルターによりブロックされました）"
 
-        return ChatResponse(reply=reply_text)
+        # 255文字制限に合わせて安全にカット（テーブル制約 VARCHAR(255) 対策）
+        db_save_reply = reply_text[:255]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI応答エラー: {str(e)}")
+
+    # 4. 発言と応答を DB に保存
+    try:
+        await client.table("ai_chat_messages").insert([
+            {"user_id": user.id, "role": "user", "content": clean_message},
+            {"user_id": user.id, "role": "model", "content": db_save_reply}
+        ]).execute()
+    except Exception as e:
+        print(f"[AI Chat DB Save Error]: {e}")
+
+    return ChatResponse(reply=reply_text)
+
+
+# --------------------------------------------------
+# 補助API: 会話履歴の取得（画面読み込み時用）
+# --------------------------------------------------
+@router.get("/history")
+async def get_chat_history(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    res = await (
+        client.table("ai_chat_messages")
+        .select("id, role, content, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    )
+    messages = res.data or []
+    messages.reverse()
+    return {"messages": messages}
+
+
+# --------------------------------------------------
+# 補助API: 会話履歴のクリア（リセット用）
+# --------------------------------------------------
+@router.delete("/history")
+async def clear_chat_history(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    await client.table("ai_chat_messages").delete().eq("user_id", user.id).execute()
+    return {"message": "AIチャットの履歴を削除しました。"}
