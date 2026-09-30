@@ -109,7 +109,7 @@
         @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
 
-        /* 思考中ローディング */
+        /* 思考中インジケータ */
         .typing-dots span {
             display: inline-block; width: 6px; height: 6px; background: var(--sub); 
             border-radius: 50%; margin: 0 2px; animation: bounce 1.2s infinite ease-in-out;
@@ -129,7 +129,7 @@
             <button class="nav-icon" onclick="location.href='/dashboard'">←</button>
             <div style="display:flex; flex-direction:column;">
                 <span style="font-size: 1.05rem;">AI相談室</span>
-                <span style="font-size: 0.75rem; color: var(--sub); font-weight: normal;">Gemini 2.5 Flash Lite</span>
+                <span style="font-size: 0.75rem; color: var(--sub); font-weight: normal;">Gemini 3.5 Flash Lite (minimal)</span>
             </div>
         </div>
         <div style="display:flex; gap: 6px; align-items:center;">
@@ -226,7 +226,7 @@
             if (msgs.length === 0) {
                 box.innerHTML = `
                     <div class="empty-state">
-                        <div>🤖</div>
+                        <div style="font-size: 2.2rem; margin-bottom: 8px;">🤖</div>
                         <div style="font-weight:bold; margin-top:8px;">AI相談室へようこそ</div>
                         <div style="font-size:0.85rem; margin-top:4px;">日常の疑問や雑談など、何でも気軽に入力してください。</div>
                     </div>`;
@@ -258,7 +258,6 @@
 
         renderMessage('user', message);
 
-        // 思考中インジケータ
         const loadingId = 'loading-' + Date.now();
         const loadingHtml = `
             <div class="msg-row msg-other" id="${loadingId}">
