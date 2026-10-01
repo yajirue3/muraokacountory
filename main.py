@@ -161,7 +161,15 @@ async def ensure_default_wallet(user_id: str):
 # --------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def get_index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(
+        request=request, 
+        name="index.html",
+        context={
+            "supabase_url": SUPABASE_URL,
+            "supabase_anon_key": SUPABASE_KEY
+        }
+    )
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def get_dashboard(request: Request):
