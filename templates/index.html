@@ -5,186 +5,354 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 入国管理所</title>
     <style>
+        :root {
+            --bg-base: #050505;
+            --bg-surface: #121212;
+            --bg-card: #1a1a1a;
+            --border-subtle: #333333;
+            --text-primary: #f0f0f0;
+            --text-secondary: #999999;
+            --accent-gold: #d4af37;
+            --accent-gold-hover: #f1c40f;
+            --danger-color: #e74c3c;
+            --chamfer-clip: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+            --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 20px 0;
+            padding: 24px 16px;
         }
-        .main-wrapper {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 720px;
+
+        .auth-wrapper {
             width: 100%;
-            padding: 0 16px;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
-        .container {
-            background: #2a2a2a;
-            border: 2px solid #555;
-            border-radius: 12px;
-            padding: 28px;
-            width: 320px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            box-sizing: border-box;
+
+        /* 王国シンボル（八角形エンブレム） */
+        .kingdom-emblem {
+            align-self: center;
+            width: 64px;
+            height: 64px;
+            background: var(--border-subtle);
+            clip-path: var(--octagon-clip);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
         }
-        h1, h2 {
-            font-size: 1.3rem;
+        .kingdom-emblem::before {
+            content: "";
+            position: absolute;
+            top: 1px; left: 1px; right: 1px; bottom: 1px;
+            background: var(--bg-card);
+            clip-path: var(--octagon-clip);
+            z-index: -1;
+        }
+        .emblem-inner {
+            font-size: 1.5rem;
+            color: var(--accent-gold);
+            font-weight: 900;
+        }
+
+        .header-title {
             text-align: center;
-            color: #d4af37; /* 金色 */
-            margin-top: 0;
-            margin-bottom: 20px;
+        }
+        .header-title h1 {
+            font-size: 1.25rem;
+            color: var(--accent-gold);
+            letter-spacing: 2px;
+            font-weight: 700;
+        }
+        .header-title p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
             letter-spacing: 1px;
         }
+
+        /* 幾何学メインコンソール */
+        .terminal-panel {
+            background: var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            padding: 1px;
+            position: relative;
+        }
+        .terminal-inner {
+            background: var(--bg-surface);
+            clip-path: var(--chamfer-clip);
+            padding: 24px;
+        }
+
+        /* タブセレクター */
+        .tab-switch {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 12px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: bold;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            clip-path: var(--chamfer-clip);
+        }
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+        .tab-btn.active {
+            color: #000;
+            background: var(--accent-gold);
+        }
+
+        /* フォームグループ */
         .form-group {
             margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
         label {
-            display: block;
-            font-size: 0.85rem;
-            margin-bottom: 6px;
-            color: #aaa;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: bold;
         }
         .optional {
-            font-size: 0.75rem;
-            color: #888;
+            font-size: 0.65rem;
+            color: #666;
             margin-left: 4px;
+            font-weight: normal;
         }
         input[type="text"],
         input[type="email"],
         input[type="password"] {
             width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background-color: #333;
-            color: #fff;
-            box-sizing: border-box;
-            font-size: 0.95rem;
+            padding: 10px 12px;
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            clip-path: var(--chamfer-clip);
+            transition: border-color 0.2s;
         }
         input:focus {
-            outline: none;
-            border-color: #d4af37;
+            border-color: var(--accent-gold);
         }
+
+        /* チェックボックス */
         .checkbox-group {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-top: 16px;
-            margin-bottom: 16px;
+            margin: 16px 0;
         }
         .checkbox-group input[type="checkbox"] {
+            accent-color: var(--accent-gold);
             width: 16px;
             height: 16px;
             cursor: pointer;
         }
         .checkbox-group label {
-            margin-bottom: 0;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
+            color: var(--text-secondary);
         }
         .checkbox-group a {
-            color: #d4af37;
+            color: var(--accent-gold);
             text-decoration: underline;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
         }
-        button {
+
+        /* ボタン */
+        .btn-action {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: none;
-            border-radius: 6px;
+            font-size: 0.85rem;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 8px;
+            clip-path: var(--chamfer-clip);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-gold {
+            background-color: var(--accent-gold);
+            color: #000;
+        }
+        .btn-gold:hover {
+            background-color: var(--accent-gold-hover);
+        }
+
+        /* モーダル */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            width: 100%;
+            max-width: 440px;
+            padding: 24px;
+        }
+        .modal-title {
+            color: var(--accent-gold);
             font-size: 0.95rem;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 8px;
+            margin-bottom: 14px;
         }
-        .btn-primary {
-            background-color: #d4af37;
-            color: #1a1a1a;
-        }
-        .btn-primary:hover {
-            background-color: #f1c40f;
-        }
-        .btn-secondary {
-            background-color: #4a90e2;
-            color: #fff;
-        }
-        .btn-secondary:hover {
-            background-color: #357abd;
+        .modal-content {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            padding: 12px;
+            height: 240px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-bottom: 16px;
+            white-space: pre-wrap;
+            line-height: 1.6;
         }
         .btn-close {
-            background-color: #444;
-            color: #fff;
+            background: var(--border-subtle);
+            color: var(--text-primary);
         }
         .btn-close:hover {
-            background-color: #555;
+            background: #444;
         }
     </style>
 </head>
 <body>
 
-<div class="main-wrapper">
-    <!-- ログイン枠 -->
-    <div class="container">
-        <h1>入国（ログイン）</h1>
-        <div class="form-group">
-            <label for="login-email">国民ID (Email)</label>
-            <input type="email" id="login-email" placeholder="mail@example.com">
-        </div>
-        <div class="form-group">
-            <label for="login-password">暗証番号 (Password)</label>
-            <input type="password" id="login-password" placeholder="••••••••">
-        </div>
-        <button class="btn-primary" onclick="login()">入国する</button>
+<div class="auth-wrapper">
+    <!-- 八角形エンブレム -->
+    <div class="kingdom-emblem">
+        <div class="emblem-inner">村</div>
     </div>
 
-    <!-- 新規登録枠 -->
-    <div class="container">
-        <h2>新規国民登録</h2>
-        <div class="form-group">
-            <label for="signup-email">国民ID (Email)</label>
-            <input type="email" id="signup-email" placeholder="mail@example.com">
-        </div>
-        <div class="form-group">
-            <label for="signup-password">暗証番号 (Password)</label>
-            <input type="password" id="signup-password" placeholder="••••••••">
-        </div>
-        <div class="form-group">
-            <label for="signup-nickname">ニックネーム<span class="optional">(任意)</span></label>
-            <input type="text" id="signup-nickname" placeholder="名無しの労働奴隷">
-        </div>
-        <div class="form-group">
-            <label for="signup-realname">リアルネーム<span class="optional">(任意ですが登録すると限定称号が貰えます)</span></label>
-            <input type="text" id="signup-realname" placeholder="山田 太郎">
-        </div>
+    <div class="header-title">
+        <h1>村岡王国 入国管理所</h1>
+        <p>IMMIGRATION & AUTHENTICATION</p>
+    </div>
 
-        <div class="checkbox-group">
-            <input type="checkbox" id="terms-agree">
-            <label for="terms-agree">利用規約に同意する</label>
-            <a onclick="openPolicyViewer()">（規約を読む）</a>
-        </div>
+    <!-- メインフレーム -->
+    <div class="terminal-panel">
+        <div class="terminal-inner">
+            <!-- タブ切り替え -->
+            <div class="tab-switch">
+                <button type="button" class="tab-btn active" id="tab-login" onclick="switchTab('login')">入国 (LOGIN)</button>
+                <button type="button" class="tab-btn" id="tab-signup" onclick="switchTab('signup')">新規登録 (REGISTER)</button>
+            </div>
 
-        <button class="btn-secondary" onclick="signup()">申請する</button>
+            <!-- ログインフォーム -->
+            <div id="form-login">
+                <div class="form-group">
+                    <label for="login-email">国民ID (Email)</label>
+                    <input type="email" id="login-email" placeholder="mail@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">暗証番号 (Password)</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
+                </div>
+                <button class="btn-action btn-gold" style="margin-top: 16px;" onclick="login()">入国認証を実行</button>
+            </div>
+
+            <!-- 新規登録フォーム -->
+            <div id="form-signup" style="display: none;">
+                <div class="form-group">
+                    <label for="signup-email">国民ID (Email)</label>
+                    <input type="email" id="signup-email" placeholder="mail@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">暗証番号 (Password)</label>
+                    <input type="password" id="signup-password" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label for="signup-nickname">ニックネーム<span class="optional">(任意)</span></label>
+                    <input type="text" id="signup-nickname" placeholder="名無しの労働奴隷">
+                </div>
+                <div class="form-group">
+                    <label for="signup-realname">リアルネーム<span class="optional">(任意: 設定で限定称号)</span></label>
+                    <input type="text" id="signup-realname" placeholder="山田 太郎">
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="terms-agree">
+                    <label for="terms-agree">利用規約に同意する</label>
+                    <a onclick="openPolicyViewer()">（規約を読む）</a>
+                </div>
+
+                <button class="btn-action btn-gold" onclick="signup()">新規国民申請</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- 利用規約モーダル -->
-<div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
-    <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
-        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
-        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 12px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5;">読み込み中...</div>
-        <button type="button" class="btn-close" onclick="closePolicyViewer()">閉じる</button>
+<div id="policy-view-modal" class="modal-overlay" onclick="if(event.target === this) closePolicyViewer();">
+    <div class="modal-box" onclick="event.stopPropagation();">
+        <div class="modal-title">📜 利用規約・ポリシー</div>
+        <div id="policy-view-content" class="modal-content">読み込み中...</div>
+        <button type="button" class="btn-action btn-close" onclick="closePolicyViewer()">閉じる</button>
     </div>
 </div>
 
 <script>
-    // ログイン済みの場合は自動でダッシュボードへ飛ばす
+    // タブ切り替え処理
+    function switchTab(mode) {
+        const loginTab = document.getElementById("tab-login");
+        const signupTab = document.getElementById("tab-signup");
+        const loginForm = document.getElementById("form-login");
+        const signupForm = document.getElementById("form-signup");
+
+        if (mode === 'login') {
+            loginTab.classList.add("active");
+            signupTab.classList.remove("active");
+            loginForm.style.display = "block";
+            signupForm.style.display = "none";
+        } else {
+            signupTab.classList.add("active");
+            loginTab.classList.remove("active");
+            signupForm.style.display = "block";
+            loginForm.style.display = "none";
+        }
+    }
+
+    // ログイン済みの場合は自動でダッシュボードへ遷移
     if (localStorage.getItem("access_token")) {
         window.location.href = "/dashboard";
     }
@@ -250,7 +418,9 @@
             const data = await res.json();
             
             if (res.ok) {
-                alert(data.message + "\n左側のフォームからログインしてください。");
+                alert(data.message + "\n入国（ログイン）タブから入国認証を行ってください。");
+                switchTab('login');
+                document.getElementById("login-email").value = email;
             } else {
                 alert(data.detail || "登録に失敗しました");
             }
@@ -259,7 +429,7 @@
         }
     }
 
-    // 利用規約モーダル関連の処理
+    // 利用規約モーダル制御
     let isPolicyFetching = false;
     async function openPolicyViewer() {
         if (isPolicyFetching) return;
