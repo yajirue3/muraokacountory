@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import List
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
@@ -75,15 +76,30 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
     raw_history = history_res.data or []
     raw_history.reverse()
 
-    contents = []
-    for item in raw_history:
-        contents.append(
-            types.Content(
-                role=item["role"],
-                parts=[types.Part.from_text(text=item["content"])]
-            )
-        )
+    # ターミナルでコンテキスト取得状況を確認
+    print(f"[AI Chat Debug] 読み込んだ履歴件数: {len(raw_history)}件")
 
+    # Geminiのターン制約対策: 先頭が 'model' の場合は取り除き、必ず 'user' から開始
+    while raw_history and raw_history[0].get("role") != "user":
+        raw_history.pop(0)
+
+    contents = []
+    last_role = None
+
+    # ロールが重複して連続しないよう整えながら contents を構築
+    for item in raw_history:
+        current_role = item.get("role")
+        text_content = item.get("content", "")
+        if current_role and text_content and current_role != last_role:
+            contents.append(
+                types.Content(
+                    role=current_role,
+                    parts=[types.Part.from_text(text=text_content)]
+                )
+            )
+            last_role = current_role
+
+    # 最後に今回のユーザー入力を追加
     contents.append(
         types.Content(
             role="user",
@@ -91,13 +107,13 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         )
     )
 
-    # 思考をオフ（thinking_budget=0）にして即時生成 + 512トークンで高速化
+    # 思考オフ（即時レスポンス）と適正トークン数設定
     config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             thinking_budget=0
         ),
         max_output_tokens=512,
-        system_instruction="親切かつ簡潔な日本語で短く回答してください。"
+        system_instruction="これまでの会話履歴を踏まえ、親切かつ簡潔な日本語で短く回答してください。"
     )
 
     try:
@@ -113,16 +129,19 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         db_save_reply = reply_text
 
     except Exception as e:
+        print(f"[AI Generate Error]: {e}")
         raise HTTPException(status_code=500, detail=f"AI応答エラー: {str(e)}")
 
-    # 発言と応答を保存
+    # 発言と応答を保存（エラー発生時はトレースバックを出力）
     try:
         await client.table("ai_chat_messages").insert([
             {"user_id": user.id, "role": "user", "content": clean_message},
             {"user_id": user.id, "role": "model", "content": db_save_reply}
         ]).execute()
+        print("[AI Chat Debug] メッセージをDBへ正常に保存しました")
     except Exception as e:
         print(f"[AI Chat DB Save Error]: {e}")
+        traceback.print_exc()
 
     return ChatResponse(reply=reply_text)
 
