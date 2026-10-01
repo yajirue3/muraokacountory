@@ -803,6 +803,7 @@ async def derby_scheduler():
 async def start_derby_task():
     asyncio.create_task(derby_scheduler())
 
+
 # ==================================================
 # 王国クラッシュ（Crash）モジュール
 # ==================================================
@@ -829,7 +830,7 @@ def generate_crash_multiplier() -> float:
     return round(min(multiplier, 100.00), 2)
 
 
-# クラッシュ倍率に応じた飛行秒数の計算（指数関数的加速: 1.00x=0秒、2.00x=約3.5秒、100x=約14秒）
+# クラッシュ倍率に応じた飛行秒数の計算（指数関数的加速: 1.00x=0.5秒、1.92x=約3.7秒、100x=約20秒）
 def calculate_flying_duration(crash_point: float) -> float:
     import math
     if crash_point <= 1.00:
@@ -918,6 +919,17 @@ async def get_crash_current(authorization: str = Header(None)):
 # --- カジノAPI：事前予約ベット実行（RPC完全制御） ---
 @router.post("/api/crash/bet")
 async def bet_crash(data: CrashBetRequest, authorization: str = Header(None)):
+    # 賭け金バリデーション
+    if data.amount < 1 or data.amount > 50000:
+        raise HTTPException(status_code=400, detail="賭け金は1〜50,000Goldの範囲で指定してください。")
+
+    # 目標倍率バリデーション（最低1.92x〜最大100.00x）
+    if data.target_multiplier < 1.92 or data.target_multiplier > 100.00:
+        raise HTTPException(
+            status_code=400, 
+            detail="目標倍率は 1.92x 〜 100.00x の範囲で指定してください。"
+        )
+
     user = await get_user_from_token(authorization)
     client = await get_supabase()
 
