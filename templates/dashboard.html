@@ -10,19 +10,16 @@
         /* --- Modern & Geometric UI Variables --- */
         :root {
             --bg-base: #050505;
-            --bg-surface: #121212;
-            --bg-card: #181818;
-            --border-subtle: #2d2d2d;
+            --bg-surface: #101010;
+            --bg-card: #161616;
+            --border-subtle: #2a2a2a;
             --text-primary: #f0f0f0;
             --text-secondary: #888;
             --accent-gold: #d4af37;
             --accent-cyan: #00f3ff;
             --danger-color: #e74c3c;
             --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-            /* 正六角形（ヘキサゴン/ハニカム） */
-            --hex-clip: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-            --hex-width: 104px;
-            --hex-height: 120px;
+            --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -50,41 +47,63 @@
             gap: 20px;
         }
 
-        /* 1. 国民身分証明証 (完全維持) */
+        /* =========================================
+           1. サイバー・ダーク幾何学 国民身分証明証
+           ========================================= */
         .id-card-wrapper { 
-            background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); 
-            border-radius: 12px; 
-            padding: 14px; 
-            color: #1a1a1a; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); 
-            position: relative; 
-            overflow: hidden; 
-            border: 1px solid #fff; 
+            background: var(--bg-surface);
+            padding: 16px;
+            clip-path: var(--chamfer-clip);
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            border: 1px solid #333;
         }
-        .id-card-wrapper::before { 
-            content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; 
-            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); 
-            transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; 
+        .id-card-wrapper::before {
+            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
+            background: linear-gradient(135deg, #1f1b14 0%, #111 60%, #151d20 100%);
+            clip-path: var(--chamfer-clip); z-index: 1;
         }
-        @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
+        /* ネオンゴールド走査光 */
         .id-card-wrapper::after { 
-            content: "MURAOKA"; position: absolute; font-size: 4rem; font-weight: 900; 
-            color: rgba(255,255,255,0.25); transform: rotate(-25deg); top: 25px; right: -20px; 
-            pointer-events: none; letter-spacing: 4px; z-index: 1; 
+            content: ""; position: absolute; top: 0; left: -150%; width: 40%; height: 100%; 
+            background: linear-gradient(to right, rgba(212, 175, 55, 0) 0%, rgba(212, 175, 55, 0.2) 50%, rgba(212, 175, 55, 0) 100%); 
+            transform: skewX(-25deg); animation: card-scan 5s infinite ease-in-out; z-index: 3; pointer-events: none; 
         }
-        
-        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 4px; margin-bottom: 8px; position: relative; z-index: 2; }
-        .id-country { font-weight: 900; font-size: 1rem; color: #2c3e50; letter-spacing: 1px; }
-        .id-title { font-size: 0.7rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
-        .id-body { display: flex; gap: 10px; position: relative; z-index: 2; align-items: center; }
-        .id-photo { width: 55px; height: 65px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #95a5a6; }
-        .id-details { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-        .id-row { display: flex; flex-direction: column; }
-        .id-label { font-size: 0.6rem; color: #7f8c8d; font-weight: bold; }
-        .id-value { font-size: 0.85rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
-        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
+        @keyframes card-scan { 0% { left: -150%; } 20% { left: 200%; } 100% { left: 200%; } }
 
-        /* 2. 幾何学パネル (Tax & Log & Settings) */
+        .id-content { position: relative; z-index: 2; }
+        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 6px; margin-bottom: 10px; }
+        .id-country { font-weight: 900; font-size: 0.95rem; color: var(--accent-gold); letter-spacing: 2px; }
+        .id-title { font-size: 0.65rem; font-weight: bold; color: var(--accent-cyan); background: rgba(0, 243, 255, 0.08); border: 1px solid var(--accent-cyan); padding: 2px 6px; clip-path: var(--chamfer-clip); display: flex; align-items: center; gap: 4px;}
+        
+        .id-body { display: flex; gap: 12px; align-items: center; }
+        .id-photo { 
+            width: 58px; height: 68px; 
+            background: #0d0d0d; 
+            border: 1px solid var(--accent-gold); 
+            clip-path: var(--chamfer-clip);
+            display: flex; justify-content: center; align-items: center; 
+            box-shadow: inset 0 0 10px rgba(212, 175, 55, 0.2);
+        }
+        .id-photo svg { width: 32px; height: 32px; stroke: var(--accent-gold); fill: none; stroke-width: 1.5; }
+        .id-details { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .id-row { display: flex; flex-direction: column; }
+        .id-label { font-size: 0.58rem; color: var(--text-secondary); font-weight: bold; letter-spacing: 0.5px; }
+        .id-value { font-size: 0.85rem; font-weight: 900; color: #fff; word-break: break-all; }
+        .id-badge { 
+            display: inline-block; 
+            background: linear-gradient(135deg, #a30000 0%, #500000 100%); 
+            color: #ffcccc; 
+            border: 1px solid #ff4d4d;
+            padding: 2px 8px; 
+            clip-path: var(--chamfer-clip);
+            font-size: 0.65rem; font-weight: bold; 
+            align-self: flex-start; margin-top: 2px; 
+        }
+
+        /* =========================================
+           2. 幾何学パネル (Tax & Log & Settings)
+           ========================================= */
         .panel {
             background: var(--bg-surface);
             padding: 16px;
@@ -96,7 +115,8 @@
             background: var(--bg-card); clip-path: var(--chamfer-clip); z-index: -1;
         }
         
-        .panel-header { font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display: flex; justify-content: space-between; }
+        .panel-header { font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .panel-header svg { width: 16px; height: 16px; stroke: var(--accent-gold); fill: none; stroke-width: 2; }
         
         .news-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
         .news-item { font-size: 0.75rem; border-bottom: 1px dashed var(--border-subtle); padding-bottom: 6px; }
@@ -107,13 +127,15 @@
         .tax-amount { color: var(--danger-color); font-size: 1.5rem; font-weight: 900; margin: 4px 0; }
         .tax-note { font-size: 0.65rem; color: var(--text-secondary); }
 
-        details summary { cursor: pointer; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); user-select: none; }
-        details summary:hover { color: var(--accent-gold); }
+        details summary { cursor: pointer; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); user-select: none; display: flex; align-items: center; gap: 6px; }
+        details summary svg { width: 16px; height: 16px; stroke: var(--text-secondary); fill: none; stroke-width: 2; }
+        details summary:hover, details summary:hover svg { color: var(--accent-gold); stroke: var(--accent-gold); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
         @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
         
         .form-group { display: flex; flex-direction: column; gap: 4px; }
-        .label { font-size: 0.7rem; color: var(--text-secondary); font-weight: bold; }
+        .label { font-size: 0.7rem; color: var(--text-secondary); font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        .label svg { width: 12px; height: 12px; stroke: currentColor; fill: none; }
         input, select {
             width: 100%; padding: 8px; background: var(--bg-base); border: 1px solid var(--border-subtle);
             color: var(--text-primary); font-size: 0.8rem; clip-path: var(--chamfer-clip); outline: none;
@@ -123,189 +145,148 @@
         .btn-solid {
             background: var(--border-subtle); color: var(--text-primary); padding: 8px;
             font-size: 0.8rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip); transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
         }
+        .btn-solid svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
         .btn-solid:hover { background: var(--accent-gold); color: #000; }
         .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; }
 
         /* =========================================
-           3. 蜂の巣（ハニカム）グリッド ＆ アニメーション
+           3. 正統オクタゴングリッド ＆ スムーズ追尾トランジション
            ========================================= */
         .grid-header { 
             display: flex; justify-content: space-between; align-items: flex-end; 
             margin: 16px 0 10px 0; font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); 
         }
         
-        /* ハニカムコンテナ：互い違いに噛み合わせる */
-        .honeycomb-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            width: 100%;
-            max-width: 360px;
-            margin: 0 auto;
-            padding-bottom: 20px;
+        .octagon-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px 12px;
+            justify-items: center;
             position: relative;
         }
 
-        .hex-node {
-            width: var(--hex-width);
-            height: var(--hex-height);
-            margin: -8px 4px; /* 縦方向を密着させて噛み合わせる */
-            background: var(--border-subtle);
-            clip-path: var(--hex-clip);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
+        /* 
+           バッジがはみ出すように、ノード自体には clip-path をかけない
+           代わりに .node-bg と .node-bg-inner がオクタゴン形状を描画する
+        */
+        .octagon-node {
+            width: 102px; height: 102px;
+            position: relative; 
             cursor: pointer;
             touch-action: pan-y;
-            transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28), background 0.2s, filter 0.2s;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-
-        .hex-node::before {
-            content: "";
-            position: absolute;
-            top: 2px; left: 2px; right: 2px; bottom: 2px;
+        .node-bg {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--border-subtle);
+            clip-path: var(--octagon-clip);
+            z-index: 1; transition: background 0.2s, box-shadow 0.2s, filter 0.2s;
+        }
+        .node-bg-inner {
+            position: absolute; top: 1.5px; left: 1.5px; right: 1.5px; bottom: 1.5px;
             background: var(--bg-card);
-            clip-path: var(--hex-clip);
-            z-index: 1;
-            transition: background 0.2s;
+            clip-path: var(--octagon-clip);
+            z-index: 2; transition: background 0.2s;
         }
 
-        .hex-node:hover:not(.dragging):not(.long-pressing) {
-            transform: scale(1.05);
-            background: var(--accent-gold);
-            filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.4));
-        }
-        .hex-node:hover:not(.dragging):not(.long-pressing)::before {
-            background: #201d14;
-        }
+        .octagon-node:hover:not(.dragging):not(.long-pressing) { transform: translateY(-3px) scale(1.04); }
+        .octagon-node:hover:not(.dragging):not(.long-pressing) .node-bg { background: var(--accent-gold); filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.4)); }
+        .octagon-node:hover:not(.dragging):not(.long-pressing) .node-bg-inner { background: #201e17; }
 
-        .node-content {
-            position: relative;
-            z-index: 2;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            width: 100%;
-            padding: 0 8px;
+        .node-content { 
+            position: relative; z-index: 3;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            width: 100%; height: 100%; pointer-events: none; 
         }
-
-        .node-icon { margin-bottom: 5px; }
-        .node-icon svg { 
-            width: 25px; height: 25px; 
-            stroke: var(--text-primary); 
-            fill: none; 
-            stroke-width: 1.5; 
-            stroke-linecap: square; 
-            transition: stroke 0.2s, transform 0.2s; 
-        }
-        .hex-node:hover:not(.dragging) .node-icon svg { stroke: var(--accent-gold); transform: scale(1.1); }
+        .node-icon { margin-bottom: 6px; display: flex; align-items: center; justify-content: center; }
+        .node-icon svg { width: 26px; height: 26px; stroke: var(--text-primary); fill: none; stroke-width: 1.5; stroke-linecap: square; transition: stroke 0.2s; }
+        .octagon-node:hover:not(.dragging) .node-icon svg { stroke: var(--accent-gold); }
         
-        .node-label { 
-            font-size: 0.62rem; 
-            font-weight: bold; 
-            color: var(--text-primary); 
-            text-align: center; 
-            line-height: 1.15; 
-            word-break: keep-all; 
-            letter-spacing: -0.2px; 
-        }
+        .node-label { font-size: 0.65rem; font-weight: bold; color: var(--text-primary); text-align: center; line-height: 1.2; word-break: keep-all; }
 
-        /* ✨ 650ms 押し込みチャージ中のスタイリッシュアニメーション */
-        .hex-node.long-pressing {
+        /* ✨ 650ms チャージ中のパルスアニメーション */
+        .octagon-node.long-pressing .node-bg {
             background: var(--accent-cyan);
-            animation: hex-charge 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            animation: node-charge 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
-        @keyframes hex-charge {
-            0% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-cyan)); }
-            50% { transform: scale(0.94); filter: drop-shadow(0 0 10px var(--accent-cyan)); }
-            100% { transform: scale(0.92); filter: drop-shadow(0 0 20px var(--accent-gold)); background: var(--accent-gold); }
+        @keyframes node-charge {
+            0% { filter: drop-shadow(0 0 2px var(--accent-cyan)); }
+            50% { filter: drop-shadow(0 0 8px var(--accent-cyan)); }
+            100% { filter: drop-shadow(0 0 15px var(--accent-gold)); background: var(--accent-gold); }
+        }
+        .octagon-node.long-pressing { animation: node-shrink 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes node-shrink {
+            0% { transform: scale(1); }
+            100% { transform: scale(0.93); }
         }
 
-        /* 🚀 浮遊・ドラッグ中のスタイリッシュ演出 */
-        .hex-node.dragging {
-            z-index: 9999 !important;
+        /* 🚀 持ち上げ・ドラッグ中の浮遊演出 */
+        .octagon-node.dragging {
+            z-index: 1000 !important;
             transform: scale(1.18) !important;
-            background: #fff !important;
-            filter: drop-shadow(0 15px 30px rgba(0, 243, 255, 0.7)) drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)) !important;
-            opacity: 0.96;
             cursor: grabbing;
+            transition: none !important;
         }
-        .hex-node.dragging::before {
-            background: #0f171d !important;
+        .octagon-node.dragging .node-bg {
+            background: #fff !important;
+            filter: drop-shadow(0 15px 30px rgba(0, 243, 255, 0.6)) drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)) !important;
+            opacity: 0.95;
         }
-        .hex-node.dragging .node-icon svg {
-            stroke: var(--accent-cyan) !important;
-        }
+        .octagon-node.dragging .node-bg-inner { background: #111a1f !important; }
+        .octagon-node.dragging .node-icon svg { stroke: var(--accent-cyan) !important; }
 
-        /* 吸着対象ノードのスタイル */
-        .hex-node.drop-target {
-            transform: scale(0.88);
-            background: var(--accent-cyan) !important;
-            filter: drop-shadow(0 0 16px var(--accent-cyan));
-        }
+        /* 吸着先ガイド */
+        .octagon-node.drop-target { transform: scale(0.9); }
+        .octagon-node.drop-target .node-bg { background: var(--accent-cyan); filter: drop-shadow(0 0 10px var(--accent-cyan)); }
 
-        /* 🚀 カジノ専用：新ギャンブル追加バッジ */
+        /* 🚀 カジノ専用：新ギャンブル追加バッジ (枠を飛び出す) */
         .badge-casino-new {
             position: absolute;
-            top: 14px;
-            right: 4px;
+            top: -4px;
+            right: -10px;
             background: linear-gradient(135deg, #ff007f 0%, #ff003c 100%);
             color: #fff;
-            font-size: 0.48rem;
+            font-size: 0.5rem;
             font-weight: 900;
-            padding: 2px 4px;
+            padding: 2px 6px;
             border-radius: 4px;
             border: 1px solid #fff;
             box-shadow: 0 0 8px #ff007f;
-            transform: scale(0.85);
             pointer-events: none;
             letter-spacing: 0.5px;
             animation: badge-pulse 1.2s infinite alternate;
-            z-index: 5;
+            z-index: 10;
         }
         @keyframes badge-pulse {
             0% { transform: scale(0.85); box-shadow: 0 0 5px #ff007f; }
-            100% { transform: scale(0.92); box-shadow: 0 0 12px #ff007f, 0 0 6px #00f3ff; }
+            100% { transform: scale(0.95); box-shadow: 0 0 12px #ff007f, 0 0 5px #00f3ff; }
         }
 
-        /* カスタムリンク削除ボタン */
-        .node-del-action {
-            position: absolute;
-            top: 12px;
-            left: 10px;
-            z-index: 4;
-            opacity: 0;
-            transition: 0.2s;
-            cursor: pointer;
-        }
-        .hex-node:hover .node-del-action { opacity: 1; }
-        .node-del-action svg { width: 13px; height: 13px; stroke: var(--text-secondary); stroke-width: 2; }
+        /* カスタムリンク削除アイコン */
+        .node-del-action { position: absolute; top: 4px; left: -2px; opacity: 0; transition: 0.2s; z-index: 10; cursor: pointer; }
+        .octagon-node:hover .node-del-action { opacity: 1; }
+        .node-del-action svg { width: 14px; height: 14px; stroke: var(--text-secondary); stroke-width: 2.5; background: var(--bg-card); border-radius: 50%; padding: 2px;}
         .node-del-action:hover svg { stroke: var(--danger-color); }
 
-        /* 追加ノード（円形破線） */
-        .hex-add {
-            background: transparent;
-            clip-path: none;
-            border-radius: 50%;
-            border: 1.5px dashed var(--border-subtle);
-            width: 78px;
-            height: 78px;
-            margin: 12px;
+        /* 追加ノード */
+        .octagon-add {
+            background: transparent; border: 1.5px dashed var(--border-subtle); clip-path: none; 
+            border-radius: 50%; width: 82px; height: 82px; margin-top: 10px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s;
         }
-        .hex-add::before { display: none; }
-        .hex-add:hover { border-color: var(--accent-gold); transform: scale(1.06); }
-        .hex-add svg { stroke: var(--text-secondary); width: 22px; height: 22px; }
-        .hex-add:hover svg { stroke: var(--accent-gold); }
+        .octagon-add svg { width: 26px; height: 26px; stroke: var(--text-secondary); fill: none; stroke-width: 2; transition: 0.2s; }
+        .octagon-add:hover { border-color: var(--accent-gold); transform: scale(1.05); }
+        .octagon-add:hover svg { stroke: var(--accent-gold); }
 
         /* 裏路地・フッター */
         .alley-box {
             margin-top: 24px; padding: 12px; border: 1px dashed var(--border-subtle); text-align: center; cursor: pointer; color: var(--text-secondary); font-size: 0.75rem; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
+        .alley-box svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
         .alley-box:hover { border-color: var(--text-primary); color: var(--text-primary); }
 
         /* モーダル群 */
@@ -315,33 +296,41 @@
         .modal-box {
             background: var(--bg-card); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); width: 100%; max-width: 400px; padding: 24px; position: relative;
         }
-        .modal-title { font-size: 1rem; color: var(--accent-gold); margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+        .modal-title { font-size: 1rem; color: var(--accent-gold); margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .modal-title svg { width: 18px; height: 18px; stroke: var(--accent-gold); fill: none; stroke-width: 2; }
     </style>
 </head>
 <body>
 
 <div class="container">
     
-    <!-- 1. 国民身分証明証 -->
+    <!-- 1. サイバー・幾何学調 国民身分証明証 -->
     <div class="id-card-wrapper">
-        <div class="id-header">
-            <div class="id-country">村岡王国</div>
-            <div class="id-title">国民身分証明証</div>
-        </div>
-        <div class="id-body">
-            <div class="id-photo">👤</div>
-            <div class="id-details">
-                <div class="id-row">
-                    <span class="id-label">氏名 (NICKNAME)</span>
-                    <span class="id-value" id="display-nickname">-</span>
+        <div class="id-content">
+            <div class="id-header">
+                <div class="id-country">村岡王国</div>
+                <div class="id-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    CITIZEN IDENTITY
                 </div>
-                <div class="id-row">
-                    <span class="id-label">国民ID (EMAIL)</span>
-                    <span class="id-value" id="user-email" style="font-size: 0.65rem;">-</span>
+            </div>
+            <div class="id-body">
+                <div class="id-photo">
+                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 </div>
-                <div class="id-row">
-                    <span class="id-label">称号 (TITLE)</span>
-                    <span class="id-badge" id="user-title-display">読込中...</span>
+                <div class="id-details">
+                    <div class="id-row">
+                        <span class="id-label">NAME / 氏名</span>
+                        <span class="id-value" id="display-nickname">-</span>
+                    </div>
+                    <div class="id-row">
+                        <span class="id-label">CITIZEN ID / メールアドレス</span>
+                        <span class="id-value" id="user-email" style="font-size: 0.65rem; color: #bbb;">-</span>
+                    </div>
+                    <div class="id-row">
+                        <span class="id-label">STATUS / 称号</span>
+                        <span class="id-badge" id="user-title-display">読込中...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -350,7 +339,10 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <!-- 2. お知らせ -->
         <div class="panel">
-            <div class="panel-header">📢 王国通信</div>
+            <div class="panel-header">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                王国通信
+            </div>
             <div class="news-list" id="announcement-list">
                 <div class="news-item"><span class="news-date">--/--</span>お知らせ読込中...</div>
             </div>
@@ -358,7 +350,10 @@
 
         <!-- 3. 税金表示 -->
         <div class="panel tax-display">
-            <div class="panel-header" style="justify-content: center;">💰 次回所得税</div>
+            <div class="panel-header" style="justify-content: center;">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                次回所得税
+            </div>
             <div class="tax-amount" id="my-tax-amount">計算中...</div>
             <div class="tax-note">※火・金 9:00 (10万G超 0.5%)</div>
         </div>
@@ -367,15 +362,18 @@
     <!-- 4. 設定パネル -->
     <div class="panel">
         <details>
-            <summary>⚙️ 各種設定・称号・納税操作</summary>
+            <summary>
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                各種設定・称号・納税操作
+            </summary>
             <div class="form-grid">
                 <div class="form-group">
-                    <span class="label">称号変更</span>
+                    <span class="label"><svg viewBox="0 0 24 24"><polygon points="2 4 5 16 12 20 19 16 22 4 17 9 12 3 7 9 2 4"></polygon></svg>称号変更</span>
                     <select id="title-select"><option value="">読込中...</option></select>
                     <button class="btn-solid" onclick="equipTitle()">適用</button>
                 </div>
                 <div class="form-group">
-                    <span class="label">納税口座</span>
+                    <span class="label"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>納税口座</span>
                     <select id="tax-wallet-select"><option value="">読込中...</option></select>
                     <button class="btn-solid btn-tax" onclick="payTax()">納税実行 (+100G)</button>
                 </div>
@@ -392,35 +390,48 @@
 
             <!-- 国王専用 -->
             <div id="admin-controls" style="display: none; border-top: 1px solid #333; margin-top: 16px; padding-top: 12px;">
-                <span class="label" style="color: var(--danger-color);">👑 ADMIN CONTROLS</span>
+                <span class="label" style="color: var(--danger-color);"><svg viewBox="0 0 24 24"><polygon points="2 4 5 16 12 20 19 16 22 4 17 9 12 3 7 9 2 4"></polygon></svg>ADMIN CONTROLS</span>
                 <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button id="btn-admin-items" class="btn-solid" style="flex:1" onclick="location.href='/admin/items'">アイテム</button>
-                    <button id="btn-admin-casino" class="btn-solid" style="flex:1" onclick="location.href='/admin/casino'">カジノ</button>
+                    <button id="btn-admin-items" class="btn-solid" style="flex:1" onclick="location.href='/admin/items'">
+                        <svg viewBox="0 0 24 24"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        アイテム
+                    </button>
+                    <button id="btn-admin-casino" class="btn-solid" style="flex:1" onclick="location.href='/admin/casino'">
+                        <svg viewBox="0 0 24 24"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line></svg>
+                        カジノ
+                    </button>
                 </div>
                 <button id="btn-admin-tax" class="btn-solid" style="width: 100%; margin-top: 8px; color: var(--danger-color);" onclick="collectAllTax()">全国民から即時徴収</button>
             </div>
             
             <div style="display: flex; gap: 8px; margin-top: 16px;">
-                <button class="btn-solid" style="flex: 1;" onclick="openPolicyViewer()">利用規約</button>
-                <button class="btn-solid" style="flex: 1; color: var(--danger-color);" onclick="logout()">ログアウト</button>
+                <button class="btn-solid" style="flex: 1;" onclick="openPolicyViewer()">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    利用規約
+                </button>
+                <button class="btn-solid" style="flex: 1; color: var(--danger-color);" onclick="logout()">
+                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    ログアウト
+                </button>
             </div>
         </details>
     </div>
 
-    <!-- 5. 蜂の巣（ハニカム）サービスグリッド -->
+    <!-- 5. 八角形サービスグリッド -->
     <div>
         <div class="grid-header">
-            <span>HONEYCOMB TERMINALS</span>
-            <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※長押しで浮遊・並び替え</span>
+            <span>SERVICE TERMINALS</span>
+            <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※長押しで浮遊・追尾並び替え</span>
         </div>
-        <div class="honeycomb-container" id="service-grid">
-            <!-- JSで描画 -->
+        <div class="octagon-grid" id="service-grid">
+            <!-- JSで動的描画 -->
         </div>
     </div>
 
     <!-- 6. 裏路地 -->
     <div class="alley-box" onclick="openAlleyModal()">
-        👀 街の裏路地で怪しげな男がこちらの様子を伺っている...
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        街の裏路地で怪しげな男がこちらの様子を伺っている...
     </div>
 
 </div>
@@ -432,7 +443,10 @@
 <!-- カスタムリンク追加 -->
 <div id="add-link-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">🔗 カスタムノード追加</div>
+        <div class="modal-title">
+            <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            カスタムノード追加
+        </div>
         <div class="form-group" style="margin-bottom: 12px;">
             <span class="label">サービス名</span>
             <input type="text" id="custom-link-name" placeholder="例: SNS">
@@ -451,12 +465,24 @@
 <!-- 裏路地 -->
 <div id="alley-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">🕵️️ 路地裏の男</div>
+        <div class="modal-title">
+            <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            路地裏の男
+        </div>
         <div id="alley-text" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;"></div>
         <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="btn-solid" onclick="chooseWork()">🔨 働きたい</button>
-            <button class="btn-solid" onclick="chooseLoan()">💰 金を借りたい</button>
-            <button class="btn-solid" style="background: transparent;" onclick="closeAlleyModal()">👋 立ち去る</button>
+            <button class="btn-solid" onclick="chooseWork()">
+                <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                働きたい
+            </button>
+            <button class="btn-solid" onclick="chooseLoan()">
+                <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+                金を借りたい
+            </button>
+            <button class="btn-solid" style="background: transparent;" onclick="closeAlleyModal()">
+                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                立ち去る
+            </button>
         </div>
         <div id="alley-choices-factory" style="display: none; flex-direction: column; gap: 8px;">
             <button class="btn-solid" onclick="location.href='/factory'">はい（工場へ）</button>
@@ -472,7 +498,10 @@
 <!-- 規約確認 -->
 <div id="policy-view-modal" class="modal-overlay" onclick="if(event.target === this) closePolicyViewer();">
     <div class="modal-box" onclick="event.stopPropagation();">
-        <div class="modal-title">📜 利用規約・ポリシー</div>
+        <div class="modal-title">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            利用規約・ポリシー
+        </div>
         <div id="policy-view-content" style="font-size: 0.75rem; color: #ccc; max-height: 250px; overflow-y: auto; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
         <button class="btn-solid" style="width: 100%;" onclick="closePolicyViewer()">閉じる</button>
     </div>
@@ -481,7 +510,10 @@
 <!-- 規約同意 -->
 <div id="terms-modal" class="modal-overlay">
     <div class="modal-box" style="border-color: var(--accent-gold);">
-        <div class="modal-title">📜 規約の同意</div>
+        <div class="modal-title">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            規約の同意
+        </div>
         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">サービスの利用には規約の同意が必要です。</div>
         <div id="terms-content-box" style="background: var(--bg-base); padding: 10px; height: 150px; overflow-y: auto; font-size: 0.7rem; color: #aaa; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
         <button id="agree-terms-btn" class="btn-solid" style="width: 100%; background: var(--accent-gold); color: #000;">同意して続ける</button>
@@ -490,7 +522,7 @@
 
 <script>
     /* ==========================================================
-       UI: ハニカムグリッド描画 ＆ スタイリッシュ長押しドラッグ並び替え
+       UI: オクタゴングリッド描画 ＆ スタイリッシュ追尾トランジション
        ========================================================== */
     const defaultServices = [
         { id: 'svc-mtube', name: 'M-Tube', url: '/videos', icon: '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>' },
@@ -501,7 +533,7 @@
         { id: 'svc-market', name: '自由市場', url: '/market', icon: '<line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line>' },
         { id: 'svc-mall', name: '民営モール', url: '/mall', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
         { id: 'svc-auction', name: '競売所', url: '/auction', icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline>' },
-        { id: 'svc-casino', name: 'カジノ', url: '/casino', icon: '<polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="22" x2="12" y2="8.5"></line>' },
+        { id: 'svc-casino', name: 'カジノ', url: '/casino', icon: '<polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line>' },
         { id: 'svc-dm', name: 'DM', url: '/dm', icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>' },
         { id: 'svc-ai', name: 'AI', url: '/ai', icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>' }
     ];
@@ -525,7 +557,7 @@
     }
 
     function saveCurrentOrder() {
-        const nodes = document.querySelectorAll('.hex-node[data-id]');
+        const nodes = document.querySelectorAll('.octagon-node[data-id]');
         const orderIds = Array.from(nodes).map(n => n.dataset.id);
         localStorage.setItem('muraoka_service_order', JSON.stringify(orderIds));
     }
@@ -539,9 +571,8 @@
             const isCustom = svc.id.startsWith('cstm-');
             const isCasino = (svc.id === 'svc-casino');
             
-            // カジノ専用バッジ
+            // カジノノード専用バッジ (コンテナの外側に配置してクリップ回避)
             const casinoBadge = isCasino ? `<div class="badge-casino-new">🚀 NEW!</div>` : '';
-            // 削除ボタン
             const deleteAction = isCustom ? `
                 <div class="node-del-action" onclick="event.stopPropagation(); removeCustomLink('${svc.id}')" title="削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -551,7 +582,9 @@
             const iconHtml = svc.icon.includes('<') ? svc.icon : '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>';
 
             html += `
-                <div class="hex-node" data-id="${svc.id}" data-url="${svc.url}" data-custom="${isCustom}">
+                <div class="octagon-node" data-id="${svc.id}" data-url="${svc.url}" data-custom="${isCustom}">
+                    <div class="node-bg"></div>
+                    <div class="node-bg-inner"></div>
                     ${casinoBadge}
                     ${deleteAction}
                     <div class="node-content">
@@ -562,18 +595,18 @@
             `;
         });
 
-        // ＋ボタン（ハニカム用カスタム追加）
+        // ＋ボタン
         html += `
-            <button class="hex-node hex-add" onclick="openAddLinkModal()" title="カスタムノード追加">
+            <div class="octagon-add" onclick="openAddLinkModal()" title="カスタムノード追加">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
+            </div>
         `;
 
         grid.innerHTML = html;
         setupDragAndDrop();
     }
 
-    /* 誤爆ゼロの長押し(650ms) ＆ スタイリッシュドラッグ */
+    /* 長押し(650ms) ＆ FLIPアニメーションによる滑らかな追尾入れ替え */
     let pressTimer = null;
     let draggedNode = null;
     let isDragging = false;
@@ -582,7 +615,7 @@
 
     function setupDragAndDrop() {
         const grid = document.getElementById('service-grid');
-        const nodes = grid.querySelectorAll('.hex-node[data-id]');
+        const nodes = grid.querySelectorAll('.octagon-node[data-id]');
 
         nodes.forEach(node => {
             const startPress = (e) => {
@@ -594,14 +627,14 @@
 
                 node.classList.add('long-pressing');
                 
-                // 650msの安全なしきい値
+                // 650msで発動
                 pressTimer = setTimeout(() => {
                     isDragging = true;
                     draggedNode = node;
                     node.classList.remove('long-pressing');
                     node.classList.add('dragging');
 
-                    if (navigator.vibrate) navigator.vibrate(60);
+                    if (navigator.vibrate) navigator.vibrate(50);
                 }, 650);
             };
 
@@ -639,7 +672,7 @@
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        // 8px以上の移動で即座にスクロールと判定して長押しを完全破棄
+        // 8px以上の移動で即座にスクロール操作と判定して長押しを破棄
         if (!isDragging && pressTimer) {
             const dist = Math.hypot(clientX - startX, clientY - startY);
             if (dist > 8) {
@@ -652,32 +685,55 @@
         }
 
         if (!isDragging || !draggedNode) return;
-        if (e.cancelable) e.preventDefault(); // スクロール抑止
+        if (e.cancelable) e.preventDefault(); // スクロール防止
 
         const deltaX = clientX - startX;
         const deltaY = clientY - startY;
-        draggedNode.style.transform = `scale(1.18) translate(${deltaX}px, ${deltaY - 14}px)`;
+        draggedNode.style.transform = `scale(1.18) translate(${deltaX}px, ${deltaY - 12}px)`;
 
-        // ターゲット判定
+        // 重なっているノードの検知
         const elemBelow = document.elementFromPoint(clientX, clientY);
-        const targetNode = elemBelow ? elemBelow.closest('.hex-node[data-id]') : null;
-
-        const allNodes = document.querySelectorAll('.hex-node[data-id]');
-        allNodes.forEach(n => n.classList.remove('drop-target'));
+        const targetNode = elemBelow ? elemBelow.closest('.octagon-node[data-id]') : null;
 
         if (targetNode && targetNode !== draggedNode) {
-            targetNode.classList.add('drop-target');
-
             const grid = document.getElementById('service-grid');
-            const nodesArr = Array.from(grid.querySelectorAll('.hex-node[data-id]'));
-            const draggedIdx = nodesArr.indexOf(draggedNode);
-            const targetIdx = nodesArr.indexOf(targetNode);
+            const allNodes = Array.from(grid.querySelectorAll('.octagon-node[data-id]'));
+            
+            // FLIP アニメーション: 入れ替え前の座標を取得 (First)
+            const firstRects = new Map();
+            allNodes.forEach(n => {
+                if (n !== draggedNode) firstRects.set(n, n.getBoundingClientRect());
+            });
+
+            // DOM入れ替え
+            const draggedIdx = allNodes.indexOf(draggedNode);
+            const targetIdx = allNodes.indexOf(targetNode);
 
             if (draggedIdx < targetIdx) {
                 targetNode.after(draggedNode);
             } else {
                 targetNode.before(draggedNode);
             }
+
+            // FLIP アニメーション: 入れ替え後の差分を計算して滑らかに追尾スライド (Last & Invert & Play)
+            allNodes.forEach(n => {
+                if (n !== draggedNode && firstRects.has(n)) {
+                    const first = firstRects.get(n);
+                    const last = n.getBoundingClientRect();
+                    const invertX = first.left - last.left;
+                    const invertY = first.top - last.top;
+
+                    if (invertX !== 0 || invertY !== 0) {
+                        n.style.transition = 'none';
+                        n.style.transform = `translate(${invertX}px, ${invertY}px)`;
+
+                        requestAnimationFrame(() => {
+                            n.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                            n.style.transform = '';
+                        });
+                    }
+                }
+            });
         }
     }
 
@@ -690,9 +746,6 @@
         draggedNode.classList.remove('dragging');
         draggedNode.style.transform = '';
         
-        const allNodes = document.querySelectorAll('.hex-node[data-id]');
-        allNodes.forEach(n => n.classList.remove('drop-target', 'long-pressing'));
-
         saveCurrentOrder();
 
         isDragging = false;
@@ -738,7 +791,7 @@
     document.addEventListener("DOMContentLoaded", renderGrid);
 
     /* ==========================================================
-       バックエンド通信ロジック (完全防護版)
+       バックエンド通信ロジック
        ========================================================== */
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
