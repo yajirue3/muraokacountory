@@ -10,8 +10,7 @@ from db import get_supabase
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-# エラー指示の通り 3.5-flash-lite を指定
-MODEL_NAME = "gemini-3.5-flash-lite"
+MODEL_NAME = "gemini-3.5-flash"
 
 ai_client = None
 if GEMINI_API_KEY:
@@ -49,7 +48,7 @@ class ChatResponse(BaseModel):
 
 
 # --------------------------------------------------
-# チャットAPIエンドポイント（minimalモード適用）
+# チャットAPIエンドポイント
 # --------------------------------------------------
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None)):
@@ -92,12 +91,10 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         )
     )
 
-    # 公式SDK最新仕様: thinking_level に MINIMAL を指定
+    # 思考レベルのややこしい設定は外し、トークン上限とキャラ付け指示のみ設定
     config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(
-            thinking_level=types.ThinkingLevel.MINIMAL
-        ),
-        max_output_tokens=300
+        max_output_tokens=2048,
+        system_instruction="親切で丁寧な日本語で、長くなりすぎないように回答してください。"
     )
 
     try:
@@ -110,7 +107,7 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         if not reply_text:
             reply_text = "（応答を取得できませんでした）"
 
-        db_save_reply = reply_text[:255]
+        db_save_reply = reply_text
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI応答エラー: {str(e)}")
