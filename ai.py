@@ -91,10 +91,13 @@ async def chat_with_gemini(data: ChatRequest, authorization: str = Header(None))
         )
     )
 
-    # 思考レベルのややこしい設定は外し、トークン上限とキャラ付け指示のみ設定
+    # 思考をオフ（thinking_budget=0）にして即時生成 + 512トークンで高速化
     config = types.GenerateContentConfig(
-        max_output_tokens=2048,
-        system_instruction="親切で丁寧な日本語で、長くなりすぎないように回答してください。"
+        thinking_config=types.ThinkingConfig(
+            thinking_budget=0
+        ),
+        max_output_tokens=512,
+        system_instruction="親切かつ簡潔な日本語で短く回答してください。"
     )
 
     try:
