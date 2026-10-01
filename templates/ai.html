@@ -46,11 +46,11 @@
         .msg-mine { align-items: flex-end; }
         .msg-other { align-items: flex-start; }
         .msg-sender-label { font-size: 0.75rem; color: var(--primary); margin-bottom: 4px; font-weight: bold; }
-        .msg-bubble-wrapper { display: flex; align-items: flex-start; gap: 8px; max-width: 85%; }
+        .msg-bubble-wrapper { display: flex; align-items: flex-start; gap: 8px; max-width: 90%; }
         .msg-mine .msg-bubble-wrapper { flex-direction: row-reverse; }
         
         .msg-bubble { 
-            padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; 
+            padding: 12px 16px; font-size: 0.95rem; line-height: 1.6; 
             word-break: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
             white-space: pre-wrap;
         }
@@ -129,7 +129,8 @@
             <button class="nav-icon" onclick="location.href='/dashboard'">←</button>
             <div style="display:flex; flex-direction:column;">
                 <span style="font-size: 1.05rem;">AI相談室</span>
-                <span style="font-size: 0.75rem; color: var(--sub); font-weight: normal;">Gemini 3.5 Flash Lite (minimal)</span>
+                <!-- モデル表示を 3.5 Flash に変更 -->
+                <span style="font-size: 0.75rem; color: var(--sub); font-weight: normal;">Gemini 3.5 Flash</span>
             </div>
         </div>
         <div style="display:flex; gap: 6px; align-items:center;">
