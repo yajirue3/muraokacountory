@@ -1232,3 +1232,11 @@ async def get_my_created_gifts(authorization: str = Header(None)):
             g["status"] = "EXPIRED"
 
     return {"gifts": gifts}
+
+# --- フロントエンド用 Supabase公開設定取得API ---
+@app.get("/api/config")
+def get_public_config():
+    return {
+        "supabase_url": SUPABASE_URL,
+        "supabase_anon_key": SUPABASE_KEY
+    }
