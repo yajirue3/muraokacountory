@@ -4,19 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村岡王国 - 入国管理所</title>
+    <!-- Supabase JS SDK CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --bg-base: #050505;
-            --bg-surface: #121212;
-            --bg-card: #1a1a1a;
-            --border-subtle: #333333;
-            --text-primary: #f0f0f0;
-            --text-secondary: #999999;
+            --bg-base: #070709;
+            --bg-surface: #101216;
+            --bg-card: #161920;
+            --border-subtle: #242933;
+            --border-hover: #3b4252;
+            --text-primary: #eceff4;
+            --text-secondary: #8892b0;
             --accent-gold: #d4af37;
-            --accent-gold-hover: #f1c40f;
-            --danger-color: #e74c3c;
-            --chamfer-clip: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
-            --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
+            --accent-gold-hover: #e5c05b;
+            --danger-color: #e06c75;
+            --chamfer-clip: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+            --octagon-clip: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,86 +32,142 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: 24px 16px;
+            padding: 32px 16px;
+            background-image: 
+                radial-gradient(ellipse at 50% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 60%),
+                linear-gradient(to bottom, #070709, #050505);
         }
 
         .auth-wrapper {
             width: 100%;
-            max-width: 420px;
+            max-width: 440px;
             display: flex;
             flex-direction: column;
             gap: 20px;
         }
 
-        /* 王国シンボル（八角形エンブレム） */
+        /* 八角形エンブレム */
+        .kingdom-emblem-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         .kingdom-emblem {
-            align-self: center;
-            width: 64px;
-            height: 64px;
-            background: var(--border-subtle);
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--accent-gold) 0%, #4a3e1a 100%);
             clip-path: var(--octagon-clip);
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            filter: drop-shadow(0 4px 16px rgba(212, 175, 55, 0.25));
         }
         .kingdom-emblem::before {
             content: "";
             position: absolute;
-            top: 1px; left: 1px; right: 1px; bottom: 1px;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
             background: var(--bg-card);
             clip-path: var(--octagon-clip);
-            z-index: -1;
+            z-index: 1;
         }
         .emblem-inner {
-            font-size: 1.5rem;
+            position: relative;
+            z-index: 2;
+            font-size: 1.8rem;
             color: var(--accent-gold);
             font-weight: 900;
+            letter-spacing: -1px;
         }
 
         .header-title {
             text-align: center;
         }
         .header-title h1 {
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             color: var(--accent-gold);
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             font-weight: 700;
         }
         .header-title p {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             margin-top: 4px;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
 
         /* 幾何学メインコンソール */
         .terminal-panel {
-            background: var(--border-subtle);
+            background: linear-gradient(145deg, rgba(212, 175, 55, 0.4), var(--border-subtle) 40%, rgba(255, 255, 255, 0.05) 100%);
             clip-path: var(--chamfer-clip);
             padding: 1px;
-            position: relative;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
         }
         .terminal-inner {
             background: var(--bg-surface);
             clip-path: var(--chamfer-clip);
-            padding: 24px;
+            padding: 26px 24px;
         }
 
-        /* タブセレクター */
+        /* ソーシャル（Google）ログイン */
+        .btn-social {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            clip-path: var(--chamfer-clip);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-social:hover {
+            border-color: var(--border-hover);
+            background: #1c202a;
+        }
+        .btn-social svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 分割線 */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+
+        /* タブ切り替え */
         .tab-switch {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-subtle);
-            padding-bottom: 12px;
+            background: var(--bg-base);
+            padding: 4px;
+            clip-path: var(--chamfer-clip);
+            border: 1px solid var(--border-subtle);
         }
         .tab-btn {
             background: none;
             border: none;
             color: var(--text-secondary);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: bold;
             padding: 8px;
             cursor: pointer;
@@ -124,12 +183,17 @@
             background: var(--accent-gold);
         }
 
-        /* フォームグループ */
+        /* フォーム */
         .form-group {
             margin-bottom: 14px;
             display: flex;
             flex-direction: column;
             gap: 6px;
+        }
+        .form-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         label {
             font-size: 0.75rem;
@@ -141,6 +205,23 @@
             color: #666;
             margin-left: 4px;
             font-weight: normal;
+        }
+        .forgot-link {
+            font-size: 0.7rem;
+            color: var(--accent-gold);
+            text-decoration: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .forgot-link:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        .input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
         }
         input[type="text"],
         input[type="email"],
@@ -157,6 +238,24 @@
         }
         input:focus {
             border-color: var(--accent-gold);
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 4px;
+        }
+        .password-toggle:hover {
+            color: var(--text-primary);
+        }
+        .password-toggle svg {
+            width: 16px;
+            height: 16px;
         }
 
         /* チェックボックス */
@@ -206,6 +305,10 @@
         .btn-gold:hover {
             background-color: var(--accent-gold-hover);
         }
+        .btn-gold:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
         /* モーダル */
         .modal-overlay {
@@ -213,7 +316,8 @@
             position: fixed;
             top: 0; left: 0;
             width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
             z-index: 10000;
             justify-content: center;
             align-items: center;
@@ -226,6 +330,7 @@
             width: 100%;
             max-width: 440px;
             padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
         }
         .modal-title {
             color: var(--accent-gold);
@@ -260,8 +365,10 @@
 
 <div class="auth-wrapper">
     <!-- 八角形エンブレム -->
-    <div class="kingdom-emblem">
-        <div class="emblem-inner">村</div>
+    <div class="kingdom-emblem-wrap">
+        <div class="kingdom-emblem">
+            <div class="emblem-inner">村</div>
+        </div>
     </div>
 
     <div class="header-title">
@@ -272,6 +379,19 @@
     <!-- メインフレーム -->
     <div class="terminal-panel">
         <div class="terminal-inner">
+            <!-- Google認証 -->
+            <button type="button" class="btn-social" onclick="loginWithGoogle()">
+                <svg viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                </svg>
+                Googleアカウントで入国
+            </button>
+
+            <div class="divider">または ID / 暗証番号</div>
+
             <!-- タブ切り替え -->
             <div class="tab-switch">
                 <button type="button" class="tab-btn active" id="tab-login" onclick="switchTab('login')">入国 (LOGIN)</button>
@@ -282,24 +402,37 @@
             <div id="form-login">
                 <div class="form-group">
                     <label for="login-email">国民ID (Email)</label>
-                    <input type="email" id="login-email" placeholder="mail@example.com">
+                    <input type="email" id="login-email" placeholder="mail@example.com" autocomplete="email">
                 </div>
                 <div class="form-group">
-                    <label for="login-password">暗証番号 (Password)</label>
-                    <input type="password" id="login-password" placeholder="••••••••">
+                    <div class="form-group-header">
+                        <label for="login-password">暗証番号 (Password)</label>
+                        <a class="forgot-link" onclick="openForgotModal()">暗証番号をお忘れの方</a>
+                    </div>
+                    <div class="input-wrap">
+                        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('login-password', this)" title="表示切替">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
                 </div>
-                <button class="btn-action btn-gold" style="margin-top: 16px;" onclick="login()">入国認証を実行</button>
+                <button id="btn-login-submit" class="btn-action btn-gold" style="margin-top: 18px;" onclick="login()">入国認証を実行</button>
             </div>
 
             <!-- 新規登録フォーム -->
             <div id="form-signup" style="display: none;">
                 <div class="form-group">
                     <label for="signup-email">国民ID (Email)</label>
-                    <input type="email" id="signup-email" placeholder="mail@example.com">
+                    <input type="email" id="signup-email" placeholder="mail@example.com" autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label for="signup-password">暗証番号 (Password)</label>
-                    <input type="password" id="signup-password" placeholder="••••••••">
+                    <div class="input-wrap">
+                        <input type="password" id="signup-password" placeholder="••••••••" autocomplete="new-password">
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('signup-password', this)" title="表示切替">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="signup-nickname">ニックネーム<span class="optional">(任意)</span></label>
@@ -316,7 +449,7 @@
                     <a onclick="openPolicyViewer()">（規約を読む）</a>
                 </div>
 
-                <button class="btn-action btn-gold" onclick="signup()">新規国民申請</button>
+                <button id="btn-signup-submit" class="btn-action btn-gold" onclick="signup()">新規国民申請</button>
             </div>
         </div>
     </div>
@@ -331,7 +464,43 @@
     </div>
 </div>
 
+<!-- パスワード忘れ・再設定モーダル -->
+<div id="forgot-modal" class="modal-overlay" onclick="if(event.target === this) closeForgotModal();">
+    <div class="modal-box" onclick="event.stopPropagation();">
+        <div class="modal-title">🔑 暗証番号の再設定</div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
+            登録済みの国民ID（メールアドレス）を入力してください。<br>暗証番号再設定用の安全なリンクを送信します。
+        </p>
+        <div class="form-group">
+            <label for="forgot-email">国民ID (Email)</label>
+            <input type="email" id="forgot-email" placeholder="mail@example.com">
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 18px;">
+            <button type="button" class="btn-action btn-close" style="flex: 1;" onclick="closeForgotModal()">戻る</button>
+            <button type="button" id="btn-forgot-submit" class="btn-action btn-gold" style="flex: 1;" onclick="sendPasswordReset()">再設定メール送信</button>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Supabase クライアント初期化
+    const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
+    let supabaseClient = null;
+    if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    // パスワード表示／非表示トグル
+    function togglePasswordVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.innerHTML = isPassword 
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    }
+
     // タブ切り替え処理
     function switchTab(mode) {
         const loginTab = document.getElementById("tab-login");
@@ -352,19 +521,85 @@
         }
     }
 
+    // Enterキー送信対応
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("login-password").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") login();
+        });
+        document.getElementById("signup-realname").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") signup();
+        });
+    });
+
     // ログイン済みの場合は自動でダッシュボードへ遷移
     if (localStorage.getItem("access_token")) {
         window.location.href = "/dashboard";
     }
 
+    // Google OAuth 認証
+    async function loginWithGoogle() {
+        if (!supabaseClient) {
+            alert("認証基盤の設定が見つかりません。Supabaseの環境設定を確認してください。");
+            return;
+        }
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin + '/dashboard'
+                }
+            });
+            if (error) throw error;
+        } catch (e) {
+            alert("Google認証エラー: " + e.message);
+        }
+    }
+
+    // パスワードリセット処理
+    function openForgotModal() {
+        document.getElementById("forgot-email").value = document.getElementById("login-email").value || "";
+        document.getElementById("forgot-modal").style.display = "flex";
+    }
+    function closeForgotModal() {
+        document.getElementById("forgot-modal").style.display = "none";
+    }
+    async function sendPasswordReset() {
+        const email = document.getElementById("forgot-email").value.trim();
+        if (!email) return alert("国民ID（メールアドレス）を入力してください");
+        if (!supabaseClient) return alert("認証クライアントが初期化されていません");
+
+        const btn = document.getElementById("btn-forgot-submit");
+        btn.disabled = true;
+        btn.innerText = "送信中...";
+
+        try {
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/dashboard'
+            });
+            if (error) throw error;
+            alert("再設定用の案内メールを送信しました。\nメール内のリンクから再設定を完了してください。");
+            closeForgotModal();
+        } catch (e) {
+            alert("送信失敗: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "再設定メール送信";
+        }
+    }
+
+    // 通常ログイン
     async function login() {
-        const email = document.getElementById("login-email").value;
+        const email = document.getElementById("login-email").value.trim();
         const password = document.getElementById("login-password").value;
+        const btn = document.getElementById("btn-login-submit");
 
         if (!email || !password) {
             alert("IDと暗証番号を入力してください");
             return;
         }
+
+        btn.disabled = true;
+        btn.innerText = "認証中...";
 
         try {
             const res = await fetch("/login", {
@@ -384,15 +619,20 @@
             }
         } catch (e) {
             alert("通信エラーが発生しました");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "入国認証を実行";
         }
     }
 
+    // 新規登録
     async function signup() {
-        const email = document.getElementById("signup-email").value;
+        const email = document.getElementById("signup-email").value.trim();
         const password = document.getElementById("signup-password").value;
-        const nickname = document.getElementById("signup-nickname").value;
-        const realName = document.getElementById("signup-realname").value;
+        const nickname = document.getElementById("signup-nickname").value.trim();
+        const realName = document.getElementById("signup-realname").value.trim();
         const agreed = document.getElementById("terms-agree").checked;
+        const btn = document.getElementById("btn-signup-submit");
 
         if (!email || !password) {
             alert("登録するIDと暗証番号を入力してください");
@@ -403,6 +643,9 @@
             alert("利用規約への同意が必要です");
             return;
         }
+
+        btn.disabled = true;
+        btn.innerText = "申請処理中...";
 
         try {
             const res = await fetch("/signup", {
@@ -426,6 +669,9 @@
             }
         } catch (e) {
             alert("通信エラーが発生しました");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "新規国民申請";
         }
     }
 
