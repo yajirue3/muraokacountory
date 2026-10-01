@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>村岡王国 - 狂乱クラッシュ (CRASH)</title>
+    <title>村岡王国 - クラッシュ (CRASH)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=M+PLUS+1p:wght@800;900&display=swap');
 
@@ -348,7 +348,7 @@
             <div class="stats-grid">
                 <div class="stat-box">
                     <div class="stat-label">🎯 あなたの目標</div>
-                    <div id="stat-target" class="stat-val">2.00x</div>
+                    <div id="stat-target" class="stat-val">1.92x</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">💰 獲得見込みGold</div>
@@ -376,7 +376,7 @@
                 </div>
                 <div>
                     <div class="label">🎯 目標利確倍率 (x)</div>
-                    <input type="number" id="target-multiplier" value="2.00" min="1.01" max="100.00" step="0.05">
+                    <input type="number" id="target-multiplier" value="1.92" min="1.92" max="100.00" step="0.05">
                 </div>
             </div>
         </div>
@@ -530,7 +530,7 @@
         // --- 入力連動計算 ---
         function updateEstimations() {
             const bet = parseFloat(inputBet.value) || 0;
-            const target = parseFloat(inputTarget.value) || 1.01;
+            const target = parseFloat(inputTarget.value) || 1.92;
             statTarget.innerText = `${target.toFixed(2)}x`;
             statPayout.innerText = `${Math.floor(bet * target)} G`;
         }
@@ -725,7 +725,7 @@
 
             if (!walletId) return alert('口座を選択してください');
             if (!amount || amount < 1 || amount > 50000) return alert('賭け金は1〜50,000Goldの範囲で入力してください');
-            if (!targetMultiplier || targetMultiplier < 1.01 || targetMultiplier > 100.0) return alert('目標倍率は1.01〜100.00xの間で入力してください');
+            if (!targetMultiplier || targetMultiplier < 1.92 || targetMultiplier > 100.0) return alert('目標倍率は1.92〜100.00xの間で入力してください');
 
             btnBet.disabled = true;
 
