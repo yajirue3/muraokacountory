@@ -49,38 +49,53 @@
             transform: translateY(-2px);
         }
 
-        /* 🏇 ピックアップ：国営ダービー専用ネオンゴールドスタイル */
-        .game-card-derby {
-            background: linear-gradient(145deg, #2d1e05, #140d02);
-            border: 2px solid #ffd700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4), inset 0 0 15px rgba(255, 140, 0, 0.3);
-            animation: pulse-derby-border 2s infinite alternate;
+        /* 🚀 新ギャンブルピックアップ：狂乱クラッシュ専用サイバーネオンスタイル */
+        .game-card-crash {
+            background: linear-gradient(145deg, #2b0024, #0d0014);
+            border: 2px solid #ff007f;
+            box-shadow: 0 0 20px rgba(255, 0, 127, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.2);
+            animation: pulse-crash-border 1.5s infinite alternate;
         }
-        .game-card-derby:hover {
-            border-color: #ff9900;
+        .game-card-crash:hover {
+            border-color: #00f3ff;
             transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.7);
         }
-        @keyframes pulse-derby-border {
-            0% { border-color: #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
-            100% { border-color: #ff9900; box-shadow: 0 0 25px rgba(255, 153, 0, 0.6), 0 0 10px rgba(255, 215, 0, 0.3); }
+        @keyframes pulse-crash-border {
+            0% { border-color: #ff007f; box-shadow: 0 0 15px rgba(255, 0, 127, 0.4); }
+            100% { border-color: #00f3ff; box-shadow: 0 0 25px rgba(0, 243, 255, 0.6), 0 0 10px rgba(255, 0, 127, 0.3); }
         }
 
-        .badge-pickup {
+        .badge-pickup-new {
             position: absolute;
             top: -10px;
             right: 12px;
-            background: linear-gradient(135deg, #ff8800, #ff2200);
+            background: linear-gradient(135deg, #ff007f, #00f3ff);
             color: #fff;
             font-size: 0.65rem;
             font-weight: 900;
             padding: 2px 8px;
             border-radius: 10px;
             border: 1px solid #fff;
-            box-shadow: 0 0 10px #ff5500;
+            box-shadow: 0 0 10px #ff007f;
             letter-spacing: 1px;
             animation: badge-bounce 1s infinite alternate;
         }
+
+        .badge-pickup-warn {
+            position: absolute;
+            top: -10px;
+            right: 12px;
+            background: linear-gradient(135deg, #777, #444);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #aaa;
+            letter-spacing: 1px;
+        }
+
         @keyframes badge-bounce {
             from { transform: translateY(0); }
             to { transform: translateY(-3px); }
@@ -96,9 +111,9 @@
             gap: 6px; 
             text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
         }
-        .title-derby {
-            color: #ffd700;
-            text-shadow: 0 0 8px #ffd700, 0 0 15px #ff8800;
+        .title-crash {
+            color: #00f3ff;
+            text-shadow: 0 0 8px #00f3ff, 0 0 15px #ff007f;
         }
         .game-desc { font-size: 0.8rem; color: #bbb; margin-bottom: 12px; line-height: 1.4; }
         
@@ -130,18 +145,30 @@
             box-shadow: 0 0 18px rgba(255, 87, 51, 0.6);
         }
 
-        .btn-play-derby {
-            background: linear-gradient(135deg, #ff9900 0%, #d4af37 50%, #ff3300 100%);
+        .btn-play-crash {
+            background: linear-gradient(135deg, #ff007f 0%, #b000ff 50%, #00f3ff 100%);
             color: #fff;
             font-size: 0.95rem;
             font-weight: 900;
-            border: 1px solid #ffe680;
-            box-shadow: 0 0 15px rgba(255, 170, 0, 0.6);
+            border: 1px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
             text-shadow: 0 0 6px #000;
         }
-        .btn-play-derby:hover {
+        .btn-play-crash:hover {
             filter: brightness(1.25);
-            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.8);
+        }
+
+        .btn-play-muted {
+            background: #2a2520;
+            color: #888;
+            border: 1px solid #444;
+            box-shadow: none;
+        }
+        .btn-play-muted:hover {
+            filter: none;
+            background: #333;
+            color: #aaa;
         }
 
         .btn-back { 
@@ -159,17 +186,28 @@
     <div class="card">
         <div class="header">🎰 王国カジノ（地下娯楽場）</div>
         
-        <!-- 🏇 ピックアップ：国営ダービー（デモ先行公開枠） -->
-        <div class="game-card game-card-derby">
-            <div class="badge-pickup">先行BETA / DEMO</div>
-            <div class="game-title title-derby">🏇 国営ダービー（Derby）</div>
-            <div class="game-desc" style="color: #ffebaa;">
-                【※現在デモ稼働中】毎時00分・30分に発走！王国屈指の名馬たちが火花を散らす競馬シミュレーション。栄冠と配当を掴み取れ！
+        <!-- 🚀 超目玉ピックアップ：狂乱クラッシュ -->
+        <div class="game-card game-card-crash">
+            <div class="badge-pickup-new">🔥 NEW GAME / PICKUP</div>
+            <div class="game-title title-crash">🚀 狂乱クラッシュ（Crash）</div>
+            <div class="game-desc" style="color: #e0faff;">
+                【新登場】ロケットが爆発する前に目標倍率に到達して利確せよ！最大100倍まで跳ね上がる、息をのむリアルタイムスリル！
             </div>
-            <button class="btn-play btn-play-derby" onclick="location.href='/derby'">🏁 レース会場へ行く（BETA）</button>
+            <button class="btn-play btn-play-crash" onclick="location.href='/crash'">🚀 クラッシュ会場へ発射する</button>
         </div>
 
-        <!-- 💣 マインズ（通常枠へ移行） -->
+        <!-- 🏇 国営ダービー（非推奨アナウンス） -->
+        <div class="game-card">
+            <div class="badge-pickup-warn">⚠️ 注意</div>
+            <div class="game-title">🏇 国営ダービー（Derby）</div>
+            <div class="game-desc" style="color: #ff9999; font-weight: bold;">
+                ※動かないと思うから賭けないの推奨。<br>
+                <span style="font-size: 0.75rem; color: #aaa; font-weight: normal;">現在システム調整中につき、正常に進行しない可能性があります。</span>
+            </div>
+            <button class="btn-play btn-play-muted" onclick="location.href='/derby'">レース会場を見る（非推奨）</button>
+        </div>
+
+        <!-- 💣 マインズ -->
         <div class="game-card">
             <div class="game-title">💣 狂乱マインズ（Mines）</div>
             <div class="game-desc">地雷を避けて宝石を掘り当てろ！進めば進むほど配当が爆散跳ね上がる極限チキンレース！</div>
