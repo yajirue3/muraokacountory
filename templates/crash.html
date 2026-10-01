@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>村岡王国 - クラッシュ (CRASH)</title>
+    <title>村岡王国 - 狂乱クラッシュ (CRASH)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=M+PLUS+1p:wght@800;900&display=swap');
 
@@ -338,9 +338,7 @@
         <div class="header">🚀 狂乱クラッシュ (CRASH) 🚀</div>
 
         <!-- 📜 直近履歴バー -->
-        <div class="history-bar" id="history-bar">
-            <!-- JSで動的生成 -->
-        </div>
+        <div class="history-bar" id="history-bar"></div>
 
         <!-- 🎰 ステータスエリア -->
         <div class="status-display" id="status-display-box">
@@ -360,7 +358,7 @@
         <!-- 🚀 クラッシュキャンバスエリア -->
         <div class="canvas-container">
             <canvas id="crash-canvas"></canvas>
-            <div id="multiplier-text" class="multiplier-overlay">1.00x</div>
+            <div id="multiplier-text" class="multiplier-overlay">15.0s</div>
         </div>
 
         <!-- 🎛️ 入力エリア -->
@@ -444,7 +442,6 @@
             gain.connect(audioCtx.destination);
 
             if (type === 'CASHOUT') {
-                // 利確音：ピロリロリーン
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(400, now);
                 osc.frequency.setValueAtTime(600, now + 0.08);
@@ -454,7 +451,6 @@
                 osc.start(now);
                 osc.stop(now + 0.4);
             } else if (type === 'CRASH') {
-                // 爆破音：ドカーン
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(120, now);
                 osc.frequency.exponentialRampToValueAtTime(15, now + 0.4);
@@ -472,7 +468,6 @@
             };
         }
 
-        // --- 画面リサイズ ---
         function resizeCanvas() {
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
@@ -480,7 +475,6 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- 口座取得（選択保持） ---
         async function loadWallets() {
             try {
                 const res = await fetch("/api/wallets", { headers: getHeaders() });
@@ -500,7 +494,6 @@
             }
         }
 
-        // --- 演出リセット & トリガー ---
         function resetEffects() {
             statusBox.className = "status-display";
             statPayout.className = "stat-val";
@@ -527,7 +520,6 @@
             }
         }
 
-        // --- 入力連動計算 ---
         function updateEstimations() {
             const bet = parseFloat(inputBet.value) || 0;
             const target = parseFloat(inputTarget.value) || 1.92;
@@ -537,7 +529,6 @@
         inputBet.addEventListener('input', updateEstimations);
         inputTarget.addEventListener('input', updateEstimations);
 
-        // --- 履歴表示 ---
         function renderHistory(history) {
             historyBar.innerHTML = (history || []).map(val => {
                 let badgeClass = 'low';
@@ -548,7 +539,6 @@
             }).join('');
         }
 
-        // --- メインポーリング（サーバー状態同期） ---
         async function fetchCurrentState() {
             try {
                 const res = await fetch("/api/crash/current", { headers: getHeaders() });
@@ -577,16 +567,9 @@
             if (!currentRound) return;
 
             const status = currentRound.status;
-            const now = getSyncedServerTime();
-            const betCloseTime = new Date(currentRound.bet_close_at).getTime();
-
             if (status === 'BETTING') {
                 hasTriggeredCashoutSound = false;
                 multText.classList.remove('crashed');
-
-                const remainSec = Math.max(0, ((betCloseTime - now) / 1000)).toFixed(1);
-                multText.innerText = `${remainSec}s`;
-                multText.style.color = 'var(--neon-yellow)';
 
                 if (myBet) {
                     btnBet.disabled = true;
@@ -598,7 +581,7 @@
                     inputTarget.disabled = true;
                 } else {
                     btnBet.disabled = false;
-                    btnBet.innerText = `🚀 エントリー (締め切り: ${remainSec}秒)`;
+                    btnBet.innerText = `🚀 エントリー (BET)`;
                     statusText.innerText = "⚡ ベット受付中！目標倍率を決めて発射せよ！";
                     statusText.style.color = "var(--neon-cyan)";
                     inputWallet.disabled = false;
@@ -622,27 +605,41 @@
             }
         }
 
-        // --- キャンバス描画 ＆ リアルタイム飛行ループ ---
+        // --- キャンバス描画 ＆ リアルタイム飛行ループ (60fps) ---
         function renderLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 背景グリッド描画
             drawBackgroundGrid();
 
-            if (currentRound && currentRound.status === 'FLYING') {
-                const now = getSyncedServerTime();
-                const betCloseTime = new Date(currentRound.bet_close_at).getTime();
+            if (!currentRound) {
+                animationId = requestAnimationFrame(renderLoop);
+                return;
+            }
+
+            const now = getSyncedServerTime();
+            const betCloseTime = new Date(currentRound.bet_close_at).getTime();
+
+            // 1. ベット受付中 (毎フレーム滑らかに0.1秒単位でカウントダウン)
+            if (currentRound.status === 'BETTING') {
+                multText.classList.remove('crashed');
+                const remainSec = Math.max(0, (betCloseTime - now) / 1000);
+                multText.innerText = `${remainSec.toFixed(1)}s`;
+                multText.style.color = 'var(--neon-yellow)';
+
+            // 2. 飛行中
+            } else if (currentRound.status === 'FLYING') {
                 const elapsedSec = Math.max(0, (now - betCloseTime) / 1000);
 
-                // 指数関数的な倍率上昇: multiplier = e^(0.2 * t)
-                const currentMultiplier = Math.max(1.00, Math.exp(0.2 * elapsedSec));
+                // 指数関数上昇: 1.00x 〜 最大100.00xで完全カンスト
+                let currentMultiplier = Math.max(1.00, Math.exp(0.2 * elapsedSec));
+                if (currentMultiplier > 100.00) currentMultiplier = 100.00;
+
+                multText.classList.remove('crashed');
                 multText.innerText = `${currentMultiplier.toFixed(2)}x`;
                 multText.style.color = '#fff';
 
-                // 曲線とロケットの描画
                 drawFlightTrajectory(elapsedSec);
 
-                // 自分の目標倍率を超えた瞬間の利確演出
+                // 利確演出
                 if (myBet && currentMultiplier >= myBet.target_multiplier && !hasTriggeredCashoutSound) {
                     hasTriggeredCashoutSound = true;
                     playSound('CASHOUT');
@@ -651,8 +648,9 @@
                     loadWallets();
                 }
 
-            } else if (currentRound && currentRound.status === 'CRASHED') {
-                const crashVal = currentRound.crash_point ? currentRound.crash_point.toFixed(2) : '💥';
+            // 3. 爆発後
+            } else if (currentRound.status === 'CRASHED') {
+                const crashVal = currentRound.crash_point ? currentRound.crash_point.toFixed(2) : '1.00';
                 multText.innerText = `${crashVal}x`;
                 multText.classList.add('crashed');
 
@@ -696,7 +694,6 @@
             const currentX = startX + (w - 60) * Math.min(progress * 1.2, 1.0);
             const currentY = startY - (h - 60) * Math.pow(progress, 1.6);
 
-            // 軌跡のグロー描画
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#00f3ff';
             ctx.strokeStyle = '#00f3ff';
@@ -706,7 +703,6 @@
             ctx.quadraticCurveTo(startX + (currentX - startX) * 0.6, startY, currentX, currentY);
             ctx.stroke();
 
-            // ロケット（アイコン）描画
             ctx.shadowBlur = 20;
             ctx.shadowColor = '#ff007f';
             ctx.fillStyle = '#ff007f';
@@ -715,7 +711,6 @@
             ctx.shadowBlur = 0;
         }
 
-        // --- ベット実行処理 ---
         async function handleBet() {
             if (!currentRound || currentRound.status !== 'BETTING') return;
 
@@ -758,7 +753,6 @@
 
         btnBet.addEventListener('click', handleBet);
 
-        // BGM/SEトグル設定
         bgmToggle.addEventListener("change", (e) => {
             if (e.target.checked) {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -771,11 +765,10 @@
             if (bgmToggle.checked && bgmPlayer.paused) bgmPlayer.play().catch(() => {});
         }, { once: true });
 
-        // 初期化
         loadWallets();
         updateEstimations();
         fetchCurrentState();
-        setInterval(fetchCurrentState, 1000); // 1秒おきにサーバー状態と高精度同期
+        setInterval(fetchCurrentState, 500); // ポーリングを0.5秒間隔に高速化して同期ズレを解消
         renderLoop();
     });
 
