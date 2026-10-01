@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>村岡王国 - ダッシュボード</title>
     <!-- Supabase JS SDK CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -11,17 +11,21 @@
         :root {
             --bg-base: #050505;
             --bg-surface: #121212;
-            --bg-card: #1a1a1a;
-            --border-subtle: #333;
+            --bg-card: #181818;
+            --border-subtle: #2d2d2d;
             --text-primary: #f0f0f0;
-            --text-secondary: #999;
+            --text-secondary: #888;
             --accent-gold: #d4af37;
+            --accent-cyan: #00f3ff;
             --danger-color: #e74c3c;
-            --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
             --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            /* 正六角形（ヘキサゴン/ハニカム） */
+            --hex-clip: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            --hex-width: 104px;
+            --hex-height: 120px;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-base);
@@ -30,6 +34,8 @@
             justify-content: center;
             padding: 20px 10px;
             min-height: 100vh;
+            user-select: none;
+            overflow-x: hidden;
         }
         button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
         ::-webkit-scrollbar { width: 4px; }
@@ -44,9 +50,7 @@
             gap: 20px;
         }
 
-        /* =========================================
-           1. 復活させた国民身分証明証 (Original Design)
-           ========================================= */
+        /* 1. 国民身分証明証 (完全維持) */
         .id-card-wrapper { 
             background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); 
             border-radius: 12px; 
@@ -80,16 +84,13 @@
         .id-value { font-size: 0.85rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
         .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
 
-        /* =========================================
-           2. 幾何学パネル (Tax & Log & Settings)
-           ========================================= */
+        /* 2. 幾何学パネル (Tax & Log & Settings) */
         .panel {
             background: var(--bg-surface);
             padding: 16px;
             clip-path: var(--chamfer-clip);
             position: relative;
         }
-        /* Clip-path用の疑似ボーダー */
         .panel::before {
             content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
             background: var(--bg-card); clip-path: var(--chamfer-clip); z-index: -1;
@@ -97,18 +98,15 @@
         
         .panel-header { font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display: flex; justify-content: space-between; }
         
-        /* お知らせ */
         .news-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
         .news-item { font-size: 0.75rem; border-bottom: 1px dashed var(--border-subtle); padding-bottom: 6px; }
         .news-item:last-child { border: none; padding-bottom: 0; }
         .news-date { color: var(--text-secondary); margin-right: 8px; font-size: 0.65rem; }
 
-        /* 税金 */
         .tax-display { text-align: center; }
         .tax-amount { color: var(--danger-color); font-size: 1.5rem; font-weight: 900; margin: 4px 0; }
         .tax-note { font-size: 0.65rem; color: var(--text-secondary); }
 
-        /* 設定フォーム */
         details summary { cursor: pointer; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); user-select: none; }
         details summary:hover { color: var(--accent-gold); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
@@ -130,52 +128,179 @@
         .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; }
 
         /* =========================================
-           3. 八角形（オクタゴン）サービスグリッド
+           3. 蜂の巣（ハニカム）グリッド ＆ アニメーション
            ========================================= */
-        .grid-header { display: flex; justify-content: space-between; margin: 16px 0 8px 0; font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); }
+        .grid-header { 
+            display: flex; justify-content: space-between; align-items: flex-end; 
+            margin: 16px 0 10px 0; font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); 
+        }
         
-        .octagon-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
-            gap: 12px;
-            justify-items: center;
+        /* ハニカムコンテナ：互い違いに噛み合わせる */
+        .honeycomb-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 360px;
+            margin: 0 auto;
+            padding-bottom: 20px;
+            position: relative;
         }
 
-        .octagon-node {
-            width: 105px; height: 105px;
+        .hex-node {
+            width: var(--hex-width);
+            height: var(--hex-height);
+            margin: -8px 4px; /* 縦方向を密着させて噛み合わせる */
             background: var(--border-subtle);
-            clip-path: var(--octagon-clip);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            position: relative; transition: all 0.2s; cursor: pointer;
+            clip-path: var(--hex-clip);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            touch-action: pan-y;
+            transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28), background 0.2s, filter 0.2s;
         }
-        .octagon-node::before {
-            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
-            background: var(--bg-card); clip-path: var(--octagon-clip); z-index: -1; transition: 0.2s;
-        }
-        .octagon-node:hover { transform: scale(1.05); background: var(--accent-gold); }
-        .octagon-node:hover::before { background: #222; }
 
-        .node-icon { margin-bottom: 6px; display: flex; align-items: center; justify-content: center; }
-        .node-icon svg { width: 26px; height: 26px; stroke: var(--text-primary); fill: none; stroke-width: 1.5; stroke-linecap: square; }
-        .octagon-node:hover .node-icon svg { stroke: var(--accent-gold); }
+        .hex-node::before {
+            content: "";
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            background: var(--bg-card);
+            clip-path: var(--hex-clip);
+            z-index: 1;
+            transition: background 0.2s;
+        }
+
+        .hex-node:hover:not(.dragging):not(.long-pressing) {
+            transform: scale(1.05);
+            background: var(--accent-gold);
+            filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.4));
+        }
+        .hex-node:hover:not(.dragging):not(.long-pressing)::before {
+            background: #201d14;
+        }
+
+        .node-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            width: 100%;
+            padding: 0 8px;
+        }
+
+        .node-icon { margin-bottom: 5px; }
+        .node-icon svg { 
+            width: 25px; height: 25px; 
+            stroke: var(--text-primary); 
+            fill: none; 
+            stroke-width: 1.5; 
+            stroke-linecap: square; 
+            transition: stroke 0.2s, transform 0.2s; 
+        }
+        .hex-node:hover:not(.dragging) .node-icon svg { stroke: var(--accent-gold); transform: scale(1.1); }
         
-        .node-label { font-size: 0.65rem; font-weight: bold; color: var(--text-primary); text-align: center; line-height: 1.2; word-break: keep-all; }
-
-        /* カスタム機能 (ピン留め/削除) */
-        .node-actions { position: absolute; top: 6px; right: 50%; transform: translateX(50%); opacity: 0; transition: 0.2s; }
-        .octagon-node:hover .node-actions { opacity: 1; }
-        .action-icon { width: 14px; height: 14px; color: var(--text-secondary); cursor: pointer; }
-        .action-icon:hover { color: var(--accent-gold); }
-        .pinned .action-icon { color: var(--accent-gold); fill: var(--accent-gold); opacity: 1; }
-        .octagon-node.pinned .node-actions { opacity: 1; }
-
-        /* 新規追加用オクタゴン */
-        .octagon-add {
-            background: transparent; border: 1px dashed var(--border-subtle); clip-path: none; 
-            border-radius: 50%; /* 代替として丸 */
-            width: 80px; height: 80px; margin-top: 12px;
+        .node-label { 
+            font-size: 0.62rem; 
+            font-weight: bold; 
+            color: var(--text-primary); 
+            text-align: center; 
+            line-height: 1.15; 
+            word-break: keep-all; 
+            letter-spacing: -0.2px; 
         }
-        .octagon-add:hover { border-color: var(--accent-gold); color: var(--accent-gold); transform: scale(1.05); }
+
+        /* ✨ 650ms 押し込みチャージ中のスタイリッシュアニメーション */
+        .hex-node.long-pressing {
+            background: var(--accent-cyan);
+            animation: hex-charge 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes hex-charge {
+            0% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-cyan)); }
+            50% { transform: scale(0.94); filter: drop-shadow(0 0 10px var(--accent-cyan)); }
+            100% { transform: scale(0.92); filter: drop-shadow(0 0 20px var(--accent-gold)); background: var(--accent-gold); }
+        }
+
+        /* 🚀 浮遊・ドラッグ中のスタイリッシュ演出 */
+        .hex-node.dragging {
+            z-index: 9999 !important;
+            transform: scale(1.18) !important;
+            background: #fff !important;
+            filter: drop-shadow(0 15px 30px rgba(0, 243, 255, 0.7)) drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)) !important;
+            opacity: 0.96;
+            cursor: grabbing;
+        }
+        .hex-node.dragging::before {
+            background: #0f171d !important;
+        }
+        .hex-node.dragging .node-icon svg {
+            stroke: var(--accent-cyan) !important;
+        }
+
+        /* 吸着対象ノードのスタイル */
+        .hex-node.drop-target {
+            transform: scale(0.88);
+            background: var(--accent-cyan) !important;
+            filter: drop-shadow(0 0 16px var(--accent-cyan));
+        }
+
+        /* 🚀 カジノ専用：新ギャンブル追加バッジ */
+        .badge-casino-new {
+            position: absolute;
+            top: 14px;
+            right: 4px;
+            background: linear-gradient(135deg, #ff007f 0%, #ff003c 100%);
+            color: #fff;
+            font-size: 0.48rem;
+            font-weight: 900;
+            padding: 2px 4px;
+            border-radius: 4px;
+            border: 1px solid #fff;
+            box-shadow: 0 0 8px #ff007f;
+            transform: scale(0.85);
+            pointer-events: none;
+            letter-spacing: 0.5px;
+            animation: badge-pulse 1.2s infinite alternate;
+            z-index: 5;
+        }
+        @keyframes badge-pulse {
+            0% { transform: scale(0.85); box-shadow: 0 0 5px #ff007f; }
+            100% { transform: scale(0.92); box-shadow: 0 0 12px #ff007f, 0 0 6px #00f3ff; }
+        }
+
+        /* カスタムリンク削除ボタン */
+        .node-del-action {
+            position: absolute;
+            top: 12px;
+            left: 10px;
+            z-index: 4;
+            opacity: 0;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .hex-node:hover .node-del-action { opacity: 1; }
+        .node-del-action svg { width: 13px; height: 13px; stroke: var(--text-secondary); stroke-width: 2; }
+        .node-del-action:hover svg { stroke: var(--danger-color); }
+
+        /* 追加ノード（円形破線） */
+        .hex-add {
+            background: transparent;
+            clip-path: none;
+            border-radius: 50%;
+            border: 1.5px dashed var(--border-subtle);
+            width: 78px;
+            height: 78px;
+            margin: 12px;
+        }
+        .hex-add::before { display: none; }
+        .hex-add:hover { border-color: var(--accent-gold); transform: scale(1.06); }
+        .hex-add svg { stroke: var(--text-secondary); width: 22px; height: 22px; }
+        .hex-add:hover svg { stroke: var(--accent-gold); }
 
         /* 裏路地・フッター */
         .alley-box {
@@ -197,7 +322,7 @@
 
 <div class="container">
     
-    <!-- 1. 国民身分証明証 (完全維持) -->
+    <!-- 1. 国民身分証明証 -->
     <div class="id-card-wrapper">
         <div class="id-header">
             <div class="id-country">村岡王国</div>
@@ -282,13 +407,13 @@
         </details>
     </div>
 
-    <!-- 5. 八角形サービスグリッド -->
+    <!-- 5. 蜂の巣（ハニカム）サービスグリッド -->
     <div>
         <div class="grid-header">
-            <span>SERVICE TERMINALS</span>
-            <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※ピン留めで並び替え可</span>
+            <span>HONEYCOMB TERMINALS</span>
+            <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※長押しで浮遊・並び替え</span>
         </div>
-        <div class="octagon-grid" id="service-grid">
+        <div class="honeycomb-container" id="service-grid">
             <!-- JSで描画 -->
         </div>
     </div>
@@ -326,7 +451,7 @@
 <!-- 裏路地 -->
 <div id="alley-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">🕵️ 路地裏の男</div>
+        <div class="modal-title">🕵️️ 路地裏の男</div>
         <div id="alley-text" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;"></div>
         <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
             <button class="btn-solid" onclick="chooseWork()">🔨 働きたい</button>
@@ -364,9 +489,9 @@
 </div>
 
 <script>
-    /* =========================================
-       UI: 八角形グリッド描画 ＆ LocalStorage
-       ========================================= */
+    /* ==========================================================
+       UI: ハニカムグリッド描画 ＆ スタイリッシュ長押しドラッグ並び替え
+       ========================================================== */
     const defaultServices = [
         { id: 'svc-mtube', name: 'M-Tube', url: '/videos', icon: '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>' },
         { id: 'svc-games', name: '王立遊技場', url: '/games', icon: '<rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"></path>' },
@@ -376,70 +501,206 @@
         { id: 'svc-market', name: '自由市場', url: '/market', icon: '<line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line>' },
         { id: 'svc-mall', name: '民営モール', url: '/mall', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
         { id: 'svc-auction', name: '競売所', url: '/auction', icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline>' },
-        { id: 'svc-casino', name: 'カジノ', url: '/casino', icon: '<polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line>' },
+        { id: 'svc-casino', name: 'カジノ', url: '/casino', icon: '<polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="22" x2="12" y2="8.5"></line>' },
         { id: 'svc-dm', name: 'DM', url: '/dm', icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>' },
         { id: 'svc-ai', name: 'AI', url: '/ai', icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>' }
     ];
 
-    function renderGrid() {
-        const grid = document.getElementById('service-grid');
-        const pinned = JSON.parse(localStorage.getItem('muraoka_pinned') || '[]');
+    function getAllServicesOrdered() {
+        const orderIds = JSON.parse(localStorage.getItem('muraoka_service_order') || '[]');
         const customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
         
+        let all = [...defaultServices, ...customLinks];
+        if (orderIds.length === 0) return all;
+
+        let ordered = [];
+        orderIds.forEach(id => {
+            const found = all.find(s => s.id === id);
+            if (found) ordered.push(found);
+        });
+        all.forEach(s => {
+            if (!ordered.some(o => o.id === s.id)) ordered.push(s);
+        });
+        return ordered;
+    }
+
+    function saveCurrentOrder() {
+        const nodes = document.querySelectorAll('.hex-node[data-id]');
+        const orderIds = Array.from(nodes).map(n => n.dataset.id);
+        localStorage.setItem('muraoka_service_order', JSON.stringify(orderIds));
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('service-grid');
+        const services = getAllServicesOrdered();
+        
         let html = '';
+        services.forEach(svc => {
+            const isCustom = svc.id.startsWith('cstm-');
+            const isCasino = (svc.id === 'svc-casino');
+            
+            // カジノ専用バッジ
+            const casinoBadge = isCasino ? `<div class="badge-casino-new">🚀 NEW!</div>` : '';
+            // 削除ボタン
+            const deleteAction = isCustom ? `
+                <div class="node-del-action" onclick="event.stopPropagation(); removeCustomLink('${svc.id}')" title="削除">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+            ` : '';
 
-        // ソート: ピン留め優先
-        const sortedDefaults = [...defaultServices].sort((a, b) => {
-            const aPin = pinned.includes(a.id);
-            const bPin = pinned.includes(b.id);
-            if (aPin && !bPin) return -1;
-            if (!aPin && bPin) return 1;
-            return 0;
-        });
+            const iconHtml = svc.icon.includes('<') ? svc.icon : '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>';
 
-        // 既存サービス描画
-        sortedDefaults.forEach(svc => {
-            const isPinned = pinned.includes(svc.id);
             html += `
-                <div class="octagon-node ${isPinned ? 'pinned' : ''}" onclick="location.href='${svc.url}'">
-                    <div class="node-actions" onclick="event.stopPropagation(); togglePin('${svc.id}')" title="ピン留め/解除">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
+                <div class="hex-node" data-id="${svc.id}" data-url="${svc.url}" data-custom="${isCustom}">
+                    ${casinoBadge}
+                    ${deleteAction}
+                    <div class="node-content">
+                        <div class="node-icon"><svg viewBox="0 0 24 24">${iconHtml}</svg></div>
+                        <div class="node-label">${svc.name}</div>
                     </div>
-                    <div class="node-icon"><svg viewBox="0 0 24 24">${svc.icon}</svg></div>
-                    <div class="node-label">${svc.name}</div>
                 </div>
             `;
         });
 
-        // 追加リンク描画
-        customLinks.forEach(link => {
-            html += `
-                <div class="octagon-node" onclick="window.open('${link.url}', '_blank')">
-                    <div class="node-actions" onclick="event.stopPropagation(); removeCustomLink('${link.id}')" title="削除">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </div>
-                    <div class="node-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>
-                    <div class="node-label">${link.name}</div>
-                </div>
-            `;
-        });
-
-        // ＋ボタン (円形)
+        // ＋ボタン（ハニカム用カスタム追加）
         html += `
-            <button class="octagon-node octagon-add" onclick="openAddLinkModal()">
-                <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <button class="hex-node hex-add" onclick="openAddLinkModal()" title="カスタムノード追加">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         `;
 
         grid.innerHTML = html;
+        setupDragAndDrop();
     }
 
-    function togglePin(id) {
-        let pinned = JSON.parse(localStorage.getItem('muraoka_pinned') || '[]');
-        if (pinned.includes(id)) { pinned = pinned.filter(p => p !== id); } 
-        else { pinned.push(id); }
-        localStorage.setItem('muraoka_pinned', JSON.stringify(pinned));
-        renderGrid();
+    /* 誤爆ゼロの長押し(650ms) ＆ スタイリッシュドラッグ */
+    let pressTimer = null;
+    let draggedNode = null;
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let hasMoved = false;
+
+    function setupDragAndDrop() {
+        const grid = document.getElementById('service-grid');
+        const nodes = grid.querySelectorAll('.hex-node[data-id]');
+
+        nodes.forEach(node => {
+            const startPress = (e) => {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                startX = clientX;
+                startY = clientY;
+                hasMoved = false;
+
+                node.classList.add('long-pressing');
+                
+                // 650msの安全なしきい値
+                pressTimer = setTimeout(() => {
+                    isDragging = true;
+                    draggedNode = node;
+                    node.classList.remove('long-pressing');
+                    node.classList.add('dragging');
+
+                    if (navigator.vibrate) navigator.vibrate(60);
+                }, 650);
+            };
+
+            const cancelPress = (e) => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+                node.classList.remove('long-pressing');
+
+                // 通常タップ遷移
+                if (!isDragging && !hasMoved && e.type !== 'touchmove' && e.type !== 'mousemove') {
+                    const url = node.getAttribute('data-url');
+                    const isCustom = node.getAttribute('data-custom') === 'true';
+                    if (url) {
+                        if (isCustom) window.open(url, '_blank');
+                        else window.location.href = url;
+                    }
+                }
+            };
+
+            node.addEventListener('mousedown', startPress);
+            node.addEventListener('touchstart', startPress, { passive: true });
+
+            node.addEventListener('mouseup', cancelPress);
+            node.addEventListener('mouseleave', cancelPress);
+            node.addEventListener('touchend', cancelPress);
+        });
+    }
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+
+    function handleMove(e) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        // 8px以上の移動で即座にスクロールと判定して長押しを完全破棄
+        if (!isDragging && pressTimer) {
+            const dist = Math.hypot(clientX - startX, clientY - startY);
+            if (dist > 8) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+                if (draggedNode) draggedNode.classList.remove('long-pressing');
+                hasMoved = true;
+            }
+            return;
+        }
+
+        if (!isDragging || !draggedNode) return;
+        if (e.cancelable) e.preventDefault(); // スクロール抑止
+
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+        draggedNode.style.transform = `scale(1.18) translate(${deltaX}px, ${deltaY - 14}px)`;
+
+        // ターゲット判定
+        const elemBelow = document.elementFromPoint(clientX, clientY);
+        const targetNode = elemBelow ? elemBelow.closest('.hex-node[data-id]') : null;
+
+        const allNodes = document.querySelectorAll('.hex-node[data-id]');
+        allNodes.forEach(n => n.classList.remove('drop-target'));
+
+        if (targetNode && targetNode !== draggedNode) {
+            targetNode.classList.add('drop-target');
+
+            const grid = document.getElementById('service-grid');
+            const nodesArr = Array.from(grid.querySelectorAll('.hex-node[data-id]'));
+            const draggedIdx = nodesArr.indexOf(draggedNode);
+            const targetIdx = nodesArr.indexOf(targetNode);
+
+            if (draggedIdx < targetIdx) {
+                targetNode.after(draggedNode);
+            } else {
+                targetNode.before(draggedNode);
+            }
+        }
+    }
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchend', endDrag);
+
+    function endDrag() {
+        if (!isDragging || !draggedNode) return;
+
+        draggedNode.classList.remove('dragging');
+        draggedNode.style.transform = '';
+        
+        const allNodes = document.querySelectorAll('.hex-node[data-id]');
+        allNodes.forEach(n => n.classList.remove('drop-target', 'long-pressing'));
+
+        saveCurrentOrder();
+
+        isDragging = false;
+        draggedNode = null;
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
     }
 
     function openAddLinkModal() {
@@ -454,26 +715,31 @@
         if (!name || !url) return alert('入力が不足しています。');
         
         let customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
-        customLinks.push({ id: 'cstm-' + Date.now(), name, url });
+        const newId = 'cstm-' + Date.now();
+        customLinks.push({ id: newId, name, url, icon: '' });
         localStorage.setItem('muraoka_custom_links', JSON.stringify(customLinks));
         
         closeAddLinkModal();
         renderGrid();
     }
     function removeCustomLink(id) {
-        if(!confirm('削除しますか？')) return;
+        if(!confirm('ノードを削除しますか？')) return;
         let customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
         customLinks = customLinks.filter(l => l.id !== id);
         localStorage.setItem('muraoka_custom_links', JSON.stringify(customLinks));
+
+        let order = JSON.parse(localStorage.getItem('muraoka_service_order') || '[]');
+        order = order.filter(o => o !== id);
+        localStorage.setItem('muraoka_service_order', JSON.stringify(order));
+
         renderGrid();
     }
 
     document.addEventListener("DOMContentLoaded", renderGrid);
 
-    /* =========================================
-       バックエンド通信ロジック (完全維持)
-       ========================================= */
-       
+    /* ==========================================================
+       バックエンド通信ロジック (完全防護版)
+       ========================================================== */
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
     
@@ -497,7 +763,6 @@
         loadAnnouncements();
     }
 
-    /* 100%エラーで落ちない完全防護版 loadAnnouncements */
     async function loadAnnouncements() {
         const container = document.getElementById("announcement-list");
         if (!container) return; 
