@@ -3,185 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>村岡王国 - 国民証</title>
+    <title>MURAOKA_SYS // TERMINAL</title>
     <!-- Supabase JS SDK CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 16px 10px; margin: 0; min-height: 100vh; }
-        .container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
-        .card { background: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-        .header { font-size: 0.95rem; font-weight: bold; color: #d4af37; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        /* BASE & VARIABLES */
+        :root {
+            --bg: #090a0f;
+            --surface: #11141a;
+            --surface-hover: #171b23;
+            --border: #232832;
+            --border-active: #e2e8f0;
+            --text-main: #f8fafc;
+            --text-sub: #64748b;
+            --accent: #00f0ff;
+            --warn: #f59e0b;
+            --alert: #ef4444;
+            --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
-        /* 身分証明書スタイル */
-        .id-card-wrapper { background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); border-radius: 12px; padding: 14px; color: #1a1a1a; box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); position: relative; overflow: hidden; border: 1px solid #fff; }
-        .id-card-wrapper::before { content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; }
-        @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
-        .id-card-wrapper::after { content: "MURAOKA"; position: absolute; font-size: 4rem; font-weight: 900; color: rgba(255,255,255,0.25); transform: rotate(-25deg); top: 25px; right: -20px; pointer-events: none; letter-spacing: 4px; z-index: 1; }
-        
-        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 4px; margin-bottom: 8px; position: relative; z-index: 2; }
-        .id-country { font-weight: 900; font-size: 1rem; color: #2c3e50; letter-spacing: 1px; }
-        .id-title { font-size: 0.7rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
-        .id-body { display: flex; gap: 10px; position: relative; z-index: 2; align-items: center; }
-        .id-photo { width: 55px; height: 65px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #95a5a6; }
-        .id-details { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-        .id-row { display: flex; flex-direction: column; }
-        .id-label { font-size: 0.6rem; color: #7f8c8d; font-weight: bold; }
-        .id-value { font-size: 0.85rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
-        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
+        body { 
+            font-family: var(--font-mono); 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            padding: 16px; 
+            min-height: 100vh;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-        /* お知らせエリア */
-        .news-card { background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); }
-        .news-list { display: flex; flex-direction: column; gap: 8px; max-height: 140px; overflow-y: auto; padding-right: 4px; }
-        .news-item { font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; line-height: 1.4; }
-        .news-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .news-date { font-size: 0.65rem; color: #888; margin-right: 6px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-sub); }
 
-        /* 税金表示 */
-        .tax-display-card { text-align: center; background: rgba(243, 156, 18, 0.05); border: 1px solid rgba(243, 156, 18, 0.2); padding: 10px 14px; }
-        .tax-display-amount { color: #e74c3c; font-size: 1.3rem; font-weight: 900; margin: 4px 0; font-variant-numeric: tabular-nums; }
-        .tax-display-note { font-size: 0.65rem; color: #a0a0a0; }
+        .container { 
+            width: 100%; 
+            max-width: 800px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+        }
 
-        /* アコーディオン・フォーム関係 */
-        details summary { cursor: pointer; user-select: none; font-size: 0.8rem; color: #aaa; font-weight: bold; padding: 4px 0; }
-        details summary:hover { color: #d4af37; }
-        .label { color: #aaa; font-size: 0.7rem; margin-top: 8px; font-weight: bold; }
-        input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; margin-top: 4px; margin-bottom: 8px; font-size: 0.8rem; }
-        
-        button { width: 100%; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; font-size: 0.85rem; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-        button:hover { filter: brightness(1.15); }
-        button:active { transform: scale(0.98); }
+        .sys-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.65rem;
+            color: var(--text-sub);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .status-led {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            margin-right: 4px;
+            box-shadow: 0 0 8px rgba(34,197,94,0.4);
+        }
 
-        .btn-primary { background: #d4af37; color: #1a1a1a; padding: 8px; }
-        .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); padding: 8px; }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
 
-        /* ナビゲーション（2列揃え） */
-        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .nav-grid button { height: 48px; padding: 0 8px; font-size: 0.8rem; line-height: 1.2; border: 1px solid rgba(255,255,255,0.08); text-align: center; word-break: break-all; }
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 14px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.15s ease;
+        }
+        .panel::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 4px; border-top: 1px solid var(--text-sub); border-left: 1px solid var(--text-sub); opacity: 0.3;
+        }
+        .panel::after {
+            content: ''; position: absolute; bottom: 0; right: 0; width: 4px; height: 4px; border-bottom: 1px solid var(--text-sub); border-right: 1px solid var(--text-sub); opacity: 0.3;
+        }
 
-        .btn-mtube { background: linear-gradient(135deg, #ff0055 0%, #a00000 100%); border: 1px solid #ff4d6d !important; font-weight: 900; grid-column: span 2; }
-        .btn-games { background: #34495e; }
-        .btn-bank { background: #27ae60; }
-        .btn-inventory { background: #d35400; }
-        .btn-board { background: #2980b9; }
-        .btn-market { background: #8e44ad; }
-        .btn-mall { background: #00897b; border: 1px solid #26a69a !important; }
-        .btn-auction { background: #2e4053; border: 1px solid #5d6d7e !important; }
-        .btn-casino { background: #c0392b; }
-        .btn-dm { background: #ffdc00; }
-        .btn-ai { background: #ffc0cb; }
-        .btn-comingsoon { background: #222; color: #555; border: 1px dashed #444 !important; cursor: not-allowed; }
-        
-        .btn-admin { background: linear-gradient(180deg, #d4af37 0%, #8a7322 100%); color: #1a1a1a; grid-column: span 2; display: none; height: 38px !important; }
-        .btn-policy-view { background: #2a2a2a; color: #888; grid-column: span 2; height: 36px !important; font-size: 0.75rem !important; }
-        .btn-logout { background: #1f1f1f; color: #e74c3c; border: 1px solid #333; margin-top: 4px; padding: 10px; }
+        .span-2 { grid-column: span 2; }
+        .span-4 { grid-column: span 4; }
 
-        .alley-card { background: #16181c; border: 1px dashed #3a4a5e; border-radius: 12px; padding: 10px; text-align: center; }
-        .btn-alley { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; padding: 8px; font-size: 0.8rem; }
-        .secret-tag { color: #e74c3c; font-size: 0.65rem; }
+        @media (max-width: 600px) {
+            .bento-grid { grid-template-columns: repeat(2, 1fr); }
+            .span-4 { grid-column: span 2; }
+        }
+
+        .icon {
+            width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter;
+        }
+
+        /* 1. ID CARD MODULE */
+        .id-header {
+            font-size: 0.65rem; color: var(--text-sub); margin-bottom: 12px; display: flex; justify-content: space-between;
+        }
+        .id-value { font-size: 1rem; font-weight: bold; color: var(--text-main); margin-bottom: 4px; }
+        .id-email { font-size: 0.7rem; color: var(--text-sub); margin-bottom: 8px; word-break: break-all; }
+        .id-badge {
+            display: inline-block; background: var(--border); color: var(--text-main); padding: 2px 6px; font-size: 0.65rem; border: 1px solid var(--text-sub);
+        }
+
+        /* 2. FINANCE MODULE */
+        .tax-amount { font-size: 1.2rem; color: var(--warn); margin: 8px 0; }
+        .tax-note { font-size: 0.6rem; color: var(--text-sub); }
+
+        /* 3. LOG MODULE */
+        .log-list { max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .log-item { font-size: 0.7rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; display: flex; gap: 8px; }
+        .log-item:last-child { border: none; }
+        .log-date { color: var(--text-sub); white-space: nowrap; }
+
+        /* 4. SERVICE NODES */
+        .node {
+            cursor: pointer; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px; background: var(--surface);
+        }
+        .node:hover {
+            border-color: var(--border-active); background: var(--surface-hover);
+        }
+        .node:active { transform: scale(0.98); }
+        .node-header {
+            display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; color: var(--text-sub);
+        }
+        .node-title { font-size: 0.75rem; font-weight: bold; color: var(--text-main); }
+
+        /* 5. SETTINGS DRAWER */
+        details summary {
+            cursor: pointer; font-size: 0.75rem; color: var(--text-sub); border: 1px solid var(--border); padding: 8px; list-style: none; display: flex; align-items: center; justify-content: space-between;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary:hover { color: var(--text-main); border-color: var(--text-sub); }
+        .settings-content { padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+        .input-group { display: flex; flex-direction: column; gap: 4px; }
+        .input-label { font-size: 0.65rem; color: var(--text-sub); }
+        input, select {
+            width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text-main); font-family: var(--font-mono); font-size: 0.75rem; outline: none;
+        }
+        input:focus, select:focus { border-color: var(--text-main); }
+        .btn-action {
+            width: 100%; padding: 8px; background: var(--border); border: 1px solid var(--text-sub); color: var(--text-main); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer;
+        }
+        .btn-action:hover { background: var(--text-sub); color: var(--bg); }
+        .btn-action.warn { color: var(--warn); border-color: var(--warn); background: transparent; }
+        .btn-action.warn:hover { background: var(--warn); color: var(--bg); }
+        .btn-admin { display: none; color: var(--alert); border-color: var(--alert); }
+
+        /* 6. UNDERGROUND */
+        .underground {
+            margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 8px; font-size: 0.65rem; color: var(--text-sub); display: flex; justify-content: space-between; cursor: pointer;
+        }
+        .underground:hover { color: var(--text-main); }
+
+        /* MODALS */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(9, 10, 15, 0.9); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center;
+        }
+        .modal-box {
+            background: var(--surface); border: 1px solid var(--border-active); width: 90%; max-width: 400px; padding: 20px; color: var(--text-main);
+        }
+        .modal-title { font-size: 0.85rem; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .modal-text { font-size: 0.75rem; color: var(--text-sub); line-height: 1.6; margin-bottom: 16px; max-height: 250px; overflow-y: auto; white-space: pre-wrap; }
+        .modal-actions { display: flex; flex-direction: column; gap: 8px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     
-    <!-- 1. 国民身分証明証 -->
-    <div class="id-card-wrapper">
-        <div class="id-header">
-            <div class="id-country">村岡王国</div>
-            <div class="id-title">国民身分証明証</div>
+    <!-- HEADER -->
+    <div class="sys-header">
+        <div>SYS_TIME: <span id="sys-clock">00:00:00.000</span></div>
+        <div><span class="status-led"></span>ONLINE</div>
+    </div>
+
+    <div class="bento-grid">
+        
+        <!-- 1. CITIZEN ID -->
+        <div class="panel span-2">
+            <div class="id-header"><span>CITIZEN_ID</span><span>SYS.AUTH</span></div>
+            <div class="id-value scramble-target" id="display-nickname">-</div>
+            <div class="id-email scramble-target" id="user-email">-</div>
+            <div><span class="id-badge" id="user-title-display">読込中...</span></div>
         </div>
-        <div class="id-body">
-            <div class="id-photo">👤</div>
-            <div class="id-details">
-                <div class="id-row">
-                    <span class="id-label">氏名 (NICKNAME)</span>
-                    <span class="id-value" id="display-nickname">-</span>
-                </div>
-                <div class="id-row">
-                    <span class="id-label">国民ID (EMAIL)</span>
-                    <span class="id-value" id="user-email" style="font-size: 0.65rem;">-</span>
-                </div>
-                <div class="id-row">
-                    <span class="id-label">称号 (TITLE)</span>
-                    <span class="id-badge" id="user-title-display">読込中...</span>
-                </div>
+
+        <!-- 2. FINANCE MODULE -->
+        <div class="panel span-2">
+            <div class="id-header"><span>FINANCE_TAX</span><span>SYS.REV</span></div>
+            <div class="tax-amount scramble-target" id="my-tax-amount">計算中...</div>
+            <div class="tax-note">※毎週 火曜・金曜 9:00 自動徴収（10万G超の0.5%）</div>
+        </div>
+
+        <!-- 3. SYSTEM LOG (Announcements) -->
+        <div class="panel span-4">
+            <div class="id-header" style="margin-bottom: 8px;"><span>SYSTEM_LOG</span><span>ANNOUNCEMENTS</span></div>
+            <div class="log-list" id="announcement-list">
+                <div class="log-item"><span class="log-date">--/--</span><span>お知らせを読み込み中...</span></div>
             </div>
         </div>
+
+        <!-- 4. SERVICE NODES -->
+        <!-- MEDIA -->
+        <div class="panel node" onclick="sysNav('/videos')" onmouseenter="scramble(this, 'M-Tube')">
+            <div class="node-header"><svg class="icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>SYS.01</span></div>
+            <div class="node-title scramble-target">M-Tube</div>
+        </div>
+        
+        <!-- GAMES -->
+        <div class="panel node" onclick="sysNav('/games')" onmouseenter="scramble(this, '王立無償遊技場')">
+            <div class="node-header"><svg class="icon"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"></path></svg><span>SYS.02</span></div>
+            <div class="node-title scramble-target">王立無償遊技場</div>
+        </div>
+
+        <!-- BANK -->
+        <div class="panel node" onclick="sysNav('/wallet')" onmouseenter="scramble(this, '王国中央銀行')">
+            <div class="node-header"><svg class="icon"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg><span>FIN.01</span></div>
+            <div class="node-title scramble-target">王国中央銀行</div>
+        </div>
+
+        <!-- INVENTORY -->
+        <div class="panel node" onclick="sysNav('/inventory')" onmouseenter="scramble(this, '所持品バッグ')">
+            <div class="node-header"><svg class="icon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg><span>USR.01</span></div>
+            <div class="node-title scramble-target">所持品バッグ</div>
+        </div>
+
+        <!-- BOARD -->
+        <div class="panel node" onclick="sysNav('/board')" onmouseenter="scramble(this, '王国回覧板')">
+            <div class="node-header"><svg class="icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg><span>COM.01</span></div>
+            <div class="node-title scramble-target">王国回覧板</div>
+        </div>
+
+        <!-- MARKET -->
+        <div class="panel node" onclick="sysNav('/market')" onmouseenter="scramble(this, '王国自由市場')">
+            <div class="node-header"><svg class="icon"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg><span>TRD.01</span></div>
+            <div class="node-title scramble-target">王国自由市場</div>
+        </div>
+
+        <!-- MALL -->
+        <div class="panel node" onclick="sysNav('/mall')" onmouseenter="scramble(this, '民営モール')">
+            <div class="node-header"><svg class="icon"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg><span>TRD.02</span></div>
+            <div class="node-title scramble-target">民営モール</div>
+        </div>
+
+        <!-- AUCTION -->
+        <div class="panel node" onclick="sysNav('/auction')" onmouseenter="scramble(this, '王国競売所')">
+            <div class="node-header"><svg class="icon"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg><span>TRD.03</span></div>
+            <div class="node-title scramble-target">王国競売所</div>
+        </div>
+
+        <!-- CASINO -->
+        <div class="panel node span-2" onclick="sysNav('/casino')" onmouseenter="scramble(this, '王国カジノ')">
+            <div class="node-header"><svg class="icon"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line></svg><span>ENT.01</span></div>
+            <div class="node-title scramble-target">王国カジノ</div>
+        </div>
+
+        <!-- DM -->
+        <div class="panel node" onclick="sysNav('/dm')" onmouseenter="scramble(this, 'DIRECT_MSG')">
+            <div class="node-header"><svg class="icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg><span>NET.01</span></div>
+            <div class="node-title scramble-target">DIRECT_MSG</div>
+        </div>
+
+        <!-- AI -->
+        <div class="panel node" onclick="sysNav('/ai')" onmouseenter="scramble(this, 'AI_PROCESS')">
+            <div class="node-header"><svg class="icon"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg><span>NET.02</span></div>
+            <div class="node-title scramble-target">AI_PROCESS</div>
+        </div>
+
+        <!-- 5. SETTINGS / ADMIN -->
+        <div class="panel span-4" style="padding: 0; border: none;">
+            <details style="background: var(--surface); border: 1px solid var(--border);">
+                <summary>CONFIG_PANEL // 設定・納税 <svg class="icon"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></summary>
+                <div class="settings-content" style="padding: 12px;">
+                    <div class="input-group">
+                        <span class="input-label">所持称号の変更</span>
+                        <select id="title-select"><option value="">読み込み中...</option></select>
+                        <button class="btn-action" onclick="sysClick(); equipTitle()">称号を変更</button>
+                    </div>
+                    <div class="input-group" style="margin-top:8px;">
+                        <span class="input-label">納税報酬受取口座</span>
+                        <select id="tax-wallet-select"><option value="">読み込み中...</option></select>
+                        <button class="btn-action warn" onclick="sysClick(true); payTax()">💰 本日の納税（+100G）</button>
+                    </div>
+                    <div class="input-group" style="margin-top:8px;">
+                        <span class="input-label">ニックネーム</span>
+                        <input type="text" id="nickname" placeholder="例: 鉱山ハナコ">
+                    </div>
+                    <div class="input-group" style="margin-top:8px;">
+                        <span class="input-label">本名 ※国王のみ閲覧可、設定すると限定称号が貰えるぞ！</span>
+                        <input type="text" id="real-name" placeholder="例: 村岡 太郎">
+                        <button class="btn-action" onclick="sysClick(); saveProfile()">情報を保存</button>
+                    </div>
+                    
+                    <div style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+                        <button id="btn-admin-items" class="btn-action btn-admin" onclick="sysNav('/admin/items')">👑 アイテム管理（国王専用）</button>
+                        <button id="btn-admin-casino" class="btn-action btn-admin" onclick="sysNav('/admin/casino')">🎰 カジノ調整（国王専用）</button>
+                        <button id="btn-admin-tax" class="btn-action btn-admin" onclick="sysClick(true); collectAllTax()">👑 全国民から所得税を即時徴収</button>
+                        <button class="btn-action" style="border-color: var(--border); color: var(--text-sub);" onclick="sysClick(); openPolicyViewer()">📜 利用規約・ポリシーを確認</button>
+                        <button class="btn-action" style="border-color: var(--border); color: var(--text-sub);" onclick="sysClick(true); logout()">王国を離脱（ログアウト）</button>
+                    </div>
+                </div>
+            </details>
+        </div>
+
     </div>
 
-    <!-- 2. お知らせ (announcementsテーブルから読み込み) -->
-    <div class="card news-card">
-        <div class="header" style="font-size: 0.85rem; margin-bottom: 6px;">📢 王国からのお知らせ</div>
-        <div class="news-list" id="announcement-list">
-            <div class="news-item"><span class="news-date">--/--</span>お知らせを読み込み中...</div>
+    <!-- 6. UNDERGROUND NODE -->
+    <div class="underground" onclick="sysClick(); openAlleyModal()" onmouseenter="scramble(this, 'SEC_UNDERGROUND // 非認可プロトコル')">
+        <span class="scramble-target">SEC_UNDERGROUND // 非認可プロトコル</span>
+        <svg class="icon" style="width: 14px; height: 14px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+
+</div>
+
+<!-- MODALS -->
+<!-- ALLEY MODAL -->
+<div id="alley-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title">🕵️ 路地裏の男</div>
+        <div id="alley-text" class="modal-text"></div>
+        <div id="alley-choices-initial" class="modal-actions">
+            <button class="btn-action" onclick="sysClick(); chooseWork()">🔨 働きたい（仕事を探す）</button>
+            <button class="btn-action" onclick="sysClick(); chooseLoan()">💰 金を借りたい（裏金融へ）</button>
+            <button class="btn-action" style="color: var(--text-sub);" onclick="sysClick(); closeAlleyModal()">👋 用はない（立ち去る）</button>
+        </div>
+        <div id="alley-choices-factory" class="modal-actions" style="display: none;">
+            <button class="btn-action warn" onclick="sysNav('/factory')">はい（工場へ行く）</button>
+            <button class="btn-action" onclick="sysClick(); openAlleyModal()">戻る</button>
+        </div>
+        <div id="alley-choices-loan" class="modal-actions" style="display: none;">
+            <button class="btn-action warn" onclick="sysNav('/loan')">裏金融へ行く</button>
+            <button class="btn-action" onclick="sysClick(); openAlleyModal()">戻る</button>
         </div>
     </div>
+</div>
 
-    <!-- 3. 税金表示 -->
-    <div class="card tax-display-card">
-        <div style="font-size: 0.75rem; color: #f39c12; font-weight: bold;">💰 次回所得税 徴収予定額</div>
-        <div class="tax-display-amount" id="my-tax-amount">計算中...</div>
-        <div class="tax-display-note">※毎週 火曜・金曜 9:00 自動徴収（10万G超の0.5%）</div>
+<!-- POLICY MODAL -->
+<div id="policy-view-modal" class="modal-overlay" onclick="if(event.target === this) closePolicyViewer();">
+    <div class="modal-box" onclick="event.stopPropagation();">
+        <div class="modal-title">📜 利用規約・ポリシー</div>
+        <div id="policy-view-content" class="modal-text">読み込み中...</div>
+        <button class="btn-action" onclick="sysClick(); closePolicyViewer()">閉じる</button>
     </div>
+</div>
 
-    <!-- 4. 設定 -->
-    <div class="card">
-        <details>
-            <summary>⚙️ 各種設定・称号付け替え・納税</summary>
-            <div style="margin-top: 10px;">
-                <div class="label">所持称号の変更</div>
-                <select id="title-select"><option value="">読み込み中...</option></select>
-                <button class="btn-primary" onclick="equipTitle()">称号を変更</button>
-
-                <div class="label" style="margin-top:12px;">納税報酬受取口座</div>
-                <select id="tax-wallet-select"><option value="">読み込み中...</option></select>
-                <button class="btn-tax" onclick="payTax()">💰 本日の納税（+100G）</button>
-
-                <div class="label" style="margin-top:12px;">ニックネーム</div>
-                <input type="text" id="nickname" placeholder="例: 鉱山ハナコ">
-
-                <div class="label">本名 <span class="secret-tag">※国王のみ閲覧可、設定すると限定称号が貰えるぞ！</span></div>
-                <input type="text" id="real-name" placeholder="例: 村岡 太郎">
-                <button class="btn-primary" onclick="saveProfile()">情報を保存</button>
-            </div>
-        </details>
+<!-- TERMS AGREE MODAL -->
+<div id="terms-modal" class="modal-overlay">
+    <div class="modal-box" style="border-color: var(--warn);">
+        <div class="modal-title" style="color: var(--warn);">📜 利用規約の同意</div>
+        <div style="font-size: 0.7rem; color: var(--text-sub); margin-bottom: 8px;">サービスの安全な運営のため、利用規約への同意が必要です。<br>内容をご確認の上、「同意する」ボタンを押してください。</div>
+        <div id="terms-content-box" class="modal-text" style="height: 180px; background: var(--bg); padding: 8px; border: 1px solid var(--border);">規約を読み込んでいます...</div>
+        <button id="agree-terms-btn" class="btn-action warn">規約に同意してプレイを続ける</button>
     </div>
-
-    <!-- 5. ナビゲーション -->
-    <div class="nav-grid">
-        <button class="btn-mtube" onclick="location.href='/videos'">▶️ M-Tube（動画共有）</button>
-        <button class="btn-games" onclick="location.href='/games'">🏛️ 王立無償遊技場</button>
-        <button class="btn-bank" onclick="location.href='/wallet'">🏦 王国中央銀行</button>
-        <button class="btn-inventory" onclick="location.href='/inventory'">🎒 所持品バッグ</button>
-        <button class="btn-board" onclick="location.href='/board'">📜 王国回覧板</button>
-        <button class="btn-market" onclick="location.href='/market'">⚖️ 王国自由市場</button>
-        <button class="btn-mall" onclick="location.href='/mall'">🏬 民営ショッピングモール</button>
-        <button class="btn-auction" onclick="location.href='/auction'">🔨 王国競売所 (Auction)</button>
-        <button class="btn-casino" onclick="location.href='/casino'">🎰 王国カジノ</button>
-        <button class="btn-dm" onclick="location.href='/dm'">✉️ DM</button>
-        <button class="btn-ai" onclick="location.href='/ai'">🤖 AI(テスト中使いすぎるな)</button>
-        
-        <!-- 国王専用メニュー -->
-        <button id="btn-admin-items" class="btn-admin" onclick="location.href='/admin/items'">👑 アイテム管理（国王専用）</button>
-        <button id="btn-admin-casino" class="btn-admin" onclick="location.href='/admin/casino'">🎰 カジノ調整（国王専用）</button>
-        <button id="btn-admin-tax" class="btn-admin" onclick="collectAllTax()">👑 全国民から所得税を即時徴収</button>
-        
-        <button class="btn-policy-view" onclick="openPolicyViewer()">📜 利用規約・ポリシーを確認</button>
-    </div>
-
-    <!-- 6. 裏路地 -->
-    <div class="alley-card">
-        <div style="font-size: 0.7rem; color: #718096; margin-bottom: 6px;">
-            👀 街の裏路地で怪しげな男がこちらの様子を伺っている...
-        </div>
-        <button class="btn-alley" onclick="openAlleyModal()">🕵️ 男に近づいて話しかける</button>
-    </div>
-
-    <button class="btn-logout" onclick="logout()">王国を離脱（ログアウト）</button>
 </div>
 
 <script>
+    // --- UI/UX INTERACTIONS ---
+    
+    // 1. System Clock
+    setInterval(() => {
+        const d = new Date();
+        document.getElementById('sys-clock').innerText = 
+            d.getHours().toString().padStart(2, '0') + ':' + 
+            d.getMinutes().toString().padStart(2, '0') + ':' + 
+            d.getSeconds().toString().padStart(2, '0') + '.' + 
+            d.getMilliseconds().toString().padStart(3, '0');
+    }, 47);
+
+    // 2. Haptic Feedback & Navigation
+    function sysClick(heavy = false) {
+        if(navigator.vibrate) navigator.vibrate(heavy ? [15, 30, 15] : 10);
+    }
+    function sysNav(url) {
+        sysClick();
+        location.href = url;
+    }
+
+    // 3. Text Scramble Decode
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+!?/';
+    function scramble(element, targetText) {
+        if(element.dataset.scrambling === "true") return;
+        element.dataset.scrambling = "true";
+        const targetElement = element.querySelector('.scramble-target') || element;
+        let iter = 0;
+        const maxIter = 12;
+        const interval = setInterval(() => {
+            targetElement.innerText = targetText.split('').map((c, i) => {
+                if(i < iter / maxIter * targetText.length) return targetText[i];
+                return chars[Math.floor(Math.random() * chars.length)];
+            }).join('');
+            iter++;
+            if(iter > maxIter) {
+                clearInterval(interval);
+                targetElement.innerText = targetText;
+                element.dataset.scrambling = "false";
+            }
+        }, 15);
+    }
+
+    // --- ORIGINAL BACKEND LOGIC (完全維持) ---
+
     // Supabaseの環境変数
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
@@ -273,20 +502,20 @@
                     const safeDate = typeof escapeHtml === 'function' ? escapeHtml(dateStr) : dateStr;
 
                     htmlBuffer += `
-                        <div class="news-item">
-                            <span class="news-date">${safeDate}</span>
-                            <strong>${safeTitle}</strong> ${safeContent ? '- ' + safeContent : ''}
+                        <div class="log-item">
+                            <span class="log-date">[${safeDate}]</span>
+                            <span>${safeTitle} ${safeContent ? '- ' + safeContent : ''}</span>
                         </div>
                     `;
                 }
 
-                container.innerHTML = htmlBuffer || '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
+                container.innerHTML = htmlBuffer || '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
             } else {
-                container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
+                container.innerHTML = '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
             }
         } catch (e) {
             // 万が一DOM操作周りで予期せぬ例外が起きても画面崩れを防ぐ fallback
-            container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
+            container.innerHTML = '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
         }
     }
 
@@ -307,9 +536,9 @@
                 if (displayNick) displayNick.innerText = data.nickname || "（未設定）";
 
                 if (data.is_king || data.role === "king") {
-                    document.getElementById("btn-admin-items").style.display = "flex";
-                    document.getElementById("btn-admin-casino").style.display = "flex";
-                    document.getElementById("btn-admin-tax").style.display = "flex";
+                    document.getElementById("btn-admin-items").style.display = "block";
+                    document.getElementById("btn-admin-casino").style.display = "block";
+                    document.getElementById("btn-admin-tax").style.display = "block";
                 }
             }
         } catch (e) { console.error(e); }
@@ -358,7 +587,10 @@
                 
                 const taxAmount = calculateWealthTax(totalBalance);
                 const taxDisplay = document.getElementById("my-tax-amount");
-                if (taxDisplay) taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
+                if (taxDisplay) {
+                    taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
+                    taxDisplay.style.color = taxAmount > 0 ? "var(--warn)" : "var(--text-sub)";
+                }
 
                 const select = document.getElementById("tax-wallet-select");
                 if (!Array.isArray(wallets) || wallets.length === 0) {
@@ -457,8 +689,6 @@
         document.getElementById("alley-choices-initial").style.display = "none";
         document.getElementById("alley-choices-loan").style.display = "flex";
     }
-    function goToFactory() { window.location.href = "/factory"; }
-    function goToLoan() { window.location.href = "/loan"; }
 
     let isPolicyFetching = false;
     async function openPolicyViewer() {
@@ -483,17 +713,8 @@
     function closePolicyViewer() { document.getElementById("policy-view-modal").style.display = "none"; }
 </script>
 
-<!-- 利用規約同意モーダル -->
-<div id="terms-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center;">
-    <div style="background: #222; border: 2px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 0 20px rgba(212,175,55,0.4); color: #fff;">
-        <h3 style="color: #ffd700; margin-top: 0; text-align: center;">📜 利用規約の同意</h3>
-        <p style="font-size: 0.8rem; color: #ccc; line-height: 1.5;">サービスの安全な運営のため、利用規約への同意が必要です。<br>内容をご確認の上、「同意する」ボタンを押してください。</p>
-        <div id="terms-content-box" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 10px; height: 180px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin-bottom: 15px; white-space: pre-wrap;">規約を読み込んでいます...</div>
-        <button id="agree-terms-btn" style="width: 100%; padding: 12px; background: #27ae60; color: #fff;">規約に同意してプレイを続ける</button>
-    </div>
-</div>
-
 <script>
+// 利用規約同意モーダル制御
 document.addEventListener("DOMContentLoaded", async () => {
     const token = localStorage.getItem("access_token");
     const modalEl = document.getElementById("terms-modal");
@@ -512,6 +733,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             modalEl.style.display = "flex";
             agreeBtn.onclick = async () => {
                 agreeBtn.disabled = true;
+                sysClick(true);
                 try {
                     const agreeRes = await fetch("/api/policy/agree", {
                         method: "POST",
@@ -530,36 +752,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (e) { console.error(e); }
 });
 </script>
-
-<!-- 利用規約・ポリシー確認モーダル -->
-<div id="policy-view-modal" onclick="if(event.target === this) closePolicyViewer();" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
-    <div style="background: #222; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; width: 90%; max-width: 420px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); color: #fff;" onclick="event.stopPropagation();">
-        <h3 style="color: #e0e0e0; margin-top: 0; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">📜 利用規約・ポリシー</h3>
-        <div id="policy-view-content" style="background: #111; border: 1px solid #444; border-radius: 6px; padding: 12px; height: 260px; overflow-y: auto; font-size: 0.75rem; color: #aaa; margin: 15px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5;">読み込み中...</div>
-        <button type="button" onclick="closePolicyViewer()" style="width: 100%; background: #444; color: #fff; padding: 8px;">閉じる</button>
-    </div>
-</div>
-
-<!-- 裏路地モーダル -->
-<div id="alley-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 9998; justify-content: center; align-items: center;">
-    <div style="background: #1c1e22; border: 2px solid #3a4a5e; border-radius: 12px; width: 90%; max-width: 380px; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8); color: #e2e8f0;">
-        <h3 style="color: #cbd5e0; margin-top: 0; text-align: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px;">🕵️ 路地裏の男</h3>
-        <div id="alley-text" style="background: #0f1115; border: 1px solid #2d3748; border-radius: 8px; padding: 14px; font-size: 0.85rem; color: #cbd5e0; line-height: 1.6; margin-bottom: 16px;"></div>
-        <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 10px;">
-            <button onclick="chooseWork()" style="background: #2b6cb0; padding: 10px;">🔨 働きたい（仕事を探す）</button>
-            <button onclick="chooseLoan()" style="background: #8e44ad; padding: 10px;">💰 金を借りたい（裏金融へ）</button>
-            <button onclick="closeAlleyModal()" style="background: #4a5568; padding: 10px;">👋 用はない（立ち去る）</button>
-        </div>
-        <div id="alley-choices-factory" style="display: none; gap: 10px;">
-            <button onclick="goToFactory()" style="background: #2b6cb0; padding: 10px;">はい（工場へ行く）</button>
-            <button onclick="openAlleyModal()" style="background: #4a5568; padding: 10px;">戻る</button>
-        </div>
-        <div id="alley-choices-loan" style="display: none; gap: 10px;">
-            <button onclick="goToLoan()" style="background: #8e44ad; padding: 10px;">裏金融へ行く</button>
-            <button onclick="openAlleyModal()" style="background: #4a5568; padding: 10px;">戻る</button>
-        </div>
-    </div>
-</div>
 
 </body>
 </html>
