@@ -7,398 +7,380 @@
     <!-- Supabase JS SDK CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* --- Modern UI Variables --- */
+        /* --- Modern & Geometric UI Variables --- */
         :root {
-            --bg-base: #000000;
-            --bg-surface: #0a0a0a;
-            --bg-card: #111111;
-            --bg-hover: #1a1a1a;
-            --border-subtle: #222222;
-            --border-hover: #333333;
-            --text-primary: #ededed;
-            --text-secondary: #a1a1aa;
-            --text-muted: #52525b;
-            --accent-color: #ffffff;
-            --danger-color: #ef4444;
-            --success-color: #10b981;
-            --radius-md: 8px;
-            --radius-lg: 12px;
-            --transition: all 0.2s ease;
+            --bg-base: #050505;
+            --bg-surface: #121212;
+            --bg-card: #1a1a1a;
+            --border-subtle: #333;
+            --text-primary: #f0f0f0;
+            --text-secondary: #999;
+            --accent-gold: #d4af37;
+            --danger-color: #e74c3c;
+            --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
+            --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
         }
 
-        /* --- Reset & Base --- */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-base);
             color: var(--text-primary);
             display: flex;
             justify-content: center;
-            padding: 24px 16px;
+            padding: 20px 10px;
             min-height: 100vh;
-            line-height: 1.5;
-            -webkit-font-smoothing: antialiased;
         }
         button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
-        a { color: inherit; text-decoration: none; }
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); }
 
-        /* --- Layout --- */
-        .app-container {
+        .container {
             width: 100%;
-            max-width: 768px;
+            max-width: 600px;
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 20px;
         }
 
-        /* --- Top Header (Profile & Settings Toggle) --- */
-        .top-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border-subtle);
+        /* =========================================
+           1. 復活させた国民身分証明証 (Original Design)
+           ========================================= */
+        .id-card-wrapper { 
+            background: linear-gradient(135deg, #e8ecef 0%, #b8c6db 100%); 
+            border-radius: 12px; 
+            padding: 14px; 
+            color: #1a1a1a; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.6); 
+            position: relative; 
+            overflow: hidden; 
+            border: 1px solid #fff; 
         }
-        .profile-summary {
-            display: flex;
-            flex-direction: column;
+        .id-card-wrapper::before { 
+            content: ""; position: absolute; top: 0; left: -150%; width: 50%; height: 100%; 
+            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%); 
+            transform: skewX(-25deg); animation: card-shine 6s infinite; z-index: 3; pointer-events: none; 
         }
-        .profile-name { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
-        .profile-badges { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
-        .badge {
-            font-size: 0.75rem; padding: 2px 8px; border-radius: 99px;
-            background: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--text-secondary);
-        }
-        .settings-toggle {
-            padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
-            background: var(--bg-card); color: var(--text-secondary); transition: var(--transition);
-        }
-        .settings-toggle:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-hover); }
-
-        /* --- Info Grid (Tax & Logs) --- */
-        .info-grid {
-            display: grid; grid-template-columns: 1fr 2fr; gap: 16px;
-        }
-        @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
-        
-        .card {
-            background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;
-        }
-        .card-title { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-        
-        /* Tax Display */
-        .tax-amount { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
-        .tax-note { font-size: 0.75rem; color: var(--text-muted); }
-
-        /* Announcements */
-        .log-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 8px; }
-        .log-item { font-size: 0.85rem; display: flex; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .log-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .log-date { color: var(--text-muted); font-size: 0.75rem; flex-shrink: 0; }
-
-        /* --- Services Grid (Bento UI) --- */
-        .section-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
-        }
-        .section-title { font-size: 1rem; font-weight: 600; }
-        .view-controls { display: flex; gap: 8px; }
-        .btn-icon {
-            color: var(--text-secondary); padding: 4px; border-radius: 4px; transition: var(--transition);
-        }
-        .btn-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
-
-        .service-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;
-        }
-        .service-grid.compact-mode {
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px;
+        @keyframes card-shine { 0% { left: -150%; } 15% { left: 200%; } 100% { left: 200%; } }
+        .id-card-wrapper::after { 
+            content: "MURAOKA"; position: absolute; font-size: 4rem; font-weight: 900; 
+            color: rgba(255,255,255,0.25); transform: rotate(-25deg); top: 25px; right: -20px; 
+            pointer-events: none; letter-spacing: 4px; z-index: 1; 
         }
         
-        .service-node {
-            background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-            padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative;
-            transition: var(--transition); text-align: left;
-        }
-        .service-node:hover {
-            border-color: var(--border-hover); background: var(--bg-hover); transform: translateY(-1px);
-        }
-        .service-grid.compact-mode .service-node { padding: 10px; gap: 8px; }
-        
-        .node-icon { width: 24px; height: 24px; color: var(--text-primary); }
-        .service-grid.compact-mode .node-icon { width: 18px; height: 18px; }
-        .node-label { font-size: 0.85rem; font-weight: 500; word-break: break-all; line-height: 1.3; }
-        .service-grid.compact-mode .node-label { font-size: 0.75rem; }
+        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 4px; margin-bottom: 8px; position: relative; z-index: 2; }
+        .id-country { font-weight: 900; font-size: 1rem; color: #2c3e50; letter-spacing: 1px; }
+        .id-title { font-size: 0.7rem; font-weight: bold; color: #555; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
+        .id-body { display: flex; gap: 10px; position: relative; z-index: 2; align-items: center; }
+        .id-photo { width: 55px; height: 65px; background: #fff; border: 2px solid #bdc3c7; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #95a5a6; }
+        .id-details { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+        .id-row { display: flex; flex-direction: column; }
+        .id-label { font-size: 0.6rem; color: #7f8c8d; font-weight: bold; }
+        .id-value { font-size: 0.85rem; font-weight: 900; color: #2c3e50; word-break: break-all; }
+        .id-badge { display: inline-block; background-color: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; align-self: flex-start; margin-top: 2px; }
 
-        /* Node Actions (Pin / Delete) */
-        .node-actions { position: absolute; top: 8px; right: 8px; opacity: 0; transition: var(--transition); display: flex; gap: 4px; }
-        .service-node:hover .node-actions { opacity: 1; }
-        .btn-action-small {
-            color: var(--text-muted); padding: 4px; border-radius: 4px;
+        /* =========================================
+           2. 幾何学パネル (Tax & Log & Settings)
+           ========================================= */
+        .panel {
+            background: var(--bg-surface);
+            padding: 16px;
+            clip-path: var(--chamfer-clip);
+            position: relative;
         }
-        .btn-action-small:hover { color: var(--text-primary); background: rgba(255,255,255,0.1); }
-        .pinned .pin-icon { color: var(--text-primary); fill: var(--text-primary); }
-        .service-node.pinned .node-actions { opacity: 1; }
-
-        /* Add Custom Node Button */
-        .service-node.add-node { border-style: dashed; justify-content: center; align-items: center; color: var(--text-muted); }
-        .service-node.add-node:hover { color: var(--text-primary); border-color: var(--text-secondary); }
-
-        /* --- Settings Panel (Hidden by default) --- */
-        .settings-panel {
-            display: none; background: var(--bg-surface); border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg); padding: 20px; flex-direction: column; gap: 16px; margin-bottom: 16px;
+        /* Clip-path用の疑似ボーダー */
+        .panel::before {
+            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
+            background: var(--bg-card); clip-path: var(--chamfer-clip); z-index: -1;
         }
-        .settings-panel.active { display: flex; }
         
-        .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-label { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
-        .form-control {
-            background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-primary);
-            padding: 10px 12px; border-radius: var(--radius-md); font-size: 0.85rem; font-family: inherit; transition: var(--transition); outline: none;
-        }
-        .form-control:focus { border-color: var(--text-primary); }
+        .panel-header { font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display: flex; justify-content: space-between; }
         
-        .btn-primary {
-            background: var(--text-primary); color: var(--bg-base); border: none; padding: 10px 16px;
-            border-radius: var(--radius-md); font-weight: 500; font-size: 0.85rem; transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-primary:hover { opacity: 0.9; }
-        .btn-secondary {
-            background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-subtle);
-            padding: 10px 16px; border-radius: var(--radius-md); font-weight: 500; font-size: 0.85rem; transition: var(--transition);
-        }
-        .btn-secondary:hover { background: var(--bg-hover); border-color: var(--border-hover); }
-        
-        .btn-danger { color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3); }
-        .btn-danger:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--danger-color); }
-        
-        .admin-controls { display: none; border-top: 1px solid var(--border-subtle); padding-top: 16px; flex-direction: column; gap: 12px; }
+        /* お知らせ */
+        .news-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+        .news-item { font-size: 0.75rem; border-bottom: 1px dashed var(--border-subtle); padding-bottom: 6px; }
+        .news-item:last-child { border: none; padding-bottom: 0; }
+        .news-date { color: var(--text-secondary); margin-right: 8px; font-size: 0.65rem; }
 
-        /* --- Footer (Underground / Policy) --- */
-        .footer-links {
-            display: flex; justify-content: space-between; padding-top: 24px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-muted);
-        }
-        .footer-link { transition: var(--transition); cursor: pointer; }
-        .footer-link:hover { color: var(--text-primary); }
+        /* 税金 */
+        .tax-display { text-align: center; }
+        .tax-amount { color: var(--danger-color); font-size: 1.5rem; font-weight: 900; margin: 4px 0; }
+        .tax-note { font-size: 0.65rem; color: var(--text-secondary); }
 
-        /* --- Modals (Custom Link / Alley / Terms) --- */
+        /* 設定フォーム */
+        details summary { cursor: pointer; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); user-select: none; }
+        details summary:hover { color: var(--accent-gold); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+        @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+        
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .label { font-size: 0.7rem; color: var(--text-secondary); font-weight: bold; }
+        input, select {
+            width: 100%; padding: 8px; background: var(--bg-base); border: 1px solid var(--border-subtle);
+            color: var(--text-primary); font-size: 0.8rem; clip-path: var(--chamfer-clip); outline: none;
+        }
+        input:focus, select:focus { border-color: var(--accent-gold); }
+        
+        .btn-solid {
+            background: var(--border-subtle); color: var(--text-primary); padding: 8px;
+            font-size: 0.8rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip); transition: 0.2s;
+        }
+        .btn-solid:hover { background: var(--accent-gold); color: #000; }
+        .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; }
+
+        /* =========================================
+           3. 八角形（オクタゴン）サービスグリッド
+           ========================================= */
+        .grid-header { display: flex; justify-content: space-between; margin: 16px 0 8px 0; font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); }
+        
+        .octagon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+            gap: 12px;
+            justify-items: center;
+        }
+
+        .octagon-node {
+            width: 105px; height: 105px;
+            background: var(--border-subtle);
+            clip-path: var(--octagon-clip);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; transition: all 0.2s; cursor: pointer;
+        }
+        .octagon-node::before {
+            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
+            background: var(--bg-card); clip-path: var(--octagon-clip); z-index: -1; transition: 0.2s;
+        }
+        .octagon-node:hover { transform: scale(1.05); background: var(--accent-gold); }
+        .octagon-node:hover::before { background: #222; }
+
+        .node-icon { margin-bottom: 6px; display: flex; align-items: center; justify-content: center; }
+        .node-icon svg { width: 26px; height: 26px; stroke: var(--text-primary); fill: none; stroke-width: 1.5; stroke-linecap: square; }
+        .octagon-node:hover .node-icon svg { stroke: var(--accent-gold); }
+        
+        .node-label { font-size: 0.65rem; font-weight: bold; color: var(--text-primary); text-align: center; line-height: 1.2; word-break: keep-all; }
+
+        /* カスタム機能 (ピン留め/削除) */
+        .node-actions { position: absolute; top: 6px; right: 50%; transform: translateX(50%); opacity: 0; transition: 0.2s; }
+        .octagon-node:hover .node-actions { opacity: 1; }
+        .action-icon { width: 14px; height: 14px; color: var(--text-secondary); cursor: pointer; }
+        .action-icon:hover { color: var(--accent-gold); }
+        .pinned .action-icon { color: var(--accent-gold); fill: var(--accent-gold); opacity: 1; }
+        .octagon-node.pinned .node-actions { opacity: 1; }
+
+        /* 新規追加用オクタゴン */
+        .octagon-add {
+            background: transparent; border: 1px dashed var(--border-subtle); clip-path: none; 
+            border-radius: 50%; /* 代替として丸 */
+            width: 80px; height: 80px; margin-top: 12px;
+        }
+        .octagon-add:hover { border-color: var(--accent-gold); color: var(--accent-gold); transform: scale(1.05); }
+
+        /* 裏路地・フッター */
+        .alley-box {
+            margin-top: 24px; padding: 12px; border: 1px dashed var(--border-subtle); text-align: center; cursor: pointer; color: var(--text-secondary); font-size: 0.75rem; transition: 0.2s;
+        }
+        .alley-box:hover { border-color: var(--text-primary); color: var(--text-primary); }
+
+        /* モーダル群 */
         .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(4px); z-index: 9999;
-            justify-content: center; align-items: center; padding: 16px;
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px;
         }
         .modal-box {
-            background: var(--bg-surface); border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg); width: 100%; max-width: 400px; padding: 24px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            background: var(--bg-card); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); width: 100%; max-width: 400px; padding: 24px; position: relative;
         }
-        .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; }
-        .modal-body { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; max-height: 40vh; overflow-y: auto; }
-        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; }
-        
-        /* SVG Utils */
-        .icon { stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .modal-title { font-size: 1rem; color: var(--accent-gold); margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
+<div class="container">
     
-    <!-- Header -->
-    <header class="top-header">
-        <div class="profile-summary">
-            <div class="profile-name" id="display-nickname">Loading...</div>
-            <div class="profile-badges">
-                <span class="badge" id="user-title-display">---</span>
-                <span class="badge" style="font-family: monospace; border: none; background: transparent; padding: 0;" id="user-email"></span>
-            </div>
+    <!-- 1. 国民身分証明証 (完全維持) -->
+    <div class="id-card-wrapper">
+        <div class="id-header">
+            <div class="id-country">村岡王国</div>
+            <div class="id-title">国民身分証明証</div>
         </div>
-        <button class="settings-toggle" onclick="toggleSettings()" title="設定">
-            <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        </button>
-    </header>
-
-    <!-- Settings Panel (Toggleable) -->
-    <div id="settings-panel" class="settings-panel">
-        <h3 style="font-size: 1rem; margin-bottom: 8px;">設定・プロフィール</h3>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div class="form-group">
-                <label class="form-label">称号</label>
-                <select class="form-control" id="title-select"><option value="">読込中...</option></select>
-                <button class="btn-secondary" onclick="equipTitle()">変更を適用</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label">納税口座</label>
-                <select class="form-control" id="tax-wallet-select"><option value="">読込中...</option></select>
-                <button class="btn-secondary" onclick="payTax()">納税実行 (+100G)</button>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
-            <div class="form-group">
-                <label class="form-label">ニックネーム</label>
-                <input class="form-control" type="text" id="nickname" placeholder="入力">
-            </div>
-            <div class="form-group">
-                <label class="form-label">本名 (非公開)</label>
-                <input class="form-control" type="text" id="real-name" placeholder="入力">
-            </div>
-        </div>
-        <button class="btn-primary" onclick="saveProfile()" style="width: 100%;">プロフィールを保存</button>
-
-        <div id="admin-controls-wrapper" class="admin-controls">
-            <h4 style="font-size: 0.85rem; color: var(--danger-color);">Admin Controls</h4>
-            <div style="display: flex; gap: 8px;">
-                <button id="btn-admin-items" class="btn-secondary btn-danger" style="flex:1" onclick="location.href='/admin/items'">アイテム管理</button>
-                <button id="btn-admin-casino" class="btn-secondary btn-danger" style="flex:1" onclick="location.href='/admin/casino'">カジノ調整</button>
-            </div>
-            <button id="btn-admin-tax" class="btn-secondary btn-danger" style="width: 100%" onclick="collectAllTax()">全国民から所得税を即時徴収</button>
-        </div>
-        
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <button class="btn-secondary" style="flex:1;" onclick="openPolicyViewer()">利用規約</button>
-            <button class="btn-secondary" style="flex:1; color: var(--danger-color);" onclick="logout()">ログアウト</button>
-        </div>
-    </div>
-
-    <!-- Info Grid -->
-    <div class="info-grid">
-        <div class="card">
-            <div class="card-title">
-                <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                次回所得税
-            </div>
-            <div class="tax-amount" id="my-tax-amount">---</div>
-            <div class="tax-note">火・金 9:00 (10万G超の0.5%)</div>
-        </div>
-        
-        <div class="card">
-            <div class="card-title">
-                <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                お知らせ
-            </div>
-            <div class="log-list" id="announcement-list">
-                <div class="log-item"><span class="log-date">--/--</span><span>読込中...</span></div>
+        <div class="id-body">
+            <div class="id-photo">👤</div>
+            <div class="id-details">
+                <div class="id-row">
+                    <span class="id-label">氏名 (NICKNAME)</span>
+                    <span class="id-value" id="display-nickname">-</span>
+                </div>
+                <div class="id-row">
+                    <span class="id-label">国民ID (EMAIL)</span>
+                    <span class="id-value" id="user-email" style="font-size: 0.65rem;">-</span>
+                </div>
+                <div class="id-row">
+                    <span class="id-label">称号 (TITLE)</span>
+                    <span class="id-badge" id="user-title-display">読込中...</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Services Section -->
-    <section>
-        <div class="section-header">
-            <div class="section-title">サービス一覧</div>
-            <div class="view-controls">
-                <button class="btn-icon" onclick="toggleDensity()" title="表示切替">
-                    <svg class="icon" width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                </button>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- 2. お知らせ -->
+        <div class="panel">
+            <div class="panel-header">📢 王国通信</div>
+            <div class="news-list" id="announcement-list">
+                <div class="news-item"><span class="news-date">--/--</span>お知らせ読込中...</div>
             </div>
         </div>
-        
-        <!-- Grid rendered by JS -->
-        <div id="service-grid" class="service-grid"></div>
-    </section>
 
-    <!-- Footer -->
-    <footer class="footer-links">
-        <span class="footer-link" onclick="openAlleyModal()">路地裏へ...</span>
-        <span style="color: var(--border-subtle);">MURAOKA PLATFORM</span>
-    </footer>
+        <!-- 3. 税金表示 -->
+        <div class="panel tax-display">
+            <div class="panel-header" style="justify-content: center;">💰 次回所得税</div>
+            <div class="tax-amount" id="my-tax-amount">計算中...</div>
+            <div class="tax-note">※火・金 9:00 (10万G超 0.5%)</div>
+        </div>
+    </div>
+
+    <!-- 4. 設定パネル -->
+    <div class="panel">
+        <details>
+            <summary>⚙️ 各種設定・称号・納税操作</summary>
+            <div class="form-grid">
+                <div class="form-group">
+                    <span class="label">称号変更</span>
+                    <select id="title-select"><option value="">読込中...</option></select>
+                    <button class="btn-solid" onclick="equipTitle()">適用</button>
+                </div>
+                <div class="form-group">
+                    <span class="label">納税口座</span>
+                    <select id="tax-wallet-select"><option value="">読込中...</option></select>
+                    <button class="btn-solid btn-tax" onclick="payTax()">納税実行 (+100G)</button>
+                </div>
+                <div class="form-group">
+                    <span class="label">ニックネーム</span>
+                    <input type="text" id="nickname" placeholder="入力">
+                </div>
+                <div class="form-group">
+                    <span class="label">本名 (非公開)</span>
+                    <input type="text" id="real-name" placeholder="入力">
+                    <button class="btn-solid" onclick="saveProfile()">保存</button>
+                </div>
+            </div>
+
+            <!-- 国王専用 -->
+            <div id="admin-controls" style="display: none; border-top: 1px solid #333; margin-top: 16px; padding-top: 12px;">
+                <span class="label" style="color: var(--danger-color);">👑 ADMIN CONTROLS</span>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button id="btn-admin-items" class="btn-solid" style="flex:1" onclick="location.href='/admin/items'">アイテム</button>
+                    <button id="btn-admin-casino" class="btn-solid" style="flex:1" onclick="location.href='/admin/casino'">カジノ</button>
+                </div>
+                <button id="btn-admin-tax" class="btn-solid" style="width: 100%; margin-top: 8px; color: var(--danger-color);" onclick="collectAllTax()">全国民から即時徴収</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button class="btn-solid" style="flex: 1;" onclick="openPolicyViewer()">利用規約</button>
+                <button class="btn-solid" style="flex: 1; color: var(--danger-color);" onclick="logout()">ログアウト</button>
+            </div>
+        </details>
+    </div>
+
+    <!-- 5. 八角形サービスグリッド -->
+    <div>
+        <div class="grid-header">
+            <span>SERVICE TERMINALS</span>
+            <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※ピン留めで並び替え可</span>
+        </div>
+        <div class="octagon-grid" id="service-grid">
+            <!-- JSで描画 -->
+        </div>
+    </div>
+
+    <!-- 6. 裏路地 -->
+    <div class="alley-box" onclick="openAlleyModal()">
+        👀 街の裏路地で怪しげな男がこちらの様子を伺っている...
+    </div>
 
 </div>
 
-<!-- --- Modals --- -->
+<!-- =========================================
+     MODALS
+     ========================================= -->
 
-<!-- Add Custom Link Modal -->
+<!-- カスタムリンク追加 -->
 <div id="add-link-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">リンクの追加</div>
-        <div class="modal-body">
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label class="form-label">サービス名</label>
-                <input class="form-control" type="text" id="custom-link-name" placeholder="例: Twitter">
-            </div>
-            <div class="form-group">
-                <label class="form-label">URL</label>
-                <input class="form-control" type="url" id="custom-link-url" placeholder="https://...">
-            </div>
+        <div class="modal-title">🔗 カスタムノード追加</div>
+        <div class="form-group" style="margin-bottom: 12px;">
+            <span class="label">サービス名</span>
+            <input type="text" id="custom-link-name" placeholder="例: SNS">
         </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeAddLinkModal()">キャンセル</button>
-            <button class="btn-primary" onclick="saveCustomLink()">追加</button>
+        <div class="form-group" style="margin-bottom: 24px;">
+            <span class="label">URL</span>
+            <input type="url" id="custom-link-url" placeholder="https://...">
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-solid" style="flex: 1;" onclick="closeAddLinkModal()">キャンセル</button>
+            <button class="btn-solid" style="flex: 1; background: var(--accent-gold); color: #000;" onclick="saveCustomLink()">追加する</button>
         </div>
     </div>
 </div>
 
-<!-- Alley Modal -->
+<!-- 裏路地 -->
 <div id="alley-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">路地裏</div>
-        <div id="alley-text" class="modal-body"></div>
+        <div class="modal-title">🕵️ 路地裏の男</div>
+        <div id="alley-text" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;"></div>
         <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="btn-secondary" onclick="chooseWork()">仕事を探す</button>
-            <button class="btn-secondary" onclick="chooseLoan()">裏金融へ</button>
-            <button class="btn-secondary" style="border:none;" onclick="closeAlleyModal()">立ち去る</button>
+            <button class="btn-solid" onclick="chooseWork()">🔨 働きたい</button>
+            <button class="btn-solid" onclick="chooseLoan()">💰 金を借りたい</button>
+            <button class="btn-solid" style="background: transparent;" onclick="closeAlleyModal()">👋 立ち去る</button>
         </div>
         <div id="alley-choices-factory" style="display: none; flex-direction: column; gap: 8px;">
-            <button class="btn-primary" onclick="location.href='/factory'">工場へ行く</button>
-            <button class="btn-secondary" onclick="openAlleyModal()">戻る</button>
+            <button class="btn-solid" onclick="location.href='/factory'">はい（工場へ）</button>
+            <button class="btn-solid" onclick="openAlleyModal()">戻る</button>
         </div>
         <div id="alley-choices-loan" style="display: none; flex-direction: column; gap: 8px;">
-            <button class="btn-primary" onclick="location.href='/loan'">裏金融へ</button>
-            <button class="btn-secondary" onclick="openAlleyModal()">戻る</button>
+            <button class="btn-solid" onclick="location.href='/loan'">裏金融へ</button>
+            <button class="btn-solid" onclick="openAlleyModal()">戻る</button>
         </div>
     </div>
 </div>
 
-<!-- Policy Viewer Modal -->
+<!-- 規約確認 -->
 <div id="policy-view-modal" class="modal-overlay" onclick="if(event.target === this) closePolicyViewer();">
     <div class="modal-box" onclick="event.stopPropagation();">
-        <div class="modal-title">利用規約・ポリシー</div>
-        <div id="policy-view-content" class="modal-body" style="white-space: pre-wrap;">読込中...</div>
-        <button class="btn-secondary" style="width: 100%;" onclick="closePolicyViewer()">閉じる</button>
+        <div class="modal-title">📜 利用規約・ポリシー</div>
+        <div id="policy-view-content" style="font-size: 0.75rem; color: #ccc; max-height: 250px; overflow-y: auto; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
+        <button class="btn-solid" style="width: 100%;" onclick="closePolicyViewer()">閉じる</button>
     </div>
 </div>
 
-<!-- Terms Agree Modal -->
+<!-- 規約同意 -->
 <div id="terms-modal" class="modal-overlay">
-    <div class="modal-box">
-        <div class="modal-title">利用規約の同意</div>
-        <div class="modal-body" style="margin-bottom: 12px;">サービスの安全な運営のため、利用規約への同意が必要です。</div>
-        <div id="terms-content-box" class="modal-body" style="background: var(--bg-base); padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); white-space: pre-wrap;">読込中...</div>
-        <button id="agree-terms-btn" class="btn-primary" style="width: 100%;">同意して続ける</button>
+    <div class="modal-box" style="border-color: var(--accent-gold);">
+        <div class="modal-title">📜 規約の同意</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">サービスの利用には規約の同意が必要です。</div>
+        <div id="terms-content-box" style="background: var(--bg-base); padding: 10px; height: 150px; overflow-y: auto; font-size: 0.7rem; color: #aaa; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
+        <button id="agree-terms-btn" class="btn-solid" style="width: 100%; background: var(--accent-gold); color: #000;">同意して続ける</button>
     </div>
 </div>
 
 <script>
     /* =========================================
-       1. Custom UI & LocalStorage Logic 
+       UI: 八角形グリッド描画 ＆ LocalStorage
        ========================================= */
-
-    // Settings Toggle
-    function toggleSettings() {
-        document.getElementById('settings-panel').classList.toggle('active');
-    }
-
-    // Default Services Data
     const defaultServices = [
-        { id: 'svc-mtube', name: 'M-Tube', url: '/videos', icon: '<svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' },
-        { id: 'svc-games', name: '王立遊技場', url: '/games', icon: '<svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"></path></svg>' },
-        { id: 'svc-bank', name: '中央銀行', url: '/wallet', icon: '<svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>' },
-        { id: 'svc-inv', name: '所持品バッグ', url: '/inventory', icon: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>' },
-        { id: 'svc-board', name: '回覧板', url: '/board', icon: '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>' },
-        { id: 'svc-market', name: '自由市場', url: '/market', icon: '<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>' },
-        { id: 'svc-mall', name: '民営モール', url: '/mall', icon: '<svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>' },
-        { id: 'svc-auction', name: '競売所', url: '/auction', icon: '<svg class="icon" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>' },
-        { id: 'svc-casino', name: '王国カジノ', url: '/casino', icon: '<svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line></svg>' },
-        { id: 'svc-dm', name: 'DM', url: '/dm', icon: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>' },
-        { id: 'svc-ai', name: 'AI', url: '/ai', icon: '<svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>' }
+        { id: 'svc-mtube', name: 'M-Tube', url: '/videos', icon: '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>' },
+        { id: 'svc-games', name: '王立遊技場', url: '/games', icon: '<rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"></path>' },
+        { id: 'svc-bank', name: '中央銀行', url: '/wallet', icon: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>' },
+        { id: 'svc-inv', name: '所持品バッグ', url: '/inventory', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>' },
+        { id: 'svc-board', name: '回覧板', url: '/board', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>' },
+        { id: 'svc-market', name: '自由市場', url: '/market', icon: '<line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line>' },
+        { id: 'svc-mall', name: '民営モール', url: '/mall', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
+        { id: 'svc-auction', name: '競売所', url: '/auction', icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline>' },
+        { id: 'svc-casino', name: 'カジノ', url: '/casino', icon: '<polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line>' },
+        { id: 'svc-dm', name: 'DM', url: '/dm', icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>' },
+        { id: 'svc-ai', name: 'AI', url: '/ai', icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>' }
     ];
 
-    // Grid Rendering Logic
     function renderGrid() {
         const grid = document.getElementById('service-grid');
         const pinned = JSON.parse(localStorage.getItem('muraoka_pinned') || '[]');
@@ -406,7 +388,7 @@
         
         let html = '';
 
-        // Sort default services (Pinned first)
+        // ソート: ピン留め優先
         const sortedDefaults = [...defaultServices].sort((a, b) => {
             const aPin = pinned.includes(a.id);
             const bPin = pinned.includes(b.id);
@@ -415,60 +397,51 @@
             return 0;
         });
 
-        // Render Defaults
+        // 既存サービス描画
         sortedDefaults.forEach(svc => {
             const isPinned = pinned.includes(svc.id);
             html += `
-                <button class="service-node ${isPinned ? 'pinned' : ''}" onclick="location.href='${svc.url}'">
-                    <div class="node-actions">
-                        <div class="btn-action-small" onclick="event.stopPropagation(); togglePin('${svc.id}')" title="ピン留め/解除">
-                            <svg class="icon pin-icon" width="14" height="14" viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
-                        </div>
+                <div class="octagon-node ${isPinned ? 'pinned' : ''}" onclick="location.href='${svc.url}'">
+                    <div class="node-actions" onclick="event.stopPropagation(); togglePin('${svc.id}')" title="ピン留め/解除">
+                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
                     </div>
-                    <div class="node-icon">${svc.icon}</div>
+                    <div class="node-icon"><svg viewBox="0 0 24 24">${svc.icon}</svg></div>
                     <div class="node-label">${svc.name}</div>
-                </button>
+                </div>
             `;
         });
 
-        // Render Custom Links
+        // 追加リンク描画
         customLinks.forEach(link => {
             html += `
-                <button class="service-node" onclick="window.open('${link.url}', '_blank')">
-                    <div class="node-actions">
-                        <div class="btn-action-small" onclick="event.stopPropagation(); removeCustomLink('${link.id}')" title="削除">
-                            <svg class="icon" width="14" height="14" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </div>
+                <div class="octagon-node" onclick="window.open('${link.url}', '_blank')">
+                    <div class="node-actions" onclick="event.stopPropagation(); removeCustomLink('${link.id}')" title="削除">
+                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </div>
-                    <div class="node-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>
+                    <div class="node-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>
                     <div class="node-label">${link.name}</div>
-                </button>
+                </div>
             `;
         });
 
-        // Add Button
+        // ＋ボタン (円形)
         html += `
-            <button class="service-node add-node" onclick="openAddLinkModal()">
-                <svg class="icon" width="24" height="24" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <button class="octagon-node octagon-add" onclick="openAddLinkModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         `;
 
         grid.innerHTML = html;
     }
 
-    // Pinning Logic
     function togglePin(id) {
         let pinned = JSON.parse(localStorage.getItem('muraoka_pinned') || '[]');
-        if (pinned.includes(id)) {
-            pinned = pinned.filter(p => p !== id);
-        } else {
-            pinned.push(id);
-        }
+        if (pinned.includes(id)) { pinned = pinned.filter(p => p !== id); } 
+        else { pinned.push(id); }
         localStorage.setItem('muraoka_pinned', JSON.stringify(pinned));
         renderGrid();
     }
 
-    // Custom Link Logic
     function openAddLinkModal() {
         document.getElementById('custom-link-name').value = '';
         document.getElementById('custom-link-url').value = '';
@@ -488,32 +461,17 @@
         renderGrid();
     }
     function removeCustomLink(id) {
-        if(!confirm('このリンクを削除しますか？')) return;
+        if(!confirm('削除しますか？')) return;
         let customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
         customLinks = customLinks.filter(l => l.id !== id);
         localStorage.setItem('muraoka_custom_links', JSON.stringify(customLinks));
         renderGrid();
     }
 
-    // View Density Toggle
-    function toggleDensity() {
-        const grid = document.getElementById('service-grid');
-        grid.classList.toggle('compact-mode');
-        const isCompact = grid.classList.contains('compact-mode');
-        localStorage.setItem('muraoka_view_compact', isCompact);
-    }
-
-    // Initialize UI state
-    document.addEventListener("DOMContentLoaded", () => {
-        if(localStorage.getItem('muraoka_view_compact') === 'true') {
-            document.getElementById('service-grid').classList.add('compact-mode');
-        }
-        renderGrid();
-    });
-
+    document.addEventListener("DOMContentLoaded", renderGrid);
 
     /* =========================================
-       2. Original Backend & Core Logic (Preserved)
+       バックエンド通信ロジック (完全維持)
        ========================================= */
        
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
@@ -593,18 +551,18 @@
                     const safeDate = typeof escapeHtml === 'function' ? escapeHtml(dateStr) : dateStr;
 
                     htmlBuffer += `
-                        <div class="log-item">
-                            <span class="log-date">${safeDate}</span>
-                            <span><strong>${safeTitle}</strong> ${safeContent ? '- ' + safeContent : ''}</span>
+                        <div class="news-item">
+                            <span class="news-date">${safeDate}</span>
+                            <strong>${safeTitle}</strong> ${safeContent ? '- ' + safeContent : ''}
                         </div>
                     `;
                 }
-                container.innerHTML = htmlBuffer || '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
+                container.innerHTML = htmlBuffer || '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
             } else {
-                container.innerHTML = '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
+                container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
             }
         } catch (e) {
-            container.innerHTML = '<div class="log-item"><span class="log-date">--/--</span><span>現在お知らせはありません。</span></div>';
+            container.innerHTML = '<div class="news-item" style="color:#888;">現在お知らせはありません。</div>';
         }
     }
 
@@ -624,9 +582,8 @@
                 const displayNick = document.getElementById("display-nickname");
                 if (displayNick) displayNick.innerText = data.nickname || "（未設定）";
 
-                // Admin UI toggle
                 if (data.is_king || data.role === "king") {
-                    document.getElementById("admin-controls-wrapper").style.display = "flex";
+                    document.getElementById("admin-controls").style.display = "block";
                 }
             }
         } catch (e) { console.error(e); }
@@ -676,8 +633,8 @@
                 const taxAmount = calculateWealthTax(totalBalance);
                 const taxDisplay = document.getElementById("my-tax-amount");
                 if (taxDisplay) {
-                    taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G";
-                    taxDisplay.style.color = taxAmount > 0 ? "var(--danger-color)" : "var(--text-primary)";
+                    taxDisplay.innerText = taxAmount > 0 ? `-${taxAmount.toLocaleString()} G` : "0 G (無税)";
+                    taxDisplay.style.color = taxAmount > 0 ? "var(--danger-color)" : "var(--text-secondary)";
                 }
 
                 const select = document.getElementById("tax-wallet-select");
@@ -703,7 +660,7 @@
             });
             const data = await res.json();
             if (res.ok) {
-                alert(data.message || "プロフィールを更新しました");
+                alert(data.message || "国民情報を更新しました");
                 loadProfile();
             } else {
                 alert("エラー: " + (data.detail || "プロフィールの保存に失敗しました"));
@@ -748,7 +705,7 @@
         window.location.href = "/";
     }
 
-    /* Alley Modal Handlers */
+    /* 裏路地モーダル制御 */
     function openAlleyModal() {
         document.getElementById("alley-text").innerHTML = "「……あ？ なんだお前、俺に何か用か？」";
         document.getElementById("alley-choices-initial").style.display = "flex";
@@ -768,7 +725,7 @@
         document.getElementById("alley-choices-loan").style.display = "flex";
     }
 
-    /* Policy Modal Handlers */
+    /* 規約モーダル制御 */
     let isPolicyFetching = false;
     async function openPolicyViewer() {
         if (isPolicyFetching) return;
@@ -793,7 +750,7 @@
 </script>
 
 <script>
-/* Terms Agreement Auto-Check */
+/* 規約同意の自動チェック */
 document.addEventListener("DOMContentLoaded", async () => {
     const token = localStorage.getItem("access_token");
     const modalEl = document.getElementById("terms-modal");
