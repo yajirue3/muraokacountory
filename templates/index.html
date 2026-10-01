@@ -483,42 +483,17 @@
 </div>
 
 <script>
-    // --- Supabase クライアント自動初期化（/api/config 連携） ---
+    // --- サーバーテンプレート（Jinja2）から動的注入 ---
+    const SUPABASE_URL = "{{ supabase_url | default('', true) }}";
+    const SUPABASE_ANON_KEY = "{{ supabase_anon_key | default('', true) }}";
+
     let supabaseClient = null;
-
-    async function initSupabase() {
-        if (supabaseClient) return supabaseClient;
-
-        let url = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL");
-        let key = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY");
-
-        // サーバー側 /api/config から環境変数を自動取得
-        if (!url || !key) {
-            try {
-                const res = await fetch("/api/config");
-                if (res.ok) {
-                    const cfg = await res.json();
-                    url = cfg.supabase_url;
-                    key = cfg.supabase_anon_key;
-                    if (url && key) {
-                        localStorage.setItem("SUPABASE_URL", url);
-                        localStorage.setItem("SUPABASE_ANON_KEY", key);
-                    }
-                }
-            } catch (e) {
-                console.error("サーバー設定の取得に失敗:", e);
-            }
+    try {
+        if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
-
-        if (typeof supabase !== 'undefined' && url && key) {
-            try {
-                supabaseClient = supabase.createClient(url, key);
-                return supabaseClient;
-            } catch (e) {
-                console.error("Supabase初期化エラー:", e);
-            }
-        }
-        return null;
+    } catch (e) {
+        console.error("Supabase初期化失敗:", e);
     }
 
     // パスワード表示／非表示トグル
@@ -551,10 +526,8 @@
         }
     }
 
-    // 画面ロード時に自動初期化・イベントバインド
-    document.addEventListener("DOMContentLoaded", async () => {
-        await initSupabase();
-
+    // Enterキー送信対応
+    document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("login-password").addEventListener("keydown", (e) => {
             if (e.key === "Enter") login();
         });
@@ -570,13 +543,12 @@
 
     // Google OAuth 認証
     async function loginWithGoogle() {
-        const client = supabaseClient || await initSupabase();
-        if (!client) {
-            alert("認証基盤の設定を取得できませんでした。\nRenderの環境変数（SUPABASE_URL / SUPABASE_KEY）をご確認ください。");
+        if (!supabaseClient) {
+            alert("認証基盤の設定が正しく読み込まれていません。サーバー環境変数を確認してください。");
             return;
         }
         try {
-            const { data, error } = await client.auth.signInWithOAuth({
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: window.location.origin + '/dashboard'
@@ -600,9 +572,8 @@
         const email = document.getElementById("forgot-email").value.trim();
         if (!email) return alert("国民ID（メールアドレス）を入力してください");
 
-        const client = supabaseClient || await initSupabase();
-        if (!client) {
-            return alert("認証クライアントの初期化に失敗しました。");
+        if (!supabaseClient) {
+            return alert("認証クライアントが初期化されていません。サーバー環境変数を確認してください。");
         }
 
         const btn = document.getElementById("btn-forgot-submit");
@@ -610,7 +581,7 @@
         btn.innerText = "送信中...";
 
         try {
-            const { error } = await client.auth.resetPasswordForEmail(email, {
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin + '/dashboard'
             });
             if (error) throw error;
