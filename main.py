@@ -285,6 +285,10 @@ def get_koneko(request: Request):
 def get_ai(request: Request):
     return templates.TemplateResponse(request=request, name="ai.html")
 
+@app.get("/pixel", response_class=HTMLResponse)
+def get_pixel(request: Request):
+    return templates.TemplateResponse(request=request, name="pixel.html")
+
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
 # --------------------------------------------------
