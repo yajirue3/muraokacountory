@@ -8,7 +8,6 @@ import random
 import struct
 import asyncio
 from collections import deque
-import os
 
 from db import get_supabase
 
@@ -19,9 +18,9 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 BOARD_WIDTH = 200
 BOARD_HEIGHT = 200
 ROCK_ID = 65535
-BOARD_FILE = BASE_DIR / "board_data.bin"
+EXPECTED_BYTE_SIZE = BOARD_WIDTH * BOARD_HEIGHT * 3
 
-board = bytearray(BOARD_WIDTH * BOARD_HEIGHT * 3)
+board = bytearray(EXPECTED_BYTE_SIZE)
 board_lock = asyncio.Lock()
 player_mass_counts = {}
 connected_clients: list[WebSocket] = []
@@ -45,41 +44,80 @@ def set_tile(x: int, y: int, owner: int, hp: int):
         if owner != 0 and owner != ROCK_ID:
             player_mass_counts[owner] = player_mass_counts.get(owner, 0) + 1
 
-def init_board():
-    if os.path.exists(BOARD_FILE):
-        with open(BOARD_FILE, "rb") as f:
-            board[:] = f.read()
-    else:
+async def load_board_from_supabase():
+    """Supabaseから盤面バイナリデータを読み込み"""
+    global board
+    client = await get_supabase()
+    res = await client.table("pixel_board").select("data").eq("id", 1).execute()
+    
+    loaded = False
+    if res.data and len(res.data) > 0:
+        raw_data = res.data[0].get("data")
+        if raw_data:
+            # Supabase Python SDK が bytes/bytearray で返すか hex 文字列 (\x...) で返す場合に対応
+            if isinstance(raw_data, (bytes, bytearray)):
+                data_bytes = bytes(raw_data)
+            elif isinstance(raw_data, str) and raw_data.startswith("\\x"):
+                data_bytes = bytes.fromhex(raw_data[2:])
+            else:
+                data_bytes = b""
+            
+            if len(data_bytes) == EXPECTED_BYTE_SIZE:
+                board[:] = data_bytes
+                loaded = True
+
+    # DBに有効なデータがない場合は岩盤付きの初期状態を生成してDBへ保存
+    if not loaded:
+        board[:] = bytearray(EXPECTED_BYTE_SIZE)
         for x in range(BOARD_WIDTH):
             if 3 <= x < BOARD_WIDTH - 3:
                 set_tile(x, 100, ROCK_ID, 255)
         for y in range(BOARD_HEIGHT):
             if 3 <= y < BOARD_HEIGHT - 3:
                 set_tile(100, y, ROCK_ID, 255)
-                
+        
+        await save_board_to_supabase()
+
+    # マスカウントの集計
+    player_mass_counts.clear()
     for y in range(BOARD_HEIGHT):
         for x in range(BOARD_WIDTH):
             owner, _ = get_tile(x, y)
             if owner != 0 and owner != ROCK_ID:
                 player_mass_counts[owner] = player_mass_counts.get(owner, 0) + 1
 
+async def save_board_to_supabase():
+    """現在の盤面バイナリデータをSupabaseへ保存"""
+    client = await get_supabase()
+    hex_str = "\\x" + board.hex()
+    await client.table("pixel_board").upsert({
+        "id": 1,
+        "data": hex_str,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }).execute()
+
 async def save_board_task():
+    """5分ごとに自動的にSupabaseへ盤面を保存"""
     while True:
         await asyncio.sleep(300)
         async with board_lock:
-            with open(BOARD_FILE, "wb") as f:
-                f.write(board)
+            try:
+                await save_board_to_supabase()
+            except Exception as e:
+                print(f"[Pixel Board Auto Save Error]: {e}")
 
 @router.on_event("startup")
 async def start_pixel_tasks():
-    init_board()
+    await load_board_from_supabase()
     asyncio.create_task(save_board_task())
 
 @router.on_event("shutdown")
 async def shutdown_pixel_tasks():
     async with board_lock:
-        with open(BOARD_FILE, "wb") as f:
-            f.write(board)
+        try:
+            await save_board_to_supabase()
+        except Exception as e:
+            print(f"[Pixel Board Shutdown Save Error]: {e}")
 
 async def get_user_from_token(authorization: str):
     if not authorization or not authorization.startswith("Bearer "):
@@ -111,7 +149,6 @@ def get_valid_spawn():
         cx, cy = random.randint(5, BOARD_WIDTH-6), random.randint(5, BOARD_HEIGHT-6)
         if all(get_tile(cx+dx, cy+dy)[0] == 0 for dx in range(-2, 3) for dy in range(-2, 3)):
             return cx, cy
-    # タイムアウトフォールバック
     for _ in range(500):
         cx, cy = random.randint(1, BOARD_WIDTH-2), random.randint(1, BOARD_HEIGHT-2)
         if get_tile(cx, cy)[0] == 0:
@@ -232,7 +269,6 @@ async def websocket_pixel(ws: WebSocket):
 
             # 3. 盤面書き換えと判定
             diffs = []
-            disconnected_tiles = []
             assassinated = False
             bounty_msg = None
 
@@ -274,7 +310,7 @@ async def websocket_pixel(ws: WebSocket):
                     bounty_msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
                     await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
                     
-                    # 敵マス全消去 (再度ロックを取得して安全に処理)
+                    # 敵マス全消去
                     async with board_lock:
                         for cy in range(BOARD_HEIGHT):
                             for cx in range(BOARD_WIDTH):
