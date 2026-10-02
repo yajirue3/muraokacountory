@@ -9,6 +9,7 @@ import struct
 import asyncio
 from collections import deque
 import os
+import math
 
 from db import get_supabase
 
@@ -201,34 +202,61 @@ async def websocket_pixel(ws: WebSocket):
             client = await get_supabase()
             
             async with board_lock:
+                # 1. 怠惰計算で状態を同期
                 mass_count = player_mass_counts.get(player_id, 0)
                 rpc_res = await client.rpc("pixel_lazy_update", {
                     "p_player_id": player_id, "p_mass_count": mass_count, "p_now": datetime.now(timezone.utc).isoformat()
                 }).execute()
                 
                 state = rpc_res.data
-                if state.get("status") == "dead_or_not_found" or state.get("ink", 0) < 1:
+                if state.get("status") == "dead_or_not_found":
+                    await ws.send_json({"type": "error", "msg": "死亡しているかプレイヤーが存在しません。"})
                     continue
-                if state.get("barrier", False) and action == 1:
+                if state.get("barrier", False):
+                    await ws.send_json({"type": "error", "msg": "バリア展開中は操作できません。"})
+                    continue
+                if state.get("ink", 0) < 1:
+                    await ws.send_json({"type": "error", "msg": "インクが不足しています。"})
                     continue
 
                 alliances = await get_alliances(player_id)
                 target_owner, target_hp = get_tile(x, y)
                 diffs = []
 
-                # ACTION 1: 塗る / 攻撃
+                # 2. アクションの制約バリデーション
+                if target_owner == ROCK_ID:
+                    await ws.send_json({"type": "error", "msg": "中央の岩盤は塗れません。"})
+                    continue
+
                 if action == 1:
-                    if target_owner == ROCK_ID or target_owner == player_id or target_owner in alliances:
+                    if target_owner == player_id or target_owner in alliances:
+                        await ws.send_json({"type": "error", "msg": "自陣または同盟国です。防壁強化モードに切り替えてください。"})
                         continue
-                    
                     if not is_adjacent_to_owned(x, y, player_id, alliances):
+                        await ws.send_json({"type": "error", "msg": "自陣または同盟国に隣接していません。"})
                         continue
                         
                     target_mass = player_mass_counts.get(target_owner, 0) if target_owner != 0 else 0
                     if (mass_count <= 10 and target_owner != 0) or (target_owner != 0 and target_mass <= 10):
+                        await ws.send_json({"type": "error", "msg": "初心者保護ルール（10マス以下）により攻撃できません。"})
                         continue
 
-                    # 耐久度削り or 上書き
+                elif action == 2:
+                    if target_owner != player_id and target_owner not in alliances:
+                        await ws.send_json({"type": "error", "msg": "防壁強化は自陣または同盟領地のみ可能です。"})
+                        continue
+                    if target_hp >= 255:
+                        await ws.send_json({"type": "error", "msg": "これ以上防壁を強化できません。"})
+                        continue
+
+                # 3. アトミックなインク消費
+                consume_res = await client.rpc("pixel_consume_ink", {"p_player_id": player_id}).execute()
+                if not consume_res.data:
+                    await ws.send_json({"type": "error", "msg": "インクが不足しています。"})
+                    continue
+
+                # 4. 盤面の書き換え
+                if action == 1:
                     if target_owner != 0 and target_hp > 1:
                         set_tile(x, y, target_owner, target_hp - 1)
                         diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp - 1))
@@ -236,7 +264,7 @@ async def websocket_pixel(ws: WebSocket):
                         set_tile(x, y, player_id, 1)
                         diffs.append(struct.pack(">BBHB", x, y, player_id, 1))
                         
-                        # 敵マスへの侵略
+                        # 敵領地への侵略時処理
                         if target_owner != 0:
                             enemy_res = await client.table("pixel_players").select("*").eq("player_id", target_owner).execute()
                             if enemy_res.data:
@@ -277,24 +305,23 @@ async def websocket_pixel(ws: WebSocket):
                                                 set_tile(dx, dy, 0, 0)
                                                 diffs.append(struct.pack(">BBHB", dx, dy, 0, 0))
 
+                        # 囲み総取り
                         apply_flood_fill(x, y, player_id, diffs)
 
-                # ACTION 2: 防壁強化
                 elif action == 2:
-                    if target_owner == player_id or target_owner in alliances:
-                        if target_hp < 255:
-                            set_tile(x, y, target_owner, target_hp + 1)
-                            diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp + 1))
+                    set_tile(x, y, target_owner, target_hp + 1)
+                    diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp + 1))
 
-                # インク消費と盤面差分ブロードキャスト
+                # 5. 結果をブロードキャスト
                 if diffs:
-                    await client.table("pixel_players").update({"ink": state["ink"] - 1}).eq("player_id", player_id).execute()
                     payload = b"".join(diffs)
                     for c in connected_clients:
                         try:
                             await c.send_bytes(payload)
                         except Exception:
                             pass
+                    # 本人に成功と残インクを通知
+                    await ws.send_json({"type": "status", "ink": state["ink"] - 1})
 
     except WebSocketDisconnect:
         connected_clients.remove(ws)
@@ -369,32 +396,22 @@ class UpgradeRequest(BaseModel):
 async def pixel_upgrade(data: UpgradeRequest, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
-    p_res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
-    if not p_res.data or p_res.data[0]["is_dead"]:
-        raise HTTPException(status_code=400, detail="プレイヤーが見つからないか死亡しています。")
-    p = p_res.data[0]
+    p_res = await client.table("pixel_players").select("player_id").eq("user_id", user.id).execute()
+    if not p_res.data:
+        raise HTTPException(status_code=400, detail="プレイヤーが存在しません。")
     
-    if data.upgrade_type == "MAX_INK":
-        cost = p["max_ink"] * 100
-    elif data.upgrade_type == "REGEN":
-        cost = p["regen"] * 5000
-    else:
-        raise HTTPException(status_code=400, detail="無効な強化タイプです。")
-        
-    w_res = await client.table("wallets").select("*").eq("wallet_id", data.wallet_id).execute()
-    if not w_res.data or w_res.data[0]["balance"] < cost:
-        raise HTTPException(status_code=400, detail="残高不足です。")
-        
-    await client.table("wallets").update({"balance": w_res.data[0]["balance"] - cost}).eq("id", w_res.data[0]["id"]).execute()
+    # SQL関数で安全に決済と強化を確定させる
+    rpc_res = await client.rpc("pixel_upgrade_stat", {
+        "p_player_id": p_res.data[0]["player_id"],
+        "p_wallet_id": data.wallet_id,
+        "p_type": data.upgrade_type
+    }).execute()
     
-    update_data = {"bounty_gold": p["bounty_gold"] + cost}
-    if data.upgrade_type == "MAX_INK":
-        update_data["max_ink"] = p["max_ink"] + 10
-    else:
-        update_data["regen"] = p["regen"] + 1
+    result = rpc_res.data
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("detail", "エラー"))
         
-    await client.table("pixel_players").update(update_data).eq("id", p["id"]).execute()
-    return {"success": True, "new_stats": update_data}
+    return result
 
 @router.post("/api/pixel/barrier/toggle")
 async def toggle_barrier(data: BasePixelRequest, authorization: str = Header(None)):
