@@ -6,50 +6,346 @@
     <title>村岡王国 - PIXEL WAR</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --bg-base: #050505; --bg-surface: #101010; --bg-card: #161616; --border-subtle: #2a2a2a; --text-primary: #f0f0f0; --text-secondary: #888; --accent-gold: #d4af37; --accent-cyan: #00f3ff; --danger-color: #e74c3c; --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: none; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg-base); color: var(--text-primary); overflow: hidden; width: 100vw; height: 100vh; user-select: none; }
+        :root {
+            --bg-base: #030305;
+            --bg-surface: rgba(14, 15, 20, 0.92);
+            --bg-card: #12131a;
+            --border-subtle: #242636;
+            --border-glow: #00f3ff;
+            --text-primary: #f5f6fa;
+            --text-secondary: #7f85a3;
+            --accent-gold: #f5c518;
+            --accent-cyan: #00f3ff;
+            --accent-green: #00ff88;
+            --danger-color: #ff3366;
+            --chamfer-clip: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
         button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
-        #game-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        
-        #toast-container { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none; }
-        .toast { background: rgba(231, 76, 60, 0.95); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); animation: fadeOut 2.5s forwards; }
-        @keyframes fadeOut { 0% { opacity: 0; transform: translateY(10px); } 10% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
-        
-        #broadcast-area { position: absolute; top: 60px; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 50; pointer-events: none; }
-        .broadcast-msg { background: rgba(0,0,0,0.8); border: 1px solid var(--accent-gold); padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; color: #fff; animation: slideDownFade 5s forwards; }
-        @keyframes slideDownFade { 0% { transform: translateY(-20px); opacity: 0;} 10% { transform: translateY(0); opacity: 1;} 80% { transform: translateY(0); opacity: 1;} 100% { transform: translateY(-20px); opacity: 0;} }
 
-        .hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 10; pointer-events: none; }
-        .hud-bar { background: rgba(16, 16, 16, 0.9); backdrop-filter: blur(6px); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-        .stat-block { display: flex; flex-direction: column; }
-        .stat-label { font-size: 0.58rem; color: var(--text-secondary); font-weight: bold; }
-        .stat-value { font-size: 0.85rem; font-weight: 900; color: #fff; }
-        .stat-value.gold { color: var(--accent-gold); }
-        .stat-value.cyan { color: var(--accent-cyan); }
-        .btn-small { background: rgba(0, 243, 255, 0.08); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); padding: 4px 8px; font-size: 0.7rem; font-weight: bold; clip-path: var(--chamfer-clip); display: flex; align-items: center; gap: 4px; }
-        .btn-small:active { filter: brightness(1.5); }
-        .hud-bottom { position: absolute; bottom: 20px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: flex-end; z-index: 10; pointer-events: none; }
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* --- トースト通知 (下部中央) --- */
+        #toast-container {
+            position: absolute;
+            bottom: 125px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 200;
+            pointer-events: none;
+            width: 90%;
+            max-width: 360px;
+            align-items: center;
+        }
+        .toast {
+            background: rgba(255, 51, 102, 0.92);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            padding: 9px 16px;
+            clip-path: var(--chamfer-clip);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            box-shadow: 0 6px 20px rgba(255, 51, 102, 0.4);
+            animation: toastAnim 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .toast.success {
+            background: rgba(0, 243, 255, 0.92);
+            color: #030305;
+            box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4);
+        }
+        @keyframes toastAnim {
+            0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+            12% { opacity: 1; transform: translateY(0) scale(1); }
+            82% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-8px) scale(0.95); }
+        }
+
+        /* --- ワールド放送 (キルログ) --- */
+        #broadcast-area {
+            position: absolute;
+            top: 65px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            z-index: 80;
+            pointer-events: none;
+        }
+        .broadcast-msg {
+            background: rgba(14, 15, 20, 0.95);
+            border: 1px solid var(--accent-gold);
+            clip-path: var(--chamfer-clip);
+            padding: 8px 18px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8), 0 0 10px rgba(245, 197, 24, 0.3);
+            animation: broadcastFade 5.5s forwards;
+        }
+        @keyframes broadcastFade {
+            0% { transform: translateY(-20px); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            85% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-15px); opacity: 0; }
+        }
+
+        /* --- HUD (Top) --- */
+        .hud-top {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 50;
+            pointer-events: none;
+        }
+        .hud-bar {
+            background: var(--bg-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            padding: 8px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: auto;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        }
+        .stat-block { display: flex; flex-direction: column; gap: 2px; }
+        .stat-label { font-size: 0.55rem; color: var(--text-secondary); font-weight: 800; letter-spacing: 0.8px; }
+        .stat-value { font-size: 0.9rem; font-weight: 900; color: #fff; font-feature-settings: "tnum"; }
+        .stat-value.gold { color: var(--accent-gold); text-shadow: 0 0 10px rgba(245, 197, 24, 0.4); }
+        .stat-value.cyan { color: var(--accent-cyan); text-shadow: 0 0 10px rgba(0, 243, 255, 0.4); }
+        .stat-value.danger { color: var(--danger-color); }
+
+        .btn-icon-hud {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 5px 9px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            clip-path: var(--chamfer-clip);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+        .btn-icon-hud:active {
+            transform: scale(0.94);
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .btn-icon-hud.gold {
+            border-color: rgba(245, 197, 24, 0.5);
+            color: var(--accent-gold);
+        }
+
+        /* --- HUD (Bottom) --- */
+        .hud-bottom {
+            position: absolute;
+            bottom: 22px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 50;
+            pointer-events: none;
+        }
         .action-menu { display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
-        .mode-toggle { display: flex; background: var(--bg-surface); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); overflow: hidden; }
-        .mode-btn { padding: 10px 14px; font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); transition: 0.2s; }
-        .mode-btn.active.attack { background: var(--danger-color); color: #fff; }
-        .mode-btn.active.defend { background: var(--accent-cyan); color: #000; }
-        .btn-circle { width: 42px; height: 42px; border-radius: 50%; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); display: flex; justify-content: center; align-items: center; transition: 0.1s; }
-        .btn-circle:active { transform: scale(0.92); border-color: var(--accent-gold); }
-        .minimap-container { width: 90px; height: 90px; background: rgba(5, 5, 5, 0.95); border: 1px solid var(--accent-gold); clip-path: var(--chamfer-clip); position: relative; pointer-events: auto; }
-        #minimap-canvas { width: 100%; height: 100%; display: block; }
-        .minimap-viewport { position: absolute; border: 1px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.2); pointer-events: none; }
+        .mode-toggle {
+            display: flex;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            overflow: hidden;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+        }
+        .mode-btn {
+            padding: 11px 16px;
+            font-size: 0.75rem;
+            font-weight: 900;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+        }
+        .mode-btn.active.attack {
+            background: var(--danger-color);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
+        }
+        .mode-btn.active.defend {
+            background: var(--accent-cyan);
+            color: #030305;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+        }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 16px; }
-        .modal-box { background: var(--bg-card); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); width: 100%; max-width: 380px; padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 90vh; overflow-y: auto; }
-        .modal-title { font-size: 0.95rem; color: var(--accent-gold); font-weight: bold; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px; }
-        .btn-solid { background: var(--border-subtle); color: var(--text-primary); padding: 10px; font-size: 0.8rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip); display: flex; justify-content: center; align-items: center; gap: 6px; }
-        .btn-solid:active { background: var(--accent-gold); color: #000; }
-        .btn-solid.gold { background: var(--accent-gold); color: #000; }
-        input, select { width: 100%; padding: 8px 10px; background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-primary); font-size: 0.85rem; clip-path: var(--chamfer-clip); outline: none; }
-        input:focus { border-color: var(--accent-gold); }
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 0.75rem; }
+        .btn-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8);
+            transition: transform 0.1s, border-color 0.2s;
+        }
+        .btn-circle svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+        .btn-circle:active { transform: scale(0.92); border-color: var(--accent-gold); }
+
+        /* ミニマップ */
+        .minimap-container {
+            width: 94px;
+            height: 94px;
+            background: #020203;
+            border: 1px solid rgba(245, 197, 24, 0.7);
+            clip-path: var(--chamfer-clip);
+            position: relative;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.9);
+        }
+        #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+        .minimap-viewport {
+            position: absolute;
+            border: 1.5px solid var(--accent-cyan);
+            background: rgba(0, 243, 255, 0.25);
+            pointer-events: none;
+        }
+
+        /* --- モーダル全般 --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            width: 100%;
+            max-width: 400px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95);
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+        .modal-title {
+            font-size: 1rem;
+            color: var(--accent-gold);
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-solid {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 11px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-align: center;
+            clip-path: var(--chamfer-clip);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .btn-solid:active { transform: scale(0.98); background: var(--accent-gold); color: #030305; }
+        .btn-solid.gold { background: var(--accent-gold); color: #030305; border: none; font-weight: 900; }
+        .btn-solid.danger { background: var(--danger-color); color: #fff; border: none; }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #08090d;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            clip-path: var(--chamfer-clip);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent-cyan); }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-subtle);
+            font-size: 0.78rem;
+        }
+
+        .rule-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .rule-card-title { font-size: 0.78rem; font-weight: 900; color: var(--accent-cyan); }
+        .rule-card-desc { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.5; }
+        .rule-card-desc strong { color: var(--accent-gold); }
     </style>
 </head>
 <body>
@@ -58,37 +354,64 @@
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
 
+<!-- Top HUD -->
 <div class="hud-top">
     <div class="hud-bar">
-        <div class="stat-block"><span class="stat-label">PLAYER ID</span><span class="stat-value" id="hud-pid">#----</span></div>
+        <div class="stat-block">
+            <span class="stat-label">PLAYER DESIGNATION</span>
+            <span class="stat-value" id="hud-pid">#----</span>
+        </div>
         <div style="display: flex; gap: 6px;">
-            <button class="btn-small" onclick="loadLeaderboard()" style="color:var(--accent-gold); border-color:var(--accent-gold);">🏆</button>
-            <button class="btn-small" onclick="centerCameraOnCore()">◎ CORE</button>
+            <button class="btn-icon-hud gold" onclick="loadLeaderboard()" title="賞金首">🏆 賞金首</button>
+            <button class="btn-icon-hud" onclick="openModal('rules-modal')" title="ルール">❓ 規約</button>
+            <button class="btn-icon-hud" onclick="centerCameraOnCore()" title="本拠地">◎ CORE</button>
         </div>
     </div>
     <div class="hud-bar">
-        <div class="stat-block"><span class="stat-label">INK / CAP</span><span class="stat-value cyan" id="hud-ink">- / -</span></div>
-        <div class="stat-block"><span class="stat-label">REGEN</span><span class="stat-value" id="hud-regen">+/min</span></div>
+        <div class="stat-block">
+            <span class="stat-label">INK LEVEL / CAPACITY</span>
+            <span class="stat-value cyan" id="hud-ink">- / -</span>
+        </div>
+        <div class="stat-block" style="text-align: right;">
+            <span class="stat-label">REGENERATION</span>
+            <span class="stat-value" id="hud-regen">+/min</span>
+        </div>
     </div>
     <div class="hud-bar">
-        <div class="stat-block"><span class="stat-label">BALANCE</span><span class="stat-value gold" id="hud-gold">0 G</span></div>
-        <div class="stat-block"><span class="stat-label">TERRITORY</span><span class="stat-value" id="hud-mass">0 マス</span></div>
+        <div class="stat-block">
+            <span class="stat-label">BANK BALANCE</span>
+            <span class="stat-value gold" id="hud-gold">0 G</span>
+        </div>
+        <div class="stat-block" style="text-align: right;">
+            <span class="stat-label">TERRITORY (10G/MIN)</span>
+            <span class="stat-value" id="hud-mass">0 マス</span>
+        </div>
     </div>
-    <div class="hud-bar" id="barrier-status-bar" style="display: none; border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.1);">
-        <div class="stat-block"><span class="stat-label" style="color: var(--accent-cyan);">🛡️ BARRIER ACTIVE</span><span class="stat-value cyan" style="font-size: 0.7rem;">無敵 (維持費: 10G/分)</span></div>
+    <div class="hud-bar" id="barrier-status-bar" style="display: none; border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.12);">
+        <div class="stat-block">
+            <span class="stat-label" style="color: var(--accent-cyan);">BARRIER ENGAGED (絶対不可侵)</span>
+            <span class="stat-value cyan" style="font-size: 0.72rem;">維持費: 毎分 10 G 自動消費中</span>
+        </div>
     </div>
 </div>
 
+<!-- Bottom HUD -->
 <div class="hud-bottom">
     <div class="action-menu">
         <div style="display: flex; gap: 8px;">
-            <button class="btn-circle" onclick="openModal('shop-modal')"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></button>
-            <button class="btn-circle" onclick="openModal('alliance-modal')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
-            <button class="btn-circle" onclick="toggleBarrier()" id="btn-barrier"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></button>
+            <button class="btn-circle" onclick="openModal('shop-modal')" title="強化工房">
+                <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </button>
+            <button class="btn-circle" onclick="openModal('alliance-modal')" title="同盟管理">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </button>
+            <button class="btn-circle" onclick="toggleBarrier()" id="btn-barrier" title="バリア">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </button>
         </div>
         <div class="mode-toggle">
-            <button class="mode-btn active attack" id="mode-attack" onclick="setMode(1)">⚔️ 侵略</button>
-            <button class="mode-btn defend" id="mode-defend" onclick="setMode(2)">🛡️ 強化</button>
+            <button class="mode-btn active attack" id="mode-attack" onclick="setMode(1)">⚔️ 侵略・塗布</button>
+            <button class="mode-btn defend" id="mode-defend" onclick="setMode(2)">🛡️ 防壁強化</button>
         </div>
     </div>
     <div class="minimap-container" id="minimap-container">
@@ -97,187 +420,399 @@
     </div>
 </div>
 
-<!-- モーダル -->
-<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
+<!-- ルール説明モーダル -->
+<div id="rules-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">PIXEL WAR - 出撃</div>
-        <select id="spawn-wallet-select"><option>読込中...</option></select>
-        <button class="btn-solid gold" onclick="spawnCore()">出撃する</button>
+        <div class="modal-title">
+            <span>📖 帝国戦時協定規約</span>
+            <span style="font-size: 0.7rem; color: var(--text-secondary);">PIXEL PROTOCOL</span>
+        </div>
+        <div class="rule-card">
+            <div class="rule-card-title">① 領地不労所得と包囲制圧</div>
+            <div class="rule-card-desc">保持領地<strong>1マスにつき毎分10 Gold</strong>が自動チャージされます。自陣の線で囲みを作ると、囲まれた内部を一括で自領地化できます。</div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-card-title">② コア破壊と懸賞金全額強奪</div>
+            <div class="rule-card-desc">王冠マークの「本陣コア」を他者に踏み潰された瞬間、<strong>全領土が蒸発</strong>し、これまでの強化に注ぎ込んだ全Goldを相手に強奪されます。</div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-card-title">③ 導線切断・電線孤立死</div>
+            <div class="rule-card-desc">全領土はコアから一筆書きで直結している必要があります。侵略を受けて<strong>コアとの接続を絶たれた飛び地は即座に中立化</strong>（消滅）します。</div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-card-title">④ 外交同盟と電撃裏切り</div>
+            <div class="rule-card-desc">同盟相手の領地を電線のように中継して遠征可能です。ただし<strong>同盟は一方的に即座に破棄可能</strong>です。破棄された瞬間、依存していた遠征領土は全蒸発します。</div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-card-title">⑤ バリア不可侵と休眠</div>
+            <div class="rule-card-desc">毎分10Gの維持費を消費して完全無敵になれます。ただし領地収入は凍結され、自分からも攻撃できなくなります。</div>
+        </div>
+        <button class="btn-solid gold" onclick="closeModal('rules-modal')">規約を承諾して参戦</button>
     </div>
 </div>
+
+<!-- 出撃モーダル -->
+<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
+    <div class="modal-box">
+        <div class="modal-title">戦線投入 - CORE DEPLOYMENT</div>
+        <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">
+            出撃元の銀行口座を選択してください。<br>
+            ※強化費用の累計額はコアの「懸賞金」となり、暗殺された瞬間に勝者へ全額奪われます。
+        </div>
+        <select id="spawn-wallet-select"><option>読込中...</option></select>
+        <button class="btn-solid gold" onclick="spawnCore()">ランダム安全区画へ出撃</button>
+    </div>
+</div>
+
+<!-- 強化工房 -->
 <div id="shop-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">王国インク工房</div>
-        <div style="background: var(--bg-base); padding: 10px; border: 1px solid var(--border-subtle);">
-            <div style="font-size: 0.8rem; font-weight: bold;">インクタンク拡張 (+1)</div>
-            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 8px;">強化費用: <span id="cost-max-ink" style="color: var(--accent-gold);"></span> G</div>
-            <button class="btn-solid" onclick="upgradeStat('MAX_INK')">拡張</button>
+        <div class="modal-title">帝国インク工房</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary);">
+            強化に投じたGoldはそのまま貴方の首にかかる「懸賞金」となります。
         </div>
-        <div style="background: var(--bg-base); padding: 10px; border: 1px solid var(--border-subtle);">
-            <div style="font-size: 0.8rem; font-weight: bold;">高速抽出機 (+1 回復/分)</div>
-            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 8px;">強化費用: <span id="cost-regen" style="color: var(--accent-gold);"></span> G</div>
-            <button class="btn-solid" onclick="upgradeStat('REGEN')">強化</button>
+        <div class="rule-card">
+            <div style="font-size: 0.82rem; font-weight: 900; margin-bottom: 2px;">インクタンク容量拡張 (+1)</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
+                強化費用: <span id="cost-max-ink" style="color: var(--accent-gold); font-weight: 900;">-</span> G
+            </div>
+            <button class="btn-solid" onclick="upgradeStat('MAX_INK')">容量を拡張する</button>
+        </div>
+        <div class="rule-card">
+            <div style="font-size: 0.82rem; font-weight: 900; margin-bottom: 2px;">高純度インク抽出器 (+1 回復/分)</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
+                強化費用: <span id="cost-regen" style="color: var(--accent-gold); font-weight: 900;">-</span> G
+            </div>
+            <button class="btn-solid" onclick="upgradeStat('REGEN')">回復速度を強化する</button>
         </div>
         <button class="btn-solid" onclick="closeModal('shop-modal')">閉じる</button>
     </div>
 </div>
+
+<!-- 外交同盟モーダル -->
 <div id="alliance-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title" style="color: var(--danger-color);">外交・同盟</div>
-        <input type="number" id="alliance-target-id" placeholder="相手の Player ID (例: 1234)">
-        <button class="btn-solid" onclick="addAlliance()">締結する</button>
-        <div style="border-top: 1px dashed var(--border-subtle); padding-top: 8px; margin-top: 8px;">
-            <div style="font-size: 0.75rem; font-weight: bold;">締結中</div>
-            <div id="alliance-list"></div>
+        <div class="modal-title" style="color: var(--danger-color);">外交カルテル管理</div>
+        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4;">
+            同盟国の領地を踏み台にして電線遠征が可能です。<br>
+            <strong style="color: var(--danger-color);">【警告】破棄は相手に通告なく即時執行されます。</strong>
+        </div>
+        <div style="display: flex; gap: 6px;">
+            <input type="number" id="alliance-target-id" placeholder="相手の Player ID (例: 1042)">
+            <button class="btn-solid" style="white-space: nowrap;" onclick="addAlliance()">締結</button>
+        </div>
+        <div style="border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
+            <div style="font-size: 0.75rem; font-weight: 800; margin-bottom: 6px;">締結中の軍事同盟</div>
+            <div id="alliance-list" style="max-height: 140px; overflow-y: auto;"></div>
         </div>
         <button class="btn-solid" onclick="closeModal('alliance-modal')">閉じる</button>
     </div>
 </div>
+
+<!-- 賞金首ランキング -->
 <div id="leaderboard-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title" style="color: var(--danger-color);">🏆 高額賞金首</div>
-        <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        <div class="modal-title" style="color: var(--danger-color);">🏆 帝国高額賞金首指名手配</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary);">
+            コアを破壊した瞬間に、表示されているGoldが貴方の口座へ全額振り込まれます。
+        </div>
+        <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
         <button class="btn-solid" onclick="closeModal('leaderboard-modal')">閉じる</button>
     </div>
 </div>
 
 <script>
+    // ==========================================================
+    // 1. 基盤システム・認証・エラー解析器
+    // ==========================================================
     const token = localStorage.getItem("access_token");
     if (!token) window.location.href = "/";
 
-    const BOARD_SIZE = 200, ROCK_ID = 65535;
+    function parseError(err) {
+        if (!err) return "通信エラーが発生しました";
+        if (typeof err === "string") return err;
+        if (err.detail) {
+            if (typeof err.detail === "string") return err.detail;
+            if (Array.isArray(err.detail) && err.detail[0]?.msg) return err.detail[0].msg;
+            return JSON.stringify(err.detail);
+        }
+        if (err.message) return err.message;
+        try { return JSON.stringify(err); } catch (e) { return String(err); }
+    }
+
+    const BOARD_SIZE = 200;
+    const ROCK_ID = 65535;
     const boardData = new Uint8Array(BOARD_SIZE * BOARD_SIZE * 3);
     const dataView = new DataView(boardData.buffer);
 
     let ws = null;
-    let gameState = { walletId: null, playerId: null, coreX: -1, coreY: -1, ink: 0, maxInk: 10, regen: 1, gold: 0, massCount: 0, barrierActive: false, alliances: new Set() };
-    let frontierSet = new Set();
+    let gameState = {
+        walletId: null, playerId: null, coreX: -1, coreY: -1,
+        ink: 0, maxInk: 10, regen: 1, gold: 0, massCount: 0,
+        barrierActive: false, alliances: new Set()
+    };
+    const frontierSet = new Set();
     let actionMode = 1;
-    let camera = { x: 100, y: 100, zoom: 20 };
-    const MIN_ZOOM = 4, MAX_ZOOM = 60;
+
+    // カメラ設定
+    let camera = { x: 100, y: 100, zoom: 22 };
+    const MIN_ZOOM = 4, MAX_ZOOM = 55;
 
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
-    const miniCtx = document.getElementById('minimap-canvas').getContext('2d', { alpha: false });
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const miniCtx = minimapCanvas.getContext('2d', { alpha: false });
 
-    // 画面の物理ピクセル比を完全に相殺するリサイズ処理
+    // Retinaディスプレイの物理解像度・CSSピクセル比率完全補正
     function resizeCanvas() {
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
+        // setTransform でスケール累積を防止
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    function showToast(msg) {
+    function showToast(msg, isSuccess = false) {
+        if (navigator.vibrate) navigator.vibrate(isSuccess ? 30 : [50, 40, 50]);
         const c = document.getElementById('toast-container');
-        const el = document.createElement('div'); el.className = 'toast'; el.innerText = msg;
-        c.appendChild(el); setTimeout(() => el.remove(), 2500);
-    }
-    function showBroadcast(text, color = "#fff") {
-        const a = document.getElementById('broadcast-area');
-        const el = document.createElement('div'); el.className = 'broadcast-msg'; el.style.borderColor = color; el.innerText = text;
-        a.appendChild(el); setTimeout(() => el.remove(), 5000);
+        const el = document.createElement('div');
+        el.className = `toast ${isSuccess ? 'success' : ''}`;
+        el.innerText = msg;
+        c.appendChild(el);
+        setTimeout(() => el.remove(), 2600);
     }
 
+    function showBroadcast(text, color = "#f5c518") {
+        const a = document.getElementById('broadcast-area');
+        const el = document.createElement('div');
+        el.className = 'broadcast-msg';
+        el.style.borderColor = color;
+        el.innerText = text;
+        a.appendChild(el);
+        setTimeout(() => el.remove(), 5500);
+    }
+
+    // ==========================================================
+    // 2. ゲーム初期化と通信ループ
+    // ==========================================================
     async function initGame() {
         try {
             const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (!wRes.ok) throw await wRes.json();
             const wallets = await wRes.json();
-            if (!wallets.length) { alert("口座がありません"); return; }
-            document.getElementById("spawn-wallet-select").innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (残高:${w.balance}G)</option>`).join('');
+            if (!wallets.length) {
+                alert("口座が見つかりません。中央銀行で口座を開設してください。");
+                window.location.href = "/wallet";
+                return;
+            }
+
+            document.getElementById("spawn-wallet-select").innerHTML = wallets.map(w => 
+                `<option value="${w.wallet_id}">${w.wallet_name} (残高:${w.balance.toLocaleString()}G)</option>`
+            ).join('');
 
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
 
             if (me.exists && !me.is_dead) {
-                Object.assign(gameState, { walletId: me.wallet_id, playerId: me.player_id, coreX: me.core_x, coreY: me.core_y, ink: me.ink, maxInk: me.max_ink, regen: me.regen, barrierActive: me.barrier_active, gold: wallets.find(w => w.wallet_id === me.wallet_id).balance });
-                centerCameraOnCore(); connectWebSocket(); updateHUD(); startSyncLoop(); return;
+                Object.assign(gameState, {
+                    walletId: me.wallet_id,
+                    playerId: me.player_id,
+                    coreX: me.core_x,
+                    coreY: me.core_y,
+                    ink: me.ink,
+                    maxInk: me.max_ink,
+                    regen: me.regen,
+                    barrierActive: me.barrier_active,
+                    gold: (wallets.find(w => w.wallet_id === me.wallet_id) || wallets[0]).balance
+                });
+
+                centerCameraOnCore();
+                connectWebSocket();
+                updateHUD();
+                startSyncLoop();
+                return;
             }
-            gameState.walletId = wallets[0].wallet_id; gameState.gold = wallets[0].balance;
-            updateHUD(); document.getElementById("spawn-modal").style.display = "flex";
-        } catch (e) { showToast("初期化エラー"); }
+
+            // 未出撃または死亡時
+            gameState.walletId = wallets[0].wallet_id;
+            gameState.gold = wallets[0].balance;
+            updateHUD();
+            document.getElementById("spawn-modal").style.display = "flex";
+
+            if (!localStorage.getItem("pixel_rules_accepted")) {
+                openModal('rules-modal');
+                localStorage.setItem("pixel_rules_accepted", "1");
+            }
+        } catch (e) {
+            showToast("初期化失敗: " + parseError(e));
+        }
     }
 
     async function spawnCore() {
         const wid = document.getElementById("spawn-wallet-select").value;
         try {
-            const res = await fetch("/api/pixel/spawn", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ wallet_id: wid }) });
-            const data = await res.json(); if (!res.ok) throw data;
-            Object.assign(gameState, { walletId: wid, playerId: data.player_id, coreX: data.core_x, coreY: data.core_y, ink: 1, maxInk: 10, regen: 1, barrierActive: false });
+            const res = await fetch("/api/pixel/spawn", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: wid })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            Object.assign(gameState, {
+                walletId: wid,
+                playerId: data.player_id,
+                coreX: data.core_x,
+                coreY: data.core_y,
+                ink: 1,
+                maxInk: 10,
+                regen: 1,
+                barrierActive: false
+            });
+
             document.getElementById("spawn-modal").style.display = "none";
-            centerCameraOnCore(); connectWebSocket(); updateShopUI(); startSyncLoop();
-        } catch (e) { showToast("出撃エラー"); }
+            centerCameraOnCore();
+            connectWebSocket();
+            updateShopUI();
+            startSyncLoop();
+            showToast("戦線投入完了。自陣コアを展開しました！", true);
+        } catch (e) {
+            showToast(parseError(e));
+        }
     }
 
     function startSyncLoop() {
         setInterval(async () => {
             try {
                 const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-                if (res.ok) { const d = await res.json(); if (!d.is_dead) Object.assign(gameState, { ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active }); }
+                if (res.ok) {
+                    const d = await res.json();
+                    if (!d.is_dead) {
+                        Object.assign(gameState, {
+                            ink: d.ink,
+                            maxInk: d.max_ink,
+                            regen: d.regen,
+                            barrierActive: d.barrier_active
+                        });
+                    }
+                }
                 const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-                if (wRes.ok) { const ws = await wRes.json(); const cw = ws.find(w => w.wallet_id === gameState.walletId); if (cw) gameState.gold = cw.balance; }
+                if (wRes.ok) {
+                    const ws = await wRes.json();
+                    const cw = ws.find(w => w.wallet_id === gameState.walletId);
+                    if (cw) gameState.gold = cw.balance;
+                }
                 updateHUD();
             } catch (e) {}
-        }, 10000);
+        }, 8000);
     }
 
     function connectWebSocket() {
         ws = new WebSocket(`${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}/api/pixel/ws`);
         ws.binaryType = "arraybuffer";
+
+        ws.onopen = () => console.log("[Pixel War] WebSocket Established");
+
         ws.onmessage = (event) => {
             if (typeof event.data === "string") {
-                try { const msg = JSON.parse(event.data);
+                try {
+                    const msg = JSON.parse(event.data);
                     if (msg.type === "broadcast") showBroadcast(msg.message, msg.color);
                     else if (msg.type === "error") showToast(msg.msg);
-                    else if (msg.type === "status") { gameState.ink = msg.ink; updateHUD(); }
-                } catch(e) {} return;
+                    else if (msg.type === "status") {
+                        gameState.ink = msg.ink;
+                        updateHUD();
+                    }
+                } catch (e) {}
+                return;
             }
-            const buffer = event.data; const dv = new DataView(buffer);
+
+            const buffer = event.data;
+            const dv = new DataView(buffer);
+
+            // 初回フルロード (120KB)
             if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
-                boardData.set(new Uint8Array(buffer)); fullRecount();
-            } else if (buffer.byteLength % 5 === 0) {
-                for (let i = 0; i < buffer.byteLength / 5; i++) {
-                    const offset = i * 5; const x = dv.getUint8(offset), y = dv.getUint8(offset + 1);
-                    const owner = dv.getUint16(offset + 2, false), hp = dv.getUint8(offset + 4);
-                    const idx = (y * BOARD_SIZE + x) * 3; const oldOwner = dataView.getUint16(idx, false);
-                    dataView.setUint16(idx, owner, false); dataView.setUint8(idx + 2, hp);
+                boardData.set(new Uint8Array(buffer));
+                fastFullRecount();
+            }
+            // 差分パケット (5バイト単位: X, Y, Owner[2], HP)
+            else if (buffer.byteLength % 5 === 0) {
+                const count = buffer.byteLength / 5;
+                for (let i = 0; i < count; i++) {
+                    const offset = i * 5;
+                    const x = dv.getUint8(offset);
+                    const y = dv.getUint8(offset + 1);
+                    const owner = dv.getUint16(offset + 2, false);
+                    const hp = dv.getUint8(offset + 4);
+
+                    const idx = (y * BOARD_SIZE + x) * 3;
+                    const oldOwner = dataView.getUint16(idx, false);
+                    dataView.setUint16(idx, owner, false);
+                    dataView.setUint8(idx + 2, hp);
+
                     if (oldOwner !== owner) {
                         if (oldOwner === gameState.playerId) gameState.massCount = Math.max(0, gameState.massCount - 1);
                         if (owner === gameState.playerId) gameState.massCount++;
                     }
+
+                    // 差分周辺のフロンティアだけをピンポイント更新 (O(1))
                     updateFrontierAround(x, y);
                 }
                 updateHUD();
             }
         };
-        ws.onclose = () => setTimeout(connectWebSocket, 3000);
+
+        ws.onclose = () => setTimeout(connectWebSocket, 2500);
     }
 
-    // 先行消費なしのアクション
+    // 先行消費なし：サーバーAck駆動
     function sendActionToServer(bx, by) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const owner = dataView.getUint16((by * BOARD_SIZE + bx) * 3, false);
-        if (owner === ROCK_ID) { showToast("岩盤は塗れません"); return; }
-        
-        const buffer = new ArrayBuffer(5); const dv = new DataView(buffer);
-        dv.setUint8(0, bx); dv.setUint8(1, by); dv.setUint8(2, actionMode); dv.setUint16(3, gameState.playerId, false);
+        if (owner === ROCK_ID) {
+            showToast("中央の岩盤不可侵壁は操作できません");
+            return;
+        }
+
+        const buffer = new ArrayBuffer(5);
+        const dv = new DataView(buffer);
+        dv.setUint8(0, bx);
+        dv.setUint8(1, by);
+        dv.setUint8(2, actionMode);
+        dv.setUint16(3, gameState.playerId, false);
         ws.send(buffer);
     }
 
-    function fullRecount() {
-        gameState.massCount = 0; frontierSet.clear();
+    // 初回フロンティア構築 (O(N) 高速走査)
+    function fastFullRecount() {
+        gameState.massCount = 0;
+        frontierSet.clear();
+
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
-                if (dataView.getUint16((y * BOARD_SIZE + x) * 3, false) === gameState.playerId) gameState.massCount++;
-                updateFrontierAround(x, y);
+                const owner = dataView.getUint16((y * BOARD_SIZE + x) * 3, false);
+                if (owner === gameState.playerId) gameState.massCount++;
+
+                if (owner === gameState.playerId || gameState.alliances.has(owner)) {
+                    for (let d of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                        const nx = x + d[0], ny = y + d[1];
+                        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_HEIGHT) {
+                            const nOwner = dataView.getUint16((ny * BOARD_SIZE + nx) * 3, false);
+                            if (nOwner !== gameState.playerId && !gameState.alliances.has(nOwner) && nOwner !== ROCK_ID) {
+                                frontierSet.add(`${nx},${ny}`);
+                            }
+                        }
+                    }
+                }
             }
         }
         updateHUD();
     }
 
+    // 差分周辺のフロンティア更新 (超軽量)
     function updateFrontierAround(x, y) {
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -290,16 +825,29 @@
                         const nnx = nx + d[0], nny = ny + d[1];
                         if (nnx >= 0 && nnx < BOARD_SIZE && nny >= 0 && nny < BOARD_SIZE) {
                             const nOwner = dataView.getUint16((nny * BOARD_SIZE + nnx) * 3, false);
-                            if (nOwner === gameState.playerId || gameState.alliances.has(nOwner)) { adjacent = true; break; }
+                            if (nOwner === gameState.playerId || gameState.alliances.has(nOwner)) {
+                                adjacent = true;
+                                break;
+                            }
                         }
                     }
-                    if (adjacent) frontierSet.add(`${nx},${ny}`); else frontierSet.delete(`${nx},${ny}`);
-                } else frontierSet.delete(`${nx},${ny}`);
+                    if (adjacent) frontierSet.add(`${nx},${ny}`);
+                    else frontierSet.delete(`${nx},${ny}`);
+                } else {
+                    frontierSet.delete(`${nx},${ny}`);
+                }
             }
         }
     }
 
-    function setMode(mode) { actionMode = mode; document.getElementById('mode-attack').classList.toggle('active', mode === 1); document.getElementById('mode-defend').classList.toggle('active', mode === 2); }
+    // ==========================================================
+    // 3. UI・ステータス更新 & モーダル操作
+    // ==========================================================
+    function setMode(mode) {
+        actionMode = mode;
+        document.getElementById('mode-attack').classList.toggle('active', mode === 1);
+        document.getElementById('mode-defend').classList.toggle('active', mode === 2);
+    }
     function openModal(id) { document.getElementById(id).style.display = "flex"; }
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
 
@@ -308,11 +856,19 @@
         document.getElementById('hud-ink').innerText = `${gameState.ink} / ${gameState.maxInk}`;
         document.getElementById('hud-regen').innerText = `+${gameState.regen}/分`;
         document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
-        document.getElementById('hud-mass').innerText = `${gameState.massCount} マス`;
-        
-        const bar = document.getElementById('barrier-status-bar'), btn = document.getElementById('btn-barrier');
-        if (gameState.barrierActive) { bar.style.display = "flex"; btn.style.color = btn.style.borderColor = "var(--accent-cyan)"; }
-        else { bar.style.display = "none"; btn.style.color = "var(--text-primary)"; btn.style.borderColor = "var(--border-subtle)"; }
+        document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス (+${(gameState.massCount * 10).toLocaleString()}G/分)`;
+
+        const bar = document.getElementById('barrier-status-bar');
+        const btn = document.getElementById('btn-barrier');
+        if (gameState.barrierActive) {
+            bar.style.display = "flex";
+            btn.style.color = "var(--accent-cyan)";
+            btn.style.borderColor = "var(--accent-cyan)";
+        } else {
+            bar.style.display = "none";
+            btn.style.color = "var(--text-primary)";
+            btn.style.borderColor = "var(--border-subtle)";
+        }
         updateShopUI();
     }
 
@@ -323,148 +879,356 @@
 
     async function upgradeStat(type) {
         try {
-            const res = await fetch("/api/pixel/upgrade", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ wallet_id: gameState.walletId, upgrade_type: type }) });
-            const data = await res.json(); if (!res.ok) throw data;
+            const res = await fetch("/api/pixel/upgrade", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: gameState.walletId, upgrade_type: type })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
             gameState.gold -= data.cost;
-            if (type === 'MAX_INK') gameState.maxInk += 1; else gameState.regen += 1;
-            showToast(`強化完了！コスト: ${data.cost.toLocaleString()}G`); updateHUD();
-        } catch (e) { showToast(e.detail || "強化失敗"); }
+            if (type === 'MAX_INK') gameState.maxInk += 1;
+            else gameState.regen += 1;
+
+            showToast(`強化成功！ 懸賞金が ${data.cost.toLocaleString()}G 上昇しました。`, true);
+            updateHUD();
+        } catch (e) {
+            showToast(parseError(e));
+        }
     }
 
     async function toggleBarrier() {
         try {
-            const res = await fetch("/api/pixel/barrier/toggle", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ wallet_id: gameState.walletId }) });
-            const data = await res.json(); if (!res.ok) throw data;
-            gameState.barrierActive = data.barrier_active; updateHUD();
-        } catch (e) { showToast("バリア操作失敗"); }
+            const res = await fetch("/api/pixel/barrier/toggle", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: gameState.walletId })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.barrierActive = data.barrier_active;
+            showToast(gameState.barrierActive ? "不可侵バリアを展開しました" : "バリアを解除しました", true);
+            updateHUD();
+        } catch (e) {
+            showToast(parseError(e));
+        }
     }
 
     async function loadLeaderboard() {
         openModal('leaderboard-modal');
-        const list = document.getElementById('leaderboard-list'); list.innerHTML = '読込中...';
+        const list = document.getElementById('leaderboard-list');
+        list.innerHTML = '<div class="list-item">探査中...</div>';
         try {
-            const res = await fetch("/api/pixel/leaderboard"); const data = await res.json();
-            list.innerHTML = data.length ? data.map((p, i) => `<div class="list-item"><span>${i+1}位 #${p.player_id}</span><strong style="color:var(--danger-color);">${p.bounty_gold.toLocaleString()} G</strong></div>`).join('') : '賞金首なし';
-        } catch(e) { list.innerHTML = '取得失敗'; }
+            const res = await fetch("/api/pixel/leaderboard");
+            const data = await res.json();
+            if (!data.length) {
+                list.innerHTML = '<div class="list-item" style="color:var(--text-secondary);">現在賞金首は存在しません</div>';
+                return;
+            }
+            list.innerHTML = data.map((p, i) => `
+                <div class="list-item">
+                    <span><strong style="color:var(--accent-gold);">${i+1}位</strong> PLAYER #${p.player_id}</span>
+                    <strong style="color:var(--danger-color); font-size:0.85rem;">${p.bounty_gold.toLocaleString()} G</strong>
+                </div>
+            `).join('');
+        } catch (e) {
+            list.innerHTML = '<div class="list-item">取得失敗</div>';
+        }
     }
 
     async function addAlliance() {
-        const id = document.getElementById("alliance-target-id").value; if(!id) return;
+        const idInput = document.getElementById("alliance-target-id");
+        const id = idInput.value;
+        if (!id) return;
         try {
-            const res = await fetch("/api/pixel/alliance/add", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ target_player_id: parseInt(id) }) });
-            const data = await res.json(); if (!res.ok) throw data;
-            gameState.alliances.add(parseInt(id)); showToast(data.message); closeModal('alliance-modal'); fullRecount();
-        } catch(e) { showToast(e.detail || "締結失敗"); }
+            const res = await fetch("/api/pixel/alliance/add", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ target_player_id: parseInt(id) })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.alliances.add(parseInt(id));
+            showToast(data.message, true);
+            idInput.value = "";
+            renderAllianceList();
+            fastFullRecount();
+        } catch (e) {
+            showToast(parseError(e));
+        }
     }
 
-    const COLOR_MAP = new Map(); COLOR_MAP.set(0, "#080808"); COLOR_MAP.set(ROCK_ID, "#222222");
+    function renderAllianceList() {
+        const list = document.getElementById("alliance-list");
+        if (gameState.alliances.size === 0) {
+            list.innerHTML = '<div class="list-item" style="color:var(--text-secondary);">締結中の同盟はありません</div>';
+            return;
+        }
+        list.innerHTML = Array.from(gameState.alliances).map(pid => `
+            <div class="list-item">
+                <span>PLAYER #${pid}</span>
+                <button class="btn-solid danger" style="padding:4px 8px; font-size:0.65rem;" onclick="breakAlliance(${pid})">即時破棄</button>
+            </div>
+        `).join('');
+    }
+
+    async function breakAlliance(targetId) {
+        if (!confirm(`警告: プレイヤー #${targetId} との同盟を即時破棄しますか？\n直結していない孤立領土は全て蒸発します。`)) return;
+        try {
+            const res = await fetch("/api/pixel/alliance/break", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ target_player_id: parseInt(targetId) })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.alliances.delete(parseInt(targetId));
+            showToast("同盟を電撃破棄しました。");
+            renderAllianceList();
+            fastFullRecount();
+        } catch (e) {
+            showToast(parseError(e));
+        }
+    }
+
+    // ==========================================================
+    // 4. Canvas 高速描画エンジン
+    // ==========================================================
+    const COLOR_MAP = new Map();
+    COLOR_MAP.set(0, "#08080a");
+    COLOR_MAP.set(ROCK_ID, "#1e2029");
+
     function getPlayerColor(id) {
         if (id === gameState.playerId) return "#00f3ff";
-        if (gameState.alliances.has(id)) return "#00ff66";
+        if (gameState.alliances.has(id)) return "#00ff88";
         if (COLOR_MAP.has(id)) return COLOR_MAP.get(id);
-        const color = `hsl(${(id * 137.5) % 360}, 80%, 50%)`; COLOR_MAP.set(id, color); return color;
+        const hue = (id * 137.5) % 360;
+        const color = `hsl(${hue}, 82%, 52%)`;
+        COLOR_MAP.set(id, color);
+        return color;
     }
 
     function draw() {
-        // 論理ピクセルで描画 (スケールはresizeCanvasで適用済み)
         const rect = canvas.getBoundingClientRect();
-        ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, rect.width, rect.height);
-        const hw = rect.width / 2, hh = rect.height / 2;
+        ctx.fillStyle = "#030305";
+        ctx.fillRect(0, 0, rect.width, rect.height);
+
+        const hw = rect.width / 2;
+        const hh = rect.height / 2;
         const startX = Math.max(0, Math.floor(camera.x - hw / camera.zoom));
         const endX = Math.min(BOARD_SIZE, Math.ceil(camera.x + hw / camera.zoom));
         const startY = Math.max(0, Math.floor(camera.y - hh / camera.zoom));
         const endY = Math.min(BOARD_SIZE, Math.ceil(camera.y + hh / camera.zoom));
 
-        const pulse = (Math.sin(Date.now() / 150) + 1) / 2;
+        const pulse = (Math.sin(Date.now() / 140) + 1) / 2;
 
         for (let y = startY; y < endY; y++) {
             for (let x = startX; x < endX; x++) {
                 const idx = (y * BOARD_SIZE + x) * 3;
-                const owner = dataView.getUint16(idx, false), hp = dataView.getUint8(idx + 2);
-                const screenX = hw + (x - camera.x) * camera.zoom, screenY = hh + (y - camera.y) * camera.zoom;
+                const owner = dataView.getUint16(idx, false);
+                const hp = dataView.getUint8(idx + 2);
 
-                if (owner === ROCK_ID) { ctx.fillStyle = "#222222"; ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom); }
-                else if (owner !== 0) { ctx.fillStyle = getPlayerColor(owner); ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom); }
+                const screenX = hw + (x - camera.x) * camera.zoom;
+                const screenY = hh + (y - camera.y) * camera.zoom;
 
-                if (camera.zoom >= 8) { ctx.strokeStyle = "rgba(255, 255, 255, 0.08)"; ctx.lineWidth = 1; ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom); }
-
-                if (actionMode === 1 && frontierSet.has(`${x},${y}`) && camera.zoom >= 10) {
-                    ctx.strokeStyle = `rgba(0, 243, 255, ${0.4 + pulse * 0.6})`; ctx.lineWidth = 2; ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
+                // ベースカラー塗り
+                if (owner === ROCK_ID) {
+                    ctx.fillStyle = "#1e2029";
+                    ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
+                } else if (owner !== 0) {
+                    ctx.fillStyle = getPlayerColor(owner);
+                    ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
+                // グリッド線 (ズーム8以上で可視化)
+                if (camera.zoom >= 8) {
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom);
+                }
+
+                // フロンティア (侵略可能マス) のネオンパルス枠
+                if (actionMode === 1 && frontierSet.has(`${x},${y}`) && camera.zoom >= 10) {
+                    ctx.strokeStyle = `rgba(0, 243, 255, ${0.35 + pulse * 0.65})`;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
+                }
+
+                // 本陣コアの強調表示 (王冠・シンボル)
                 if (x === gameState.coreX && y === gameState.coreY) {
-                    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
-                    ctx.fillStyle = "#ffffff"; ctx.fillRect(screenX + camera.zoom * 0.3, screenY + camera.zoom * 0.3, camera.zoom * 0.4, camera.zoom * 0.4);
-                } else if (hp > 1 && owner !== ROCK_ID) {
-                    ctx.strokeStyle = "rgba(0, 0, 0, 0.6)"; ctx.lineWidth = Math.max(1, camera.zoom * 0.1); ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
-                    if (camera.zoom >= 22) { ctx.fillStyle = "#ffffff"; ctx.font = `bold ${Math.floor(camera.zoom * 0.35)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(hp, screenX + camera.zoom / 2, screenY + camera.zoom / 2); }
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(screenX + camera.zoom * 0.32, screenY + camera.zoom * 0.32, camera.zoom * 0.36, camera.zoom * 0.36);
+                }
+                // 防壁 (耐久値2以上)
+                else if (hp > 1 && owner !== ROCK_ID) {
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.65)";
+                    ctx.lineWidth = Math.max(1, camera.zoom * 0.12);
+                    ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
+
+                    if (camera.zoom >= 22) {
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = `900 ${Math.floor(camera.zoom * 0.35)}px sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(hp, screenX + camera.zoom / 2, screenY + camera.zoom / 2);
+                    }
                 }
             }
         }
-        drawMinimap(); requestAnimationFrame(draw);
+
+        drawMinimap();
+        requestAnimationFrame(draw);
     }
 
     function drawMinimap() {
-        miniCtx.fillStyle = "#050505"; miniCtx.fillRect(0, 0, 200, 200);
-        const imgData = miniCtx.createImageData(200, 200); const data = imgData.data;
+        miniCtx.fillStyle = "#030305";
+        miniCtx.fillRect(0, 0, 200, 200);
+
+        const imgData = miniCtx.createImageData(200, 200);
+        const data = imgData.data;
+
         for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
-            const owner = dataView.getUint16(i * 3, false), ptr = i * 4;
-            if (owner === gameState.playerId) { data[ptr] = 0; data[ptr+1] = 243; data[ptr+2] = 255; data[ptr+3] = 255; }
-            else if (owner === ROCK_ID) { data[ptr] = 60; data[ptr+1] = 60; data[ptr+2] = 60; data[ptr+3] = 255; }
-            else if (owner !== 0) { data[ptr] = 231; data[ptr+1] = 76; data[ptr+2] = 60; data[ptr+3] = 255; }
-            else data[ptr+3] = 0;
+            const owner = dataView.getUint16(i * 3, false);
+            const ptr = i * 4;
+            if (owner === gameState.playerId) {
+                data[ptr] = 0; data[ptr+1] = 243; data[ptr+2] = 255; data[ptr+3] = 255;
+            } else if (owner === ROCK_ID) {
+                data[ptr] = 45; data[ptr+1] = 48; data[ptr+2] = 60; data[ptr+3] = 255;
+            } else if (owner !== 0) {
+                data[ptr] = 255; data[ptr+1] = 51; data[ptr+2] = 102; data[ptr+3] = 255;
+            } else {
+                data[ptr+3] = 0;
+            }
         }
         miniCtx.putImageData(imgData, 0, 0);
+
         const rect = canvas.getBoundingClientRect();
-        const vp = document.getElementById('minimap-vp'), viewW = (rect.width / camera.zoom) / 200 * 100, viewH = (rect.height / camera.zoom) / 200 * 100;
-        vp.style.width = `${Math.min(100, Math.max(1, viewW))}%`; vp.style.height = `${Math.min(100, Math.max(1, viewH))}%`;
-        vp.style.left = `${Math.max(0, (camera.x / 200 * 100) - viewW / 2)}%`; vp.style.top = `${Math.max(0, (camera.y / 200 * 100) - viewH / 2)}%`;
+        const vp = document.getElementById('minimap-vp');
+        const viewW = (rect.width / camera.zoom) / 200 * 100;
+        const viewH = (rect.height / camera.zoom) / 200 * 100;
+        vp.style.width = `${Math.min(100, Math.max(1, viewW))}%`;
+        vp.style.height = `${Math.min(100, Math.max(1, viewH))}%`;
+        vp.style.left = `${Math.max(0, (camera.x / 200 * 100) - viewW / 2)}%`;
+        vp.style.top = `${Math.max(0, (camera.y / 200 * 100) - viewH / 2)}%`;
     }
 
-    function centerCameraOnCore() { if (gameState.coreX >= 0) { camera.x = gameState.coreX; camera.y = gameState.coreY; camera.zoom = 22; } }
+    function centerCameraOnCore() {
+        if (gameState.coreX >= 0) {
+            camera.x = gameState.coreX;
+            camera.y = gameState.coreY;
+            camera.zoom = 22;
+        }
+    }
 
-    let isDragging = false, touchStartX = 0, touchStartY = 0, cameraStartX = 0, cameraStartY = 0, lastPinchDist = 0, pressInterval = null, activePointer = null;
+    // ==========================================================
+    // 5. スマホ・タッチインタラクション (完全座標計算)
+    // ==========================================================
+    let isDragging = false;
+    let touchStartX = 0, touchStartY = 0;
+    let cameraStartX = 0, cameraStartY = 0;
+    let lastPinchDist = 0;
+    let pressInterval = null;
+    let activePointer = null;
     const activeTouches = new Map();
 
     canvas.addEventListener('pointerdown', (e) => {
         activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
         if (activeTouches.size === 1) {
-            isDragging = true; touchStartX = e.clientX; touchStartY = e.clientY; cameraStartX = camera.x; cameraStartY = camera.y;
+            isDragging = true;
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+            cameraStartX = camera.x;
+            cameraStartY = camera.y;
+
             const rect = canvas.getBoundingClientRect();
+            // CSSピクセルに基づいた厳密なグリッド座標計算
             const bx = Math.floor(camera.x + (e.clientX - rect.left - rect.width / 2) / camera.zoom);
             const by = Math.floor(camera.y + (e.clientY - rect.top - rect.height / 2) / camera.zoom);
             activePointer = { x: e.clientX, y: e.clientY, bx, by };
+
             if (camera.zoom >= 10 && bx >= 0 && bx < BOARD_SIZE && by >= 0 && by < BOARD_SIZE) {
                 sendActionToServer(bx, by);
-                pressInterval = setInterval(() => { if (activePointer && Math.hypot(e.clientX - activePointer.x, e.clientY - activePointer.y) < 15) sendActionToServer(activePointer.bx, activePointer.by); else clearInterval(pressInterval); }, 250);
+
+                // 長押し防壁注入 (タップ位置が動かない限り連続発火)
+                pressInterval = setInterval(() => {
+                    if (activePointer && Math.hypot(e.clientX - activePointer.x, e.clientY - activePointer.y) < 14) {
+                        sendActionToServer(activePointer.bx, activePointer.by);
+                    } else {
+                        clearInterval(pressInterval);
+                    }
+                }, 220);
             }
         } else if (activeTouches.size === 2) {
-            clearInterval(pressInterval); isDragging = false;
-            const pts = Array.from(activeTouches.values()); lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            clearInterval(pressInterval);
+            isDragging = false;
+            const pts = Array.from(activeTouches.values());
+            lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         }
     });
 
     canvas.addEventListener('pointermove', (e) => {
         if (!activeTouches.has(e.pointerId)) return;
         activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // 2本指ピンチズーム
         if (activeTouches.size === 2) {
-            const pts = Array.from(activeTouches.values()), currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-            if (lastPinchDist > 0) camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * (currentDist / lastPinchDist)));
-            lastPinchDist = currentDist; return;
+            const pts = Array.from(activeTouches.values());
+            const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            if (lastPinchDist > 0) {
+                camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * (currentDist / lastPinchDist)));
+            }
+            lastPinchDist = currentDist;
+            return;
         }
+
+        // 1本指ドラッグスクロール
         if (isDragging && activeTouches.size === 1) {
-            const dx = (touchStartX - e.clientX) / camera.zoom, dy = (touchStartY - e.clientY) / camera.zoom;
-            if (Math.hypot(touchStartX - e.clientX, touchStartY - e.clientY) > 10) clearInterval(pressInterval);
-            camera.x = Math.max(0, Math.min(BOARD_SIZE, cameraStartX + dx)); camera.y = Math.max(0, Math.min(BOARD_SIZE, cameraStartY + dy));
+            const dx = (touchStartX - e.clientX) / camera.zoom;
+            const dy = (touchStartY - e.clientY) / camera.zoom;
+
+            if (Math.hypot(touchStartX - e.clientX, touchStartY - e.clientY) > 10) {
+                clearInterval(pressInterval);
+            }
+
+            camera.x = Math.max(0, Math.min(BOARD_SIZE, cameraStartX + dx));
+            camera.y = Math.max(0, Math.min(BOARD_SIZE, cameraStartY + dy));
         }
     });
 
-    const cleanupTouch = (e) => { activeTouches.delete(e.pointerId); if (activeTouches.size < 2) lastPinchDist = 0; if (activeTouches.size === 0) { isDragging = false; clearInterval(pressInterval); activePointer = null; } };
-    canvas.addEventListener('pointerup', cleanupTouch); canvas.addEventListener('pointercancel', cleanupTouch);
-    canvas.addEventListener('wheel', (e) => { camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); });
-    document.getElementById('minimap-container').addEventListener('pointerdown', (e) => { const rect = e.currentTarget.getBoundingClientRect(); camera.x = ((e.clientX - rect.left) / rect.width) * BOARD_SIZE; camera.y = ((e.clientY - rect.top) / rect.height) * BOARD_SIZE; });
+    const cleanupTouch = (e) => {
+        activeTouches.delete(e.pointerId);
+        if (activeTouches.size < 2) lastPinchDist = 0;
+        if (activeTouches.size === 0) {
+            isDragging = false;
+            clearInterval(pressInterval);
+            activePointer = null;
+        }
+    };
 
-    initGame(); requestAnimationFrame(draw);
+    canvas.addEventListener('pointerup', cleanupTouch);
+    canvas.addEventListener('pointercancel', cleanupTouch);
+    canvas.addEventListener('wheel', (e) => {
+        camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+    });
+
+    // ミニマップ直接タップでのカメラジャンプ
+    document.getElementById('minimap-container').addEventListener('pointerdown', (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        camera.x = ((e.clientX - rect.left) / rect.width) * BOARD_SIZE;
+        camera.y = ((e.clientY - rect.top) / rect.height) * BOARD_SIZE;
+    });
+
+    // 起動開始
+    initGame();
+    requestAnimationFrame(draw);
 </script>
 </body>
 </html>
