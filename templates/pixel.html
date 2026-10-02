@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>村岡王国 - PIXEL WAR</title>
+    <!-- Supabase JS SDK CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* --- Modern & Geometric UI Variables --- */
+        :root {
+            --bg-base: #050505;
+            --bg-surface: #101010;
+            --bg-card: #161616;
+            --border-subtle: #2a2a2a;
+            --text-primary: #f0f0f0;
+            --text-secondary: #888;
+            --accent-gold: #d4af37;
+            --accent-cyan: #00f3ff;
+            --accent-green: #00ff66;
+            --danger-color: #e74c3c;
+            --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            user-select: none;
+        }
+        button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
+
+        /* =========================================
+           Canvas & Rendering
+           ========================================= */
+        #game-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
+
+        /* =========================================
+           HUD (Heads Up Display) - Top
+           ========================================= */
+        .hud-top {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; flex-direction: column; gap: 8px; z-index: 10; pointer-events: none;
+        }
+        .hud-bar {
+            background: rgba(16, 16, 16, 0.85); backdrop-filter: blur(4px);
+            border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip);
+            padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
+            pointer-events: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .stat-block { display: flex; flex-direction: column; }
+        .stat-label { font-size: 0.6rem; color: var(--text-secondary); font-weight: bold; }
+        .stat-value { font-size: 0.9rem; font-weight: 900; color: #fff; }
+        .stat-value.gold { color: var(--accent-gold); }
+        .stat-value.cyan { color: var(--accent-cyan); }
+        .stat-value.danger { color: var(--danger-color); }
+        
+        .core-btn {
+            background: rgba(0, 243, 255, 0.1); border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan); padding: 4px 8px; font-size: 0.7rem; font-weight: bold;
+            clip-path: var(--chamfer-clip); display: flex; align-items: center; gap: 4px;
+        }
+
+        /* =========================================
+           HUD (Heads Up Display) - Bottom
+           ========================================= */
+        .hud-bottom {
+            position: absolute; bottom: 20px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between; align-items: flex-end; z-index: 10; pointer-events: none;
+        }
+        
+        .action-menu {
+            display: flex; flex-direction: column; gap: 10px; pointer-events: auto;
+        }
+        .mode-toggle {
+            display: flex; background: var(--bg-surface); border: 1px solid var(--border-subtle);
+            clip-path: var(--chamfer-clip); overflow: hidden;
+        }
+        .mode-btn {
+            padding: 10px 16px; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); transition: 0.2s;
+        }
+        .mode-btn.active.attack { background: var(--danger-color); color: #fff; }
+        .mode-btn.active.defend { background: var(--accent-cyan); color: #000; }
+
+        .btn-circle {
+            width: 44px; height: 44px; border-radius: 50%; background: var(--bg-surface);
+            border: 1px solid var(--border-subtle); color: var(--text-primary);
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;
+        }
+        .btn-circle svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .btn-circle:active { transform: scale(0.9); }
+        
+        /* Minimap */
+        .minimap-container {
+            width: 90px; height: 90px; background: rgba(0,0,0,0.8);
+            border: 1px solid var(--accent-gold); clip-path: var(--chamfer-clip);
+            position: relative; pointer-events: auto; cursor: pointer;
+        }
+        #minimap-canvas { width: 100%; height: 100%; }
+        .minimap-viewport {
+            position: absolute; border: 1px solid var(--accent-cyan);
+            background: rgba(0, 243, 255, 0.2); pointer-events: none;
+        }
+
+        /* =========================================
+           Modals
+           ========================================= */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px;
+        }
+        .modal-box {
+            background: var(--bg-card); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip);
+            width: 100%; max-width: 400px; padding: 20px; display: flex; flex-direction: column; gap: 16px;
+        }
+        .modal-title { font-size: 1rem; color: var(--accent-gold); font-weight: bold; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+        
+        .btn-solid {
+            background: var(--border-subtle); color: var(--text-primary); padding: 12px;
+            font-size: 0.85rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip);
+            display: flex; justify-content: center; align-items: center; gap: 6px; transition: 0.2s;
+        }
+        .btn-solid:active { background: var(--accent-gold); color: #000; }
+        .btn-solid.danger:active { background: var(--danger-color); color: #fff; }
+
+        input, select {
+            width: 100%; padding: 10px; background: var(--bg-base); border: 1px solid var(--border-subtle);
+            color: var(--text-primary); font-size: 0.9rem; clip-path: var(--chamfer-clip); outline: none;
+        }
+        input:focus, select:focus { border-color: var(--accent-gold); }
+
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Canvas -->
+<canvas id="game-canvas"></canvas>
+
+<!-- HUD Top -->
+<div class="hud-top">
+    <div class="hud-bar">
+        <div class="stat-block">
+            <span class="stat-label">INK / CAPACITY</span>
+            <span class="stat-value cyan" id="hud-ink">- / -</span>
+        </div>
+        <div class="stat-block">
+            <span class="stat-label">REGEN</span>
+            <span class="stat-value" id="hud-regen">+/min</span>
+        </div>
+        <button class="core-btn" onclick="centerCameraOnCore()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+            CORE
+        </button>
+    </div>
+    <div class="hud-bar">
+        <div class="stat-block">
+            <span class="stat-label">GOLD</span>
+            <span class="stat-value gold" id="hud-gold">0 G</span>
+        </div>
+        <div class="stat-block">
+            <span class="stat-label">TERRITORY (INCOME)</span>
+            <span class="stat-value" id="hud-mass">0 マス (+0 G/min)</span>
+        </div>
+    </div>
+    <div class="hud-bar" id="barrier-status-bar" style="display: none; border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.1);">
+        <div class="stat-block">
+            <span class="stat-label" style="color: var(--accent-cyan);">BARRIER ACTIVE</span>
+            <span class="stat-value cyan" style="font-size: 0.75rem;">維持費: 10 G/min (収入停止中)</span>
+        </div>
+    </div>
+</div>
+
+<!-- HUD Bottom -->
+<div class="hud-bottom">
+    <div class="action-menu">
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-circle" onclick="openModal('shop-modal')" title="強化ショップ">
+                <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </button>
+            <button class="btn-circle" onclick="openModal('alliance-modal')" title="同盟管理">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </button>
+            <button class="btn-circle" onclick="toggleBarrier()" id="btn-barrier" title="バリア展開">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </button>
+        </div>
+        <div class="mode-toggle">
+            <button class="mode-btn active attack" id="mode-attack" onclick="setMode(1)">⚔️ 攻撃・塗る</button>
+            <button class="mode-btn defend" id="mode-defend" onclick="setMode(2)">🛡️ 防壁強化</button>
+        </div>
+    </div>
+    
+    <div class="minimap-container" id="minimap-container">
+        <canvas id="minimap-canvas" width="200" height="200"></canvas>
+        <div class="minimap-viewport" id="minimap-vp"></div>
+    </div>
+</div>
+
+<!-- =========================================
+     MODALS
+     ========================================= -->
+
+<!-- 初期スポーンモーダル -->
+<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
+    <div class="modal-box">
+        <div class="modal-title">PIXEL WAR - 出撃準備</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary);">
+            コアを設置する口座を選択してください。<br>
+            ※死んだ場合、注ぎ込んだ全Goldは奪われます。
+        </div>
+        <select id="spawn-wallet-select"><option>読込中...</option></select>
+        <button class="btn-solid" style="background: var(--accent-gold); color: #000;" onclick="spawnCore()">出撃する</button>
+    </div>
+</div>
+
+<!-- 強化ショップ -->
+<div id="shop-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title">王国インク工房 (強化)</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">強化費用はコアの「懸賞金」として蓄積され、死んだ際に全額強奪されます。</div>
+        
+        <div style="background: var(--bg-base); padding: 12px; clip-path: var(--chamfer-clip); border: 1px solid var(--border-subtle);">
+            <div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 4px;">タンク拡張 (+10 保有上限)</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">現在のコスト: <span id="cost-max-ink" style="color: var(--accent-gold);">計算中</span> G</div>
+            <button class="btn-solid" onclick="upgradeStat('MAX_INK')">上限を強化</button>
+        </div>
+
+        <div style="background: var(--bg-base); padding: 12px; clip-path: var(--chamfer-clip); border: 1px solid var(--border-subtle);">
+            <div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 4px;">インク生成機 (+1 回復/分)</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">現在のコスト: <span id="cost-regen" style="color: var(--accent-gold);">計算中</span> G</div>
+            <button class="btn-solid" onclick="upgradeStat('REGEN')">回復量を強化</button>
+        </div>
+        
+        <button class="btn-solid" style="margin-top: 8px;" onclick="closeModal('shop-modal')">閉じる</button>
+    </div>
+</div>
+
+<!-- 同盟・裏切り管理 -->
+<div id="alliance-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title" style="color: var(--danger-color);">外交と裏切り</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            同盟相手の領地を通って遠征できます。<br>
+            <span style="color: var(--danger-color); font-weight:bold;">※即時破棄可能。破棄時、自前でコアと繋がっていない領土は即時消滅します。</span>
+        </div>
+        
+        <div style="margin-top: 8px;">
+            <input type="number" id="target-player-id" placeholder="相手の Player ID (マップ上の数値)">
+            <button class="btn-solid" style="margin-top: 8px; width: 100%;" onclick="requestAlliance()">同盟を申請する (未実装/調整中)</button>
+        </div>
+
+        <div style="border-top: 1px dashed var(--border-subtle); padding-top: 12px; margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;">現在の同盟国</div>
+            <div id="alliance-list" style="max-height: 150px; overflow-y: auto;">
+                <div class="list-item" style="color: var(--text-secondary);">同盟国はありません</div>
+            </div>
+        </div>
+
+        <button class="btn-solid" onclick="closeModal('alliance-modal')">閉じる</button>
+    </div>
+</div>
+
+<script>
+    // ==========================================================
+    // 1. 基本設定と認証
+    // ==========================================================
+    const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
+    const token = localStorage.getItem("access_token");
+    
+    if (!token) window.location.href = "/"; // トークンが無ければホームへ
+    
+    let supabaseClient = null;
+    if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    // [object Object] 回避用の安全なエラーパース関数
+    function parseError(err) {
+        if (typeof err === 'string') return err;
+        if (err && err.detail) return typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+        if (err && err.message) return typeof err.message === 'string' ? err.message : JSON.stringify(err.message);
+        return JSON.stringify(err);
+    }
+
+    // ==========================================================
+    // 2. ゲーム状態管理
+    // ==========================================================
+    const BOARD_SIZE = 200;
+    const ROCK_ID = 65535;
+    let boardData = new Uint8Array(BOARD_SIZE * BOARD_SIZE * 3); // X*Y*3 bytes
+    let dataView = new DataView(boardData.buffer);
+
+    let ws = null;
+    let gameState = {
+        walletId: null,
+        playerId: null,
+        coreX: -1,
+        coreY: -1,
+        ink: 0,
+        maxInk: 10,
+        regen: 1,
+        gold: 0,
+        massCount: 0,
+        barrierActive: false,
+        alliances: new Set()
+    };
+
+    let actionMode = 1; // 1: 塗る(Attack), 2: 強化(Defend)
+    
+    // カメラ設定
+    let camera = { x: 100, y: 100, zoom: 15 };
+    const MIN_ZOOM = 3, MAX_ZOOM = 40;
+
+    // Canvas Contexts
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const miniCtx = minimapCanvas.getContext('2d', { alpha: false });
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ==========================================================
+    // 3. 初期化とAPI通信
+    // ==========================================================
+    async function initGame() {
+        // 1. ウォレット情報の取得
+        try {
+            const res = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (!res.ok) throw await res.json();
+            const wallets = await res.json();
+            
+            const spawnSelect = document.getElementById("spawn-wallet-select");
+            spawnSelect.innerHTML = wallets.map(w => `<option value="${w.wallet_id}">${w.wallet_name} (残高:${w.balance}G)</option>`).join('');
+            
+            if (wallets.length > 0) {
+                gameState.walletId = wallets[0].wallet_id;
+                gameState.gold = wallets[0].balance;
+                updateHUD();
+                checkSpawnStatus();
+            } else {
+                alert("口座がありません。中央銀行で作成してください。");
+                window.location.href = "/wallet";
+            }
+        } catch (e) {
+            alert("口座情報の取得に失敗: " + parseError(e));
+        }
+    }
+
+    async function checkSpawnStatus() {
+        // バックエンドに自分の状態を問い合わせる(今回はSpawn APIを叩いてエラーなら死んでる、既存なら復帰する挙動を想定)
+        // 実際は GET /api/pixel/status があれば良いが、仕様書の spawn を活用
+        document.getElementById("spawn-modal").style.display = "flex";
+    }
+
+    async function spawnCore() {
+        const wid = document.getElementById("spawn-wallet-select").value;
+        try {
+            const res = await fetch("/api/pixel/spawn", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: wid })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.walletId = wid;
+            gameState.playerId = data.player_id;
+            gameState.coreX = data.core_x;
+            gameState.coreY = data.core_y;
+            gameState.ink = 1;
+            gameState.maxInk = 10;
+            gameState.regen = 1;
+            gameState.barrierActive = false;
+
+            document.getElementById("spawn-modal").style.display = "none";
+            centerCameraOnCore();
+            connectWebSocket();
+            updateShopUI();
+            
+            // 定期的なインカム加算のダミー（実際はサーバー側で怠惰計算されるがUI同期用）
+            setInterval(() => {
+                if (!gameState.barrierActive) {
+                    gameState.gold += gameState.massCount * 10;
+                    if (gameState.ink < gameState.maxInk) gameState.ink = Math.min(gameState.maxInk, gameState.ink + gameState.regen);
+                    updateHUD();
+                } else {
+                    gameState.gold -= 10;
+                    if(gameState.gold < 0) {
+                        gameState.gold = 0;
+                        gameState.barrierActive = false; // 金欠解除
+                    }
+                    if (gameState.ink < gameState.maxInk) gameState.ink = Math.min(gameState.maxInk, gameState.ink + gameState.regen);
+                    updateHUD();
+                }
+            }, 60000);
+
+        } catch (e) {
+            alert("出撃失敗: " + parseError(e));
+        }
+    }
+
+    // ==========================================================
+    // 4. WebSocket 通信 (バイナリ処理)
+    // ==========================================================
+    function connectWebSocket() {
+        const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        ws = new WebSocket(`${protocol}${location.host}/api/pixel/ws`);
+        ws.binaryType = "arraybuffer";
+
+        ws.onopen = () => { console.log("WS Connected"); };
+        
+        ws.onmessage = (event) => {
+            const buffer = event.data;
+            const dv = new DataView(buffer);
+            
+            // 初回: 全盤面 (120KB)
+            if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
+                boardData.set(new Uint8Array(buffer));
+                recountMass();
+            } 
+            // 差分: 5 bytes 単位 (X[1], Y[1], Owner[2], HP[1])
+            else if (buffer.byteLength % 5 === 0) {
+                const count = buffer.byteLength / 5;
+                for (let i = 0; i < count; i++) {
+                    const offset = i * 5;
+                    const x = dv.getUint8(offset);
+                    const y = dv.getUint8(offset + 1);
+                    const owner = dv.getUint16(offset + 2, false); // BigEndian
+                    const hp = dv.getUint8(offset + 4);
+                    
+                    const idx = (y * BOARD_SIZE + x) * 3;
+                    const oldOwner = dataView.getUint16(idx, false);
+                    
+                    dataView.setUint16(idx, owner, false);
+                    dataView.setUint8(idx + 2, hp);
+
+                    // マス数の増減管理
+                    if (oldOwner !== owner) {
+                        if (oldOwner === gameState.playerId) gameState.massCount = Math.max(0, gameState.massCount - 1);
+                        if (owner === gameState.playerId) gameState.massCount++;
+                    }
+                }
+                updateHUD();
+            }
+        };
+
+        ws.onclose = () => {
+            alert("通信が切断されました。リロードしてください。");
+        };
+    }
+
+    function sendActionToServer(bx, by) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (gameState.ink < 1 || gameState.barrierActive) return;
+
+        // クライアント発信: 5bytes (X[1], Y[1], Action[1], PlayerID[2])
+        const buffer = new ArrayBuffer(5);
+        const dv = new DataView(buffer);
+        dv.setUint8(0, bx);
+        dv.setUint8(1, by);
+        dv.setUint8(2, actionMode);
+        dv.setUint16(3, gameState.playerId, false); // BigEndian
+
+        ws.send(buffer);
+        
+        // 疑似的な先行消費 (サーバーレスポンス待たずに減らす)
+        gameState.ink--;
+        updateHUD();
+    }
+
+    function recountMass() {
+        let count = 0;
+        for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+            if (dataView.getUint16(i * 3, false) === gameState.playerId) count++;
+        }
+        gameState.massCount = count;
+        updateHUD();
+    }
+
+    // ==========================================================
+    // 5. UI制御
+    // ==========================================================
+    function setMode(mode) {
+        actionMode = mode;
+        document.getElementById('mode-attack').classList.toggle('active', mode === 1);
+        document.getElementById('mode-defend').classList.toggle('active', mode === 2);
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-ink').innerText = `${gameState.ink} / ${gameState.maxInk}`;
+        document.getElementById('hud-regen').innerText = `+${gameState.regen}/min`;
+        document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
+        document.getElementById('hud-mass').innerText = `${gameState.massCount} マス (+${gameState.massCount * 10} G/min)`;
+
+        const bBar = document.getElementById('barrier-status-bar');
+        const bBtn = document.getElementById('btn-barrier');
+        if (gameState.barrierActive) {
+            bBar.style.display = "flex";
+            bBtn.style.color = "var(--accent-cyan)";
+            bBtn.style.borderColor = "var(--accent-cyan)";
+        } else {
+            bBar.style.display = "none";
+            bBtn.style.color = "var(--text-primary)";
+            bBtn.style.borderColor = "var(--border-subtle)";
+        }
+        updateShopUI();
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = "flex"; }
+    function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
+    function updateShopUI() {
+        document.getElementById('cost-max-ink').innerText = (gameState.maxInk * 100).toLocaleString();
+        document.getElementById('cost-regen').innerText = (gameState.regen * 5000).toLocaleString();
+    }
+
+    async function upgradeStat(type) {
+        try {
+            const res = await fetch("/api/pixel/upgrade", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: gameState.walletId, upgrade_type: type })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.gold -= (type === 'MAX_INK' ? gameState.maxInk * 100 : gameState.regen * 5000);
+            if (type === 'MAX_INK') gameState.maxInk += 10;
+            else gameState.regen += 1;
+
+            alert("強化完了！ 懸賞金が上がりました。");
+            updateHUD();
+        } catch (e) { alert("強化失敗: " + parseError(e)); }
+    }
+
+    async function toggleBarrier() {
+        if (gameState.gold < 10) return alert("Goldが不足しています。");
+        try {
+            const res = await fetch("/api/pixel/barrier/toggle", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ wallet_id: gameState.walletId })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+
+            gameState.barrierActive = data.barrier_active;
+            updateHUD();
+        } catch (e) { alert("バリア操作失敗: " + parseError(e)); }
+    }
+
+    async function breakAlliance(targetId) {
+        if (!confirm("本当に同盟を即時破棄しますか？ 共有していた導線が切断されます。")) return;
+        try {
+            const res = await fetch("/api/pixel/alliance/break", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ target_player_id: parseInt(targetId) })
+            });
+            const data = await res.json();
+            if (!res.ok) throw data;
+            
+            gameState.alliances.delete(parseInt(targetId));
+            alert(data.message);
+            // 本来はリストを再描画する処理を呼ぶ
+        } catch(e) { alert("破棄失敗: " + parseError(e)); }
+    }
+
+    // ==========================================================
+    // 6. Canvas 描画エンジン
+    // ==========================================================
+    const COLOR_MAP = new Map();
+    COLOR_MAP.set(0, "#0a0a0a"); // 空白
+    COLOR_MAP.set(ROCK_ID, "#222222"); // 十字壁
+
+    function getPlayerColor(id) {
+        if (id === gameState.playerId) return "#00f3ff"; // 自分はシアン
+        if (gameState.alliances.has(id)) return "#00ff66"; // 同盟は緑
+        if (COLOR_MAP.has(id)) return COLOR_MAP.get(id);
+        
+        // 敵は適当な暖色系をハッシュ生成
+        const hue = (id * 137.5) % 360;
+        const color = `hsl(${hue}, 80%, 50%)`;
+        COLOR_MAP.set(id, color);
+        return color;
+    }
+
+    function draw() {
+        // 背景クリア
+        ctx.fillStyle = "var(--bg-base)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const hw = canvas.width / 2;
+        const hh = canvas.height / 2;
+        
+        // 画面に収まるマス目の範囲を計算
+        const startX = Math.max(0, Math.floor(camera.x - hw / camera.zoom));
+        const endX = Math.min(BOARD_SIZE, Math.ceil(camera.x + hw / camera.zoom));
+        const startY = Math.max(0, Math.floor(camera.y - hh / camera.zoom));
+        const endY = Math.min(BOARD_SIZE, Math.ceil(camera.y + hh / camera.zoom));
+
+        for (let y = startY; y < endY; y++) {
+            for (let x = startX; x < endX; x++) {
+                const idx = (y * BOARD_SIZE + x) * 3;
+                const owner = dataView.getUint16(idx, false);
+                const hp = dataView.getUint8(idx + 2);
+
+                if (owner === 0) continue; // 空白は描画しない(背景色)
+
+                const screenX = hw + (x - camera.x) * camera.zoom;
+                const screenY = hh + (y - camera.y) * camera.zoom;
+
+                ctx.fillStyle = getPlayerColor(owner);
+                // 隙間を無くすために幅・高さを1px分盛る (ズーム時用)
+                ctx.fillRect(screenX, screenY, camera.zoom + 0.5, camera.zoom + 0.5);
+
+                // ズームが十分に寄っている場合のみHPやテクスチャを描画
+                if (camera.zoom > 15 && owner !== ROCK_ID) {
+                    if (x === gameState.coreX && y === gameState.coreY) {
+                        // コアは特別に光らせる
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                        ctx.fillRect(screenX + camera.zoom*0.25, screenY + camera.zoom*0.25, camera.zoom*0.5, camera.zoom*0.5);
+                    } else if (hp > 1) {
+                        // 防壁(HP)を黒い枠/数字で表現
+                        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
+                        
+                        if (camera.zoom > 25) {
+                            ctx.fillStyle = "#fff";
+                            ctx.font = `bold ${camera.zoom * 0.4}px Arial`;
+                            ctx.textAlign = "center";
+                            ctx.textBaseline = "middle";
+                            ctx.fillText(hp, screenX + camera.zoom/2, screenY + camera.zoom/2);
+                        }
+                    }
+                }
+            }
+        }
+
+        drawMinimap();
+        requestAnimationFrame(draw);
+    }
+
+    function drawMinimap() {
+        // ミニマップは負荷を下げるため数フレームに1回で良いが、今回は簡略化のため直接描画
+        miniCtx.fillStyle = "#000";
+        miniCtx.fillRect(0, 0, 200, 200);
+
+        const imgData = miniCtx.createImageData(200, 200);
+        const data = imgData.data;
+
+        for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+            const owner = dataView.getUint16(i * 3, false);
+            const ptr = i * 4;
+            if (owner === gameState.playerId) {
+                data[ptr] = 0; data[ptr+1] = 243; data[ptr+2] = 255; data[ptr+3] = 255;
+            } else if (owner === ROCK_ID) {
+                data[ptr] = 50; data[ptr+1] = 50; data[ptr+2] = 50; data[ptr+3] = 255;
+            } else if (owner !== 0) {
+                data[ptr] = 255; data[ptr+1] = 50; data[ptr+2] = 50; data[ptr+3] = 255;
+            } else {
+                data[ptr+3] = 0; // 透明
+            }
+        }
+        miniCtx.putImageData(imgData, 0, 0);
+
+        // ビューポート枠の更新
+        const vp = document.getElementById('minimap-vp');
+        const viewW = (canvas.width / camera.zoom) / 200 * 100;
+        const viewH = (canvas.height / camera.zoom) / 200 * 100;
+        const viewX = (camera.x / 200 * 100) - viewW / 2;
+        const viewY = (camera.y / 200 * 100) - viewH / 2;
+
+        vp.style.width = `${Math.min(100, Math.max(1, viewW))}%`;
+        vp.style.height = `${Math.min(100, Math.max(1, viewH))}%`;
+        vp.style.left = `${Math.max(0, viewX)}%`;
+        vp.style.top = `${Math.max(0, viewY)}%`;
+    }
+
+    function centerCameraOnCore() {
+        if (gameState.coreX >= 0) {
+            camera.x = gameState.coreX;
+            camera.y = gameState.coreY;
+        }
+    }
+
+    // ==========================================================
+    // 7. タッチ・マウス操作 (パン・ズーム・タップ・長押し)
+    // ==========================================================
+    let isDragging = false, lastPinchDist = 0;
+    let touchStartX = 0, touchStartY = 0;
+    let cameraStartX = 0, cameraStartY = 0;
+    
+    let pressInterval = null;
+    let activePointer = null;
+
+    canvas.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        touchStartX = e.clientX;
+        touchStartY = e.clientY;
+        cameraStartX = camera.x;
+        cameraStartY = camera.y;
+
+        // タップした座標のマスを特定
+        const hw = canvas.width / 2;
+        const hh = canvas.height / 2;
+        const bx = Math.floor(camera.x + (e.clientX - hw) / camera.zoom);
+        const by = Math.floor(camera.y + (e.clientY - hh) / camera.zoom);
+
+        activePointer = { x: e.clientX, y: e.clientY, bx, by };
+
+        // ズームが遠すぎる時は塗れない(誤爆防止)
+        if (camera.zoom >= 10) {
+            sendActionToServer(bx, by);
+            // 長押しで連続注入
+            pressInterval = setInterval(() => {
+                if(activePointer && Math.hypot(e.clientX - activePointer.x, e.clientY - activePointer.y) < 10) {
+                    sendActionToServer(activePointer.bx, activePointer.by);
+                } else {
+                    clearInterval(pressInterval);
+                }
+            }, 250);
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+
+        // ピンチズーム用(PCではwheelを使うため省略気味だが、本来はtouches.lengthを判定)
+        // 今回はシンプルな1本指パンを優先
+        
+        const dx = (touchStartX - e.clientX) / camera.zoom;
+        const dy = (touchStartY - e.clientY) / camera.zoom;
+        
+        // 10px以上動かしたら長押し注入をキャンセル（ドラッグと判定）
+        if (Math.hypot(touchStartX - e.clientX, touchStartY - e.clientY) > 10) {
+            clearInterval(pressInterval);
+        }
+
+        camera.x = Math.max(0, Math.min(BOARD_SIZE, cameraStartX + dx));
+        camera.y = Math.max(0, Math.min(BOARD_SIZE, cameraStartY + dy));
+    });
+
+    canvas.addEventListener('pointerup', () => {
+        isDragging = false;
+        clearInterval(pressInterval);
+        activePointer = null;
+    });
+    canvas.addEventListener('pointercancel', () => {
+        isDragging = false;
+        clearInterval(pressInterval);
+        activePointer = null;
+    });
+
+    // マウスホイールでのズーム
+    canvas.addEventListener('wheel', (e) => {
+        const zoomDelta = e.deltaY > 0 ? -0.9 : 1.1;
+        camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * zoomDelta));
+    });
+
+    // ミニマップタップでジャンプ
+    document.getElementById('minimap-container').addEventListener('pointerdown', (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        camera.x = (px / rect.width) * BOARD_SIZE;
+        camera.y = (py / rect.height) * BOARD_SIZE;
+    });
+
+    // 起動
+    initGame();
+    requestAnimationFrame(draw);
+
+</script>
+</body>
+</html>
