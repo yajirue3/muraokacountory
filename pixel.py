@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # ==================================================
-# ゲーム定数 & メモリ管理
+# ゲーム定数 & メモリ管理 (512MB / 0.2 CPU 用設計)
 # ==================================================
 BOARD_WIDTH = 200
 BOARD_HEIGHT = 200
@@ -63,7 +63,7 @@ def init_board():
             if 3 <= y < BOARD_HEIGHT - 3:
                 set_tile(100, y, ROCK_ID, 255)
                 
-    # 起動時に全マスの所有数を集計し直す
+    # 起動時に全マスの所有数を集計
     for y in range(BOARD_HEIGHT):
         for x in range(BOARD_WIDTH):
             owner, _ = get_tile(x, y)
@@ -77,7 +77,7 @@ async def save_board_task():
             with open(BOARD_FILE, "wb") as f:
                 f.write(board)
 
-# サーバー起動/終了フック (再起動時のデータロストを完全に防ぐ)[span_0](start_span)[span_0](end_span)
+# サーバー起動/終了フック (再起動時のデータロスト防止)
 @router.on_event("startup")
 async def start_pixel_tasks():
     init_board()
@@ -85,11 +85,9 @@ async def start_pixel_tasks():
 
 @router.on_event("shutdown")
 async def shutdown_pixel_tasks():
-    print("[Pixel War] サーバーシャットダウン検知。盤面を保存します...")
     async with board_lock:
         with open(BOARD_FILE, "wb") as f:
             f.write(board)
-    print("[Pixel War] 盤面保存完了。")
 
 # ==================================================
 # 認証 & ヘルパー
@@ -111,7 +109,7 @@ async def get_alliances(player_id: int) -> set:
     return {row["player1_id"] if row["player2_id"] == player_id else row["player2_id"] for row in res.data}
 
 def is_adjacent_to_owned(target_x: int, target_y: int, owner_id: int, alliances: set) -> bool:
-    """飛び地防止：自陣または同盟領地に隣接しているか判定""[span_1](start_span)"[span_1](end_span)
+    # 飛び地防止判定
     for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
         nx, ny = target_x + dx, target_y + dy
         if 0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT:
@@ -121,7 +119,7 @@ def is_adjacent_to_owned(target_x: int, target_y: int, owner_id: int, alliances:
     return False
 
 def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, core_y: int, alliances: set) -> set:
-    """切断判定：コアへ辿れるかBFSで探索""[span_2](start_span)"[span_2](end_span)
+    # 切断判定BFS
     queue = deque([(start_x, start_y)])
     visited = set([(start_x, start_y)])
     is_connected = False
@@ -144,7 +142,7 @@ def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, c
     return set() if is_connected else visited
 
 def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
-    """囲み総取り判定""[span_3](start_span)"[span_3](end_span)
+    # 囲み総取り判定
     for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
         nx, ny = start_x + dx, start_y + dy
         if not (0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT):
@@ -162,7 +160,7 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
             cx, cy = queue.popleft()
             if cx == 0 or cx == BOARD_WIDTH - 1 or cy == 0 or cy == BOARD_HEIGHT - 1:
                 is_closed = False
-                if len(visited) > 500: break # 負荷軽減
+                if len(visited) > 500: break
 
             for ddx, ddy in [(-1,0), (1,0), (0,-1), (0,1)]:
                 nnx, nny = cx + ddx, cy + ddy
@@ -181,11 +179,10 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
 # WebSocket: 戦闘通信 & ワールド放送
 # ==================================================
 async def broadcast_event(message: dict):
-    """ワールド全域へキルログ等のJSONイベントを配信"""
     for c in connected_clients:
         try:
             await c.send_json(message)
-        except:
+        except Exception:
             pass
 
 @router.websocket("/api/pixel/ws")
@@ -193,7 +190,7 @@ async def websocket_pixel(ws: WebSocket):
     await ws.accept()
     connected_clients.append(ws)
     try:
-        # 初回は全盤面バイナリ(120KB)を送信[span_4](start_span)[span_4](end_span)
+        # 初回盤面同期(120KBバイナリ)
         await ws.send_bytes(board)
 
         while True:
@@ -204,7 +201,6 @@ async def websocket_pixel(ws: WebSocket):
             client = await get_supabase()
             
             async with board_lock:
-                # 怠惰評価[span_5](start_span)[span_5](end_span)
                 mass_count = player_mass_counts.get(player_id, 0)
                 rpc_res = await client.rpc("pixel_lazy_update", {
                     "p_player_id": player_id, "p_mass_count": mass_count, "p_now": datetime.now(timezone.utc).isoformat()
@@ -240,13 +236,13 @@ async def websocket_pixel(ws: WebSocket):
                         set_tile(x, y, player_id, 1)
                         diffs.append(struct.pack(">BBHB", x, y, player_id, 1))
                         
-                        # --- 敵領地への侵略時処理 ---
+                        # 敵マスへの侵略
                         if target_owner != 0:
                             enemy_res = await client.table("pixel_players").select("*").eq("player_id", target_owner).execute()
                             if enemy_res.data:
                                 ep = enemy_res.data[0]
                                 
-                                # コア暗殺成立[span_6](start_span)[span_6](end_span)
+                                # コア暗殺成立
                                 if x == ep["core_x"] and y == ep["core_y"]:
                                     bounty = ep["bounty_gold"]
                                     if bounty > 0:
@@ -257,7 +253,7 @@ async def websocket_pixel(ws: WebSocket):
                                                 "p_amount": bounty
                                             }).execute()
                                     
-                                    # 敵の領地を全消滅
+                                    # 敵領地全消滅
                                     for cy in range(BOARD_HEIGHT):
                                         for cx in range(BOARD_WIDTH):
                                             if get_tile(cx, cy)[0] == target_owner:
@@ -266,8 +262,7 @@ async def websocket_pixel(ws: WebSocket):
                                                 
                                     await client.table("pixel_players").update({"is_dead": True, "ink": 0}).eq("player_id", target_owner).execute()
                                     
-                                    # ワールド放送（キルログ）の配信
-                                    msg = f"⚔️ プレイヤー #{player_id} が #{target_owner} を暗殺し、懸賞金 {bounty:,} G を強奪しました！"
+                                    msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
                                     await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": msg}).execute()
                                     await broadcast_event({"type": "broadcast", "message": msg, "color": "#e74c3c"})
                                 
@@ -282,7 +277,6 @@ async def websocket_pixel(ws: WebSocket):
                                                 set_tile(dx, dy, 0, 0)
                                                 diffs.append(struct.pack(">BBHB", dx, dy, 0, 0))
 
-                        # 囲み総取り
                         apply_flood_fill(x, y, player_id, diffs)
 
                 # ACTION 2: 防壁強化
@@ -299,7 +293,7 @@ async def websocket_pixel(ws: WebSocket):
                     for c in connected_clients:
                         try:
                             await c.send_bytes(payload)
-                        except:
+                        except Exception:
                             pass
 
     except WebSocketDisconnect:
@@ -338,7 +332,7 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
         if res.data:
             p = res.data[0]
             if not p["is_dead"]:
-                return p # 既に生存中ならそのまま復帰
+                return p
                 
             core_x, core_y = 0, 0
             while True:
@@ -412,14 +406,12 @@ async def toggle_barrier(data: BasePixelRequest, authorization: str = Header(Non
     await client.table("pixel_players").update({"barrier_active": new_state, "last_tick": datetime.now(timezone.utc).isoformat()}).eq("id", p["id"]).execute()
     return {"barrier_active": new_state}
 
-# ランキングAPI (賞金首リスト)
 @router.get("/api/pixel/leaderboard")
 async def get_leaderboard():
     client = await get_supabase()
     res = await client.table("pixel_players").select("player_id, bounty_gold").eq("is_dead", False).order("bounty_gold", desc=True).limit(5).execute()
     return res.data
 
-# 同盟追加API
 class AddAllianceRequest(BaseModel):
     target_player_id: int
 
@@ -433,15 +425,13 @@ async def add_alliance(data: AddAllianceRequest, authorization: str = Header(Non
     if my_id == data.target_player_id:
         raise HTTPException(status_code=400, detail="自分自身とは同盟を組めません。")
         
-    # 双方向の同盟としてインサート (制約違反無視)
     try:
         await client.table("pixel_alliances").insert({"player1_id": min(my_id, data.target_player_id), "player2_id": max(my_id, data.target_player_id)}).execute()
-    except:
-        pass # 既に存在する場合は無視
+    except Exception:
+        pass
         
     return {"success": True, "message": f"プレイヤー #{data.target_player_id} と同盟を締結しました。"}
 
-# 同盟破棄API
 class BreakAllianceRequest(BaseModel):
     target_player_id: int
 
@@ -456,11 +446,10 @@ async def break_alliance(data: BreakAllianceRequest, authorization: str = Header
     
     await client.table("pixel_alliances").delete().or_(f"and(player1_id.eq.{min(my_id, target_id)},player2_id.eq.{max(my_id, target_id)})").execute()
     
-    msg = f"🚨 プレイヤー #{my_id} が #{target_id} との同盟を電撃破棄しました！"
+    msg = f"プレイヤー #{my_id} が #{target_id} との同盟を電撃破棄！"
     await client.table("pixel_logs").insert({"event_type": "BETRAYAL", "message": msg}).execute()
     await broadcast_event({"type": "broadcast", "message": msg, "color": "#f39c12"})
 
-    # ドミノ消滅処理
     my_alliances = await get_alliances(my_id)
     target_alliances = await get_alliances(target_id)
     t_res = await client.table("pixel_players").select("*").eq("player_id", target_id).execute()
@@ -493,7 +482,7 @@ async def break_alliance(data: BreakAllianceRequest, authorization: str = Header
             payload = b"".join(diffs)
             for c in connected_clients:
                 try: await c.send_bytes(payload)
-                except: pass
+                except Exception: pass
 
     return {"success": True, "message": "同盟を破棄し、孤立領地を消滅させました。"}
 
