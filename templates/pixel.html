@@ -37,7 +37,6 @@
 
         button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
 
-        /* キャンバスのみタッチアクションを遮断 */
         #game-canvas {
             position: absolute;
             top: 0; left: 0;
@@ -46,15 +45,13 @@
             touch-action: none;
         }
 
-        /* SVG共通アイコン */
         .icon {
-            width: 16px; height: 16px;
+            width: 15px; height: 15px;
             stroke: currentColor; fill: none;
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
             vertical-align: middle;
         }
 
-        /* トースト通知 */
         #toast-container {
             position: absolute; bottom: 125px; left: 50%; transform: translateX(-50%);
             display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none;
@@ -74,9 +71,8 @@
             100% { opacity: 0; transform: translateY(-8px); }
         }
 
-        /* ワールド放送 */
         #broadcast-area {
-            position: absolute; top: 65px; left: 0; width: 100%;
+            position: absolute; top: 85px; left: 0; width: 100%;
             display: flex; flex-direction: column; align-items: center; gap: 6px;
             z-index: 80; pointer-events: none;
         }
@@ -93,34 +89,35 @@
             100% { transform: translateY(-15px); opacity: 0; }
         }
 
-        /* HUD Top */
+        /* HUD Top: 余白と配置を整理 */
         .hud-top {
-            position: absolute; top: 12px; left: 12px; right: 12px;
-            display: flex; flex-direction: column; gap: 6px; z-index: 50; pointer-events: none;
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; flex-direction: column; gap: 5px; z-index: 50; pointer-events: none;
         }
         .hud-bar {
             background: var(--bg-surface); backdrop-filter: blur(10px);
             border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip);
-            padding: 8px 14px; display: flex; justify-content: space-between; align-items: center;
-            pointer-events: auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            padding: 7px 12px; display: flex; justify-content: space-between; align-items: center;
+            pointer-events: auto; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
         }
-        .stat-block { display: flex; flex-direction: column; gap: 2px; }
-        .stat-label { font-size: 0.55rem; color: var(--text-secondary); font-weight: 800; }
-        .stat-value { font-size: 0.9rem; font-weight: 900; color: #fff; }
+        .stat-block { display: flex; flex-direction: column; gap: 1px; }
+        .stat-label { font-size: 0.52rem; color: var(--text-secondary); font-weight: 800; letter-spacing: 0.5px; }
+        .stat-value { font-size: 0.88rem; font-weight: 900; color: #fff; }
         .stat-value.gold { color: var(--accent-gold); }
         .stat-value.cyan { color: var(--accent-cyan); }
 
         .btn-icon-hud {
             background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-subtle);
-            color: var(--text-primary); padding: 5px 9px; font-size: 0.7rem; font-weight: 800;
-            clip-path: var(--chamfer-clip); display: flex; align-items: center; gap: 5px;
+            color: var(--text-primary); padding: 5px 8px; font-size: 0.68rem; font-weight: 800;
+            clip-path: var(--chamfer-clip); display: inline-flex; align-items: center; gap: 4px;
+            white-space: nowrap;
         }
         .btn-icon-hud:active { background: rgba(0, 243, 255, 0.2); border-color: var(--accent-cyan); }
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
 
         /* HUD Bottom */
         .hud-bottom {
-            position: absolute; bottom: 22px; left: 12px; right: 12px;
+            position: absolute; bottom: 20px; left: 10px; right: 10px;
             display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none;
         }
         .action-menu { display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
@@ -129,7 +126,7 @@
             clip-path: var(--chamfer-clip); overflow: hidden;
         }
         .mode-btn {
-            padding: 11px 16px; font-size: 0.75rem; font-weight: 900; color: var(--text-secondary);
+            padding: 10px 14px; font-size: 0.75rem; font-weight: 900; color: var(--text-secondary);
             transition: 0.2s; display: flex; align-items: center; gap: 6px;
         }
         .mode-btn.active.attack { background: var(--danger-color); color: #fff; }
@@ -144,13 +141,13 @@
         .btn-circle:active { border-color: var(--accent-gold); }
 
         .minimap-container {
-            width: 94px; height: 94px; background: #020203; border: 1px solid rgba(245, 197, 24, 0.7);
+            width: 90px; height: 90px; background: #020203; border: 1px solid rgba(245, 197, 24, 0.7);
             clip-path: var(--chamfer-clip); position: relative; pointer-events: auto;
         }
         #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
         .minimap-viewport { position: absolute; border: 1.5px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.25); pointer-events: none; }
 
-        /* モーダル (スクロールを確実に動作させるスタイル) */
+        /* モーダル */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); z-index: 9999;
@@ -161,10 +158,7 @@
             background: var(--bg-card); border: 1px solid var(--border-subtle);
             clip-path: var(--chamfer-clip); width: 100%; max-width: 420px; padding: 20px;
             display: flex; flex-direction: column; gap: 14px;
-            max-height: 82vh;
-            overflow-y: scroll; /* スマホスクロール必須指定 */
-            -webkit-overflow-scrolling: touch;
-            touch-action: pan-y;
+            max-height: 82vh; overflow-y: scroll; -webkit-overflow-scrolling: touch; touch-action: pan-y;
         }
         .modal-title {
             font-size: 0.95rem; color: var(--accent-gold); font-weight: 900;
@@ -206,17 +200,18 @@
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
 
-<!-- Top HUD -->
+<!-- Top HUD (整理した2段レイアウト) -->
 <div class="hud-top">
+    <!-- 段1: ナビゲーションとアクション -->
     <div class="hud-bar">
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
             <button class="btn-icon-hud" onclick="location.href='/dashboard'" style="color: var(--accent-cyan); border-color: rgba(0,243,255,0.4);">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 戻る
             </button>
-            <span class="stat-value" id="hud-pid" style="font-size: 0.8rem;">#----</span>
+            <span class="stat-value" id="hud-pid" style="font-size: 0.78rem; letter-spacing: 0.5px;">#----</span>
         </div>
-        <div style="display: flex; gap: 6px;">
+        <div style="display: flex; gap: 5px;">
             <button class="btn-icon-hud gold" onclick="loadLeaderboard()" title="賞金首">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M6 9H4a2 2 0 0 1-2-2V5h4M18 9h2a2 2 0 0 0 2-2V5h-4M4 5h16v6a6 6 0 0 1-12 0V5zM12 17v4M8 21h8"/></svg>
                 賞金首
@@ -231,24 +226,30 @@
             </button>
         </div>
     </div>
+    <!-- 段2: ステータス表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">INK CAPACITY</span>
             <span class="stat-value cyan" id="hud-ink">- / -</span>
         </div>
-        <div class="stat-block" style="text-align: right;">
+        <div class="stat-block" style="text-align: center;">
             <span class="stat-label">RECOVERY RATE</span>
             <span class="stat-value" id="hud-regen">+/分</span>
         </div>
+        <div class="stat-block" style="text-align: right;">
+            <span class="stat-label">TERRITORY</span>
+            <span class="stat-value" id="hud-mass">0 マス</span>
+        </div>
     </div>
+    <!-- 段3: 資金表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">GOLD BALANCE</span>
             <span class="stat-value gold" id="hud-gold">0 G</span>
         </div>
         <div class="stat-block" style="text-align: right;">
-            <span class="stat-label">TERRITORY (10G/分)</span>
-            <span class="stat-value" id="hud-mass">0 マス</span>
+            <span class="stat-label">INCOME RATE</span>
+            <span class="stat-value" id="hud-income" style="font-size: 0.78rem; color: var(--text-secondary);">+0 G/分</span>
         </div>
     </div>
     <div class="hud-bar" id="barrier-status-bar" style="display: none; border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.12);">
@@ -558,11 +559,17 @@
                 ink: 1, maxInk: 10, regen: 1, barrierActive: false
             });
 
+            // ローカル配列上でコアマスを即座に自陣化
+            const coreIdx = (data.core_y * BOARD_SIZE + data.core_x) * 3;
+            dataView.setUint16(coreIdx, data.player_id, false);
+            dataView.setUint8(coreIdx + 2, 1);
+
             document.getElementById("spawn-modal").style.display = "none";
             centerCameraOnCore();
             connectWebSocket();
             updateShopUI();
             startSyncLoop();
+            fastFullRecount();
             showToast("本陣コアを出撃させました！", true);
         } catch (e) {
             showToast(parseError(e));
@@ -613,8 +620,17 @@
             const buffer = event.data;
             const dv = new DataView(buffer);
 
+            // 初回全盤面受信 (120KB)
             if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
                 boardData.set(new Uint8Array(buffer));
+                // 自陣コアが空白になっていたら強制補正
+                if (gameState.coreX >= 0 && gameState.coreY >= 0) {
+                    const cIdx = (gameState.coreY * BOARD_SIZE + gameState.coreX) * 3;
+                    if (dataView.getUint16(cIdx, false) === 0) {
+                        dataView.setUint16(cIdx, gameState.playerId, false);
+                        dataView.setUint8(cIdx + 2, 1);
+                    }
+                }
                 fastFullRecount();
             } else if (buffer.byteLength % 5 === 0) {
                 const count = buffer.byteLength / 5;
@@ -660,15 +676,26 @@
         ws.send(buffer);
     }
 
+    // 全マスを再集計し、フロンティア（隣接する塗れるマス）を確実に検出
     function fastFullRecount() {
         gameState.massCount = 0;
         frontierSet.clear();
+
+        // コアマスが登録されていれば必ずマス数に反映
+        if (gameState.coreX >= 0 && gameState.coreY >= 0) {
+            const cIdx = (gameState.coreY * BOARD_SIZE + gameState.coreX) * 3;
+            if (dataView.getUint16(cIdx, false) !== gameState.playerId) {
+                dataView.setUint16(cIdx, gameState.playerId, false);
+                dataView.setUint8(cIdx + 2, 1);
+            }
+        }
 
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 const owner = dataView.getUint16((y * BOARD_SIZE + x) * 3, false);
                 if (owner === gameState.playerId) gameState.massCount++;
 
+                // 自陣または同盟領地に隣接する空白/敵マスを検出
                 if (owner === gameState.playerId || gameState.alliances.has(owner)) {
                     for (let d of [[-1,0],[1,0],[0,-1],[0,1]]) {
                         const nx = x + d[0], ny = y + d[1];
@@ -725,7 +752,8 @@
         document.getElementById('hud-ink').innerText = `${gameState.ink} / ${gameState.maxInk}`;
         document.getElementById('hud-regen').innerText = `+${gameState.regen}/分`;
         document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
-        document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス (+${(gameState.massCount * 10).toLocaleString()}G/分)`;
+        document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス`;
+        document.getElementById('hud-income').innerText = `+${(gameState.massCount * 10).toLocaleString()} G/分`;
 
         const bar = document.getElementById('barrier-status-bar');
         const btn = document.getElementById('btn-barrier');
@@ -864,16 +892,15 @@
         }
     }
 
-    // 全プレイヤー共通カラー生成 (全クライアントで同一色)
+    // 全プレイヤー共通カラー生成
     const COLOR_CACHE = new Map();
     COLOR_CACHE.set(0, "#08080a");
     COLOR_CACHE.set(ROCK_ID, "#1e2029");
 
     function getPlayerColor(id) {
         if (COLOR_CACHE.has(id)) return COLOR_CACHE.get(id);
-        // 黄金角による決定論的かつ高コントラストなカラー生成
         const hue = Math.floor((id * 137.508) % 360);
-        const color = `hsl(${hue}, 85%, 52%)`;
+        const color = `hsl(${hue}, 82%, 52%)`;
         COLOR_CACHE.set(id, color);
         return color;
     }
@@ -901,7 +928,7 @@
                 const screenX = hw + (x - camera.x) * camera.zoom;
                 const screenY = hh + (y - camera.y) * camera.zoom;
 
-                // 1. ベースマス描画 (全員共通色)
+                // 1. ベースマス描画 (共通色)
                 if (owner === ROCK_ID) {
                     ctx.fillStyle = "#1e2029";
                     ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
@@ -910,14 +937,14 @@
                     ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
-                // 2. 自陣マス用の視覚的識別枠 (シアンの控えめな枠線)
+                // 2. 自陣マス識別枠
                 if (owner === gameState.playerId && camera.zoom >= 10) {
                     ctx.strokeStyle = "rgba(0, 243, 255, 0.4)";
                     ctx.lineWidth = 1;
                     ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
-                // 3. マス目グリッド線
+                // 3. グリッド線
                 if (camera.zoom >= 8) {
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
                     ctx.lineWidth = 1;
@@ -926,12 +953,12 @@
 
                 // 4. フロンティア (侵略可能マス) のネオンパルス枠
                 if (actionMode === 1 && frontierSet.has(`${x},${y}`) && camera.zoom >= 9) {
-                    ctx.strokeStyle = `rgba(0, 243, 255, ${0.4 + pulse * 0.6})`;
+                    ctx.strokeStyle = `rgba(0, 243, 255, ${0.45 + pulse * 0.55})`;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
                 }
 
-                // 5. コア表示 (自陣は白枠＋白コア、他プレイヤーはコア枠)
+                // 5. コア表示 (自陣は白枠＋白コア)
                 if (x === gameState.coreX && y === gameState.coreY) {
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 2;
@@ -973,9 +1000,8 @@
             if (owner === ROCK_ID) {
                 data[ptr] = 45; data[ptr+1] = 48; data[ptr+2] = 60; data[ptr+3] = 255;
             } else if (owner !== 0) {
-                // 共通色からRGB展開
                 const hue = Math.floor((owner * 137.508) % 360);
-                const rgb = hslToRgb(hue / 360, 0.85, 0.52);
+                const rgb = hslToRgb(hue / 360, 0.82, 0.52);
                 data[ptr] = rgb[0]; data[ptr+1] = rgb[1]; data[ptr+2] = rgb[2]; data[ptr+3] = 255;
             } else {
                 data[ptr+3] = 0;
@@ -1022,7 +1048,7 @@
     }
 
     // ==========================================================
-    // 5. スマホ・タッチ操作 (スクロールとタップの完全分離)
+    // 5. スマホ・タッチ操作
     // ==========================================================
     let isDragging = false;
     let touchStartX = 0, touchStartY = 0;
@@ -1049,7 +1075,6 @@
             const by = Math.floor(camera.y + (e.clientY - rect.top - rect.height / 2) / camera.zoom);
             activePointer = { x: e.clientX, y: e.clientY, bx, by };
 
-            // 長押し連続強化 (指が静止している場合のみ)
             pressInterval = setTimeout(() => {
                 if (!hasMoved && activePointer) {
                     sendActionToServer(activePointer.bx, activePointer.by);
@@ -1096,7 +1121,6 @@
         activeTouches.delete(e.pointerId);
         clearTimeout(pressInterval);
 
-        // 指を動かさずタップして離した時だけ判定
         if (!hasMoved && activePointer && activeTouches.size === 0) {
             if (camera.zoom >= 8 && activePointer.bx >= 0 && activePointer.bx < BOARD_SIZE && activePointer.by >= 0 && activePointer.by < BOARD_SIZE) {
                 sendActionToServer(activePointer.bx, activePointer.by);
