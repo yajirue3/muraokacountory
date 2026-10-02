@@ -753,8 +753,9 @@
         document.getElementById('hud-regen').innerText = `+${gameState.regen}/分`;
         document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
         document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス`;
-        document.getElementById('hud-income').innerText = `+${(gameState.massCount * 10).toLocaleString()} G/分`;
+        document.getElementById('hud-income').innerText = `配当: +${estimatedDailyGold.toLocaleString()} G/日`;
 
+        
         const bar = document.getElementById('barrier-status-bar');
         const btn = document.getElementById('btn-barrier');
         if (gameState.barrierActive) {
