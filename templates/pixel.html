@@ -312,7 +312,7 @@
 
 <script>
     // ==========================================================
-    // 1. 認証とエラーハンドリング完全対策[span_7](start_span)[span_7](end_span)
+    // 1. 認証とエラーハンドリング完全対策
     // ==========================================================
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
@@ -333,7 +333,7 @@
     }
 
     // ==========================================================
-    // 2. ゲーム状態と最適化カメラ[span_8](start_span)[span_8](end_span)
+    // 2. ゲーム状態と最適化カメラ
     // ==========================================================
     const BOARD_SIZE = 200;
     const ROCK_ID = 65535;
@@ -365,7 +365,7 @@
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
     // ==========================================================
-    // 3. 初期化とAPI通信[span_9](start_span)[span_9](end_span)
+    // 3. 初期化とAPI通信
     // ==========================================================
     async function initGame() {
         try {
@@ -440,18 +440,36 @@
         } catch (e) { alert("出撃エラー: " + parseError(e)); }
     }
 
+    // ★★★ 修正の要：自動回復・自動同期ループ ★★★
     function startSyncLoop() {
-        setInterval(() => {
-            if (!gameState.barrierActive) {
-                gameState.gold += gameState.massCount * 10;
-                if (gameState.ink < gameState.maxInk) gameState.ink = Math.min(gameState.maxInk, gameState.ink + gameState.regen);
-            } else {
-                if (gameState.gold >= 10) gameState.gold -= 10;
-                else { gameState.gold = 0; gameState.barrierActive = false; }
-                if (gameState.ink < gameState.maxInk) gameState.ink = Math.min(gameState.maxInk, gameState.ink + gameState.regen);
-            }
-            updateHUD();
-        }, 60000);
+        // 10秒ごとにサーバーに問い合わせ、怠惰評価を発火させて
+        // 経過時間分のインクとGoldを自動で取得・HUD反映する
+        setInterval(async () => {
+            try {
+                const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (!data.is_dead) {
+                        gameState.ink = data.ink;
+                        gameState.maxInk = data.max_ink;
+                        gameState.regen = data.regen;
+                        gameState.barrierActive = data.barrier_active;
+                        updateHUD();
+                    }
+                }
+                
+                // 口座残高（領地インカム加算分）も同期
+                const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+                if (wRes.ok) {
+                    const wallets = await wRes.json();
+                    const curWallet = wallets.find(w => w.wallet_id === gameState.walletId);
+                    if (curWallet) {
+                        gameState.gold = curWallet.balance;
+                        updateHUD();
+                    }
+                }
+            } catch (e) {}
+        }, 10000);
     }
 
     // ==========================================================
@@ -468,7 +486,6 @@
         };
 
         ws.onmessage = (event) => {
-            // テキスト(JSON)によるキルログ等の受信
             if (typeof event.data === "string") {
                 try {
                     const msg = JSON.parse(event.data);
@@ -477,7 +494,6 @@
                 return;
             }
 
-            // バイナリ通信(盤面)
             const buffer = event.data;
             const dv = new DataView(buffer);
 
@@ -517,6 +533,7 @@
 
     function sendActionToServer(bx, by) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // インクが0、またはバリア展開中はアクションを送信しない
         if (gameState.ink < 1 || gameState.barrierActive) return;
 
         const buffer = new ArrayBuffer(5);
@@ -551,7 +568,7 @@
     }
 
     // ==========================================================
-    // 5. UI制御 & 各種API[span_10](start_span)[span_10](end_span)
+    // 5. UI制御 & 各種API
     // ==========================================================
     function setMode(mode) {
         actionMode = mode;
@@ -687,7 +704,7 @@
     }
 
     // ==========================================================
-    // 6. Canvas 描画エンジン[span_11](start_span)[span_11](end_span)
+    // 6. Canvas 描画エンジン
     // ==========================================================
     const COLOR_MAP = new Map();
     COLOR_MAP.set(0, "#080808");
@@ -791,7 +808,7 @@
     }
 
     // ==========================================================
-    // 7. スマホ特化操作[span_12](start_span)[span_12](end_span)
+    // 7. スマホ特化操作
     // ==========================================================
     let isDragging = false;
     let touchStartX = 0, touchStartY = 0, cameraStartX = 0, cameraStartY = 0, lastPinchDist = 0;
