@@ -290,6 +290,10 @@ def get_ai(request: Request):
 def get_pixel(request: Request):
     return templates.TemplateResponse(request=request, name="pixel.html")
 
+@app.get("/minecraft", response_class=HTMLResponse)
+def get_minecraft(request: Request):
+    return templates.TemplateResponse(request=request, name="eaglercraft-26.2-zeus-skins.html")
+
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
 # --------------------------------------------------
