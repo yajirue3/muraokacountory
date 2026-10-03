@@ -467,7 +467,6 @@
     const minimapCanvas = document.getElementById('minimap-canvas');
     const miniCtx = minimapCanvas.getContext('2d', { alpha: false });
 
-    // SVG 王冠パス (24x24 viewBox: 王冠のアウトラインと底面)
     const CROWN_SVG_PATH = new Path2D("M2 4l3 12h14l3-12-5 4-5-6-5 6-5-4zm3 14h14v2H5v-2z");
 
     function drawCrownIcon(targetCtx, cx, cy, size, fillColor) {
@@ -1032,10 +1031,10 @@
                     ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
                 }
 
-                // 5. コア表示判定 (自陣コア または 敵プレイヤーのコア)
-                const isMyCore = (x === gameState.coreX && y === gameState.coreY);
+                // 5. コア表示判定 (盤面の owner と一致している生存コアのみ描画)
+                const isMyCore = (x === gameState.coreX && y === gameState.coreY && owner === gameState.playerId);
                 const coreOwner = activeCores.get(`${x},${y}`);
-                const isEnemyCore = !isMyCore && coreOwner !== undefined && coreOwner !== 0;
+                const isEnemyCore = !isMyCore && coreOwner !== undefined && coreOwner !== 0 && owner === coreOwner;
 
                 if (isMyCore || isEnemyCore) {
                     ctx.strokeStyle = isMyCore ? "#ffffff" : "#ff3366";
@@ -1095,12 +1094,15 @@
         }
         miniCtx.putImageData(imgData, 0, 0);
 
-        // ミニマップ上にコアをプロット（自陣: 白、敵コア: 黄金）
+        // ミニマップ上にコアをプロット（盤面の現在の所有者と一致している場合のみ描画）
         for (const [coordStr, pId] of activeCores.entries()) {
             const [cx, cy] = coordStr.split(',').map(Number);
-            const isMine = (cx === gameState.coreX && cy === gameState.coreY);
-            miniCtx.fillStyle = isMine ? "#ffffff" : "#f5c518";
-            miniCtx.fillRect(cx - 1, cy - 1, 3, 3);
+            const currentOwner = dataView.getUint16((cy * BOARD_SIZE + cx) * 3, false);
+            if (currentOwner === pId && pId !== 0) {
+                const isMine = (cx === gameState.coreX && cy === gameState.coreY);
+                miniCtx.fillStyle = isMine ? "#ffffff" : "#f5c518";
+                miniCtx.fillRect(cx - 1, cy - 1, 3, 3);
+            }
         }
 
         const rect = canvas.getBoundingClientRect();
