@@ -472,3 +472,13 @@ async def break_alliance(data: AllianceRequest, authorization: str = Header(None
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel(request: Request):
     return templates.TemplateResponse(request=request, name="pixel.html")
+
+# -------------------------------------------------------------
+# コア座標配信API（他プレイヤーのコア可視化用）
+# -------------------------------------------------------------
+@router.get("/api/pixel/cores")
+async def get_active_cores():
+    """生存している全プレイヤーのコア位置を取得"""
+    client = await get_supabase()
+    res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
+    return res.data or []
