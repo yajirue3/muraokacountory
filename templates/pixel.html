@@ -113,6 +113,7 @@
             white-space: nowrap;
         }
         .btn-icon-hud:active { background: rgba(0, 243, 255, 0.2); border-color: var(--accent-cyan); }
+        .btn-icon-hud:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
 
         /* HUD Bottom */
@@ -212,6 +213,10 @@
             <span class="stat-value" id="hud-pid" style="font-size: 0.78rem; letter-spacing: 0.5px;">#----</span>
         </div>
         <div style="display: flex; gap: 5px;">
+            <button class="btn-icon-hud" id="btn-manual-sync" onclick="manualSync()" title="更新">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                更新
+            </button>
             <button class="btn-icon-hud gold" onclick="loadLeaderboard()" title="賞金首">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M6 9H4a2 2 0 0 1-2-2V5h4M18 9h2a2 2 0 0 0 2-2V5h-4M4 5h16v6a6 6 0 0 1-12 0V5zM12 17v4M8 21h8"/></svg>
                 賞金首
@@ -598,6 +603,41 @@
                 updateHUD();
             } catch (e) {}
         }, 8000);
+    }
+
+    let isManualSyncing = false;
+    async function manualSync() {
+        if (isManualSyncing) return;
+        isManualSyncing = true;
+        const btn = document.getElementById("btn-manual-sync");
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const d = await res.json();
+                if (!d.is_dead) {
+                    Object.assign(gameState, {
+                        ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active
+                    });
+                }
+            }
+            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (wRes.ok) {
+                const ws = await wRes.json();
+                const cw = ws.find(w => w.wallet_id === gameState.walletId);
+                if (cw) gameState.gold = cw.balance;
+            }
+            updateHUD();
+            showToast("最新情報を取得しました", true);
+        } catch (e) {
+            showToast("更新に失敗しました");
+        } finally {
+            setTimeout(() => {
+                isManualSyncing = false;
+                if (btn) btn.disabled = false;
+            }, 1000);
+        }
     }
 
     function connectWebSocket() {
