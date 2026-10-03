@@ -342,6 +342,19 @@ async def get_my_pixel_status(authorization: str = Header(None)):
     res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
     if not res.data: return {"exists": False, "is_dead": True}
     p = res.data[0]
+    
+    if not p.get("is_dead", True):
+        mass_count = player_mass_counts.get(p["player_id"], 0)
+        rpc_res = await client.rpc("pixel_lazy_update", {
+            "p_player_id": p["player_id"],
+            "p_mass_count": mass_count,
+            "p_now": datetime.now(timezone.utc).isoformat()
+        }).execute()
+        if rpc_res.data and rpc_res.data.get("status") == "ok":
+            latest = await client.table("pixel_players").select("*").eq("id", p["id"]).execute()
+            if latest.data:
+                p = latest.data[0]
+
     return { "exists": True, "is_dead": p["is_dead"], "player_id": p["player_id"], "core_x": p["core_x"], "core_y": p["core_y"], "ink": p["ink"], "max_ink": p["max_ink"], "regen": p["regen"], "barrier_active": p["barrier_active"], "wallet_id": p["wallet_id"] }
 
 @router.post("/api/pixel/spawn")
