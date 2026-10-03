@@ -306,6 +306,7 @@ async def websocket_pixel(ws: WebSocket):
             if assassinated:
                 kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": target_owner}).execute()
                 if kill_res.data and kill_res.data.get("success"):
+                    await client.table("pixel_players").update({"is_dead": True}).eq("player_id", target_owner).execute()
                     bounty = kill_res.data["bounty"]
                     bounty_msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
                     await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
@@ -469,16 +470,12 @@ async def break_alliance(data: AllianceRequest, authorization: str = Header(None
                 except: pass
     return {"success": True, "message": "同盟破棄・孤立領地消滅"}
 
-@router.get("/pixel", response_class=HTMLResponse)
-async def get_pixel(request: Request):
-    return templates.TemplateResponse(request=request, name="pixel.html")
-
-# -------------------------------------------------------------
-# コア座標配信API（他プレイヤーのコア可視化用）
-# -------------------------------------------------------------
 @router.get("/api/pixel/cores")
 async def get_active_cores():
-    """生存している全プレイヤーのコア位置を取得"""
     client = await get_supabase()
     res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
     return res.data or []
+
+@router.get("/pixel", response_class=HTMLResponse)
+async def get_pixel(request: Request):
+    return templates.TemplateResponse(request=request, name="pixel.html")
