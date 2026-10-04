@@ -287,15 +287,16 @@ def get_ai(request: Request):
     return templates.TemplateResponse(request=request, name="ai.html")
 
 @app.get("/pixel", response_class=HTMLResponse)
-async def get_pixel_page(request: Request):
+def get_pixel_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="pixel.html",
         context={
-            "supabase_url": os.getenv("SUPABASE_URL", ""),
-            "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
+            "supabase_url": SUPABASE_URL,
+            "supabase_anon_key": SUPABASE_KEY
         }
     )
+
 
 
 
