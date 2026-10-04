@@ -289,13 +289,14 @@ def get_ai(request: Request):
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel_page(request: Request):
     return templates.TemplateResponse(
-        "pixel.html",
-        {
-            "request": request,
+        request=request,
+        name="pixel.html",
+        context={
             "supabase_url": os.getenv("SUPABASE_URL", ""),
             "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
         }
     )
+
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
