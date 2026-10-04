@@ -249,10 +249,6 @@ async def websocket_pixel(ws: WebSocket):
                 if not is_adjacent_to_owned(x, y, player_id, alliances):
                     await ws.send_json({"type": "error", "msg": "自陣に隣接していません。"})
                     continue
-                target_mass = player_mass_counts.get(target_owner, 0) if target_owner != 0 else 0
-                if (mass_count <= 10 and target_owner != 0) or (target_owner != 0 and target_mass <= 10):
-                    await ws.send_json({"type": "error", "msg": "初心者保護（10マス以下）対象です。"})
-                    continue
             elif action == 2:
                 if target_owner != player_id and target_owner not in alliances:
                     await ws.send_json({"type": "error", "msg": "自陣のみ強化可能です。"})
