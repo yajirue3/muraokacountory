@@ -40,7 +40,7 @@
         #game-canvas {
             position: absolute;
             top: 0; left: 0;
-            width: 100%; height: 100%;
+            width: 100vw; height: 100vh;
             z-index: 1;
             touch-action: none;
         }
@@ -50,6 +50,12 @@
             stroke: currentColor; fill: none;
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
             vertical-align: middle;
+        }
+
+        #debug-banner {
+            position: absolute; top: 0; left: 0; width: 100%;
+            background: #ff3366; color: #fff; font-size: 0.7rem; font-weight: bold;
+            padding: 4px 8px; z-index: 99999; display: none; word-break: break-all;
         }
 
         #toast-container {
@@ -194,6 +200,7 @@
 </head>
 <body>
 
+<div id="debug-banner"></div>
 <canvas id="game-canvas"></canvas>
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
@@ -364,12 +371,32 @@
 </div>
 
 <script>
+    // 画面上に例外を強制表示する安全フック
+    function reportError(msg) {
+        const b = document.getElementById('debug-banner');
+        if (b) {
+            b.style.display = 'block';
+            b.innerText = msg;
+        }
+    }
+    window.onerror = function(message, source, lineno, colno, error) {
+        reportError("Script Error: " + message + " (line: " + lineno + ")");
+    };
+    window.onunhandledrejection = function(e) {
+        reportError("Promise Error: " + (e.reason ? (e.reason.message || e.reason) : e));
+    };
+
     const SUPABASE_URL = "{{ supabase_url }}";
     const SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true }
-    });
+    let supabase = null;
+    try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true }
+        });
+    } catch (e) {
+        reportError("Supabase Init Error: " + e.message);
+    }
 
     function parseError(err) {
         if (!err) return "エラーが発生しました";
@@ -384,9 +411,11 @@
         if (t) return t;
 
         try {
-            const { data } = await supabase.auth.getSession();
-            if (data && data.session && data.session.access_token) {
-                return data.session.access_token;
+            if (supabase) {
+                const { data } = await supabase.auth.getSession();
+                if (data && data.session && data.session.access_token) {
+                    return data.session.access_token;
+                }
             }
         } catch (e) {}
 
@@ -428,24 +457,38 @@
     const minimapCanvas = document.getElementById('minimap-canvas');
     const miniCtx = minimapCanvas.getContext('2d', { alpha: false });
 
-    const CROWN_SVG_PATH = new Path2D("M2 4l3 12h14l3-12-5 4-5-6-5 6-5-4zm3 14h14v2H5v-2z");
-
+    // Path2D を使わず直接パスを描画する王冠アイコン関数
     function drawCrownIcon(targetCtx, cx, cy, size, fillColor) {
         targetCtx.save();
         targetCtx.translate(cx, cy);
-        const scale = size / 24;
-        targetCtx.scale(scale, scale);
+        const s = size / 24;
+        targetCtx.scale(s, s);
         targetCtx.translate(-12, -12);
         targetCtx.fillStyle = fillColor;
-        targetCtx.fill(CROWN_SVG_PATH);
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(2, 4);
+        targetCtx.lineTo(5, 16);
+        targetCtx.lineTo(19, 16);
+        targetCtx.lineTo(22, 4);
+        targetCtx.lineTo(17, 8);
+        targetCtx.lineTo(12, 2);
+        targetCtx.lineTo(7, 8);
+        targetCtx.closePath();
+        targetCtx.fill();
+
+        targetCtx.fillRect(5, 18, 14, 2);
         targetCtx.restore();
     }
 
     function resizeCanvas() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
         const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + "px";
+        canvas.style.height = h + "px";
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -472,6 +515,7 @@
     }
 
     async function loadBoardFromDB() {
+        if (!supabase) return;
         try {
             const { data, error } = await supabase.from('pixel_board').select('data').eq('id', 1).single();
             if (error || !data || !data.data) return;
@@ -489,11 +533,12 @@
                 fastFullRecount();
             }
         } catch (e) {
-            console.error("盤面ロード失敗:", e);
+            reportError("盤面読込エラー: " + e.message);
         }
     }
 
     async function syncCores() {
+        if (!supabase) return;
         try {
             const { data, error } = await supabase.from('pixel_players').select('player_id, core_x, core_y').eq('is_dead', false);
             if (!error && data) {
@@ -506,6 +551,7 @@
     }
 
     function setupRealtime() {
+        if (!supabase) return;
         realtimeChannel = supabase.channel('pixel_war_realtime', {
             config: { broadcast: { self: false } }
         });
@@ -539,8 +585,8 @@
         try {
             token = await getValidToken();
             if (!token) {
-                alert("ログインセッションが見つかりません。トップページからログインし直してください。");
-                window.location.href = "/";
+                reportError("セッション未保持: トップへ遷移します");
+                setTimeout(() => { window.location.href = "/"; }, 1500);
                 return;
             }
 
@@ -549,7 +595,7 @@
             });
             if (!wRes.ok) {
                 const errText = await wRes.text();
-                throw new Error(`/api/wallets 失敗 (${wRes.status}): ${errText}`);
+                throw new Error(`/api/wallets (${wRes.status}): ${errText}`);
             }
             const wallets = await wRes.json();
             if (!wallets.length) {
@@ -567,7 +613,7 @@
             });
             if (!meRes.ok) {
                 const errText = await meRes.text();
-                throw new Error(`/api/pixel/me 失敗 (${meRes.status}): ${errText}`);
+                throw new Error(`/api/pixel/me (${meRes.status}): ${errText}`);
             }
             const me = await meRes.json();
 
@@ -601,8 +647,7 @@
             document.getElementById("spawn-modal").style.display = "flex";
 
         } catch (e) {
-            console.error("初期化失敗:", e);
-            alert("初期化エラー:\n" + (e.message || String(e)));
+            reportError("Init Fail: " + (e.message || String(e)));
         }
     }
 
@@ -971,11 +1016,14 @@
 
     function draw() {
         const rect = canvas.getBoundingClientRect();
-        ctx.fillStyle = "#030305";
-        ctx.fillRect(0, 0, rect.width, rect.height);
+        const width = rect.width || window.innerWidth;
+        const height = rect.height || window.innerHeight;
 
-        const hw = rect.width / 2;
-        const hh = rect.height / 2;
+        ctx.fillStyle = "#030305";
+        ctx.fillRect(0, 0, width, height);
+
+        const hw = width / 2;
+        const hh = height / 2;
         const startX = Math.max(0, Math.floor(camera.x - hw / camera.zoom));
         const endX = Math.min(BOARD_SIZE, Math.ceil(camera.x + hw / camera.zoom));
         const startY = Math.max(0, Math.floor(camera.y - hh / camera.zoom));
@@ -1088,10 +1136,11 @@
             }
         }
 
-        const rect = canvas.getBoundingClientRect();
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         const vp = document.getElementById('minimap-vp');
-        const viewW = (rect.width / camera.zoom) / 200 * 100;
-        const viewH = (rect.height / camera.zoom) / 200 * 100;
+        const viewW = (width / camera.zoom) / 200 * 100;
+        const viewH = (height / camera.zoom) / 200 * 100;
         vp.style.width = `${Math.min(100, Math.max(1, viewW))}%`;
         vp.style.height = `${Math.min(100, Math.max(1, viewH))}%`;
         vp.style.left = `${Math.max(0, (camera.x / 200 * 100) - viewW / 2)}%`;
@@ -1229,6 +1278,7 @@
         camera.y = ((e.clientY - rect.top) / rect.height) * BOARD_SIZE;
     });
 
+    // 起動
     initGame();
     requestAnimationFrame(draw);
 </script>
