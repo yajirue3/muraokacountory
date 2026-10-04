@@ -371,15 +371,35 @@
         auth: { persistSession: true, autoRefreshToken: true }
     });
 
-    const token = localStorage.getItem("access_token");
-    if (!token) window.location.href = "/";
-
     function parseError(err) {
         if (!err) return "エラーが発生しました";
         if (typeof err === "string") return err;
         if (err.detail) return typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
         if (err.message) return err.message;
         try { return JSON.stringify(err); } catch (e) { return String(err); }
+    }
+
+    async function getValidToken() {
+        let t = localStorage.getItem("access_token");
+        if (t) return t;
+
+        try {
+            const { data } = await supabase.auth.getSession();
+            if (data && data.session && data.session.access_token) {
+                return data.session.access_token;
+            }
+        } catch (e) {}
+
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(key));
+                    if (parsed && parsed.access_token) return parsed.access_token;
+                } catch (e) {}
+            }
+        }
+        return null;
     }
 
     const BOARD_SIZE = 200;
@@ -400,6 +420,8 @@
 
     let camera = { x: 100, y: 100, zoom: 22 };
     const MIN_ZOOM = 4, MAX_ZOOM = 55;
+
+    let token = null;
 
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -515,8 +537,20 @@
 
     async function initGame() {
         try {
-            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
-            if (!wRes.ok) throw await wRes.json();
+            token = await getValidToken();
+            if (!token) {
+                alert("ログインセッションが見つかりません。トップページからログインし直してください。");
+                window.location.href = "/";
+                return;
+            }
+
+            const wRes = await fetch("/api/wallets", { 
+                headers: { "Authorization": `Bearer ${token}` } 
+            });
+            if (!wRes.ok) {
+                const errText = await wRes.text();
+                throw new Error(`/api/wallets 失敗 (${wRes.status}): ${errText}`);
+            }
             const wallets = await wRes.json();
             if (!wallets.length) {
                 alert("口座がありません。中央銀行で作成してください。");
@@ -528,8 +562,14 @@
                 `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()}G)</option>`
             ).join('');
 
-            const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-            const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
+            const meRes = await fetch("/api/pixel/me", { 
+                headers: { "Authorization": `Bearer ${token}` } 
+            });
+            if (!meRes.ok) {
+                const errText = await meRes.text();
+                throw new Error(`/api/pixel/me 失敗 (${meRes.status}): ${errText}`);
+            }
+            const me = await meRes.json();
 
             await loadBoardFromDB();
             setupRealtime();
@@ -559,8 +599,10 @@
             updateHUD();
             await syncCores();
             document.getElementById("spawn-modal").style.display = "flex";
+
         } catch (e) {
-            showToast("初期化失敗: " + parseError(e));
+            console.error("初期化失敗:", e);
+            alert("初期化エラー:\n" + (e.message || String(e)));
         }
     }
 
