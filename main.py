@@ -1271,3 +1271,22 @@ async def get_announcements():
     except Exception as e:
         print(f"Announcements fetch error: {e}")
         return []
+
+# --- 称号アンロック用モデル＆API ---
+class UnlockTitleRequest(BaseModel):
+    title: str
+
+@app.post("/api/titles/unlock")
+async def unlock_title(data: UnlockTitleRequest, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    # 既に持っているか確認
+    exist = await client.table("user_titles").select("id").eq("user_id", user.id).eq("title", data.title).execute()
+    if not exist.data:
+        await client.table("user_titles").insert({
+            "user_id": user.id,
+            "title": data.title
+        }).execute()
+        
+    return {"message": f"称号「{data.title}」を獲得しました！"}
