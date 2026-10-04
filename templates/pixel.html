@@ -364,11 +364,22 @@
 </div>
 
 <script>
-    const SUPABASE_URL = "{{ supabase_url }}";
-    const SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
+    // Jinja2 または Meta タグから環境変数を取得
+    let SUPABASE_URL = "{{ supabase_url }}";
+    let SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
 
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        console.error("Supabase 環境変数が設定されていません。VercelのEnvironment Variablesを確認してください。");
+    // Jinja2 で展開されていない場合のフォールバック（Direct / Vercel）
+    if (!SUPABASE_URL || SUPABASE_URL.startsWith("{{")) {
+        const metaUrl = document.querySelector('meta[name="supabase-url"]');
+        if (metaUrl && metaUrl.content && !metaUrl.content.startsWith("{{")) {
+            SUPABASE_URL = metaUrl.content;
+        }
+    }
+    if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.startsWith("{{")) {
+        const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
+        if (metaKey && metaKey.content && !metaKey.content.startsWith("{{")) {
+            SUPABASE_ANON_KEY = metaKey.content;
+        }
     }
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -701,7 +712,6 @@
                     await syncCores();
                 }
             }
-
         } catch (e) {
             showToast("通信エラーが発生しました");
         }
