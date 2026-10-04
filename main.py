@@ -1258,3 +1258,16 @@ def get_public_config():
         "supabase_url": SUPABASE_URL,
         "supabase_anon_key": SUPABASE_KEY
     }
+
+# --------------------------------------------------
+# お知らせAPI
+# --------------------------------------------------
+@app.get("/api/announcements")
+async def get_announcements():
+    client = await get_supabase()
+    try:
+        res = await client.table("announcements").select("id, title, content, created_at").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        print(f"Announcements fetch error: {e}")
+        return []
