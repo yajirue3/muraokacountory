@@ -54,7 +54,6 @@ async def load_board_from_supabase():
     if res.data and len(res.data) > 0:
         raw_data = res.data[0].get("data")
         if raw_data:
-            # Supabase Python SDK が bytes/bytearray で返すか hex 文字列 (\x...) で返す場合に対応
             if isinstance(raw_data, (bytes, bytearray)):
                 data_bytes = bytes(raw_data)
             elif isinstance(raw_data, str) and raw_data.startswith("\\x"):
@@ -66,7 +65,6 @@ async def load_board_from_supabase():
                 board[:] = data_bytes
                 loaded = True
 
-    # DBに有効なデータがない場合は岩盤付きの初期状態を生成してDBへ保存
     if not loaded:
         board[:] = bytearray(EXPECTED_BYTE_SIZE)
         for x in range(BOARD_WIDTH):
@@ -78,7 +76,16 @@ async def load_board_from_supabase():
         
         await save_board_to_supabase()
 
-    # マスカウントの集計
+    # 生存プレイヤーのコアを確実に盤面に復元
+    alive_players = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
+    if alive_players.data:
+        for p in alive_players.data:
+            cx, cy = p["core_x"], p["core_y"]
+            if 0 <= cx < BOARD_WIDTH and 0 <= cy < BOARD_HEIGHT:
+                current_owner, _ = get_tile(cx, cy)
+                if current_owner != p["player_id"]:
+                    set_tile(cx, cy, p["player_id"], 1)
+
     player_mass_counts.clear()
     for y in range(BOARD_HEIGHT):
         for x in range(BOARD_WIDTH):
@@ -235,6 +242,18 @@ async def websocket_pixel(ws: WebSocket):
                 await ws.send_json({"type": "error", "msg": "インクが不足しています。"})
                 continue
 
+            # サーバー側でコアマスが外れていた場合の自己修復保証
+            p_core_res = await client.table("pixel_players").select("core_x, core_y").eq("player_id", player_id).execute()
+            if p_core_res.data:
+                pcx, pcy = p_core_res.data[0]["core_x"], p_core_res.data[0]["core_y"]
+                if get_tile(pcx, pcy)[0] != player_id:
+                    async with board_lock:
+                        set_tile(pcx, pcy, player_id, 1)
+                        repair_diff = struct.pack(">BBHB", pcx, pcy, player_id, 1)
+                        for c in connected_clients:
+                            try: await c.send_bytes(repair_diff)
+                            except: pass
+
             alliances = await get_alliances(player_id)
             target_owner, target_hp = get_tile(x, y)
             
@@ -377,6 +396,7 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
                 "user_id": str(user.id), "wallet_id": data.wallet_id, "player_id": player_id, "core_x": core_x, "core_y": core_y, "ink": 1
             }).execute()
         set_tile(core_x, core_y, player_id, 1)
+        await save_board_to_supabase()
     return {"player_id": player_id, "core_x": core_x, "core_y": core_y}
 
 class UpgradeRequest(BaseModel):
