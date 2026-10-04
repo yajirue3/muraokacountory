@@ -285,17 +285,27 @@ def get_koneko(request: Request):
 @app.get("/ai", response_class=HTMLResponse)
 def get_ai(request: Request):
     return templates.TemplateResponse(request=request, name="ai.html")
+import traceback
 
 @app.get("/pixel", response_class=HTMLResponse)
 def get_pixel_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="pixel.html",
-        context={
-            "supabase_url": SUPABASE_URL,
-            "supabase_anon_key": SUPABASE_KEY
-        }
-    )
+    try:
+        return templates.TemplateResponse(
+            request=request,
+            name="pixel.html",
+            context={
+                "supabase_url": SUPABASE_URL,
+                "supabase_anon_key": SUPABASE_KEY
+            }
+        )
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        return HTMLResponse(
+            content=f"<h2>Pixel Render Error</h2><pre style='color:red;'>{error_detail}</pre>",
+            status_code=200
+        )
+
+
 
 
 
