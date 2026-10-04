@@ -9,15 +9,15 @@
     <style>
         /* --- Modern & Geometric UI Variables --- */
         :root {
-            --bg-base: #050505;
-            --bg-surface: #101010;
-            --bg-card: #161616;
-            --border-subtle: #2a2a2a;
-            --text-primary: #f0f0f0;
-            --text-secondary: #888;
+            --bg-base: #060709;
+            --bg-surface: #0f1115;
+            --bg-card: #15181e;
+            --border-subtle: #242831;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
             --accent-gold: #d4af37;
             --accent-cyan: #00f3ff;
-            --danger-color: #e74c3c;
+            --danger-color: #ff3366;
             --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
             --octagon-clip: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
         }
@@ -29,7 +29,7 @@
             color: var(--text-primary);
             display: flex;
             justify-content: center;
-            padding: 20px 10px;
+            padding: 20px 10px 40px;
             min-height: 100vh;
             user-select: none;
             overflow-x: hidden;
@@ -44,61 +44,162 @@
             max-width: 600px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
         }
 
         /* =========================================
-           1. サイバー・ダーク幾何学 国民身分証明証
+           1. ホログラム国民身分証明証 (Black Card)
            ========================================= */
         .id-card-wrapper { 
-            background: var(--bg-surface);
-            padding: 16px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%), #0d0f12;
+            padding: 18px 20px;
             clip-path: var(--chamfer-clip);
             position: relative;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
-            border: 1px solid #333;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.85);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            cursor: pointer;
+            transition: transform 0.1s ease, border-color 0.3s;
+            overflow: hidden;
         }
+        .id-card-wrapper:active {
+            transform: scale(0.985);
+        }
+
+        /* 虹色ホログラム下地（鈍く玉虫色に反射） */
         .id-card-wrapper::before {
-            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
-            background: linear-gradient(135deg, #1f1b14 0%, #111 60%, #151d20 100%);
-            clip-path: var(--chamfer-clip); z-index: 1;
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(125deg, 
+                rgba(255, 0, 128, 0.05) 0%, 
+                rgba(0, 243, 255, 0.06) 30%, 
+                rgba(212, 175, 55, 0.08) 60%, 
+                rgba(147, 51, 234, 0.05) 100%);
+            z-index: 1; pointer-events: none;
         }
-        /* ネオンゴールド走査光 */
-        .id-card-wrapper::after { 
-            content: ""; position: absolute; top: 0; left: -150%; width: 40%; height: 100%; 
-            background: linear-gradient(to right, rgba(212, 175, 55, 0) 0%, rgba(212, 175, 55, 0.2) 50%, rgba(212, 175, 55, 0) 100%); 
-            transform: skewX(-25deg); animation: card-scan 5s infinite ease-in-out; z-index: 3; pointer-events: none; 
+
+        /* タップ時のみ発動するホログラム光彩レイヤー */
+        .holo-flash {
+            position: absolute;
+            top: -50%; left: -60%; width: 220%; height: 200%;
+            background: linear-gradient(
+                115deg,
+                transparent 20%,
+                rgba(0, 243, 255, 0.25) 40%,
+                rgba(255, 255, 255, 0.6) 50%,
+                rgba(212, 175, 55, 0.3) 60%,
+                transparent 80%
+            );
+            transform: rotate(-20deg) translateY(-100%);
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
         }
-        @keyframes card-scan { 0% { left: -150%; } 20% { left: 200%; } 100% { left: 200%; } }
+        .holo-flash.active {
+            animation: holo-sweep 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        @keyframes holo-sweep {
+            0% { transform: rotate(-20deg) translateY(-80%); opacity: 1; }
+            100% { transform: rotate(-20deg) translateY(80%); opacity: 0; }
+        }
 
         .id-content { position: relative; z-index: 2; }
-        .id-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 6px; margin-bottom: 10px; }
-        .id-country { font-weight: 900; font-size: 0.95rem; color: var(--accent-gold); letter-spacing: 2px; }
-        .id-title { font-size: 0.65rem; font-weight: bold; color: var(--accent-cyan); background: rgba(0, 243, 255, 0.08); border: 1px solid var(--accent-cyan); padding: 2px 6px; clip-path: var(--chamfer-clip); display: flex; align-items: center; gap: 4px;}
         
-        .id-body { display: flex; gap: 12px; align-items: center; }
+        .id-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            border-bottom: 1px solid rgba(255,255,255,0.08); 
+            padding-bottom: 10px; margin-bottom: 14px; 
+        }
+
+        /* 🔥 ド派手な村岡王国エンボスゴールドテキスト */
+        .id-country { 
+            font-weight: 900; 
+            font-size: 1.25rem; 
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #fff7d1 0%, #ffd700 25%, #d4af37 55%, #8a6c1e 85%, #f9e29c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 16px rgba(212, 175, 55, 0.45);
+            transition: filter 0.3s;
+        }
+        .id-card-wrapper:hover .id-country,
+        .id-country.flash {
+            filter: drop-shadow(0 0 10px rgba(255, 225, 120, 0.9));
+        }
+
+        .id-title-chip { 
+            font-size: 0.65rem; 
+            font-weight: 800; 
+            letter-spacing: 1px;
+            color: var(--accent-cyan); 
+            background: rgba(0, 243, 255, 0.08); 
+            border: 1px solid rgba(0, 243, 255, 0.4); 
+            padding: 3px 8px; 
+            clip-path: var(--chamfer-clip); 
+            display: flex; align-items: center; gap: 5px;
+        }
+        
+        .id-body { display: flex; gap: 16px; align-items: center; }
         .id-photo { 
-            width: 58px; height: 68px; 
-            background: #0d0d0d; 
-            border: 1px solid var(--accent-gold); 
+            width: 62px; height: 72px; 
+            background: linear-gradient(145deg, #090b0d 0%, #171b22 100%); 
+            border: 1px solid rgba(212, 175, 55, 0.5); 
             clip-path: var(--chamfer-clip);
             display: flex; justify-content: center; align-items: center; 
-            box-shadow: inset 0 0 10px rgba(212, 175, 55, 0.2);
+            box-shadow: inset 0 0 12px rgba(0, 243, 255, 0.15);
+            position: relative;
         }
-        .id-photo svg { width: 32px; height: 32px; stroke: var(--accent-gold); fill: none; stroke-width: 1.5; }
-        .id-details { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        .id-row { display: flex; flex-direction: column; }
-        .id-label { font-size: 0.58rem; color: var(--text-secondary); font-weight: bold; letter-spacing: 0.5px; }
-        .id-value { font-size: 0.85rem; font-weight: 900; color: #fff; word-break: break-all; }
+        .id-photo::after {
+            content: ""; position: absolute; inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 243, 255, 0.05) 3px);
+            pointer-events: none;
+        }
+        .id-photo svg { width: 34px; height: 34px; stroke: var(--accent-gold); fill: none; stroke-width: 1.5; }
+
+        .id-details { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .id-user-name { 
+            font-size: 1.15rem; 
+            font-weight: 900; 
+            color: #fff; 
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+        }
+        .id-user-email { 
+            font-size: 0.72rem; 
+            color: var(--text-secondary); 
+            word-break: break-all;
+            font-family: monospace;
+        }
         .id-badge { 
-            display: inline-block; 
-            background: linear-gradient(135deg, #a30000 0%, #500000 100%); 
-            color: #ffcccc; 
-            border: 1px solid #ff4d4d;
-            padding: 2px 8px; 
+            display: inline-flex; 
+            align-items: center;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.05) 100%); 
+            color: #ffdf79; 
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            padding: 3px 10px; 
             clip-path: var(--chamfer-clip);
-            font-size: 0.65rem; font-weight: bold; 
-            align-self: flex-start; margin-top: 2px; 
+            font-size: 0.7rem; font-weight: 800; 
+            align-self: flex-start;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        /* 100回達成専用トースト通知 */
+        .clicker-unlock-banner {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(135deg, #ffd700, #ff8800);
+            color: #000;
+            font-weight: 900;
+            padding: 12px 24px;
+            clip-path: var(--chamfer-clip);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+            z-index: 10000;
+            text-align: center;
+            animation: banner-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        @keyframes banner-pop {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.9); }
+            100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
 
         /* =========================================
@@ -106,35 +207,32 @@
            ========================================= */
         .panel {
             background: var(--bg-surface);
-            padding: 16px;
+            padding: 14px 16px;
             clip-path: var(--chamfer-clip);
             position: relative;
+            border: 1px solid var(--border-subtle);
         }
-        .panel::before {
-            content: ""; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
-            background: var(--bg-card); clip-path: var(--chamfer-clip); z-index: -1;
-        }
+        .panel-header { font-size: 0.82rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .panel-header svg { width: 15px; height: 15px; stroke: var(--accent-gold); fill: none; stroke-width: 2; }
         
-        .panel-header { font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-        .panel-header svg { width: 16px; height: 16px; stroke: var(--accent-gold); fill: none; stroke-width: 2; }
-        
-        .news-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
-        .news-item { font-size: 0.75rem; border-bottom: 1px dashed var(--border-subtle); padding-bottom: 6px; }
+        .news-list { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+        .news-item { font-size: 0.72rem; border-bottom: 1px dashed var(--border-subtle); padding-bottom: 5px; }
         .news-item:last-child { border: none; padding-bottom: 0; }
-        .news-date { color: var(--text-secondary); margin-right: 8px; font-size: 0.65rem; }
+        .news-date { color: var(--text-secondary); margin-right: 6px; font-size: 0.65rem; }
 
         .tax-display { text-align: center; }
-        .tax-amount { color: var(--danger-color); font-size: 1.5rem; font-weight: 900; margin: 4px 0; }
-        .tax-note { font-size: 0.65rem; color: var(--text-secondary); }
+        .tax-amount { color: var(--danger-color); font-size: 1.35rem; font-weight: 900; margin: 4px 0; }
+        .tax-note { font-size: 0.62rem; color: var(--text-secondary); }
 
         details summary { cursor: pointer; font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); user-select: none; display: flex; align-items: center; gap: 6px; }
-        details summary svg { width: 16px; height: 16px; stroke: var(--text-secondary); fill: none; stroke-width: 2; }
+        details summary svg { width: 15px; height: 15px; stroke: var(--text-secondary); fill: none; stroke-width: 2; }
         details summary:hover, details summary:hover svg { color: var(--accent-gold); stroke: var(--accent-gold); }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
         @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
         
         .form-group { display: flex; flex-direction: column; gap: 4px; }
-        .label { font-size: 0.7rem; color: var(--text-secondary); font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        .label { font-size: 0.68rem; color: var(--text-secondary); font-weight: bold; display: flex; align-items: center; gap: 4px; }
         .label svg { width: 12px; height: 12px; stroke: currentColor; fill: none; }
         input, select {
             width: 100%; padding: 8px; background: var(--bg-base); border: 1px solid var(--border-subtle);
@@ -144,7 +242,7 @@
         
         .btn-solid {
             background: var(--border-subtle); color: var(--text-primary); padding: 8px;
-            font-size: 0.8rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip); transition: 0.2s;
+            font-size: 0.78rem; font-weight: bold; text-align: center; clip-path: var(--chamfer-clip); transition: 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 6px;
         }
         .btn-solid svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
@@ -152,48 +250,49 @@
         .btn-tax { background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; }
 
         /* =========================================
-           3. 八角形グリッド ＆ ノードごとの個別カラー
+           3. 八角形グリッド
            ========================================= */
         .grid-header { 
             display: flex; justify-content: space-between; align-items: flex-end; 
-            margin: 16px 0 10px 0; font-size: 0.85rem; font-weight: bold; color: var(--accent-gold); 
+            margin: 14px 2px 8px; font-size: 0.82rem; font-weight: 900; color: var(--accent-gold); 
+            letter-spacing: 1px;
         }
         
         .octagon-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 16px 12px;
+            gap: 14px 10px;
             justify-items: center;
             position: relative;
         }
 
         .octagon-node {
-            width: 102px; height: 102px;
+            width: 104px; height: 104px;
             position: relative; 
             cursor: pointer;
             touch-action: pan-y;
-            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-            --node-color: var(--accent-gold); /* 動的に上書きされる */
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            --node-color: var(--accent-gold);
         }
         .node-bg {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            position: absolute; inset: 0;
             background: var(--border-subtle);
             clip-path: var(--octagon-clip);
             z-index: 1; transition: background 0.2s, box-shadow 0.2s, filter 0.2s;
         }
         .node-bg-inner {
-            position: absolute; top: 1.5px; left: 1.5px; right: 1.5px; bottom: 1.5px;
-            background: var(--bg-card);
+            position: absolute; inset: 1.5px;
+            background: linear-gradient(145deg, #15181e 0%, #0d0f12 100%);
             clip-path: var(--octagon-clip);
             z-index: 2; transition: background 0.2s;
         }
 
-        .octagon-node:hover:not(.dragging):not(.long-pressing) { transform: translateY(-3px) scale(1.04); }
+        .octagon-node:hover:not(.dragging):not(.long-pressing) { transform: translateY(-3px) scale(1.03); }
         .octagon-node:hover:not(.dragging):not(.long-pressing) .node-bg { 
             background: var(--node-color); 
             filter: drop-shadow(0 0 10px var(--node-color)); 
         }
-        .octagon-node:hover:not(.dragging):not(.long-pressing) .node-bg-inner { background: #1c1a17; }
+        .octagon-node:hover:not(.dragging):not(.long-pressing) .node-bg-inner { background: #1a1e24; }
         .octagon-node:hover:not(.dragging) .node-icon svg { stroke: var(--node-color); }
 
         .node-content { 
@@ -204,22 +303,28 @@
         .node-icon { margin-bottom: 6px; display: flex; align-items: center; justify-content: center; }
         .node-icon svg { width: 26px; height: 26px; stroke: var(--node-color); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
         
-        .node-label { font-size: 0.65rem; font-weight: bold; color: var(--text-primary); text-align: center; line-height: 1.2; word-break: keep-all; }
+        .node-label { 
+            font-size: 0.65rem; 
+            font-weight: 700; 
+            color: #d8e2ec; 
+            text-align: center; 
+            line-height: 1.2; 
+            letter-spacing: 0.03em;
+            word-break: keep-all; 
+        }
 
-        /* 🔥 新機能「紛争 (/pixel)」専用の強烈な目立ち演出 */
+        /* 紛争専用パルス */
         .octagon-node[data-id="svc-pixel"] .node-bg {
             background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
             animation: pixel-pulse 2s infinite ease-in-out;
         }
-        .octagon-node[data-id="svc-pixel"] .node-bg-inner {
-            background: #180308;
-        }
+        .octagon-node[data-id="svc-pixel"] .node-bg-inner { background: #1c050a; }
         @keyframes pixel-pulse {
             0%, 100% { filter: drop-shadow(0 0 4px #ff0055); }
-            50% { filter: drop-shadow(0 0 16px #ff5500); }
+            50% { filter: drop-shadow(0 0 14px #ff5500); }
         }
 
-        /* ✨ チャージ＆浮遊ドラッグアニメーション */
+        /* チャージ・ドラッグ */
         .octagon-node.long-pressing .node-bg {
             background: var(--accent-cyan);
             animation: node-charge 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -247,11 +352,9 @@
         }
         .octagon-node.dragging .node-bg-inner { background: #111a1f !important; }
 
-        /* ✨ 飛び出すバッジ演出 */
         .node-badge-new {
             position: absolute;
-            top: -4px;
-            right: -8px;
+            top: -4px; right: -6px;
             background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
             color: #fff;
             font-size: 0.52rem;
@@ -270,11 +373,10 @@
         }
         .node-badge-new svg { width: 10px; height: 10px; fill: currentColor; }
         @keyframes badge-pulse {
-            0% { transform: scale(0.85); box-shadow: 0 0 5px #ff0055; }
-            100% { transform: scale(1.05); box-shadow: 0 0 14px #ff0055, 0 0 6px #ffbb00; }
+            0% { transform: scale(0.9); box-shadow: 0 0 5px #ff0055; }
+            100% { transform: scale(1.05); box-shadow: 0 0 14px #ff0055; }
         }
 
-        /* カスタムリンク削除アイコン */
         .node-del-action { 
             position: absolute; top: 2px; left: -2px; opacity: 0; transition: 0.2s; z-index: 20; cursor: pointer; padding: 4px;
         }
@@ -284,20 +386,19 @@
         }
         .node-del-action:hover svg { stroke: #fff; background: var(--danger-color); }
 
-        /* 追加ノード */
         .octagon-add {
             background: transparent; border: 1.5px dashed var(--border-subtle); clip-path: none; 
-            border-radius: 50%; width: 82px; height: 82px; margin-top: 10px;
+            border-radius: 50%; width: 80px; height: 80px; margin-top: 12px;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.2s;
         }
-        .octagon-add svg { width: 26px; height: 26px; stroke: var(--text-secondary); fill: none; stroke-width: 2; transition: 0.2s; }
+        .octagon-add svg { width: 24px; height: 24px; stroke: var(--text-secondary); fill: none; stroke-width: 2; transition: 0.2s; }
         .octagon-add:hover { border-color: var(--accent-gold); transform: scale(1.05); }
         .octagon-add:hover svg { stroke: var(--accent-gold); }
 
         /* 裏路地・フッター */
         .alley-box {
-            margin-top: 24px; padding: 12px; border: 1px dashed var(--border-subtle); text-align: center; cursor: pointer; color: var(--text-secondary); font-size: 0.75rem; transition: 0.2s;
+            margin-top: 16px; padding: 12px; border: 1px dashed var(--border-subtle); text-align: center; cursor: pointer; color: var(--text-secondary); font-size: 0.75rem; transition: 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
         .alley-box svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
@@ -305,7 +406,7 @@
 
         /* モーダル群 */
         .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px;
+            display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px;
         }
         .modal-box {
             background: var(--bg-card); border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip); width: 100%; max-width: 400px; padding: 24px; position: relative;
@@ -318,13 +419,19 @@
 
 <div class="container">
     
-    <!-- 1. サイバー・幾何学調 国民身分証明証 -->
-    <div class="id-card-wrapper">
+    <!-- 達成バナー -->
+    <div id="clicker-banner" class="clicker-unlock-banner">
+        🎉 隠し称号【カードクリッカー】を獲得！
+    </div>
+
+    <!-- 1. サイバー・ホログラム 国民身分証明証 -->
+    <div class="id-card-wrapper" id="citizen-card" onclick="handleCardClick()">
+        <div class="holo-flash" id="holo-flash"></div>
         <div class="id-content">
             <div class="id-header">
-                <div class="id-country">村岡王国</div>
-                <div class="id-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <div class="id-country" id="id-country-text">村岡王国</div>
+                <div class="id-title-chip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     CITIZEN IDENTITY
                 </div>
             </div>
@@ -333,25 +440,16 @@
                     <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 </div>
                 <div class="id-details">
-                    <div class="id-row">
-                        <span class="id-label">NAME / 氏名</span>
-                        <span class="id-value" id="display-nickname">-</span>
-                    </div>
-                    <div class="id-row">
-                        <span class="id-label">CITIZEN ID / メールアドレス</span>
-                        <span class="id-value" id="user-email" style="font-size: 0.65rem; color: #bbb;">-</span>
-                    </div>
-                    <div class="id-row">
-                        <span class="id-label">STATUS / 称号</span>
-                        <span class="id-badge" id="user-title-display">読込中...</span>
-                    </div>
+                    <div class="id-user-name" id="display-nickname">-</div>
+                    <div class="id-user-email" id="user-email">-</div>
+                    <div class="id-badge" id="user-title-display">読込中...</div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 2 & 3. お知らせ・税金 -->
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <!-- 2. お知らせ -->
         <div class="panel">
             <div class="panel-header">
                 <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
@@ -362,7 +460,6 @@
             </div>
         </div>
 
-        <!-- 3. 税金表示 -->
         <div class="panel tax-display">
             <div class="panel-header" style="justify-content: center;">
                 <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
@@ -406,27 +503,15 @@
             <div id="admin-controls" style="display: none; border-top: 1px solid #333; margin-top: 16px; padding-top: 12px;">
                 <span class="label" style="color: var(--danger-color);"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>ADMIN CONTROLS</span>
                 <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button id="btn-admin-items" class="btn-solid" style="flex:1" onclick="location.href='/admin/items'">
-                        <svg viewBox="0 0 24 24"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                        アイテム
-                    </button>
-                    <button id="btn-admin-casino" class="btn-solid" style="flex:1" onclick="location.href='/admin/casino'">
-                        <svg viewBox="0 0 24 24"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line></svg>
-                        カジノ
-                    </button>
+                    <button id="btn-admin-items" class="btn-solid" style="flex:1" onclick="location.href='/admin/items'">アイテム</button>
+                    <button id="btn-admin-casino" class="btn-solid" style="flex:1" onclick="location.href='/admin/casino'">カジノ</button>
                 </div>
                 <button id="btn-admin-tax" class="btn-solid" style="width: 100%; margin-top: 8px; color: var(--danger-color);" onclick="collectAllTax()">全国民から即時徴収</button>
             </div>
             
             <div style="display: flex; gap: 8px; margin-top: 16px;">
-                <button class="btn-solid" style="flex: 1;" onclick="openPolicyViewer()">
-                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    利用規約
-                </button>
-                <button class="btn-solid" style="flex: 1; color: var(--danger-color);" onclick="logout()">
-                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                    ログアウト
-                </button>
+                <button class="btn-solid" style="flex: 1;" onclick="openPolicyViewer()">利用規約</button>
+                <button class="btn-solid" style="flex: 1; color: var(--danger-color);" onclick="logout()">ログアウト</button>
             </div>
         </details>
     </div>
@@ -437,9 +522,7 @@
             <span>SERVICE TERMINALS</span>
             <span style="font-size: 0.65rem; color: var(--text-secondary); font-weight: normal;">※長押しで浮遊・並び替え</span>
         </div>
-        <div class="octagon-grid" id="service-grid">
-            <!-- JSで動的描画 -->
-        </div>
+        <div class="octagon-grid" id="service-grid"></div>
     </div>
 
     <!-- 6. 裏路地 -->
@@ -450,17 +533,10 @@
 
 </div>
 
-<!-- =========================================
-     MODALS
-     ========================================= -->
-
-<!-- カスタムリンク追加 -->
+<!-- MODALS -->
 <div id="add-link-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">
-            <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-            カスタムノード追加
-        </div>
+        <div class="modal-title">カスタムノード追加</div>
         <div class="form-group" style="margin-bottom: 12px;">
             <span class="label">サービス名</span>
             <input type="text" id="custom-link-name" placeholder="例: SNS">
@@ -480,27 +556,14 @@
     </div>
 </div>
 
-<!-- 裏路地 -->
 <div id="alley-modal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">
-            <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            路地裏の男
-        </div>
+        <div class="modal-title">路地裏の男</div>
         <div id="alley-text" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;"></div>
         <div id="alley-choices-initial" style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="btn-solid" onclick="chooseWork()">
-                <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                働きたい
-            </button>
-            <button class="btn-solid" onclick="chooseLoan()">
-                <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
-                金を借りたい
-            </button>
-            <button class="btn-solid" style="background: transparent;" onclick="closeAlleyModal()">
-                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                立ち去る
-            </button>
+            <button class="btn-solid" onclick="chooseWork()">働きたい</button>
+            <button class="btn-solid" onclick="chooseLoan()">金を借りたい</button>
+            <button class="btn-solid" style="background: transparent;" onclick="closeAlleyModal()">立ち去る</button>
         </div>
         <div id="alley-choices-factory" style="display: none; flex-direction: column; gap: 8px;">
             <button class="btn-solid" onclick="location.href='/factory'">はい（工場へ）</button>
@@ -513,25 +576,17 @@
     </div>
 </div>
 
-<!-- 規約確認 -->
 <div id="policy-view-modal" class="modal-overlay" onclick="if(event.target === this) closePolicyViewer();">
     <div class="modal-box" onclick="event.stopPropagation();">
-        <div class="modal-title">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            利用規約・ポリシー
-        </div>
+        <div class="modal-title">利用規約・ポリシー</div>
         <div id="policy-view-content" style="font-size: 0.75rem; color: #ccc; max-height: 250px; overflow-y: auto; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
         <button class="btn-solid" style="width: 100%;" onclick="closePolicyViewer()">閉じる</button>
     </div>
 </div>
 
-<!-- 規約同意 -->
 <div id="terms-modal" class="modal-overlay">
     <div class="modal-box" style="border-color: var(--accent-gold);">
-        <div class="modal-title">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-            規約の同意
-        </div>
+        <div class="modal-title">規約の同意</div>
         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">サービスの利用には規約の同意が必要です。</div>
         <div id="terms-content-box" style="background: var(--bg-base); padding: 10px; height: 150px; overflow-y: auto; font-size: 0.7rem; color: #aaa; margin-bottom: 16px; white-space: pre-wrap;">読込中...</div>
         <button id="agree-terms-btn" class="btn-solid" style="width: 100%; background: var(--accent-gold); color: #000;">同意して続ける</button>
@@ -540,7 +595,61 @@
 
 <script>
     /* ==========================================================
-       UI: 各サービス固有のアクセントカラー ＆ オクタゴングリッド描画
+       ホログラムクリック ＆ 100回隠し称号「カードクリッカー」
+       ========================================================== */
+    let sessionCardClicks = 0;
+    let clickerAchieved = false;
+
+    function handleCardClick() {
+        sessionCardClicks++;
+
+        // 1. ホログラム光彩エフェクト
+        const flash = document.getElementById("holo-flash");
+        const country = document.getElementById("id-country-text");
+        
+        flash.classList.remove("active");
+        country.classList.remove("flash");
+        void flash.offsetWidth; // リフロー
+        flash.classList.add("active");
+        country.classList.add("flash");
+        
+        setTimeout(() => country.classList.remove("flash"), 400);
+
+        // 2. 100回達成判定（セッション中のみ）
+        if (sessionCardClicks === 100 && !clickerAchieved) {
+            clickerAchieved = true;
+            awardClickerTitle();
+        }
+    }
+
+    async function awardClickerTitle() {
+        const banner = document.getElementById("clicker-banner");
+        banner.style.display = "block";
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+
+        try {
+            // バックエンドに称号保存を要求
+            const res = await fetch("/api/titles/unlock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ title: "カードクリッカー" })
+            });
+            // そのまま自動装備
+            await fetch("/api/titles/equip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ title: "カードクリッカー" })
+            });
+            loadTitles();
+        } catch (e) {
+            console.error("Clicker title error:", e);
+        }
+
+        setTimeout(() => { banner.style.display = "none"; }, 4000);
+    }
+
+    /* ==========================================================
+       サービスグリッド ＆ ドラッグ＆ドロップ
        ========================================================== */
     const defaultServices = [
         { id: 'svc-pixel', name: '紛争', url: '/pixel', color: '#ff0055', icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>', isNew: true },
@@ -560,7 +669,6 @@
     function getAllServicesOrdered() {
         const orderIds = JSON.parse(localStorage.getItem('muraoka_service_order') || '[]');
         const customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
-        
         let all = [...defaultServices, ...customLinks];
         if (orderIds.length === 0) return all;
 
@@ -590,7 +698,6 @@
             const isCustom = svc.id.startsWith('cstm-');
             const color = svc.color || '#00f3ff';
             
-            // 紛争用バッジ（NEW / WAR）
             const newBadge = svc.isNew ? `
                 <div class="node-badge-new">
                     <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
@@ -598,7 +705,6 @@
                 </div>
             ` : '';
 
-            // 削除ボタン（ご要望3: 確実に機能するように孤立化）
             const deleteAction = isCustom ? `
                 <div class="node-del-action" onclick="removeCustomLink('${svc.id}', event)" title="削除">
                     <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -621,7 +727,6 @@
             `;
         });
 
-        // ＋ボタン
         html += `
             <div class="octagon-add" onclick="openAddLinkModal()" title="カスタムノード追加">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -632,7 +737,6 @@
         setupDragAndDrop();
     }
 
-    /* ご要望1: 長押し(500ms) 判定の超快適化 ＆ スムーズ追尾ドラッグ */
     let pressTimer = null;
     let draggedNode = null;
     let isDragging = false;
@@ -645,7 +749,6 @@
 
         nodes.forEach(node => {
             const startPress = (e) => {
-                // 削除ボタンのクリック処理ならスキップ
                 if (e.target.closest('.node-del-action')) return;
 
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -656,13 +759,11 @@
 
                 node.classList.add('long-pressing');
                 
-                // 500msでドラッグ起動（過度なブレ判定によるキャンセルを解消）
                 pressTimer = setTimeout(() => {
                     isDragging = true;
                     draggedNode = node;
                     node.classList.remove('long-pressing');
                     node.classList.add('dragging');
-
                     if (navigator.vibrate) navigator.vibrate(40);
                 }, 500);
             };
@@ -674,7 +775,6 @@
                 }
                 node.classList.remove('long-pressing');
 
-                // 通常タップ遷移
                 if (!isDragging && !hasMoved && e.type !== 'touchmove' && e.type !== 'mousemove') {
                     if (e.target.closest('.node-del-action')) return;
                     const url = node.getAttribute('data-url');
@@ -688,7 +788,6 @@
 
             node.addEventListener('mousedown', startPress);
             node.addEventListener('touchstart', startPress, { passive: true });
-
             node.addEventListener('mouseup', cancelPress);
             node.addEventListener('mouseleave', cancelPress);
             node.addEventListener('touchend', cancelPress);
@@ -702,7 +801,6 @@
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        // 16px以上の移動でのみ長押しキャンセル（手の震えや軽い指滑りを許容）
         if (!isDragging && pressTimer) {
             const dist = Math.hypot(clientX - startX, clientY - startY);
             if (dist > 16) {
@@ -715,13 +813,12 @@
         }
 
         if (!isDragging || !draggedNode) return;
-        if (e.cancelable) e.preventDefault(); // スクロール抑止
+        if (e.cancelable) e.preventDefault();
 
         const deltaX = clientX - startX;
         const deltaY = clientY - startY;
         draggedNode.style.transform = `scale(1.18) translate(${deltaX}px, ${deltaY - 10}px)`;
 
-        // 重なっているノードとの位置交替
         const elemBelow = document.elementFromPoint(clientX, clientY);
         const targetNode = elemBelow ? elemBelow.closest('.octagon-node[data-id]') : null;
 
@@ -750,7 +847,6 @@
                     if (invertX !== 0 || invertY !== 0) {
                         n.style.transition = 'none';
                         n.style.transform = `translate(${invertX}px, ${invertY}px)`;
-
                         requestAnimationFrame(() => {
                             n.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
                             n.style.transform = '';
@@ -766,12 +862,9 @@
 
     function endDrag() {
         if (!isDragging || !draggedNode) return;
-
         draggedNode.classList.remove('dragging');
         draggedNode.style.transform = '';
-        
         saveCurrentOrder();
-
         isDragging = false;
         draggedNode = null;
         if (pressTimer) {
@@ -780,7 +873,7 @@
         }
     }
 
-    /* モーダル＆カスタムリンク制御 */
+    /* モーダル＆カスタムリンク */
     function openAddLinkModal() {
         document.getElementById('custom-link-name').value = '';
         document.getElementById('custom-link-url').value = '';
@@ -804,12 +897,8 @@
         renderGrid();
     }
 
-    /* ご要望3: 削除イベントの完全独立化 */
     function removeCustomLink(id, e) {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
+        if (e) { e.stopPropagation(); e.preventDefault(); }
         if(!confirm('ノードを削除しますか？')) return;
         
         let customLinks = JSON.parse(localStorage.getItem('muraoka_custom_links') || '[]');
@@ -826,7 +915,7 @@
     document.addEventListener("DOMContentLoaded", renderGrid);
 
     /* ==========================================================
-       バックエンド通信ロジック (Supabase & REST API)
+       バックエンド連携 (Supabase & REST)
        ========================================================== */
     const SUPABASE_URL = window.SUPABASE_URL || localStorage.getItem("SUPABASE_URL") || "";
     const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || localStorage.getItem("SUPABASE_ANON_KEY") || "";
@@ -862,7 +951,6 @@
                     .from('announcements')
                     .select('id, title, content, created_at')
                     .order('created_at', { ascending: false });
-
                 if (!error && Array.isArray(data)) announcements = data;
             }
         } catch (e) {}
@@ -870,9 +958,7 @@
         if (!Array.isArray(announcements)) {
             try {
                 const authToken = typeof token !== 'undefined' ? token : (localStorage.getItem("access_token") || "");
-                const res = await fetch("/api/announcements", { 
-                    headers: { "Authorization": `Bearer ${authToken}` }
-                });
+                const res = await fetch("/api/announcements", { headers: { "Authorization": `Bearer ${authToken}` } });
                 if (res && res.ok) {
                     const apiData = await res.json();
                     if (Array.isArray(apiData)) announcements = apiData;
@@ -888,21 +974,17 @@
                     if (!item || typeof item !== 'object') continue;
 
                     let dateStr = '--/--';
-                    if (item.created_at !== null && item.created_at !== undefined) {
+                    if (item.created_at) {
                         const rawStr = String(item.created_at);
                         dateStr = rawStr.length >= 10 ? rawStr.substring(0, 10) : rawStr;
                     }
 
-                    const rawTitle = item.title !== null && item.title !== undefined ? String(item.title) : '（タイトルなし）';
-                    const rawContent = item.content !== null && item.content !== undefined ? String(item.content) : '';
-                    const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(rawTitle) : rawTitle;
-                    const safeContent = typeof escapeHtml === 'function' ? escapeHtml(rawContent) : rawContent;
-                    const safeDate = typeof escapeHtml === 'function' ? escapeHtml(dateStr) : dateStr;
-
+                    const rawTitle = item.title ? String(item.title) : '（タイトルなし）';
+                    const rawContent = item.content ? String(item.content) : '';
                     htmlBuffer += `
                         <div class="news-item">
-                            <span class="news-date">${safeDate}</span>
-                            <strong>${safeTitle}</strong> ${safeContent ? '- ' + safeContent : ''}
+                            <span class="news-date">${escapeHtml(dateStr)}</span>
+                            <strong>${escapeHtml(rawTitle)}</strong> ${rawContent ? '- ' + escapeHtml(rawContent) : ''}
                         </div>
                     `;
                 }
@@ -1054,7 +1136,7 @@
         window.location.href = "/";
     }
 
-    /* 裏路地モーダル制御 */
+    /* 裏路地モーダル */
     function openAlleyModal() {
         document.getElementById("alley-text").innerHTML = "「……あ？ なんだお前、俺に何か用か？」";
         document.getElementById("alley-choices-initial").style.display = "flex";
@@ -1074,7 +1156,7 @@
         document.getElementById("alley-choices-loan").style.display = "flex";
     }
 
-    /* 規約モーダル制御 */
+    /* 規約モーダル */
     let isPolicyFetching = false;
     async function openPolicyViewer() {
         if (isPolicyFetching) return;
@@ -1099,7 +1181,7 @@
 </script>
 
 <script>
-/* 規約同意の自動チェック */
+/* 規約同意自動チェック */
 document.addEventListener("DOMContentLoaded", async () => {
     const token = localStorage.getItem("access_token");
     const modalEl = document.getElementById("terms-modal");
