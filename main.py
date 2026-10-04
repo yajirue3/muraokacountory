@@ -286,7 +286,7 @@ def get_koneko(request: Request):
 def get_ai(request: Request):
     return templates.TemplateResponse(request=request, name="ai.html")
 
-@router.get("/pixel", response_class=HTMLResponse)
+@app.get("/pixel", response_class=HTMLResponse)
 async def get_pixel_page(request: Request):
     return templates.TemplateResponse(
         request=request,
@@ -296,6 +296,7 @@ async def get_pixel_page(request: Request):
             "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
         }
     )
+
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
