@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException, Header, Request
+import os
+import random
+from datetime import datetime, timezone
+from pathlib import Path
+
+from db import get_supabase
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from pathlib import Path
-from datetime import datetime, timezone
-import random
-
-from db import get_supabase
 
 router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parent
@@ -70,15 +71,27 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
             return p
         core_x, core_y = get_valid_spawn()
         await client.table("pixel_players").update({
-            "is_dead": False, "core_x": core_x, "core_y": core_y, 
-            "ink": 1, "max_ink": 10, "regen": 1, "bounty_gold": 0, "barrier_active": False, "last_tick": datetime.now(timezone.utc).isoformat()
+            "is_dead": False,
+            "core_x": core_x,
+            "core_y": core_y,
+            "ink": 1,
+            "max_ink": 10,
+            "regen": 1,
+            "bounty_gold": 0,
+            "barrier_active": False,
+            "last_tick": datetime.now(timezone.utc).isoformat()
         }).eq("id", p["id"]).execute()
         player_id = p["player_id"]
     else:
         core_x, core_y = get_valid_spawn()
         player_id = random.randint(1, 65534)
         await client.table("pixel_players").insert({
-            "user_id": str(user.id), "wallet_id": data.wallet_id, "player_id": player_id, "core_x": core_x, "core_y": core_y, "ink": 1
+            "user_id": str(user.id),
+            "wallet_id": data.wallet_id,
+            "player_id": player_id,
+            "core_x": core_x,
+            "core_y": core_y,
+            "ink": 1
         }).execute()
 
     return {"player_id": player_id, "core_x": core_x, "core_y": core_y}
@@ -160,4 +173,13 @@ async def get_active_cores():
 
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel(request: Request):
-    return templates.TemplateResponse(request=request, name="pixel.html")
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
+    return templates.TemplateResponse(
+        request=request,
+        name="pixel.html",
+        context={
+            "supabase_url": supabase_url,
+            "supabase_anon_key": supabase_anon_key
+        }
+    )
