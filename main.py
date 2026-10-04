@@ -286,13 +286,16 @@ def get_koneko(request: Request):
 def get_ai(request: Request):
     return templates.TemplateResponse(request=request, name="ai.html")
 
-@app.get("/pixel", response_class=HTMLResponse)
-def get_pixel(request: Request):
-    return templates.TemplateResponse(request=request, name="pixel.html")
-
-@app.get("/minecraft", response_class=HTMLResponse)
-def get_minecraft(request: Request):
-    return templates.TemplateResponse(request=request, name="eaglercraft-26.2-zeus-skins.html")
+@router.get("/pixel", response_class=HTMLResponse)
+async def get_pixel_page(request: Request):
+    return templates.TemplateResponse(
+        "pixel.html",
+        {
+            "request": request,
+            "supabase_url": os.getenv("SUPABASE_URL", ""),
+            "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
+        }
+    )
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 
