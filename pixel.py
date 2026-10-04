@@ -171,15 +171,3 @@ async def get_active_cores():
     res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
     return res.data or []
 
-@router.get("/pixel", response_class=HTMLResponse)
-async def get_pixel(request: Request):
-    supabase_url = os.getenv("SUPABASE_URL", "")
-    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", os.getenv("SUPABASE_KEY", ""))
-    return templates.TemplateResponse(
-        request=request,
-        name="pixel.html",
-        context={
-            "supabase_url": supabase_url,
-            "supabase_anon_key": supabase_anon_key
-        }
-    )
