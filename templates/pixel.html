@@ -340,7 +340,7 @@
     </div>
 </div>
 
-<!-- 出撃モーダル (初期状態では絶対に非表示) -->
+<!-- 出撃モーダル (初期スタイルは確実に非表示) -->
 <div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base); display: none;">
     <div class="modal-box">
         <div class="modal-title">
@@ -514,19 +514,15 @@
         } catch (e) {}
     }
 
-    // 【完全改修】遅延・通信不調で勝手に0リセットしない確実な初期化処理
+    // 【完全同期】/api/pixel/me と /api/wallets のレスポンスを厳密に受け取る
     async function initGame() {
         try {
-            // まず並列フェッチ
             const [wRes, meRes] = await Promise.all([
                 fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } }),
                 fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } })
             ]);
 
-            if (!wRes.ok) {
-                showToast("口座データの取得に失敗しました");
-                return;
-            }
+            if (!wRes.ok) throw await wRes.json();
             const wallets = await wRes.json();
             if (!wallets.length) {
                 alert("口座がありません。中央銀行で作成してください。");
@@ -540,7 +536,6 @@
 
             if (!meRes.ok) {
                 showToast("通信が不安定です。再接続中...");
-                // 失敗したからといって出撃画面は出さない！
                 return;
             }
 
@@ -550,22 +545,21 @@
                 showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
             }
 
-            // 【超重要】明示的に is_dead === false のときは何があってもゲーム画面を維持
-            if (me.exists && me.is_dead === false) {
+            // 【完全一致判定】DB上で生存していれば、絶対にモーダルは表示せず戦場へ直接入る
+            if (me.exists === true && me.is_dead === false) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
                     playerId: me.player_id,
                     coreX: me.core_x,
                     coreY: me.core_y,
-                    ink: me.ink,
-                    maxInk: me.max_ink,
-                    regen: me.regen,
-                    barrierActive: me.barrier_active,
+                    ink: me.ink !== undefined ? me.ink : 1,
+                    maxInk: me.max_ink !== undefined ? me.max_ink : 10,
+                    regen: me.regen !== undefined ? me.regen : 1,
+                    barrierActive: me.barrier_active || false,
                     isDead: false,
                     gold: (wallets.find(w => w.wallet_id === me.wallet_id) || wallets[0]).balance
                 });
 
-                // モーダルを確実に隠す
                 document.getElementById("spawn-modal").style.display = "none";
                 centerCameraOnCore();
                 connectWebSocket();
@@ -575,7 +569,7 @@
                 return;
             }
 
-            // サーバーから明示的に「未登録」または「死亡中(is_dead: true)」と返された場合のみ出撃モーダルを開く
+            // サーバーから「未登録」または「死亡中(is_dead: true)」と返された場合のみ出撃モーダルを表示
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
@@ -589,10 +583,11 @@
             }
         } catch (e) {
             console.error(e);
-            showToast("接続エラーが発生しました。リトライしてください。");
+            showToast("接続エラー: " + parseError(e));
         }
     }
 
+    // 【完全一致判定】/api/pixel/spawn のレスポンスを直接セットし、モーダルを閉じる
     async function spawnCore() {
         const wid = document.getElementById("spawn-wallet-select").value;
         const btn = document.getElementById("btn-spawn-exec");
@@ -607,10 +602,10 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
-            // 即座にモーダルを消す（画面をフリーズさせない）
+            // 即座に出撃モーダルを閉じる
             document.getElementById("spawn-modal").style.display = "none";
 
-            // 最新ステータス（永続アップグレード値）を取得
+            // /api/pixel/me で永続アップグレード値を取得
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             const me = meRes.ok ? await meRes.json() : {};
 
@@ -653,7 +648,7 @@
                     fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } })
                 ]);
 
-                // 通信失敗時は何もしない（勝手に0リセットしない！）
+                // 通信成功時のみ状態を反映
                 if (mRes.ok) {
                     const d = await mRes.json();
                     if (d.daily_reward_granted && d.daily_reward_granted > 0) {
@@ -664,7 +659,6 @@
                             ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                         });
                     } else if (d.is_dead === true) {
-                        // サーバー側で確実に死亡判定された時のみモーダルを表示
                         gameState.isDead = true;
                         document.getElementById("spawn-modal").style.display = "flex";
                     }
@@ -676,9 +670,7 @@
                 }
                 updateHUD();
                 syncCores();
-            } catch (e) {
-                // 通信エラー時もローカルの生存状態を信じて維持する
-            }
+            } catch (e) {}
         }, 12000);
     }
 
@@ -715,7 +707,7 @@
             syncCores();
             showToast("最新情報を取得しました", true);
         } catch (e) {
-            showToast("更新に失敗しました（再接続中）");
+            showToast("更新に失敗しました（再試行中）");
         } finally {
             setTimeout(() => {
                 isManualSyncing = false;
@@ -741,7 +733,6 @@
                         gameState.ink = msg.ink;
                         updateHUD();
                     } else if (msg.type === "player_killed") {
-                        // 明示的に自分が殺されたイベントを受信した時のみ出撃モーダルを開く
                         if (msg.victim_id === gameState.playerId) {
                             showToast("本陣コアが破壊されました！");
                             gameState.isDead = true;
@@ -908,7 +899,6 @@
     }
 
     function updateShopUI() {
-        // 現在の強化値に応じた正確な計算式
         const maxInkLvl = Math.max(10, gameState.maxInk);
         const regenLvl = Math.max(1, gameState.regen);
         document.getElementById('cost-max-ink').innerText = Math.floor(10000 * Math.pow(1.066, maxInkLvl - 10)).toLocaleString();
