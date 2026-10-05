@@ -1437,4 +1437,8 @@ async def delete_maker_stage(stage_id: int, authorization: str = Header(None)):
         raise HTTPException(status_code=404, detail="ステージが見つかりません。")
         
     is_owner = (res.data[0]["creator_id"] == str(user.id))
-    if not is
+    if not is_owner and not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="削除権限がありません。")
+        
+    await client.table("maker_stages").delete().eq("id", stage_id).execute()
+    return {"message": "ステージを消去しました。"}
