@@ -41,7 +41,6 @@
             padding: 0 12px; z-index: 100; gap: 6px;
         }
 
-        /* カートゥーン風ボタン */
         .btn-retro {
             background: var(--bg-surface); border: 3px solid #000;
             color: var(--text-primary); padding: 6px 10px; cursor: pointer;
@@ -57,7 +56,6 @@
         .btn-retro.btn-gold { background: var(--accent-gold); color: #000; }
         .btn-retro.btn-cyan:hover, .btn-retro.btn-gold:hover { filter: brightness(1.1); }
 
-        /* トグルスイッチ */
         .mode-toggle { 
             display: flex; background: var(--bg-surface); border: 3px solid #000; 
             border-radius: 10px; overflow: hidden; box-shadow: var(--btn-shadow); 
@@ -70,7 +68,6 @@
         .mode-toggle button svg { width: 18px; height: 18px; fill: currentColor; }
         .mode-toggle button.active { background: var(--accent-cyan); color: #000; }
 
-        /* ズームコントローラー */
         .zoom-controls {
             display: flex; align-items: center; background: #000; border-radius: 8px; border: 2px solid #000;
         }
@@ -80,7 +77,7 @@
         .zoom-btn:active { background: var(--accent-gold); color: #000; }
         .zoom-val { font-size: 0.75rem; padding: 0 8px; color: var(--accent-gold); font-weight: bold; }
 
-        /* HUD コース識別バッジ＆所持品 */
+        /* HUD */
         #hud {
             position: absolute; top: 70px; left: 10px; z-index: 90;
             display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; pointer-events: none;
@@ -98,7 +95,7 @@
         .tag-my { background: var(--accent-gold); color: #000; text-shadow: none; }
         .tag-other { background: var(--accent-cyan); color: #000; text-shadow: none; }
 
-        /* ツールパレット (折りたたみ対応) */
+        /* ツールパレット */
         #palette-wrap {
             position: absolute; bottom: calc(var(--safe-bottom) + 10px); left: 50%;
             transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -115,17 +112,17 @@
         #palette {
             background: var(--bg-surface); border: 3px solid #000; backdrop-filter: blur(4px);
             padding: 8px; display: flex; gap: 6px; border-radius: 14px;
-            box-shadow: 0 6px 0 rgba(0,0,0,0.6); max-width: 95vw; overflow-x: auto;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.6); max-width: 98vw; overflow-x: auto;
         }
         .palette-item {
-            min-width: 44px; height: 44px; background: #111; border: 2.5px solid #000;
+            min-width: 46px; height: 46px; background: #111; border: 2.5px solid #000;
             border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: 0.1s; position: relative; box-shadow: 0 3px 0 rgba(0,0,0,0.5); flex-shrink: 0;
         }
         .palette-item:active { transform: translateY(3px); box-shadow: 0 0 0; }
         .palette-item.selected { background: var(--accent-gold) !important; border-color: #000 !important; color: #000 !important; }
         .palette-item svg { width: 22px; height: 22px; }
-        .palette-label { font-size: 0.55rem; font-weight: 900; margin-top: 2px; color: inherit; }
+        .palette-label { font-size: 0.5rem; font-weight: 900; margin-top: 2px; color: inherit; white-space: nowrap; }
 
         /* スマホ用コントローラー */
         #mobile-controls {
@@ -146,7 +143,7 @@
         /* Canvas */
         #gameCanvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
-        /* 画面中央＆トーストメッセージ */
+        /* メッセージ系 */
         #center-msg {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             background: #000; border: 5px solid var(--accent-gold); border-radius: 16px;
@@ -210,7 +207,6 @@
         .st-author { font-size: 0.85rem; color: var(--text-secondary); margin-top: 6px; }
         .st-stats { font-size: 0.8rem; color: var(--accent-cyan); text-align: left; font-weight: bold; margin-top: 6px;}
 
-        /* スマホ用レイアウト調整 */
         @media (max-width: 650px) {
             .hide-sm { display: none; }
             .btn-retro { padding: 6px 8px; }
@@ -271,7 +267,6 @@
 
     <canvas id="gameCanvas"></canvas>
 
-    <!-- メッセージ系 -->
     <div id="center-msg" class="pixel-text">STAGE CLEAR!</div>
     <div id="toast-msg">
         <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13" stroke="#000" stroke-width="2"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="#000" stroke-width="2"/></svg>
@@ -370,32 +365,42 @@ let input = { x: 0, y: 0, isDown: false, rightDown: false };
 let keys = { left: false, right: false, jump: false };
 let mapData = [];
 
-// タイル定義 (両方の仕様をマージ)
+// タイル拡張 (旧BEAM(14)はBEAM_Rとして互換を維持)
 const T = {
     EMPTY: 0, BLOCK: 1, SPIKE_UP: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, 
     ENEMY: 8, START: 9, BRICK: 10, SPIKE_DOWN: 11, SPIKE_LEFT: 12, SPIKE_RIGHT: 13,
-    BEAM: 14, ONEWAY: 15, WARP_A: 16, WARP_B: 17, PAN: 100
+    BEAM_R: 14, ONEWAY_UP: 15, WARP_1: 16, WARP_2: 17, PAN: 100,
+    BEAM_L: 18, BEAM_U: 19, BEAM_D: 20,
+    ONEWAY_DOWN: 21, ONEWAY_LEFT: 22, ONEWAY_RIGHT: 23,
+    ENEMY2: 24
 };
 
 // パレットアイテム
 const paletteItems = [
     { id: T.PAN, color: '#fff', label: '移動', icon: '<path d="M9 11V4a2 2 0 0 1 4 0v7"/><path d="M13 11V7a2 2 0 0 1 4 0v4"/><path d="M17 11v-1a2 2 0 0 1 4 0v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9a2 2 0 0 1 4 0v2"/>' },
-    { id: T.EMPTY, color: '#ff477e', label: '消しゴム', icon: '<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { id: T.EMPTY, color: '#ff477e', label: '消す', icon: '<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>' },
     { id: T.BLOCK, color: '#aaa', label: 'ブロック', icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
     { id: T.BRICK, color: '#e67e22', label: 'こわれる', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v9M8 12v9M16 12v9"/>' },
-    { id: T.ONEWAY, color: '#2ecc71', label: '一方通行', icon: '<rect x="3" y="3" width="18" height="6" rx="2"/><path d="M12 21V11M8 15l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { id: T.ONEWAY_UP, color: '#2ecc71', label: '一方(上)', icon: '<rect x="3" y="15" width="18" height="6" rx="2"/><path d="M12 15V5M8 9l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { id: T.ONEWAY_DOWN, color: '#2ecc71', label: '一方(下)', icon: '<rect x="3" y="3" width="18" height="6" rx="2"/><path d="M12 9v10M8 15l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { id: T.ONEWAY_LEFT, color: '#2ecc71', label: '一方(左)', icon: '<rect x="15" y="3" width="6" height="18" rx="2"/><path d="M15 12H5M9 8l-4 4 4 4" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { id: T.ONEWAY_RIGHT, color: '#2ecc71', label: '一方(右)', icon: '<rect x="3" y="3" width="6" height="18" rx="2"/><path d="M9 12h10M15 8l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>' },
     { id: T.SPIKE_UP, color: '#ff477e', label: '上針', icon: '<polygon points="12 2 2 22 22 22" stroke-linejoin="round"/>' },
     { id: T.SPIKE_DOWN, color: '#ff477e', label: '下針', icon: '<polygon points="12 22 2 2 22 2" stroke-linejoin="round"/>' },
     { id: T.SPIKE_LEFT, color: '#ff477e', label: '左針', icon: '<polygon points="2 12 22 2 22 22" stroke-linejoin="round"/>' },
     { id: T.SPIKE_RIGHT, color: '#ff477e', label: '右針', icon: '<polygon points="22 12 2 2 2 22" stroke-linejoin="round"/>' },
-    { id: T.BEAM, color: '#e74c3c', label: 'ビーム砲', icon: '<rect x="2" y="6" width="14" height="12" rx="3"/><circle cx="20" cy="12" r="3"/>' },
-    { id: T.WARP_A, color: '#9b59b6', label: 'ワープA', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.5" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold" stroke="none">A</text>' },
-    { id: T.WARP_B, color: '#3498db', label: 'ワープB', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.5" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold" stroke="none">B</text>' },
+    { id: T.BEAM_R, color: '#e74c3c', label: 'ビーム(右)', icon: '<rect x="2" y="6" width="12" height="12" rx="3"/><circle cx="18" cy="12" r="3"/>' },
+    { id: T.BEAM_L, color: '#e74c3c', label: 'ビーム(左)', icon: '<rect x="10" y="6" width="12" height="12" rx="3"/><circle cx="6" cy="12" r="3"/>' },
+    { id: T.BEAM_U, color: '#e74c3c', label: 'ビーム(上)', icon: '<rect x="6" y="10" width="12" height="12" rx="3"/><circle cx="12" cy="6" r="3"/>' },
+    { id: T.BEAM_D, color: '#e74c3c', label: 'ビーム(下)', icon: '<rect x="6" y="2" width="12" height="12" rx="3"/><circle cx="12" cy="18" r="3"/>' },
+    { id: T.WARP_1, color: '#9b59b6', label: 'ワープ1', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.5" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold" stroke="none">1</text>' },
+    { id: T.WARP_2, color: '#3498db', label: 'ワープ2', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.5" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold" stroke="none">2</text>' },
     { id: T.COIN, color: '#ffcc00', label: 'コイン', icon: '<circle cx="12" cy="12" r="8"/><line x1="12" y1="8" x2="12" y2="16"/>' },
     { id: T.KEY, color: '#f39c12', label: 'カギ', icon: '<circle cx="8" cy="8" r="4"/><line x1="11" y1="11" x2="20" y2="20" stroke-linecap="round"/><line x1="16" y1="16" x2="19" y2="13" stroke-linecap="round"/>' },
     { id: T.DOOR, color: '#8e44ad', label: 'ドア', icon: '<rect x="5" y="11" width="14" height="10" rx="3"/><circle cx="12" cy="16" r="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' },
     { id: T.BOUNCER, color: '#00f3ff', label: 'バネ', icon: '<path d="M4 18h16M7 14l5-5 5 5M12 9v9" stroke-linecap="round" stroke-linejoin="round"/>' },
-    { id: T.ENEMY, color: '#a855f7', label: '敵', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
+    { id: T.ENEMY, color: '#a855f7', label: '敵(歩)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
+    { id: T.ENEMY2, color: '#ff3366', label: '敵(跳)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M7 9l3 2M17 9l-3 2" stroke-linecap="round"/>' },
     { id: T.GOAL, color: '#fff', label: 'ゴール', icon: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>' },
     { id: T.START, color: '#10b981', label: 'スタート', icon: '<polygon points="5 3 19 12 5 21 5 3" stroke-linejoin="round"/>' }
 ];
@@ -405,7 +410,8 @@ let player = { x: 0, y: 0, vx: 0, vy: 0, w: 26, h: 26, state: 'idle', coins: 0, 
 let totalCoinsInStage = 0;
 let enemies = [];
 let particles = [];
-let beamTimer = 0;
+let beamEmitters = [];
+let projectiles = [];
 
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
@@ -439,8 +445,7 @@ function selectBrush(id) {
 }
 
 function togglePalette() {
-    const wrap = document.getElementById('palette-wrap');
-    wrap.classList.toggle('collapsed');
+    document.getElementById('palette-wrap').classList.toggle('collapsed');
 }
 
 function adjustZoom(delta) {
@@ -477,12 +482,13 @@ function setMode(newMode) {
 
 function startPlay() {
     enemies = [];
+    beamEmitters = [];
+    projectiles = [];
     player.hasKey = false;
     player.coins = 0;
     player.state = 'idle';
     player.vx = 0; player.vy = 0; player.warpCooldown = 0;
     document.getElementById('center-msg').classList.remove('show');
-    beamTimer = 0;
 
     totalCoinsInStage = 0;
     let startFound = false;
@@ -496,10 +502,11 @@ function startPlay() {
                 player.y = r * TILE_SIZE + (TILE_SIZE - player.h);
                 startFound = true;
             } else if (tile === T.ENEMY) {
-                enemies.push({
-                    x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28),
-                    vx: -2, vy: 0, w: 28, h: 28, blink: 0
-                });
+                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 1 });
+            } else if (tile === T.ENEMY2) {
+                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 2, jumpTimer: 0 });
+            } else if (tile === T.BEAM_R || tile === T.BEAM_L || tile === T.BEAM_U || tile === T.BEAM_D) {
+                beamEmitters.push({ r, c, type: tile, timer: Math.floor(Math.random() * 40) });
             }
         }
     }
@@ -539,6 +546,7 @@ function updateHUD() {
 }
 
 function die() {
+    if (player.state === 'dead') return;
     player.state = 'dead';
     createParticles(player.x + player.w/2, player.y + player.h/2, '#ff477e', 30);
     setTimeout(() => { if (mode === 'play') startPlay(); }, 1200);
@@ -546,7 +554,6 @@ function die() {
 
 function win() {
     if (player.state === 'clear') return;
-
     if (player.coins < totalCoinsInStage) {
         showToast(`コインをぜんぶ集めてね！（残り: ${totalCoinsInStage - player.coins}枚）`);
         return;
@@ -564,12 +571,11 @@ function win() {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         }).catch(e => console.log(e));
     }
-
     setTimeout(() => setMode('edit'), 2500);
 }
 
 /* =========================================================
-   3. 入力・操作 (PC / スマホ両対応)
+   3. 入力・操作
 ========================================================= */
 window.addEventListener('keydown', e => {
     if (mode !== 'play') return;
@@ -612,7 +618,6 @@ function handlePaint(e) {
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) / zoomScale;
     const cy = (e.clientY - rect.top) / zoomScale;
-    
     const col = Math.floor((cx + camera.x) / TILE_SIZE);
     const row = Math.floor((cy + camera.y) / TILE_SIZE);
 
@@ -624,7 +629,6 @@ function handlePaint(e) {
     }
 }
 
-// スマホタッチ
 const bindBtn = (id, key) => {
     const btn = document.getElementById(id);
     btn.addEventListener('touchstart', (e) => { e.preventDefault(); if (key==='jump'){if(!keys.jump)doJump();} keys[key] = true; }, {passive:false});
@@ -651,7 +655,7 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; });
 
 /* =========================================================
-   4. 物理演算 & 新ブロック仕掛けロジック
+   4. 物理演算 & プロジェクタイル
 ========================================================= */
 function getTile(x, y) {
     const col = Math.floor(x / TILE_SIZE);
@@ -661,7 +665,12 @@ function getTile(x, y) {
 }
 
 function isSolid(t) {
-    return t === T.BLOCK || t === T.BRICK || t === T.DOOR || t === T.BEAM;
+    return t === T.BLOCK || t === T.BRICK || t === T.DOOR || 
+           t === T.BEAM_R || t === T.BEAM_L || t === T.BEAM_U || t === T.BEAM_D;
+}
+function rectIntersect(r1, r2) {
+    return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x &&
+           r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
 }
 
 function updatePhysics() {
@@ -688,32 +697,80 @@ function updatePhysics() {
 
     if (player.y > MAP_ROWS * TILE_SIZE + 200) die();
 
+    // 敵の移動とAI
     enemies.forEach(e => {
         e.vy += 0.6;
+        
+        if (e.type === 2) {
+            if (player.x + player.w/2 > e.x + e.w/2) e.vx += 0.15;
+            else e.vx -= 0.15;
+            e.vx = Math.max(-2.5, Math.min(2.5, e.vx));
+            e.jumpTimer++;
+        }
+
         e.x += e.vx;
-        if (isSolid(getTile(e.x + (e.vx > 0 ? e.w : 0), e.y + e.h/2))) { e.vx *= -1; e.x += e.vx; }
+        let onGround = false;
+
+        if (isSolid(getTile(e.x + (e.vx > 0 ? e.w : 0), e.y + e.h/2))) {
+            if (e.type === 1) {
+                e.vx *= -1; e.x += e.vx;
+            } else {
+                e.vx = 0; e.x -= (e.vx > 0 ? 0.1 : -0.1); 
+            }
+        }
+        
         e.y += e.vy;
         if (e.vy > 0 && isSolid(getTile(e.x + e.w/2, e.y + e.h))) {
             e.y = Math.floor((e.y + e.h) / TILE_SIZE) * TILE_SIZE - e.h;
             e.vy = 0;
+            onGround = true;
         }
-        e.blink = (e.blink + 1) % 100;
 
+        if (e.type === 2 && onGround && e.jumpTimer > 60 && Math.abs(player.x - e.x) < 250) {
+            e.vy = -10; 
+            e.jumpTimer = 0;
+        }
+        
+        e.blink = (e.blink + 1) % 100;
         if (rectIntersect(player, e)) {
             if (player.vy > 0 && player.y + player.h - e.y < 20) {
                 e.dead = true; player.vy = -10;
-                createParticles(e.x + e.w/2, e.y + e.h/2, '#fff', 15);
+                createParticles(e.x + e.w/2, e.y + e.h/2, (e.type===2)?'#ff3366':'#a855f7', 15);
             } else { die(); }
         }
     });
     enemies = enemies.filter(e => !e.dead);
 
-    beamTimer = (beamTimer + 1) % 120;
-}
+    // ビーム砲発射処理
+    beamEmitters.forEach(b => {
+        b.timer++;
+        if (b.timer >= 80) { // 発射間隔
+            b.timer = 0;
+            let px = b.c * TILE_SIZE + TILE_SIZE/2;
+            let py = b.r * TILE_SIZE + TILE_SIZE/2;
+            let pvx = 0, pvy = 0;
+            if (b.type === T.BEAM_R) pvx = 6;
+            if (b.type === T.BEAM_L) pvx = -6;
+            if (b.type === T.BEAM_U) pvy = -6;
+            if (b.type === T.BEAM_D) pvy = 6;
+            projectiles.push({ x: px - 6, y: py - 6, vx: pvx, vy: pvy, w: 12, h: 12, active: true });
+        }
+    });
 
-function rectIntersect(r1, r2) {
-    return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x &&
-           r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+    // 小ビーム（プロジェクタイル）の移動と判定
+    projectiles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > MAP_COLS*TILE_SIZE || p.y < 0 || p.y > MAP_ROWS*TILE_SIZE) p.active = false;
+        
+        if (rectIntersect(player, p)) { die(); p.active = false; }
+        
+        if (isSolid(getTile(p.x + p.w/2, p.y + p.h/2))) {
+            p.active = false;
+            createParticles(p.x+p.w/2, p.y+p.h/2, '#e74c3c', 4);
+        }
+    });
+    projectiles = projectiles.filter(p => p.active);
 }
 
 function checkCollision(isX) {
@@ -728,9 +785,7 @@ function checkCollision(isX) {
             if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) continue;
             let tile = mapData[r][c];
 
-            if (tile === T.SPIKE_UP || tile === T.SPIKE_DOWN || tile === T.SPIKE_LEFT || tile === T.SPIKE_RIGHT) {
-                die(); return;
-            }
+            if (tile === T.SPIKE_UP || tile === T.SPIKE_DOWN || tile === T.SPIKE_LEFT || tile === T.SPIKE_RIGHT) { die(); return; }
 
             if (tile === T.COIN) {
                 mapData[r][c] = 0; player.coins += 1; updateHUD();
@@ -749,27 +804,38 @@ function checkCollision(isX) {
 
             if (tile === T.BOUNCER && !isX && p.vy > 0) {
                 p.vy = -20; p.y = r * TILE_SIZE - p.h;
-                createParticles(p.x+p.w/2, p.y+p.h, '#00f3ff', 10);
-                return;
+                createParticles(p.x+p.w/2, p.y+p.h, '#00f3ff', 10); return;
             }
 
-            if (tile === T.ONEWAY && !isX && p.vy > 0 && (p.y + p.h - p.vy) <= r * TILE_SIZE + 8) {
-                p.y = r * TILE_SIZE - p.h; p.grounded = true; p.vy = 0;
-                return;
+            // 方向指定一方通行
+            if (tile === T.ONEWAY_UP && !isX && p.vy > 0 && (p.y + p.h - p.vy) <= r * TILE_SIZE + 8) {
+                p.y = r * TILE_SIZE - p.h; p.grounded = true; p.vy = 0; return;
+            }
+            if (tile === T.ONEWAY_DOWN && !isX && p.vy < 0 && (p.y - p.vy) >= r * TILE_SIZE + TILE_SIZE - 8) {
+                p.y = r * TILE_SIZE + TILE_SIZE; p.vy = 0; return;
+            }
+            if (tile === T.ONEWAY_LEFT && isX && p.vx > 0 && (p.x + p.w - p.vx) <= c * TILE_SIZE + 8) {
+                p.x = c * TILE_SIZE - p.w; p.vx = 0; return;
+            }
+            if (tile === T.ONEWAY_RIGHT && isX && p.vx < 0 && (p.x - p.vx) >= c * TILE_SIZE + TILE_SIZE - 8) {
+                p.x = c * TILE_SIZE + TILE_SIZE; p.vx = 0; return;
             }
 
-            if ((tile === T.WARP_A || tile === T.WARP_B) && p.warpCooldown === 0) {
-                const targetType = (tile === T.WARP_A) ? T.WARP_B : T.WARP_A;
+            // ペア指定ワープ
+            if ((tile === T.WARP_1 || tile === T.WARP_2) && p.warpCooldown === 0) {
+                let targets = [];
                 for (let tr = 0; tr < MAP_ROWS; tr++) {
                     for (let tc = 0; tc < MAP_COLS; tc++) {
-                        if (mapData[tr][tc] === targetType) {
-                            p.x = tc * TILE_SIZE + (TILE_SIZE - p.w)/2;
-                            p.y = tr * TILE_SIZE + (TILE_SIZE - p.h);
-                            p.warpCooldown = 60;
-                            createParticles(p.x+p.w/2, p.y+p.h/2, (tile === T.WARP_A) ? '#3498db' : '#9b59b6', 20);
-                            return;
-                        }
+                        if (mapData[tr][tc] === tile && (tr !== r || tc !== c)) targets.push({r: tr, c: tc});
                     }
+                }
+                if (targets.length > 0) {
+                    let tgt = targets[0];
+                    p.x = tgt.c * TILE_SIZE + (TILE_SIZE - p.w)/2;
+                    p.y = tgt.r * TILE_SIZE + (TILE_SIZE - p.h);
+                    p.warpCooldown = 60;
+                    createParticles(p.x+p.w/2, p.y+p.h/2, (tile === T.WARP_1) ? '#9b59b6' : '#3498db', 25);
+                    return;
                 }
             }
 
@@ -781,13 +847,11 @@ function checkCollision(isX) {
                     else if (p.vx < 0) p.x = c * TILE_SIZE + TILE_SIZE;
                     p.vx = 0;
                 } else {
-                    if (p.vy > 0) {
-                        p.y = r * TILE_SIZE - p.h; p.grounded = true;
-                    } else if (p.vy < 0) {
+                    if (p.vy > 0) { p.y = r * TILE_SIZE - p.h; p.grounded = true; }
+                    else if (p.vy < 0) {
                         p.y = r * TILE_SIZE + TILE_SIZE;
                         if (tile === T.BRICK) {
-                            mapData[r][c] = 0;
-                            createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#e67e22', 15);
+                            mapData[r][c] = 0; createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#e67e22', 15);
                         }
                     }
                     p.vy = 0;
@@ -799,17 +863,16 @@ function checkCollision(isX) {
 
 function createParticles(x, y, color, count) {
     for (let i = 0; i < count; i++) {
-        particles.push({
-            x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 2, life: 1.0, color
-        });
+        particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 2, life: 1.0, color });
     }
 }
 
-// 角丸矩形描画ヘルパー
+/* =========================================================
+   5. カートゥーン風 描画
+========================================================= */
 function roundRect(ctx, x, y, width, height, radius) {
     ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
+    ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y);
     ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
     ctx.lineTo(x + width, y + height - radius);
     ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
@@ -817,24 +880,18 @@ function roundRect(ctx, x, y, width, height, radius) {
     ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
     ctx.lineTo(x, y + radius);
     ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
 }
 
 function drawSpike(ctx, x, y, ts, dir) {
-    ctx.fillStyle = '#ff477e';
-    const hc = ts/2;
+    ctx.fillStyle = '#ff477e'; const hc = ts/2;
     ctx.beginPath();
     if (dir === 'up') { ctx.moveTo(x+hc, y+4); ctx.lineTo(x+ts-2, y+ts); ctx.lineTo(x+2, y+ts); }
     else if (dir === 'down') { ctx.moveTo(x+hc, y+ts-4); ctx.lineTo(x+ts-2, y); ctx.lineTo(x+2, y); }
     else if (dir === 'left') { ctx.moveTo(x+4, y+hc); ctx.lineTo(x+ts, y+2); ctx.lineTo(x+ts, y+ts-2); }
     else if (dir === 'right') { ctx.moveTo(x+ts-4, y+hc); ctx.lineTo(x, y+2); ctx.lineTo(x, y+ts-2); }
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    
-    // ハイライト
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.beginPath();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath();
     if (dir === 'up') { ctx.moveTo(x+hc, y+10); ctx.lineTo(x+hc+6, y+ts-4); ctx.lineTo(x+hc-2, y+ts-4); }
     else if (dir === 'down') { ctx.moveTo(x+hc, y+ts-10); ctx.lineTo(x+hc+6, y+4); ctx.lineTo(x+hc-2, y+4); }
     else if (dir === 'left') { ctx.moveTo(x+10, y+hc); ctx.lineTo(x+ts-4, y+hc+6); ctx.lineTo(x+ts-4, y+hc-2); }
@@ -842,9 +899,14 @@ function drawSpike(ctx, x, y, ts, dir) {
     ctx.fill();
 }
 
-/* =========================================================
-   5. カートゥーン風 描画
-========================================================= */
+function drawOneway(ctx, x, y, ts, dir) {
+    ctx.fillStyle = '#2ecc71';
+    if (dir === 'up') { roundRect(ctx, x, y+ts-12, ts, 12, 4); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+ts/2, y+16); ctx.lineTo(x+ts/2-6, y+26); ctx.lineTo(x+ts/2+6, y+26); ctx.fill(); }
+    else if (dir === 'down') { roundRect(ctx, x, y, ts, 12, 4); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+ts/2, y+24); ctx.lineTo(x+ts/2-6, y+14); ctx.lineTo(x+ts/2+6, y+14); ctx.fill(); }
+    else if (dir === 'left') { roundRect(ctx, x+ts-12, y, 12, ts, 4); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+16, y+ts/2); ctx.lineTo(x+26, y+ts/2-6); ctx.lineTo(x+26, y+ts/2+6); ctx.fill(); }
+    else if (dir === 'right') { roundRect(ctx, x, y, 12, ts, 4); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+24, y+ts/2); ctx.lineTo(x+14, y+ts/2-6); ctx.lineTo(x+14, y+ts/2+6); ctx.fill(); }
+}
+
 function draw() {
     ctx.fillStyle = '#1a1e29';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -904,31 +966,28 @@ function draw() {
                 ctx.fillStyle = '#e67e22'; roundRect(ctx, x, y, ts, ts, 4);
                 ctx.fillStyle = '#d35400'; ctx.fillRect(x+4, y+14, ts-8, 4); ctx.fillRect(x+14, y+4, 4, ts-8);
             }
-            else if (tile === T.ONEWAY) {
-                ctx.fillStyle = '#2ecc71'; roundRect(ctx, x, y, ts, 12, 4);
-                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+hc, y+18); ctx.lineTo(x+hc-6, y+28); ctx.lineTo(x+hc+6, y+28); ctx.fill();
-            }
+            else if (tile === T.ONEWAY_UP) drawOneway(ctx, x, y, ts, 'up');
+            else if (tile === T.ONEWAY_DOWN) drawOneway(ctx, x, y, ts, 'down');
+            else if (tile === T.ONEWAY_LEFT) drawOneway(ctx, x, y, ts, 'left');
+            else if (tile === T.ONEWAY_RIGHT) drawOneway(ctx, x, y, ts, 'right');
             else if (tile === T.SPIKE_UP) drawSpike(ctx, x, y, ts, 'up');
             else if (tile === T.SPIKE_DOWN) drawSpike(ctx, x, y, ts, 'down');
             else if (tile === T.SPIKE_LEFT) drawSpike(ctx, x, y, ts, 'left');
             else if (tile === T.SPIKE_RIGHT) drawSpike(ctx, x, y, ts, 'right');
-            else if (tile === T.BEAM) {
+            else if (tile === T.BEAM_R || tile === T.BEAM_L || tile === T.BEAM_U || tile === T.BEAM_D) {
                 ctx.fillStyle = '#e74c3c'; roundRect(ctx, x, y, ts, ts, 4);
-                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                
-                if (beamTimer > 40) {
-                    ctx.fillStyle = 'rgba(255, 71, 126, 0.85)';
-                    ctx.fillRect(x + ts, y + hc - 6, 300, 12);
-                    if (mode === 'play' && rectIntersect(player, { x: x + ts, y: y + hc - 6, w: 300, h: 12 })) {
-                        die();
-                    }
-                }
+                ctx.fillStyle = '#000'; ctx.beginPath();
+                if(tile === T.BEAM_R) ctx.arc(x+ts-8, y+hc, 6, 0, Math.PI*2);
+                else if(tile === T.BEAM_L) ctx.arc(x+8, y+hc, 6, 0, Math.PI*2);
+                else if(tile === T.BEAM_U) ctx.arc(x+hc, y+8, 6, 0, Math.PI*2);
+                else if(tile === T.BEAM_D) ctx.arc(x+hc, y+ts-8, 6, 0, Math.PI*2);
+                ctx.fill(); ctx.stroke();
             }
-            else if (tile === T.WARP_A || tile === T.WARP_B) {
-                ctx.fillStyle = (tile === T.WARP_A) ? '#9b59b6' : '#3498db';
+            else if (tile === T.WARP_1 || tile === T.WARP_2) {
+                ctx.fillStyle = (tile === T.WARP_1) ? '#9b59b6' : '#3498db';
                 ctx.beginPath(); ctx.arc(x+hc, y+hc, hc-3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-                ctx.fillText((tile === T.WARP_A) ? 'A' : 'B', x+hc, y+hc+6);
+                ctx.fillText((tile === T.WARP_1) ? '1' : '2', x+hc, y+hc+6);
             }
             else if (tile === T.COIN) {
                 ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(x+hc, y+hc, ts/3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
@@ -948,12 +1007,12 @@ function draw() {
                 ctx.fillStyle = '#00f3ff'; roundRect(ctx, x+2, y+ts-12, ts-4, 12, 4);
                 ctx.fillStyle = '#fff'; ctx.fillRect(x+6, y+ts-10, ts-12, 4);
             }
-            else if (tile === T.ENEMY && mode === 'edit') {
-                ctx.fillStyle = '#a855f7'; roundRect(ctx, x+4, y+ts-28, 28, 28, 6);
+            else if ((tile === T.ENEMY || tile === T.ENEMY2) && mode === 'edit') {
+                ctx.fillStyle = (tile === T.ENEMY2) ? '#ff3366' : '#a855f7'; 
+                roundRect(ctx, x+4, y+ts-28, 28, 28, 6);
                 ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x+12, y+ts-18, 4, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x+24, y+ts-18, 4, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = '#000'; ctx.fillRect(x+11, y+ts-19, 2, 2); ctx.fillRect(x+23, y+ts-19, 2, 2);
-                ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(x+8, y+ts-22); ctx.lineTo(x+14, y+ts-19); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(x+28, y+ts-22); ctx.lineTo(x+22, y+ts-19); ctx.stroke();
+                if(tile === T.ENEMY) { ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(x+8, y+ts-22); ctx.lineTo(x+14, y+ts-19); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x+28, y+ts-22); ctx.lineTo(x+22, y+ts-19); ctx.stroke(); }
             }
             else if (tile === T.GOAL) {
                 ctx.fillStyle = '#fff'; ctx.fillRect(x+ts/4, y, 4, ts); ctx.strokeRect(x+ts/4, y, 4, ts);
@@ -966,39 +1025,36 @@ function draw() {
         }
     }
 
-    // プレイヤー描画
+    // プロジェクタイル (小ビーム)
+    projectiles.forEach(p => {
+        ctx.fillStyle = 'rgba(255, 71, 126, 0.9)'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, p.w/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, p.w/4, 0, Math.PI*2); ctx.fill();
+    });
+
     if (player.state !== 'dead') {
         ctx.fillStyle = '#00f3ff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
         roundRect(ctx, player.x, player.y, player.w, player.h, 6);
-        
         ctx.fillStyle = '#fff';
         const eyeOffsetX = player.faceDir > 0 ? 8 : 4;
         ctx.beginPath(); ctx.arc(player.x + eyeOffsetX, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        
         ctx.fillStyle = '#000';
         ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10 + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
     }
 
-    // 敵描画 (プレイモード)
     if (mode === 'play') {
         enemies.forEach(e => {
-            ctx.fillStyle = '#a855f7'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+            ctx.fillStyle = (e.type === 2) ? '#ff3366' : '#a855f7'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
             roundRect(ctx, e.x, e.y, e.w, e.h, 6);
-            
             if(e.blink < 90) { 
-                ctx.fillStyle = '#fff'; 
-                const ex = e.vx > 0 ? e.x+14 : e.x+6;
+                ctx.fillStyle = '#fff'; const ex = e.vx > 0 ? e.x+14 : e.x+6;
                 ctx.beginPath(); ctx.arc(ex, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
                 ctx.beginPath(); ctx.arc(ex+8, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                
-                ctx.fillStyle = '#000';
-                ctx.beginPath(); ctx.arc(ex+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(ex+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(ex+8+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
-                
-                ctx.beginPath(); ctx.moveTo(ex-3, e.y+5); ctx.lineTo(ex+3, e.y+8); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(ex+11, e.y+5); ctx.lineTo(ex+5, e.y+8); ctx.stroke();
+                if(e.type === 1) { ctx.beginPath(); ctx.moveTo(ex-3, e.y+5); ctx.lineTo(ex+3, e.y+8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(ex+11, e.y+5); ctx.lineTo(ex+5, e.y+8); ctx.stroke(); }
             } else {
                 ctx.beginPath(); ctx.moveTo(e.x+6, e.y+10); ctx.lineTo(e.x+12, e.y+10); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(e.x+16, e.y+10); ctx.lineTo(e.x+22, e.y+10); ctx.stroke();
@@ -1006,12 +1062,9 @@ function draw() {
         });
     }
 
-    // パーティクル
     for(let i=particles.length-1; i>=0; i--) {
         let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 6, 6);
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 6, 6); ctx.globalAlpha = 1.0;
         if(p.life <= 0) particles.splice(i, 1);
     }
 
@@ -1053,20 +1106,14 @@ async function saveStage() {
     const title = document.getElementById('save-title').value.trim();
     const desc = document.getElementById('save-desc').value.trim();
     if (!title) return alert("ステージ名を入力してください。");
-
     const mapStr = JSON.stringify(mapData);
     try {
-        const res = await fetch("/api/maker/stages", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ title, description: desc, map_data: mapStr })
-        });
+        const res = await fetch("/api/maker/stages", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ title, description: desc, map_data: mapStr }) });
         const data = await res.json();
         if (res.ok) {
             alert(data.message || "公開が完了しました！");
             currentStageInfo = { id: data.id, title, author: '自分', isMine: true };
-            updateCourseHUDInfo();
-            closeModal('modal-save');
+            updateCourseHUDInfo(); closeModal('modal-save');
         } else { alert("エラー: " + (data.detail || "保存失敗")); }
     } catch (e) { alert("通信エラーが発生しました。"); }
 }
@@ -1076,39 +1123,25 @@ async function openLoadModal() {
     openModal('modal-load');
     const container = document.getElementById('stage-list-container');
     container.innerHTML = '<div style="text-align:center;color:#888;margin-top:20px;">検索中...</div>';
-
     try {
         const res = await fetch("/api/maker/stages", { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
-        
         if (data.stages && data.stages.length > 0) {
             let html = '';
             data.stages.forEach(s => {
-                const isKing = data.is_king;
-                const badges = [];
-                // 勅命👑アイコン SVG
+                const isKing = data.is_king; const badges = [];
                 const svgCrown = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
-                // 接収🚨アイコン SVG
                 const svgAlert = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-                // ユーザー👤アイコン SVG
                 const svgUser = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-
                 if (s.is_pinned) badges.push(`<span style="color:var(--accent-gold); display:flex; align-items:center; gap:2px;">${svgCrown}勅命</span>`);
                 if (s.is_confiscated) badges.push(`<span style="color:var(--danger-color); display:flex; align-items:center; gap:2px;">${svgAlert}接収済</span>`);
-                
                 let actions = '';
-                if (s.is_mine || isKing) {
-                    actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem; border-color:var(--danger-color);" onclick="deleteStage(${s.id}, event)">破棄</button>`;
-                }
+                if (s.is_mine || isKing) actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem; border-color:var(--danger-color);" onclick="deleteStage(${s.id}, event)">破棄</button>`;
                 if (isKing) {
                     actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="pinStage(${s.id}, event)">勅命</button>`;
-                    if(!s.is_confiscated) {
-                        actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="confiscateStage(${s.id}, event)">接収</button>`;
-                    }
+                    if(!s.is_confiscated) actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="confiscateStage(${s.id}, event)">接収</button>`;
                 }
-
                 const userIcon = s.is_mine ? `<span style="color:var(--accent-gold);">${svgCrown}</span>` : `<span style="color:var(--text-secondary);">${svgUser}</span>`;
-
                 html += `
                 <div class="stage-card" onclick="loadStage(${s.id})">
                     <div style="flex:1;">
@@ -1117,24 +1150,14 @@ async function openLoadModal() {
                         <div class="st-stats">プレイ: ${s.plays_count} / クリア: ${s.clears_count}</div>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-                        <button class="btn-retro btn-cyan" style="padding:8px 12px; font-size:0.85rem;">
-                            <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg> PLAY
-                        </button>
+                        <button class="btn-retro btn-cyan" style="padding:8px 12px; font-size:0.85rem;"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg> PLAY</button>
                         <div style="display:flex; gap:6px; margin-top:4px;">${actions}</div>
                     </div>
                 </div>`;
             });
             container.innerHTML = html;
-        } else {
-            container.innerHTML = '<div style="text-align:center;color:#888;margin-top:20px;">ステージがまだありません。</div>';
-        }
-    } catch (e) {
-        container.innerHTML = `
-            <div style="text-align:center;color:#ff477e;margin-top:20px;">
-                取得エラーが発生しました。<br>
-                <button class="btn-retro" style="margin:10px auto;" onclick="openLoadModal()">再試行</button>
-            </div>`;
-    }
+        } else { container.innerHTML = '<div style="text-align:center;color:#888;margin-top:20px;">ステージがまだありません。</div>'; }
+    } catch (e) { container.innerHTML = '<div style="text-align:center;color:#ff477e;margin-top:20px;">取得エラーが発生しました。<br><button class="btn-retro" style="margin:10px auto;" onclick="openLoadModal()">再試行</button></div>'; }
 }
 
 async function loadStage(id) {
@@ -1143,50 +1166,22 @@ async function loadStage(id) {
         const data = await res.json();
         if (res.ok) {
             mapData = JSON.parse(data.stage.map_data);
-            currentStageInfo = {
-                id: id,
-                title: data.stage.title,
-                author: data.stage.creator_name,
-                isMine: data.stage.is_mine
-            };
-            updateCourseHUDInfo();
-            closeModal('modal-load');
-            setMode('play'); 
+            currentStageInfo = { id: id, title: data.stage.title, author: data.stage.creator_name, isMine: data.stage.is_mine };
+            updateCourseHUDInfo(); closeModal('modal-load'); setMode('play'); 
         } else { alert("ロード失敗: " + data.detail); }
     } catch (e) { alert("通信エラーが発生しました。"); }
 }
 
-/* --- 国王・管理アクション --- */
 async function deleteStage(id, e) {
-    e.stopPropagation();
-    if(!confirm("本当にこの迷宮を破壊しますか？")) return;
-    try {
-        const res = await fetch(`/api/maker/stages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal(); 
-    } catch(e) { alert("エラーが発生しました。"); }
+    e.stopPropagation(); if(!confirm("本当にこの迷宮を破壊しますか？")) return;
+    try { const res = await fetch(`/api/maker/stages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); alert(data.message); openLoadModal(); } catch(e) { alert("エラーが発生しました。"); }
 }
-
 async function pinStage(id, e) {
-    e.stopPropagation();
-    try {
-        const res = await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal();
-    } catch(e) { alert("エラーが発生しました。"); }
+    e.stopPropagation(); try { const res = await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); alert(data.message); openLoadModal(); } catch(e) { alert("エラーが発生しました。"); }
 }
-
 async function confiscateStage(id, e) {
-    e.stopPropagation();
-    if(!confirm("この迷宮の著作権を国庫へ強制接収しますか？")) return;
-    try {
-        const res = await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal();
-    } catch(e) { alert("エラーが発生しました。"); }
+    e.stopPropagation(); if(!confirm("この迷宮の著作権を国庫へ強制接収しますか？")) return;
+    try { const res = await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); alert(data.message); openLoadModal(); } catch(e) { alert("エラーが発生しました。"); }
 }
 </script>
 </body>
