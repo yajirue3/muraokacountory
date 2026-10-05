@@ -65,7 +65,7 @@
             transform: scale(0.985);
         }
 
-        /* 虹色ホログラム下地（鈍く玉虫色に反射） */
+        /* 虹色ホログラム下地 */
         .id-card-wrapper::before {
             content: ""; position: absolute; inset: 0;
             background: linear-gradient(125deg, 
@@ -109,7 +109,6 @@
             padding-bottom: 10px; margin-bottom: 14px; 
         }
 
-        /* 🔥 ド派手な村岡王国エンボスゴールドテキスト */
         .id-country { 
             font-weight: 900; 
             font-size: 1.25rem; 
@@ -182,7 +181,6 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
 
-        /* 100回達成専用トースト通知 */
         .clicker-unlock-banner {
             display: none;
             position: fixed;
@@ -313,6 +311,19 @@
             word-break: keep-all; 
         }
 
+        /* 👑 国王誕生祭限定ゲーム専用プレミアムエフェクト */
+        .octagon-node[data-id="svc-maker"] .node-bg {
+            background: linear-gradient(135deg, #ffd700 0%, #ff8800 50%, #d4af37 100%);
+            animation: royal-pulse 2s infinite ease-in-out;
+        }
+        .octagon-node[data-id="svc-maker"] .node-bg-inner {
+            background: linear-gradient(145deg, #221a05 0%, #110d02 100%);
+        }
+        @keyframes royal-pulse {
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.7)); }
+            50% { filter: drop-shadow(0 0 16px rgba(255, 136, 0, 0.95)); }
+        }
+
         /* 紛争専用パルス */
         .octagon-node[data-id="svc-pixel"] .node-bg {
             background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
@@ -370,6 +381,13 @@
             display: flex;
             align-items: center;
             gap: 2px;
+            white-space: nowrap;
+        }
+        .node-badge-new.badge-royal {
+            background: linear-gradient(135deg, #ffd700 0%, #ff5500 100%);
+            color: #000;
+            border-color: #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.9);
         }
         .node-badge-new svg { width: 10px; height: 10px; fill: currentColor; }
         @keyframes badge-pulse {
@@ -603,19 +621,17 @@
     function handleCardClick() {
         sessionCardClicks++;
 
-        // 1. ホログラム光彩エフェクト
         const flash = document.getElementById("holo-flash");
         const country = document.getElementById("id-country-text");
         
         flash.classList.remove("active");
         country.classList.remove("flash");
-        void flash.offsetWidth; // リフロー
+        void flash.offsetWidth;
         flash.classList.add("active");
         country.classList.add("flash");
         
         setTimeout(() => country.classList.remove("flash"), 400);
 
-        // 2. 100回達成判定（セッション中のみ）
         if (sessionCardClicks === 100 && !clickerAchieved) {
             clickerAchieved = true;
             awardClickerTitle();
@@ -628,13 +644,11 @@
         if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
 
         try {
-            // バックエンドに称号保存を要求
-            const res = await fetch("/api/titles/unlock", {
+            await fetch("/api/titles/unlock", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({ title: "カードクリッカー" })
             });
-            // そのまま自動装備
             await fetch("/api/titles/equip", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -652,7 +666,17 @@
        サービスグリッド ＆ ドラッグ＆ドロップ
        ========================================================== */
     const defaultServices = [
-        { id: 'svc-pixel', name: '紛争', url: '/pixel', color: '#ff0055', icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>', isNew: true },
+        { 
+            id: 'svc-maker', 
+            name: '試練迷宮', 
+            url: '/maker', 
+            color: '#ffd700', 
+            icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>', 
+            isNew: true,
+            badgeText: '誕生祭限定',
+            isRoyal: true
+        },
+        { id: 'svc-pixel', name: '紛争', url: '/pixel', color: '#ff0055', icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>', isNew: true, badgeText: 'WAR' },
         { id: 'svc-mtube', name: 'M-Tube', url: '/videos', color: '#ff0033', icon: '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>' },
         { id: 'svc-games', name: '王立遊技場', url: '/games', color: '#a855f7', icon: '<rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"></path>' },
         { id: 'svc-bank', name: '中央銀行', url: '/wallet', color: '#10b981', icon: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>' },
@@ -698,12 +722,19 @@
             const isCustom = svc.id.startsWith('cstm-');
             const color = svc.color || '#00f3ff';
             
-            const newBadge = svc.isNew ? `
-                <div class="node-badge-new">
-                    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-                    WAR
-                </div>
-            ` : '';
+            let newBadge = '';
+            if (svc.isNew) {
+                const badgeClass = svc.isRoyal ? 'node-badge-new badge-royal' : 'node-badge-new';
+                const badgeIcon = svc.isRoyal 
+                    ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
+                    : '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>';
+                newBadge = `
+                    <div class="${badgeClass}">
+                        <svg viewBox="0 0 24 24">${badgeIcon}</svg>
+                        ${svc.badgeText || 'NEW'}
+                    </div>
+                `;
+            }
 
             const deleteAction = isCustom ? `
                 <div class="node-del-action" onclick="removeCustomLink('${svc.id}', event)" title="削除">
