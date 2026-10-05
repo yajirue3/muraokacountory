@@ -152,7 +152,7 @@ async def set_dm_id(data: DMIDUpdate, authorization: str = Header(None)):
     client = await get_supabase()
     exist = await client.table("profiles").select("id").eq("dm_id", data.dm_id).neq("id", user.id).execute()
     if exist.data:
-        raise HTTPException(status_code=400, detail="そのIDは既に他の国民が使用しています。")
+        raise HTTPException(status_code=400, detail="そのIDは既に他の国民が使用しています。HINT:他のIDを試してみましょう。")
     await client.table("profiles").update({"dm_id": data.dm_id}).eq("id", user.id).execute()
     return {"message": f"DM IDを @{data.dm_id} に設定しました！"}
 
@@ -189,7 +189,7 @@ async def subscribe_push(sub: PushSubscription, authorization: str = Header(None
         await client.table("push_subscriptions").update({"user_id": user.id, "p256dh": sub.p256dh, "auth": sub.auth}).eq("id", exist.data[0]["id"]).execute()
     else:
         await client.table("push_subscriptions").insert({"user_id": user.id, "endpoint": sub.endpoint, "p256dh": sub.p256dh, "auth": sub.auth}).execute()
-    return {"message": "通知設定を有効化しました。"}
+    return {"message": "通知設定を有効化しました。（既に一度している場合はもう一度有効化しています。）"}
 
 @router.post("/blocks/toggle")
 async def toggle_block(data: BlockReq, authorization: str = Header(None)):
