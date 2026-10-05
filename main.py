@@ -100,17 +100,17 @@ class ReviewCreate(BaseModel):
 # --- 追加: 融資・借金システム用モデル (Zero Trust 堅牢化) ---
 class LoanOfferCreate(BaseModel):
     lender_wallet_id: str
-    max_amount: int = Field(..., gt=0, description="出品額は1以上でなければなりません")
-    interest_rate: int = Field(..., ge=0, description="金利はマイナスにできません")
+    max_amount: int = Field(..., gt=0, description="出品額は1以上でなければなりません、冷やかしですか？")
+    interest_rate: int = Field(..., ge=0, description="金利はマイナスにできません。損しますよ？")
 
 class LoanBorrow(BaseModel):
     offer_id: int
-    borrow_amount: int = Field(..., gt=0, description="借入額は1以上でなければなりません")
+    borrow_amount: int = Field(..., gt=0, description="借入額は1以上でなければなりません、冷やかしですか？")
     borrower_wallet_id: str
 
 class LoanRepay(BaseModel):
     loan_id: int
-    repay_amount: int = Field(..., gt=0, description="返済額は1以上でなければなりません")
+    repay_amount: int = Field(..., gt=0, description="返済額は1以上でなければなりません、金を借りている自覚を持ちましょう。")
 # -------------------------------------
 
 # --- 追加: 称号付け替え用モデル ---
@@ -304,10 +304,6 @@ def get_pixel_page(request: Request):
             content=f"<h2>Pixel Render Error</h2><pre style='color:red;'>{error_detail}</pre>",
             status_code=200
         )
-
-
-
-
 
 
 app.mount("/templates", StaticFiles(directory="templates"), name="templates")
