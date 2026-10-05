@@ -3,162 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>村岡王国 - 王立試練迷宮（Maker）</title>
+    <title>村岡王国 - 王立試練迷宮（Maker DX）</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&family=Press+Start+2P&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800;900&family=Press+Start+2P&display=swap');
 
         :root {
-            --bg-base: #1a1e29;
-            --bg-surface: #2c3140;
-            --border-subtle: #454d66;
+            --bg-base: #1e2430;
+            --bg-surface: #2d3546;
+            --border-bold: #000000;
             --text-primary: #ffffff;
-            --text-secondary: #a3adc2;
+            --text-secondary: #a0aec0;
             --accent-gold: #ffcc00;
-            --accent-cyan: #00f3ff;
-            --danger-color: #ff477e;
-            --btn-shadow: 0 5px 0 rgba(0,0,0,0.5);
-            --chamfer-clip: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+            --accent-cyan: #00f0ff;
+            --accent-green: #2ecc71;
+            --danger-color: #ff4757;
+            --btn-shadow: 0 4px 0 #000;
         }
 
-        /* 100vhではなく100dvhを使用してスマホのアドレスバー等に対応 */
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         
         body {
             background-color: var(--bg-base); color: var(--text-primary);
             font-family: 'M PLUS Rounded 1c', -apple-system, sans-serif;
-            overflow: hidden; 
-            width: 100vw; height: 100dvh;
+            overflow: hidden; width: 100vw; height: 100dvh;
         }
 
-        .pixel-text { font-family: 'Press Start 2P', 'M PLUS Rounded 1c', monospace; text-transform: uppercase; }
+        .pixel-text { font-family: 'Press Start 2P', 'M PLUS Rounded 1c', monospace; }
 
-        /* ヘッダー UI（圧迫感を減らすため高さを広げ、パディング追加） */
+        /* --- ヘッダー UI（コンパクト化＋透過で邪魔にならない配置） --- */
         #top-bar {
-            position: absolute; top: 0; left: 0; width: 100%; height: 75px;
-            background: linear-gradient(to bottom, rgba(26,30,41,0.95) 40%, rgba(26,30,41,0));
-            display: flex; justify-content: space-between; align-items: flex-start;
-            padding: 15px 16px 0; z-index: 100;
+            position: absolute; top: 0; left: 0; width: 100%; height: 56px;
+            background: rgba(26, 30, 41, 0.75); backdrop-filter: blur(6px);
+            border-bottom: 3px solid var(--border-bold);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 12px; z-index: 100; gap: 8px;
         }
 
-        /* カートゥーン風ボタン */
         .btn-retro {
-            background: var(--bg-surface); border: 3px solid #000;
-            color: var(--text-primary); padding: 8px 14px; cursor: pointer;
-            display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold;
-            border-radius: 12px; box-shadow: var(--btn-shadow);
-            transition: all 0.1s;
+            background: #fff; border: 3px solid #000; color: #000;
+            padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+            font-size: 0.8rem; font-weight: 900; border-radius: 10px;
+            box-shadow: var(--btn-shadow); transition: all 0.1s; white-space: nowrap;
         }
-        .btn-retro:hover { background: #3a4156; }
-        .btn-retro:active { transform: translateY(5px); box-shadow: 0 0 0 rgba(0,0,0,0.5); }
-        .btn-retro svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5; }
-        .btn-retro.active { background: var(--accent-gold); color: #000; border-color: #000; }
+        .btn-retro:hover { background: #f0f0f0; }
+        .btn-retro:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+        .btn-retro svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; }
+        .btn-retro.active { background: var(--accent-gold); }
+        .btn-retro.btn-cyan { background: var(--accent-cyan); }
+        .btn-retro.btn-gold { background: var(--accent-gold); }
 
-        /* トグルスイッチ */
+        /* モード切替 */
         .mode-toggle { 
-            display: flex; background: var(--bg-surface); border: 3px solid #000; 
+            display: flex; background: #000; border: 3px solid #000; 
             border-radius: 12px; overflow: hidden; box-shadow: var(--btn-shadow); 
         }
         .mode-toggle button {
-            background: transparent; border: none; color: #fff; padding: 8px 18px; cursor: pointer;
-            transition: 0.2s; display: flex; align-items: center; justify-content: center;
+            background: #333; border: none; color: #fff; padding: 5px 12px; cursor: pointer;
+            transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px;
+            font-weight: 900; font-size: 0.8rem;
         }
-        .mode-toggle button svg { width: 20px; height: 20px; fill: currentColor; }
-        .mode-toggle button.active { background: var(--accent-cyan); color: #000; font-weight: bold;}
-        
-        /* ツールパレット (カートゥーン風) */
+        .mode-toggle button svg { width: 16px; height: 16px; fill: currentColor; }
+        .mode-toggle button.active { background: var(--accent-cyan); color: #000; }
+
+        /* ズームコントローラー */
+        .zoom-controls {
+            display: flex; align-items: center; background: #000; border-radius: 10px; border: 2px solid #000;
+        }
+        .zoom-btn {
+            background: var(--bg-surface); color: #fff; border: none; padding: 3px 8px; font-weight: bold; cursor: pointer;
+        }
+        .zoom-btn:active { background: var(--accent-gold); color: #000; }
+        .zoom-val { font-size: 0.75rem; padding: 0 6px; color: var(--accent-gold); font-weight: bold; }
+
+        /* --- コース識別バッジ＆HUD --- */
+        #hud {
+            position: absolute; top: 64px; left: 12px; z-index: 90;
+            display: flex; gap: 12px; align-items: center; pointer-events: none;
+        }
+        .hud-badge {
+            background: rgba(0,0,0,0.75); border: 2.5px solid #000; border-radius: 8px;
+            padding: 4px 10px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.85rem; font-weight: 900; text-shadow: 1px 1px 0 #000;
+        }
+        .course-tag {
+            padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 900; text-transform: uppercase;
+        }
+        .tag-my { background: var(--accent-gold); color: #000; }
+        .tag-other { background: var(--accent-cyan); color: #000; }
+
+        /* --- パレット（トグル折りたたみ付き & 邪魔にならない） --- */
+        #palette-wrap {
+            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%;
+            transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 4px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #palette-wrap.collapsed { transform: translate(-50%, calc(100% - 28px)); }
+
+        #palette-toggle {
+            background: #000; color: #fff; border: 2px solid #fff; border-radius: 12px 12px 0 0;
+            padding: 2px 16px; font-size: 0.7rem; font-weight: 900; cursor: pointer;
+        }
+
         #palette {
-            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 50%; transform: translateX(-50%);
-            background: var(--bg-surface); border: 3px solid #000;
-            padding: 10px; display: flex; gap: 8px; border-radius: 16px;
-            box-shadow: 0 8px 0 rgba(0,0,0,0.5); z-index: 100;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 95vw; overflow-x: auto;
+            background: rgba(44, 49, 64, 0.95); border: 3px solid #000; backdrop-filter: blur(4px);
+            padding: 6px; display: flex; gap: 6px; border-radius: 14px;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.6); max-width: 96vw; overflow-x: auto;
         }
-        #palette.hidden { transform: translate(-50%, 200%); }
-
         .palette-item {
-            min-width: 48px; height: 48px; background: #111; border: 3px solid #000;
-            border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.1s; position: relative; box-shadow: 0 3px 0 rgba(0,0,0,0.5);
+            min-width: 42px; height: 42px; background: #111; border: 2.5px solid #000;
+            border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: 0.1s; position: relative; box-shadow: 0 3px 0 rgba(0,0,0,0.4); flex-shrink: 0;
         }
-        .palette-item:active { transform: translateY(3px); box-shadow: 0 0 0; }
-        .palette-item.selected { background: var(--accent-gold); border-color: #000; color: #000 !important; }
-        .palette-item svg { width: 28px; height: 28px; }
+        .palette-item:active { transform: translateY(2px); box-shadow: none; }
+        .palette-item.selected { background: var(--accent-gold) !important; border-color: #000 !important; color: #000 !important; }
+        .palette-item svg { width: 22px; height: 22px; }
+        .palette-label { font-size: 0.55rem; font-weight: 900; margin-top: 1px; color: inherit; }
 
-        /* スマホ用コントローラー (画面下部の余裕を持たせる) */
+        /* スマホ用コントローラー */
         #mobile-controls {
-            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); left: 0; width: 100%;
-            display: none; justify-content: space-between; padding: 0 25px; z-index: 100;
+            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 15px); left: 0; width: 100%;
+            display: none; justify-content: space-between; padding: 0 15px; z-index: 95; pointer-events: none;
         }
-        .ctrl-group { display: flex; gap: 15px; }
+        .ctrl-group { display: flex; gap: 10px; pointer-events: auto; }
         .ctrl-btn {
-            width: 70px; height: 70px; background: rgba(255, 255, 255, 0.15);
-            border: 4px solid rgba(255,255,255,0.4); border-radius: 50%;
+            width: 60px; height: 60px; background: rgba(0,0,0,0.5);
+            border: 3px solid rgba(255,255,255,0.7); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            color: rgba(255,255,255,0.8); font-size: 30px; pointer-events: auto;
-            backdrop-filter: blur(4px); box-shadow: 0 5px 0 rgba(0,0,0,0.2);
+            color: #fff; font-size: 24px; font-weight: bold; pointer-events: auto;
+            backdrop-filter: blur(2px); box-shadow: 0 4px 0 rgba(0,0,0,0.4);
         }
-        .ctrl-btn:active { 
-            background: rgba(255,255,255,0.3); border-color: var(--accent-gold); 
-            color: var(--accent-gold); transform: translateY(5px); box-shadow: 0 0 0;
-        }
+        .ctrl-btn:active { background: var(--accent-gold); color: #000; transform: translateY(3px); box-shadow: none; }
 
         /* Canvas */
-        #gameCanvas {
-            display: block; width: 100%; height: 100%; image-rendering: pixelated;
-        }
+        #gameCanvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
-        /* 画面中央メッセージ */
+        /* --- 見やすいシンプル＆ポップなクリア / ポップアップ通知 --- */
         #center-msg {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: var(--accent-gold); 
-            text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
-            font-size: 2.5rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 150;
-            white-space: nowrap; font-weight: bold;
+            background: #000; border: 5px solid var(--accent-gold); border-radius: 16px;
+            padding: 16px 32px; text-align: center; color: var(--accent-gold);
+            font-size: 2rem; font-weight: 900; opacity: 0; pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s; z-index: 150; box-shadow: 0 10px 0 rgba(0,0,0,0.8);
+            white-space: nowrap;
         }
-        #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(-3deg); }
+        #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
 
-        /* HUD (圧迫感を避けるため位置を調整) */
-        #hud {
-            position: absolute; top: 85px; left: 20px; z-index: 90;
-            display: flex; gap: 20px; font-size: 18px; font-weight: bold;
+        #toast-msg {
+            position: absolute; top: 110px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 71, 87, 0.95); color: #fff; border: 3px solid #000;
+            padding: 8px 16px; border-radius: 20px; font-weight: 900; font-size: 0.9rem;
+            pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 140; box-shadow: 0 4px 0 #000;
         }
-        .hud-item { 
-            display: flex; align-items: center; gap: 8px; 
-            text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; 
-        }
-        .hud-item svg { width: 26px; height: 26px; filter: drop-shadow(2px 2px 0px #000); }
+        #toast-msg.show { opacity: 1; }
 
-        /* モーダル */
+        /* --- モーダル (✕ボタン＆エラー時復帰対応) --- */
         .modal-overlay {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
-            justify-content: center; align-items: center; padding: 16px;
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999;
+            justify-content: center; align-items: center; padding: 16px; backdrop-filter: blur(4px);
         }
         .modal-box {
             background: var(--bg-surface); border: 4px solid #000; border-radius: 16px;
-            width: 100%; max-width: 550px; padding: 24px; position: relative; max-height: 85vh; display: flex; flex-direction: column;
-            box-shadow: 0 10px 0 rgba(0,0,0,0.8);
+            width: 100%; max-width: 520px; padding: 20px; position: relative; max-height: 85vh;
+            display: flex; flex-direction: column; box-shadow: 0 10px 0 #000;
         }
-        .modal-title { font-size: 1.3rem; color: var(--accent-gold); margin-bottom: 16px; border-bottom: 3px dashed var(--border-subtle); padding-bottom: 8px; font-weight: bold;}
-        
-        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-        .form-group label { font-size: 0.85rem; color: var(--text-primary); font-weight: bold; }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 3px dashed var(--text-secondary); padding-bottom: 10px; margin-bottom: 12px;
+        }
+        .modal-title { font-size: 1.2rem; color: var(--accent-gold); font-weight: 900; }
+        .modal-close {
+            background: var(--danger-color); color: #fff; border: 2.5px solid #000;
+            width: 32px; height: 32px; border-radius: 8px; font-weight: 900; font-size: 1.1rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #000;
+        }
+        .modal-close:active { transform: translateY(2px); box-shadow: none; }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .form-group label { font-size: 0.8rem; font-weight: bold; }
         .form-group input { 
-            padding: 12px; background: #111; border: 3px solid #000; border-radius: 8px;
-            color: #fff; outline: none; font-family: inherit; font-size: 1rem;
+            padding: 10px; background: #111; border: 2.5px solid #000; border-radius: 8px;
+            color: #fff; outline: none; font-size: 0.95rem; font-weight: bold;
         }
-        .form-group input:focus { border-color: var(--accent-gold); }
         
-        .stage-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding-right: 4px;}
+        .stage-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; padding-right: 4px;}
         .stage-card {
-            background: #1a1e29; border: 3px solid #000; padding: 14px; cursor: pointer;
-            display: flex; justify-content: space-between; align-items: center; transition: 0.2s; border-radius: 12px;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+            background: #1e2430; border: 3px solid #000; padding: 10px 12px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; transition: 0.15s; border-radius: 10px;
+            box-shadow: 0 4px 0 #000;
         }
-        .stage-card:active { transform: translateY(4px); box-shadow: 0 0 0; }
-        .st-title { font-weight: bold; color: var(--accent-gold); font-size: 1.1rem; display: flex; align-items: center; gap: 6px;}
-        .st-author { font-size: 0.85rem; color: #fff; margin-top: 6px; }
-        .st-stats { font-size: 0.8rem; color: var(--accent-cyan); text-align: right; font-weight: bold;}
+        .stage-card:hover { background: #283040; }
+        .stage-card:active { transform: translateY(3px); box-shadow: none; }
+        .st-title { font-weight: 900; color: var(--accent-gold); font-size: 1rem; display: flex; align-items: center; gap: 6px;}
+        .st-author { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -170,74 +206,94 @@
         </button>
 
         <div class="mode-toggle">
-            <button id="btn-edit" class="active" onclick="setMode('edit')" title="エディットモード">
-                <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <button id="btn-edit" class="active" onclick="setMode('edit')">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> 作成
             </button>
-            <button id="btn-play" onclick="setMode('play')" title="テストプレイ">
-                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <button id="btn-play" onclick="setMode('play')">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> 游ぶ
             </button>
         </div>
 
-        <div style="display: flex; gap: 8px;">
-            <button class="btn-retro" onclick="openLoadModal()">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> 探す
-            </button>
-            <button class="btn-retro" onclick="openSaveModal()">
-                <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> 公開
-            </button>
+        <!-- ズーム機能 -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="adjustZoom(-0.15)">－</button>
+            <span class="zoom-val" id="zoom-text">100%</span>
+            <button class="zoom-btn" onclick="adjustZoom(0.15)">＋</button>
+        </div>
+
+        <div style="display: flex; gap: 6px;">
+            <button class="btn-retro btn-cyan" onclick="openLoadModal()">探す</button>
+            <button class="btn-retro btn-gold" onclick="openSaveModal()">公開</button>
         </div>
     </div>
 
-    <!-- HUD -->
-    <div id="hud" class="pixel-text">
-        <div class="hud-item" style="color: var(--accent-gold);">
-            <svg fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="8" x2="12" y2="16" stroke="#000" stroke-width="2"></line></svg>
-            <span id="hud-coins">0</span>
+    <!-- HUD (コース情報 & 所持コイン) -->
+    <div id="hud">
+        <div class="hud-badge" style="color: var(--accent-gold);">
+            🪙 <span id="hud-coins">0</span> / <span id="hud-total-coins">0</span>
         </div>
-        <div class="hud-item" id="hud-key" style="color: #666;">
-            <svg stroke="currentColor" fill="none" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4"></circle><line x1="11" y1="11" x2="20" y2="20"></line><line x1="16" y1="16" x2="19" y2="13"></line></svg>
+        <div class="hud-badge" id="hud-key" style="color: #666;">
+            🔑 <span id="hud-key-text">なし</span>
+        </div>
+        <div class="hud-badge" id="hud-course-info">
+            <span id="hud-course-tag" class="course-tag tag-my">MY COURSE</span>
+            <span id="hud-course-title">新規作成コース</span>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
+    <!-- 画面中央メッセージ (コミカル&視認性良好) -->
     <div id="center-msg" class="pixel-text">STAGE CLEAR!</div>
+    <div id="toast-msg">コインを全部あつめてね！</div>
 
-    <div id="palette"></div>
+    <!-- ツールパレット (折りたたみ対応) -->
+    <div id="palette-wrap">
+        <button id="palette-toggle" onclick="togglePalette()">▼ ツール閉じる</button>
+        <div id="palette"></div>
+    </div>
 
-    <!-- スマホ用コントロール -->
+    <!-- スマホ用操作ボタン -->
     <div id="mobile-controls">
         <div class="ctrl-group">
             <div class="ctrl-btn" id="btn-left">◀</div>
             <div class="ctrl-btn" id="btn-right">▶</div>
         </div>
-        <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,243,255,0.25); border-color: rgba(0,243,255,0.6);">▲</div>
+        <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,240,255,0.4); border-color: #00f0ff;">▲</div>
     </div>
 
-    <!-- モーダル：保存 -->
+    <!-- モーダル：公開保存 -->
     <div id="modal-save" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-save')">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <div class="modal-title pixel-text">STAGE UPLOAD</div>
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">STAGE UPLOAD</div>
+                <button class="modal-close" onclick="closeModal('modal-save')">✕</button>
+            </div>
             <div class="form-group">
                 <label>ステージ名</label>
-                <input type="text" id="save-title" placeholder="例: 奈落の神殿" maxlength="30">
+                <input type="text" id="save-title" placeholder="例: 奈落のどっきり迷宮" maxlength="30">
             </div>
             <div class="form-group">
                 <label>説明・煽り文句</label>
-                <input type="text" id="save-desc" placeholder="任意" maxlength="50">
+                <input type="text" id="save-desc" placeholder="例: 罠がいっぱい！" maxlength="50">
             </div>
-            <button class="btn-retro" style="justify-content: center; background: var(--accent-gold); color:#000; margin-top:10px; font-size:1rem;" onclick="saveStage()">データベースへ公開する</button>
+            <button class="btn-retro btn-gold" style="justify-content: center; padding: 10px; margin-top: 10px;" onclick="saveStage()">データベースへ公開する</button>
         </div>
     </div>
 
-    <!-- モーダル：ロード -->
+    <!-- モーダル：探す (エラー時復帰＆✕ボタン完備) -->
     <div id="modal-load" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-load')">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <div class="modal-title pixel-text">WORLD STAGES</div>
-            <div class="stage-list" id="stage-list-container">
-                <div style="text-align:center; color:#666; margin-top:20px;">読込中...</div>
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">WORLD STAGES</div>
+                <button class="modal-close" onclick="closeModal('modal-load')">✕</button>
             </div>
-            <button class="btn-retro" style="justify-content: center; margin-top:10px;" onclick="closeModal('modal-load')">閉じる</button>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button class="btn-retro" onclick="openLoadModal()" style="width:100%; justify-content:center;">🔄 リロード / 再検索</button>
+            </div>
+            <div class="stage-list" id="stage-list-container">
+                <div style="text-align:center; color:#888; margin-top:20px;">読込中...</div>
+            </div>
         </div>
     </div>
 
@@ -250,18 +306,18 @@ function escapeHtml(str) {
 }
 
 /* =========================================================
-   1. 定数・初期設定・アセット定義
+   1. 定数・マップ・ズーム・ツール定義
 ========================================================= */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
-ctx.imageSmoothingEnabled = false;
 
 const TILE_SIZE = 40;
 const MAP_COLS = 100;
 const MAP_ROWS = 25;
 
 let mode = 'edit'; // 'edit' | 'play'
-let currentStageId = null; 
+let zoomScale = 1.0;
+let currentStageInfo = { id: null, title: '新規作成コース', author: '自分', isMine: true };
 
 let camera = { x: 0, y: 0 };
 let input = { x: 0, y: 0, isDown: false, rightDown: false };
@@ -269,54 +325,64 @@ let keys = { left: false, right: false, jump: false };
 let mapData = [];
 
 // タイル定義
-const TILES = {
-    EMPTY: 0, BLOCK: 1, SPIKE: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, ENEMY: 8, START: 9, PAN: 100
+const T = {
+    EMPTY: 0, BLOCK: 1, SPIKE_UP: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, 
+    ENEMY: 8, START: 9, BRICK: 10, SPIKE_DOWN: 11, SPIKE_LEFT: 12, SPIKE_RIGHT: 13,
+    BEAM: 14, ONEWAY: 15, WARP_A: 16, WARP_B: 17, PAN: 100
 };
 
-// パレットにスクロール用の「手のひら(PAN)」を追加
+// パレットアイテム
 const paletteItems = [
-    { id: 100, color: '#fff', icon: '<path d="M9 11V4a2 2 0 0 1 4 0v7"/><path d="M13 11V7a2 2 0 0 1 4 0v4"/><path d="M17 11v-1a2 2 0 0 1 4 0v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9a2 2 0 0 1 4 0v2"/>' }, // 手のひら(スクロール)
-    { id: 1, color: '#444', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
-    { id: 2, color: '#ff477e', icon: '<polygon points="12 2 2 22 22 22 12 2" stroke-linejoin="round"/>' },
-    { id: 3, color: '#ffcc00', icon: '<circle cx="12" cy="12" r="8"/><line x1="12" y1="8" x2="12" y2="16"/>' },
-    { id: 5, color: '#ff9900', icon: '<circle cx="8" cy="8" r="4"/><line x1="11" y1="11" x2="20" y2="20"/><line x1="16" y1="16" x2="19" y2="13"/>' },
-    { id: 6, color: '#888', icon: '<rect x="5" y="11" width="14" height="10" rx="3"/><circle cx="12" cy="16" r="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' },
-    { id: 7, color: '#00f3ff', icon: '<path d="M4 18h16"/><path d="M7 14l5-5 5 5"/><path d="M12 9v9"/>' },
-    { id: 8, color: '#a855f7', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
-    { id: 4, color: '#fff', icon: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>' },
-    { id: 9, color: '#10b981', icon: '<polygon points="5 3 19 12 5 21 5 3" stroke-linejoin="round"/>' }, 
-    { id: 0, color: '#ff3333', icon: '<path d="M18 6L6 18M6 6l12 12"/>' } // バツ印（消しゴム）
+    { id: T.PAN, color: '#fff', label: '移動', icon: '<path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V2a2 2 0 0 0-4 0v9"/><path d="M18 11a2 2 0 0 1 4 0v4.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9"/>' },
+    { id: T.EMPTY, color: '#ff4757', label: '消しゴム', icon: '<path d="M18 6L6 18M6 6l12 12"/>' },
+    { id: T.BLOCK, color: '#aaa', label: 'ブロック', icon: '<rect x="3" y="3" width="18" height="18" rx="3"/>' },
+    { id: T.BRICK, color: '#e67e22', label: '頭こわれ', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v9M8 12v9M16 12v9"/>' },
+    { id: T.ONEWAY, color: '#2ecc71', label: '一方通行', icon: '<rect x="3" y="3" width="18" height="6" rx="2"/><path d="M12 21V11M8 15l4-4 4 4"/>' },
+    { id: T.SPIKE_UP, color: '#ff477e', label: '上針', icon: '<polygon points="12 2 2 22 22 22"/>' },
+    { id: T.SPIKE_DOWN, color: '#ff477e', label: '下針', icon: '<polygon points="12 22 2 2 22 2"/>' },
+    { id: T.SPIKE_LEFT, color: '#ff477e', label: '左針', icon: '<polygon points="2 12 22 2 22 22"/>' },
+    { id: T.SPIKE_RIGHT, color: '#ff477e', label: '右針', icon: '<polygon points="22 12 2 2 2 22"/>' },
+    { id: T.BEAM, color: '#e74c3c', label: 'ビーム砲', icon: '<rect x="2" y="6" width="14" height="12" rx="3"/><circle cx="20" cy="12" r="3"/>' },
+    { id: T.WARP_A, color: '#9b59b6', label: 'ワープA', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold">A</text>' },
+    { id: T.WARP_B, color: '#3498db', label: 'ワープB', icon: '<circle cx="12" cy="12" r="9"/><text x="12" y="16" font-size="12" text-anchor="middle" fill="#fff" font-weight="bold">B</text>' },
+    { id: T.COIN, color: '#ffcc00', label: 'コイン1枚', icon: '<circle cx="12" cy="12" r="8"/><text x="12" y="16" font-size="11" text-anchor="middle" fill="#000" font-weight="bold">1</text>' },
+    { id: T.KEY, color: '#f39c12', label: 'カギ', icon: '<circle cx="8" cy="8" r="4"/><line x1="11" y1="11" x2="20" y2="20"/><line x1="16" y1="16" x2="19" y2="13"/>' },
+    { id: T.DOOR, color: '#8e44ad', label: 'ドア', icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="15" cy="12" r="1.5"/>' },
+    { id: T.BOUNCER, color: '#00f0ff', label: 'バネ', icon: '<path d="M4 18h16M7 14l5-6 5 6"/>' },
+    { id: T.ENEMY, color: '#a855f7', label: '敵', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="11" r="2"/><circle cx="15" cy="11" r="2"/>' },
+    { id: T.GOAL, color: '#2ecc71', label: 'ゴール', icon: '<path d="M4 22V2h16l-4 5 4 5H4"/>' },
+    { id: T.START, color: '#10b981', label: 'スタート', icon: '<polygon points="5 3 19 12 5 21"/>' }
 ];
-let currentBrush = 1;
 
-let player = { x: 0, y: 0, vx: 0, vy: 0, w: 26, h: 26, state: 'idle', coins: 0, hasKey: false, grounded: false, faceDir: 1 };
+let currentBrush = T.BLOCK;
+let player = { x: 0, y: 0, vx: 0, vy: 0, w: 26, h: 26, state: 'idle', coins: 0, hasKey: false, grounded: false, faceDir: 1, warpCooldown: 0 };
+let totalCoinsInStage = 0;
 let enemies = [];
 let particles = [];
+let beamTimer = 0;
 
 function initMap() {
-    mapData = [];
-    for(let r=0; r<MAP_ROWS; r++) {
-        mapData.push(new Array(MAP_COLS).fill(0));
-    }
-    for(let c=0; c<MAP_COLS; c++) {
-        mapData[MAP_ROWS-1][c] = 1;
-        mapData[MAP_ROWS-2][c] = 1;
-        if(c===0 || c===MAP_COLS-1) {
-            for(let r=0; r<MAP_ROWS; r++) mapData[r][c] = 1;
+    mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
+    for (let c = 0; c < MAP_COLS; c++) {
+        mapData[MAP_ROWS-1][c] = T.BLOCK;
+        mapData[MAP_ROWS-2][c] = T.BLOCK;
+        if (c === 0 || c === MAP_COLS-1) {
+            for (let r = 0; r < MAP_ROWS; r++) mapData[r][c] = T.BLOCK;
         }
     }
-    mapData[MAP_ROWS-4][3] = 9; 
+    mapData[MAP_ROWS-3][3] = T.START;
+    mapData[MAP_ROWS-3][15] = T.GOAL;
+    updateCourseHUDInfo();
 }
 
 function initPalette() {
     const pal = document.getElementById('palette');
-    let html = '';
-    paletteItems.forEach(item => {
-        html += `<div class="palette-item ${item.id===currentBrush?'selected':''}" data-id="${item.id}" style="color:${item.color}" onclick="selectBrush(${item.id})">
+    pal.innerHTML = paletteItems.map(item => `
+        <div class="palette-item ${item.id===currentBrush?'selected':''}" data-id="${item.id}" style="color:${item.color}" onclick="selectBrush(${item.id})">
             <svg stroke="currentColor" fill="none" stroke-width="2.5" viewBox="0 0 24 24">${item.icon}</svg>
-        </div>`;
-    });
-    pal.innerHTML = html;
+            <span class="palette-label">${item.label}</span>
+        </div>
+    `).join('');
 }
 
 function selectBrush(id) {
@@ -326,24 +392,37 @@ function selectBrush(id) {
     });
 }
 
+function togglePalette() {
+    const wrap = document.getElementById('palette-wrap');
+    const btn = document.getElementById('palette-toggle');
+    wrap.classList.toggle('collapsed');
+    btn.innerText = wrap.classList.contains('collapsed') ? '▲ ツール開く' : '▼ ツール閉じる';
+}
+
+function adjustZoom(delta) {
+    zoomScale = Math.min(Math.max(0.5, zoomScale + delta), 1.8);
+    document.getElementById('zoom-text').innerText = Math.round(zoomScale * 100) + '%';
+    resize();
+}
+
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    ctx.imageSmoothingEnabled = false;
 }
 window.addEventListener('resize', resize);
+
 initMap();
 initPalette();
 resize();
 
 /* =========================================================
-   3. モード切替 & プレイロジック
+   2. モード切り替え & ゲーム開始
 ========================================================= */
 function setMode(newMode) {
     mode = newMode;
     document.getElementById('btn-edit').classList.toggle('active', mode === 'edit');
     document.getElementById('btn-play').classList.toggle('active', mode === 'play');
-    document.getElementById('palette').classList.toggle('hidden', mode === 'play');
+    document.getElementById('palette-wrap').style.display = (mode === 'play') ? 'none' : 'flex';
     
     const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
     document.getElementById('mobile-controls').style.display = (mode === 'play' && isMobile) ? 'flex' : 'none';
@@ -356,78 +435,112 @@ function startPlay() {
     player.hasKey = false;
     player.coins = 0;
     player.state = 'idle';
-    player.vx = 0; player.vy = 0;
-    updateHUD();
+    player.vx = 0; player.vy = 0; player.warpCooldown = 0;
     document.getElementById('center-msg').classList.remove('show');
 
+    // コイン総数をカウント（1枚ずつ加算用）
+    totalCoinsInStage = 0;
     let startFound = false;
-    for(let r=0; r<MAP_ROWS; r++) {
-        for(let c=0; c<MAP_COLS; c++) {
-            if (mapData[r][c] === 9) {
-                player.x = c * TILE_SIZE + (TILE_SIZE - player.w)/2;
+
+    for (let r = 0; r < MAP_ROWS; r++) {
+        for (let c = 0; c < MAP_COLS; c++) {
+            const tile = mapData[r][c];
+            if (tile === T.COIN) totalCoinsInStage++;
+            else if (tile === T.START) {
+                player.x = c * TILE_SIZE + (TILE_SIZE - player.w) / 2;
                 player.y = r * TILE_SIZE + (TILE_SIZE - player.h);
                 startFound = true;
-            } else if (mapData[r][c] === 8) {
+            } else if (tile === T.ENEMY) {
                 enemies.push({
                     x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28),
-                    vx: -2, w: 28, h: 28, blink: 0
+                    vx: -2, vy: 0, w: 28, h: 28, blink: 0
                 });
             }
         }
     }
-    if(!startFound) { player.x = 2 * TILE_SIZE; player.y = 2 * TILE_SIZE; }
+    if (!startFound) { player.x = 2 * TILE_SIZE; player.y = 2 * TILE_SIZE; }
 
-    camera.x = player.x + player.w/2 - canvas.width/2;
-    camera.y = player.y + player.h/2 - canvas.height/2;
+    updateHUD();
+    camera.x = player.x + player.w/2 - (canvas.width / zoomScale) / 2;
+    camera.y = player.y + player.h/2 - (canvas.height / zoomScale) / 2;
 }
 
-function die() {
-    player.state = 'dead';
-    createParticles(player.x + player.w/2, player.y + player.h/2, '#00f3ff', 30);
-    setTimeout(() => { if(mode === 'play') startPlay(); }, 1200);
+function showToast(text) {
+    const t = document.getElementById('toast-msg');
+    t.innerText = text;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-function win() {
-    if (player.state === 'clear') return;
-    player.state = 'clear';
-    const msg = document.getElementById('center-msg');
-    msg.innerText = "STAGE CLEAR!";
-    msg.style.color = "var(--accent-gold)";
-    msg.classList.add('show');
-    
-    if (currentStageId) {
-        const token = localStorage.getItem("access_token");
-        fetch(`/api/maker/stages/${currentStageId}/clear`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({})
-        }).catch(e=>console.log(e));
+function updateCourseHUDInfo() {
+    const tag = document.getElementById('hud-course-tag');
+    const title = document.getElementById('hud-course-title');
+    if (currentStageInfo.isMine) {
+        tag.className = 'course-tag tag-my';
+        tag.innerText = 'MY COURSE';
+    } else {
+        tag.className = 'course-tag tag-other';
+        tag.innerText = '作者: ' + currentStageInfo.author;
     }
-
-    setTimeout(() => setMode('edit'), 2500);
+    title.innerText = currentStageInfo.title;
 }
 
 function updateHUD() {
     document.getElementById('hud-coins').innerText = player.coins;
-    document.getElementById('hud-key').style.color = player.hasKey ? '#ff9900' : '#666';
+    document.getElementById('hud-total-coins').innerText = totalCoinsInStage;
+    const keyEl = document.getElementById('hud-key');
+    document.getElementById('hud-key-text').innerText = player.hasKey ? 'あり' : 'なし';
+    keyEl.style.color = player.hasKey ? '#ffcc00' : '#666';
+}
+
+function die() {
+    player.state = 'dead';
+    createParticles(player.x + player.w/2, player.y + player.h/2, '#ff4757', 30);
+    setTimeout(() => { if (mode === 'play') startPlay(); }, 1000);
+}
+
+function win() {
+    if (player.state === 'clear') return;
+
+    // ゴール条件チェック: コインがステージ上にある場合、全回収が条件！
+    if (player.coins < totalCoinsInStage) {
+        showToast(`コインをぜんぶ集めてね！（残り: ${totalCoinsInStage - player.coins}枚）`);
+        return;
+    }
+
+    player.state = 'clear';
+    const msg = document.getElementById('center-msg');
+    msg.innerText = "STAGE CLEAR!";
+    msg.classList.add('show');
+    
+    if (currentStageInfo.id) {
+        const token = localStorage.getItem("access_token");
+        fetch(`/api/maker/stages/${currentStageInfo.id}/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+        }).catch(e => console.log(e));
+    }
+
+    setTimeout(() => setMode('edit'), 2200);
 }
 
 /* =========================================================
-   4. 入力・コントロール
+   3. 入力・操作 (PC / スマホ両対応)
 ========================================================= */
 window.addEventListener('keydown', e => {
-    if(mode !== 'play') return;
-    if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
-    if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
-    if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
-        if(!keys.jump) { keys.jump = true; doJump(); }
+    if (mode !== 'play') return;
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        if (!keys.jump) { keys.jump = true; doJump(); }
     }
 });
 window.addEventListener('keyup', e => {
-    if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
-    if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
-    if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
 });
+
 function doJump() {
     if (player.state !== 'dead' && player.grounded) {
         player.vy = -12;
@@ -436,130 +549,129 @@ function doJump() {
     }
 }
 
+// 描画・操作イベント
 canvas.addEventListener('mousedown', e => {
-    if(e.button === 0) input.isDown = true;
-    if(e.button === 2) input.rightDown = true;
-    if(currentBrush === 100) input.rightDown = true; // PCでもPanツールは右クリ扱い
+    if (e.button === 0) input.isDown = true;
+    if (e.button === 2 || currentBrush === T.PAN) input.rightDown = true;
     handlePaint(e);
 });
-window.addEventListener('mouseup', e => {
-    if(e.button === 0) input.isDown = false;
-    if(e.button === 2) input.rightDown = false;
-    if(currentBrush === 100) input.rightDown = false;
-});
+window.addEventListener('mouseup', () => { input.isDown = false; input.rightDown = false; });
 canvas.addEventListener('mousemove', e => {
-    if(mode === 'edit' && input.rightDown) {
-        camera.x -= e.movementX; camera.y -= e.movementY;
+    if (mode === 'edit' && input.rightDown) {
+        camera.x -= e.movementX / zoomScale;
+        camera.y -= e.movementY / zoomScale;
     } else { handlePaint(e); }
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 function handlePaint(e) {
-    if(mode !== 'edit' || !input.isDown || currentBrush === 100) return;
+    if (mode !== 'edit' || !input.isDown || currentBrush === T.PAN) return;
     const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
+    const cx = (e.clientX - rect.left) / zoomScale;
+    const cy = (e.clientY - rect.top) / zoomScale;
     
     const col = Math.floor((cx + camera.x) / TILE_SIZE);
     const row = Math.floor((cy + camera.y) / TILE_SIZE);
 
     if (row >= 0 && row < MAP_ROWS && col >= 0 && col < MAP_COLS) {
-        if (currentBrush === 9) {
-            for(let r=0; r<MAP_ROWS; r++) for(let c=0; c<MAP_COLS; c++) if(mapData[r][c] === 9) mapData[r][c] = 0;
+        if (currentBrush === T.START) {
+            for (let r=0; r<MAP_ROWS; r++) for (let c=0; c<MAP_COLS; c++) if (mapData[r][c] === T.START) mapData[r][c] = 0;
         }
         mapData[row][col] = currentBrush;
     }
 }
 
+// スマホタッチ
 const bindBtn = (id, key) => {
     const btn = document.getElementById(id);
-    btn.addEventListener('touchstart', (e) => { e.preventDefault(); if(key==='jump'){if(!keys.jump)doJump();} keys[key] = true; }, {passive:false});
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); if (key==='jump'){if(!keys.jump)doJump();} keys[key] = true; }, {passive:false});
     btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; }, {passive:false});
 };
 bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-jump', 'jump');
 
-// スマホの描画/スクロール完全分離
 let lastTouch = null;
 canvas.addEventListener('touchstart', e => {
-    if(mode === 'edit' && e.touches.length===1) {
-        lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-        if (currentBrush !== 100) {
-            input.isDown = true; handlePaint(e.touches[0]);
-        }
+    if (mode === 'edit' && e.touches.length === 1) {
+        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        if (currentBrush !== T.PAN) { input.isDown = true; handlePaint(e.touches[0]); }
     }
 });
 canvas.addEventListener('touchmove', e => {
-    if(mode === 'edit' && e.touches.length===1 && lastTouch) {
-        if(currentBrush === 100) { 
-            // PANツールの場合はスワイプで画面移動
-            camera.x -= e.touches[0].clientX - lastTouch.x;
-            camera.y -= e.touches[0].clientY - lastTouch.y;
-            lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-        } else if (input.isDown) {
-            // 他のツールの場合はなぞって描画
-            handlePaint(e.touches[0]);
-        }
+    if (mode === 'edit' && e.touches.length === 1 && lastTouch) {
+        if (currentBrush === T.PAN) {
+            camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale;
+            camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale;
+            lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (input.isDown) { handlePaint(e.touches[0]); }
     }
 }, {passive:false});
 canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; });
 
 /* =========================================================
-   5. 物理演算
+   4. 物理演算 & 新ブロック仕掛けロジック
 ========================================================= */
 function getTile(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
-    if(col<0 || col>=MAP_COLS || row<0 || row>=MAP_ROWS) return 1;
+    if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return T.BLOCK;
     return mapData[row][col];
 }
-function isSolid(t) { return t === 1 || t === 6; }
+
+function isSolid(t) {
+    return t === T.BLOCK || t === T.BRICK || t === T.DOOR || t === T.BEAM;
+}
 
 function updatePhysics() {
     if (player.state === 'dead' || player.state === 'clear') return;
 
+    if (player.warpCooldown > 0) player.warpCooldown--;
+
+    // 横移動
     if (keys.left) { player.vx -= 0.8; player.faceDir = -1; }
     if (keys.right) { player.vx += 0.8; player.faceDir = 1; }
     if (!keys.left && !keys.right) player.vx *= 0.75;
     
-    if (player.vx > 6) player.vx = 6;
-    if (player.vx < -6) player.vx = -6;
+    player.vx = Math.max(-6, Math.min(6, player.vx));
     if (Math.abs(player.vx) < 0.1) player.vx = 0;
 
-    player.vy += 0.65; 
+    // 重力
+    player.vy += 0.65;
     if (player.vy > 14) player.vy = 14;
 
+    // X軸衝突判定
     player.x += player.vx;
-    checkMapCollision(true);
+    checkCollision(true);
 
+    // Y軸衝突判定
     player.y += player.vy;
     player.grounded = false;
-    checkMapCollision(false);
+    checkCollision(false);
 
-    if (player.y > MAP_ROWS * TILE_SIZE + 200) die();
+    if (player.y > MAP_ROWS * TILE_SIZE + 100) die();
 
+    // 敵の移動と判定
     enemies.forEach(e => {
-        e.vy = (e.vy || 0) + 0.6;
+        e.vy += 0.6;
         e.x += e.vx;
-        if(isSolid(getTile(e.x + (e.vx>0?e.w:0), e.y + e.h/2))) {
-            e.vx *= -1; e.x += e.vx;
-        }
+        if (isSolid(getTile(e.x + (e.vx > 0 ? e.w : 0), e.y + e.h/2))) { e.vx *= -1; e.x += e.vx; }
         e.y += e.vy;
-        if(e.vy > 0 && isSolid(getTile(e.x + e.w/2, e.y + e.h))) {
-            e.y = Math.floor((e.y+e.h)/TILE_SIZE)*TILE_SIZE - e.h;
+        if (e.vy > 0 && isSolid(getTile(e.x + e.w/2, e.y + e.h))) {
+            e.y = Math.floor((e.y + e.h) / TILE_SIZE) * TILE_SIZE - e.h;
             e.vy = 0;
         }
         e.blink = (e.blink + 1) % 100;
 
         if (rectIntersect(player, e)) {
-            if (player.vy > 0 && player.y + player.h - e.y < 20) {
+            if (player.vy > 0 && player.y + player.h - e.y < 18) {
                 e.dead = true; player.vy = -10;
-                createParticles(e.x+e.w/2, e.y+e.h/2, '#fff', 15);
-            } else {
-                die();
-            }
+                createParticles(e.x + e.w/2, e.y + e.h/2, '#a855f7', 15);
+            } else { die(); }
         }
     });
     enemies = enemies.filter(e => !e.dead);
+
+    // ビーム砲のタイマー＆判定
+    beamTimer = (beamTimer + 1) % 120; // 2秒周期
 }
 
 function rectIntersect(r1, r2) {
@@ -567,7 +679,7 @@ function rectIntersect(r1, r2) {
            r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
 }
 
-function checkMapCollision(isX) {
+function checkCollision(isX) {
     const p = player;
     const left = Math.floor(p.x / TILE_SIZE);
     const right = Math.floor((p.x + p.w - 0.1) / TILE_SIZE);
@@ -577,39 +689,80 @@ function checkMapCollision(isX) {
     for (let r = top; r <= bottom; r++) {
         for (let c = left; c <= right; c++) {
             if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) continue;
-            let t = mapData[r][c];
+            let tile = mapData[r][c];
 
-            if (t === 2) { die(); return; } 
-            if (t === 3) { 
-                mapData[r][c] = 0; player.coins += 10; updateHUD();
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ffcc00', 8);
+            // 針（各種向き）
+            if (tile === T.SPIKE_UP || tile === T.SPIKE_DOWN || tile === T.SPIKE_LEFT || tile === T.SPIKE_RIGHT) {
+                die(); return;
             }
-            if (t === 5) { 
+
+            // コイン（1枚ずつ加算！）
+            if (tile === T.COIN) {
+                mapData[r][c] = 0; player.coins += 1; updateHUD();
+                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ffcc00', 6);
+            }
+
+            // カギ
+            if (tile === T.KEY) {
                 mapData[r][c] = 0; player.hasKey = true; updateHUD();
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ff9900', 12);
+                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#f39c12', 10);
             }
-            if (t === 4) { win(); return; }
 
-            if (t === 6 && player.hasKey) {
-                mapData[r][c] = 0;
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#888', 15);
+            // ドア
+            if (tile === T.DOOR && player.hasKey) {
+                mapData[r][c] = 0; createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#8e44ad', 12);
                 continue;
             }
-            
-            if (t === 7 && !isX && p.vy > 0) {
-                p.vy = -20; p.y = r * TILE_SIZE - p.h; 
-                createParticles(p.x+p.w/2, p.y+p.h, '#00f3ff', 10);
+
+            // ジャンプバネ
+            if (tile === T.BOUNCER && !isX && p.vy > 0) {
+                p.vy = -18; p.y = r * TILE_SIZE - p.h;
+                createParticles(p.x+p.w/2, p.y+p.h, '#00f0ff', 12);
                 return;
             }
 
-            if (isSolid(t)) {
+            // 一方通行床（上から降りてきた時のみ固い）
+            if (tile === T.ONEWAY && !isX && p.vy > 0 && (p.y + p.h - p.vy) <= r * TILE_SIZE + 8) {
+                p.y = r * TILE_SIZE - p.h; p.grounded = true; p.vy = 0;
+                return;
+            }
+
+            // ワープゲート (1対1で相互移動)
+            if ((tile === T.WARP_A || tile === T.WARP_B) && p.warpCooldown === 0) {
+                const targetType = (tile === T.WARP_A) ? T.WARP_B : T.WARP_A;
+                for (let tr = 0; tr < MAP_ROWS; tr++) {
+                    for (let tc = 0; tc < MAP_COLS; tc++) {
+                        if (mapData[tr][tc] === targetType) {
+                            p.x = tc * TILE_SIZE + (TILE_SIZE - p.w)/2;
+                            p.y = tr * TILE_SIZE + (TILE_SIZE - p.h);
+                            p.warpCooldown = 60; // 1秒間クールダウン
+                            createParticles(p.x+p.w/2, p.y+p.h/2, '#9b59b6', 20);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // ゴール
+            if (tile === T.GOAL) { win(); return; }
+
+            // 固いブロック処理（頭ぶつけ壊れるブロック対応！）
+            if (isSolid(tile)) {
                 if (isX) {
                     if (p.vx > 0) p.x = c * TILE_SIZE - p.w;
                     else if (p.vx < 0) p.x = c * TILE_SIZE + TILE_SIZE;
                     p.vx = 0;
                 } else {
-                    if (p.vy > 0) { p.y = r * TILE_SIZE - p.h; p.grounded = true; }
-                    else if (p.vy < 0) { p.y = r * TILE_SIZE + TILE_SIZE; }
+                    if (p.vy > 0) {
+                        p.y = r * TILE_SIZE - p.h; p.grounded = true;
+                    } else if (p.vy < 0) {
+                        p.y = r * TILE_SIZE + TILE_SIZE;
+                        // 頭をぶつけたら壊れるブロック！
+                        if (tile === T.BRICK) {
+                            mapData[r][c] = 0;
+                            createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#e67e22', 15);
+                        }
+                    }
                     p.vy = 0;
                 }
             }
@@ -618,195 +771,169 @@ function checkMapCollision(isX) {
 }
 
 function createParticles(x, y, color, count) {
-    for(let i=0; i<count; i++) {
+    for (let i = 0; i < count; i++) {
         particles.push({
-            x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 2, life: 1.0, color
+            x, y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8 - 1, life: 1.0, color
         });
     }
 }
 
-// 角丸矩形描画ヘルパー
-function roundRect(ctx, x, y, width, height, radius) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-}
-
 /* =========================================================
-   6. カートゥーン風 描画
+   5. カートゥーン＆コミカル風 描画処理
 ========================================================= */
 function draw() {
-    ctx.fillStyle = '#1a1e29';
+    ctx.save();
+    ctx.fillStyle = '#1e2430';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // カメラ追従 (ズーム反映)
+    const viewW = canvas.width / zoomScale;
+    const viewH = canvas.height / zoomScale;
+
     if (mode === 'play') {
-        const targetCx = player.x + player.w/2 - canvas.width/2;
-        const targetCy = player.y + player.h/2 - canvas.height/2;
+        const targetCx = player.x + player.w/2 - viewW / 2;
+        const targetCy = player.y + player.h/2 - viewH / 2;
         camera.x += (targetCx - camera.x) * 0.15;
         camera.y += (targetCy - camera.y) * 0.15;
     }
     
-    const maxCx = Math.max(0, MAP_COLS * TILE_SIZE - canvas.width);
-    const maxCy = Math.max(0, MAP_ROWS * TILE_SIZE - canvas.height);
-    if(camera.x < 0) camera.x = 0; if(camera.x > maxCx) camera.x = maxCx;
-    if(camera.y < 0) camera.y = 0; if(camera.y > maxCy) camera.y = maxCy;
+    camera.x = Math.max(0, Math.min(MAP_COLS * TILE_SIZE - viewW, camera.x));
+    camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, camera.y));
 
-    ctx.save();
+    ctx.scale(zoomScale, zoomScale);
     ctx.translate(-camera.x, -camera.y);
 
+    // グリッド（エディットモード時）
     if (mode === 'edit') {
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        ctx.lineWidth = 1;
-        const startC = Math.max(0, Math.floor(camera.x / TILE_SIZE));
-        const endC = Math.min(MAP_COLS, Math.ceil((camera.x + canvas.width) / TILE_SIZE));
-        const startR = Math.max(0, Math.floor(camera.y / TILE_SIZE));
-        const endR = Math.min(MAP_ROWS, Math.ceil((camera.y + canvas.height) / TILE_SIZE));
-        
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+        const sC = Math.max(0, Math.floor(camera.x / TILE_SIZE));
+        const eC = Math.min(MAP_COLS, Math.ceil((camera.x + viewW) / TILE_SIZE));
+        const sR = Math.max(0, Math.floor(camera.y / TILE_SIZE));
+        const eR = Math.min(MAP_ROWS, Math.ceil((camera.y + viewH) / TILE_SIZE));
+
         ctx.beginPath();
-        for(let c=startC; c<=endC; c++) { ctx.moveTo(c*TILE_SIZE, startR*TILE_SIZE); ctx.lineTo(c*TILE_SIZE, endR*TILE_SIZE); }
-        for(let r=startR; r<=endR; r++) { ctx.moveTo(startC*TILE_SIZE, r*TILE_SIZE); ctx.lineTo(endC*TILE_SIZE, r*TILE_SIZE); }
+        for (let c=sC; c<=eC; c++) { ctx.moveTo(c*TILE_SIZE, sR*TILE_SIZE); ctx.lineTo(c*TILE_SIZE, eR*TILE_SIZE); }
+        for (let r=sR; r<=eR; r++) { ctx.moveTo(sC*TILE_SIZE, r*TILE_SIZE); ctx.lineTo(eC*TILE_SIZE, r*TILE_SIZE); }
         ctx.stroke();
     }
 
-    const startCol = Math.max(0, Math.floor(camera.x / TILE_SIZE));
-    const endCol = Math.min(MAP_COLS, Math.ceil((camera.x + canvas.width) / TILE_SIZE));
-    const startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
-    const endRow = Math.min(MAP_ROWS, Math.ceil((camera.y + canvas.height) / TILE_SIZE));
+    const sC = Math.max(0, Math.floor(camera.x / TILE_SIZE));
+    const eC = Math.min(MAP_COLS, Math.ceil((camera.x + viewW) / TILE_SIZE));
+    const sR = Math.max(0, Math.floor(camera.y / TILE_SIZE));
+    const eR = Math.min(MAP_ROWS, Math.ceil((camera.y + viewH) / TILE_SIZE));
 
-    ctx.lineWidth = 3; // カートゥーン風の太いアウトライン
-    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#000';
 
-    for (let r = startRow; r < endRow; r++) {
-        for (let c = startCol; c < endCol; c++) {
-            const t = mapData[r][c];
-            if (t === 0) continue;
-            
+    for (let r = sR; r < eR; r++) {
+        for (let c = sC; c < eC; c++) {
+            const tile = mapData[r][c];
+            if (tile === 0) continue;
+
             const x = c * TILE_SIZE, y = r * TILE_SIZE, ts = TILE_SIZE, hc = ts/2;
-            ctx.strokeStyle = '#000'; // すべてのオブジェクトに黒枠
 
-            if (t === 1) { // ブロック
-                ctx.fillStyle = '#4a5568';
-                roundRect(ctx, x, y, ts, ts, 4);
-                ctx.fillStyle = '#2d3748';
-                ctx.fillRect(x+4, y+4, ts-8, ts-12); // 少し立体感
+            if (tile === T.BLOCK) {
+                ctx.fillStyle = '#4a5568'; ctx.fillRect(x, y, ts, ts); ctx.strokeRect(x, y, ts, ts);
+                ctx.fillStyle = '#2d3748'; ctx.fillRect(x+4, y+4, ts-8, ts-8);
             }
-            else if (t === 2) { // トゲ
-                ctx.fillStyle = '#ff477e';
-                ctx.beginPath(); ctx.moveTo(x+hc, y+4); ctx.lineTo(x+ts-2, y+ts); ctx.lineTo(x+2, y+ts); ctx.closePath();
-                ctx.fill(); ctx.stroke();
-                // ハイライト
-                ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.beginPath(); ctx.moveTo(x+hc, y+10); ctx.lineTo(x+hc+6, y+ts-4); ctx.lineTo(x+hc-2, y+ts-4); ctx.fill();
+            else if (tile === T.BRICK) { // 壊れるブロック
+                ctx.fillStyle = '#e67e22'; ctx.fillRect(x, y, ts, ts); ctx.strokeRect(x, y, ts, ts);
+                ctx.fillStyle = '#d35400'; ctx.fillRect(x+2, y+10, ts-4, 4); ctx.fillRect(x+10, y+2, 4, ts-4);
             }
-            else if (t === 3) { // コイン
-                ctx.fillStyle = '#ffcc00';
-                ctx.beginPath(); ctx.arc(x+hc, y+hc, ts/3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = '#b38f00'; ctx.fillRect(x+hc-2, y+hc-ts/5, 4, ts/2.5);
+            else if (tile === T.ONEWAY) { // 一方通行
+                ctx.fillStyle = '#2ecc71'; ctx.fillRect(x, y, ts, 10); ctx.strokeRect(x, y, ts, 10);
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x+hc, y+14); ctx.lineTo(x+hc-6, y+24); ctx.lineTo(x+hc+6, y+24); ctx.fill();
             }
-            else if (t === 4) { // ゴール
-                ctx.fillStyle = '#fff'; 
-                ctx.fillRect(x+ts/4, y, 4, ts); ctx.strokeRect(x+ts/4, y, 4, ts);
-                ctx.fillStyle = '#ff3366'; 
-                ctx.beginPath(); ctx.moveTo(x+ts/4+4, y+2); ctx.lineTo(x+ts-2, y+ts/4); ctx.lineTo(x+ts/4+4, y+ts/2); ctx.closePath();
-                ctx.fill(); ctx.stroke();
+            else if (tile === T.SPIKE_UP) drawSpike(x, y, ts, 'up');
+            else if (tile === T.SPIKE_DOWN) drawSpike(x, y, ts, 'down');
+            else if (tile === T.SPIKE_LEFT) drawSpike(x, y, ts, 'left');
+            else if (tile === T.SPIKE_RIGHT) drawSpike(x, y, ts, 'right');
+            else if (tile === T.BEAM) { // ビーム砲
+                ctx.fillStyle = '#e74c3c'; ctx.fillRect(x, y, ts, ts); ctx.strokeRect(x, y, ts, ts);
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 6, 0, Math.PI*2); ctx.fill();
+                
+                // 一定間隔で右方向にビーム発射！
+                if (beamTimer > 40) {
+                    ctx.fillStyle = 'rgba(255, 71, 87, 0.85)';
+                    ctx.fillRect(x + ts, y + hc - 6, 200, 12);
+                    // プレイヤーへのビーム判定
+                    if (mode === 'play' && rectIntersect(player, { x: x + ts, y: y + hc - 6, w: 200, h: 12 })) {
+                        die();
+                    }
+                }
             }
-            else if (t === 5) { // カギ
-                ctx.fillStyle = '#ff9900';
-                ctx.beginPath(); ctx.arc(x+ts*0.3, y+hc, ts/5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                ctx.fillRect(x+ts*0.3, y+hc-3, ts*0.5, 6); ctx.strokeRect(x+ts*0.3, y+hc-3, ts*0.5, 6);
-                ctx.fillRect(x+ts*0.6, y+hc, 4, 8); ctx.strokeRect(x+ts*0.6, y+hc, 4, 8);
+            else if (tile === T.WARP_A || tile === T.WARP_B) {
+                ctx.fillStyle = (tile === T.WARP_A) ? '#9b59b6' : '#3498db';
+                ctx.beginPath(); ctx.arc(x+hc, y+hc, hc-2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText((tile === T.WARP_A) ? 'A' : 'B', x+hc, y+hc+6);
             }
-            else if (t === 6) { // ドア
-                ctx.fillStyle = '#8B4513'; 
-                roundRect(ctx, x, y, ts, ts, 4);
-                ctx.fillStyle = '#5C2E0B'; ctx.fillRect(x+4, y+4, ts-8, ts-8);
-                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            else if (tile === T.COIN) {
+                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 10, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#000'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('1', x+hc, y+hc+3);
             }
-            else if (t === 7) { // バウンサー(ジャンプ台)
-                ctx.fillStyle = '#00f3ff'; 
-                roundRect(ctx, x+2, y+ts-12, ts-4, 12, 4);
-                ctx.fillStyle = '#fff'; ctx.fillRect(x+6, y+ts-10, ts-12, 4);
+            else if (tile === T.KEY) {
+                ctx.fillStyle = '#f39c12'; ctx.beginPath(); ctx.arc(x+12, y+hc, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.fillRect(x+12, y+hc-2, 16, 4); ctx.strokeRect(x+12, y+hc-2, 16, 4);
             }
-            else if (t === 8 && mode === 'edit') { // 敵（エディット用表示）
-                ctx.fillStyle = '#a855f7';
-                roundRect(ctx, x+4, y+ts-28, 28, 28, 6);
-                // 怒り目
-                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x+12, y+ts-18, 4, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(x+24, y+ts-18, 4, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#000'; ctx.fillRect(x+11, y+ts-19, 2, 2); ctx.fillRect(x+23, y+ts-19, 2, 2);
-                ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(x+8, y+ts-22); ctx.lineTo(x+14, y+ts-19); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(x+28, y+ts-22); ctx.lineTo(x+22, y+ts-19); ctx.stroke();
+            else if (tile === T.DOOR) {
+                ctx.fillStyle = '#8e44ad'; ctx.fillRect(x+4, y, ts-8, ts); ctx.strokeRect(x+4, y, ts-8, ts);
+                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(x+ts-10, y+hc, 4, 0, Math.PI*2); ctx.fill();
             }
-            else if (t === 9) { // スタート
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.4)'; 
-                roundRect(ctx, x, y, ts, ts, 4);
-                ctx.fillStyle = '#fff'; ctx.font = "bold 12px sans-serif"; ctx.fillText("START", x+2, y+hc+4);
+            else if (tile === T.BOUNCER) {
+                ctx.fillStyle = '#00f0ff'; ctx.fillRect(x+2, y+ts-12, ts-4, 12); ctx.strokeRect(x+2, y+ts-12, ts-4, 12);
+            }
+            else if (tile === T.ENEMY && mode === 'edit') {
+                ctx.fillStyle = '#a855f7'; ctx.fillRect(x+6, y+ts-28, 28, 28); ctx.strokeRect(x+6, y+ts-28, 28, 28);
+            }
+            else if (tile === T.GOAL) {
+                ctx.fillStyle = '#fff'; ctx.fillRect(x+8, y, 4, ts); ctx.strokeRect(x+8, y, 4, ts);
+                ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.moveTo(x+12, y+2); ctx.lineTo(x+ts-2, y+10); ctx.lineTo(x+12, y+18); ctx.closePath(); ctx.fill(); ctx.stroke();
+            }
+            else if (tile === T.START) {
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.4)'; ctx.fillRect(x, y, ts, ts);
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('START', x+hc, y+hc+4);
             }
         }
     }
 
-    // プレイヤー描画
-    if (player.state !== 'dead') {
-        ctx.fillStyle = '#00f3ff';
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-        roundRect(ctx, player.x, player.y, player.w, player.h, 6);
-        
-        // 目 (向いている方向で変化)
-        ctx.fillStyle = '#fff';
-        const eyeOffsetX = player.faceDir > 0 ? 8 : 4;
-        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10 + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
+    // トゲ描画ヘルパー
+    function drawSpike(x, y, ts, dir) {
+        ctx.fillStyle = '#ff477e'; ctx.beginPath();
+        if (dir==='up') { ctx.moveTo(x+ts/2, y+2); ctx.lineTo(x+ts-2, y+ts); ctx.lineTo(x+2, y+ts); }
+        else if (dir==='down') { ctx.moveTo(x+ts/2, y+ts-2); ctx.lineTo(x+ts-2, y+2); ctx.lineTo(x+2, y+2); }
+        else if (dir==='left') { ctx.moveTo(x+2, y+ts/2); ctx.lineTo(x+ts, y+2); ctx.lineTo(x+ts, y+ts-2); }
+        else if (dir==='right') { ctx.moveTo(x+ts-2, y+ts/2); ctx.lineTo(x+2, y+2); ctx.lineTo(x+2, y+ts-2); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
     }
 
-    // 敵描画 (プレイモード)
+    // プレイヤー描画 (ポップなコミカルデザイン)
+    if (player.state !== 'dead') {
+        ctx.fillStyle = '#00f0ff'; ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.strokeRect(player.x, player.y, player.w, player.h);
+        
+        // 目
+        ctx.fillStyle = '#fff';
+        const eyeX = player.faceDir > 0 ? player.x + 12 : player.x + 4;
+        ctx.fillRect(eyeX, player.y + 6, 5, 8); ctx.fillRect(eyeX + 8, player.y + 6, 5, 8);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(eyeX + (player.faceDir>0?2:0), player.y + 8, 3, 4);
+        ctx.fillRect(eyeX + 8 + (player.faceDir>0?2:0), player.y + 8, 3, 4);
+    }
+
+    // 敵描画
     if (mode === 'play') {
         enemies.forEach(e => {
-            ctx.fillStyle = '#a855f7'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-            roundRect(ctx, e.x, e.y, e.w, e.h, 6);
-            
-            if(e.blink < 90) { // まばたき処理
-                ctx.fillStyle = '#fff'; 
-                const ex = e.vx > 0 ? e.x+14 : e.x+6;
-                ctx.beginPath(); ctx.arc(ex, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                ctx.beginPath(); ctx.arc(ex+8, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                
-                ctx.fillStyle = '#000';
-                ctx.beginPath(); ctx.arc(ex+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(ex+8+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
-                
-                // 怒り眉
-                ctx.beginPath(); ctx.moveTo(ex-3, e.y+5); ctx.lineTo(ex+3, e.y+8); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(ex+11, e.y+5); ctx.lineTo(ex+5, e.y+8); ctx.stroke();
-            } else {
-                ctx.beginPath(); ctx.moveTo(e.x+6, e.y+10); ctx.lineTo(e.x+12, e.y+10); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(e.x+16, e.y+10); ctx.lineTo(e.x+22, e.y+10); ctx.stroke();
-            }
+            ctx.fillStyle = '#a855f7'; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.strokeRect(e.x, e.y, e.w, e.h);
+            ctx.fillStyle = '#fff'; ctx.fillRect(e.x+4, e.y+6, 6, 6); ctx.fillRect(e.x+16, e.y+6, 6, 6);
+            ctx.fillStyle = '#000'; ctx.fillRect(e.x+6, e.y+8, 3, 3); ctx.fillRect(e.x+18, e.y+8, 3, 3);
         });
     }
 
     // パーティクル
-    for(let i=particles.length-1; i>=0; i--) {
-        let p = particles[i];
-        p.x += p.vx; p.y += p.vy; p.life -= 0.05;
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color; 
-        ctx.fillRect(p.x, p.y, 6, 6);
-        ctx.globalAlpha = 1.0;
-        if(p.life <= 0) particles.splice(i, 1);
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+        ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 5, 5);
+        if (p.life <= 0) particles.splice(i, 1);
     }
 
     ctx.restore();
@@ -820,7 +947,7 @@ function loop() {
 requestAnimationFrame(loop);
 
 /* =========================================================
-   7. API・モーダル処理 (Save / Load / Admin) 完全維持
+   6. モーダル & 通信エラー復帰ロジック
 ========================================================= */
 const token = localStorage.getItem("access_token");
 
@@ -828,16 +955,16 @@ function openModal(id) { document.getElementById(id).style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
 function openSaveModal() {
-    if(mode === 'play') setMode('edit');
+    if (mode === 'play') setMode('edit');
     let hasStart = false, hasGoal = false;
-    for(let r=0; r<MAP_ROWS; r++) {
-        for(let c=0; c<MAP_COLS; c++) {
-            if(mapData[r][c] === 9) hasStart = true;
-            if(mapData[r][c] === 4) hasGoal = true;
+    for (let r=0; r<MAP_ROWS; r++) {
+        for (let c=0; c<MAP_COLS; c++) {
+            if (mapData[r][c] === T.START) hasStart = true;
+            if (mapData[r][c] === T.GOAL) hasGoal = true;
         }
     }
-    if(!hasStart || !hasGoal) {
-        alert("公開するには「スタート地点(S)」と「ゴール(旗)」がマップ内に必要です。");
+    if (!hasStart || !hasGoal) {
+        alert("公開するには「スタート地点(S)」と「ゴール(旗)」が必要です。");
         return;
     }
     openModal('modal-save');
@@ -846,7 +973,7 @@ function openSaveModal() {
 async function saveStage() {
     const title = document.getElementById('save-title').value.trim();
     const desc = document.getElementById('save-desc').value.trim();
-    if(!title) return alert("ステージ名を入力してください。");
+    if (!title) return alert("ステージ名を入力してください。");
 
     const mapStr = JSON.stringify(mapData);
     try {
@@ -857,64 +984,43 @@ async function saveStage() {
         });
         const data = await res.json();
         if (res.ok) {
-            alert(data.message);
+            alert(data.message || "公開が完了しました！");
+            currentStageInfo = { id: data.id, title, author: '自分', isMine: true };
+            updateCourseHUDInfo();
             closeModal('modal-save');
-        } else {
-            alert("エラー: " + (data.detail || "保存失敗"));
-        }
-    } catch (e) {
-        alert("通信エラーが発生しました。");
-    }
+        } else { alert("エラー: " + (data.detail || "保存失敗")); }
+    } catch (e) { alert("通信エラーが発生しました。"); }
 }
 
 async function openLoadModal() {
-    if(mode === 'play') setMode('edit');
+    if (mode === 'play') setMode('edit');
     openModal('modal-load');
     const container = document.getElementById('stage-list-container');
-    container.innerHTML = '<div style="text-align:center;color:#666;margin-top:20px;">検索中...</div>';
+    container.innerHTML = '<div style="text-align:center;color:#888;margin-top:20px;">検索中...</div>';
 
     try {
         const res = await fetch("/api/maker/stages", { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         
         if (data.stages && data.stages.length > 0) {
-            let html = '';
-            data.stages.forEach(s => {
-                const isKing = data.is_king;
-                const badges = [];
-                if (s.is_pinned) badges.push('<span style="color:var(--accent-gold); font-size:0.7rem;">[👑勅命]</span>');
-                if (s.is_confiscated) badges.push('<span style="color:var(--danger-color); font-size:0.7rem;">[🚨接収済]</span>');
-                
-                let actions = '';
-                if (s.is_mine || isKing) {
-                    actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem; border-color:var(--danger-color);" onclick="deleteStage(${s.id}, event)">破棄</button>`;
-                }
-                if (isKing) {
-                    actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="pinStage(${s.id}, event)">勅命</button>`;
-                    if(!s.is_confiscated) {
-                        actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="confiscateStage(${s.id}, event)">接収</button>`;
-                    }
-                }
-
-                html += `
+            container.innerHTML = data.stages.map(s => `
                 <div class="stage-card" onclick="loadStage(${s.id})">
-                    <div style="flex:1;">
-                        <div class="st-title">${badges.join(' ')} ${escapeHtml(s.title)}</div>
+                    <div>
+                        <div class="st-title">${s.is_mine ? '👑 [自分]' : '👤'} ${escapeHtml(s.title)}</div>
                         <div class="st-author">作: ${escapeHtml(s.creator_name)} | ${escapeHtml(s.description||'')}</div>
-                        <div class="st-stats" style="text-align:left; margin-top:6px;">プレイ: ${s.plays_count} / クリア: ${s.clears_count}</div>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-                        <button class="btn-retro" style="padding:8px 12px; font-size:0.85rem; background:var(--accent-cyan); color:#000;">PLAY</button>
-                        <div style="display:flex; gap:6px; margin-top:4px;">${actions}</div>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html;
+                    <button class="btn-retro btn-cyan">PLAY</button>
+                </div>
+            `).join('');
         } else {
-            container.innerHTML = '<div style="text-align:center;color:#666;margin-top:20px;">ステージがまだありません。</div>';
+            container.innerHTML = '<div style="text-align:center;color:#888;margin-top:20px;">ステージがありません。</div>';
         }
     } catch (e) {
-        container.innerHTML = '<div style="text-align:center;color:#ff477e;margin-top:20px;">取得エラー</div>';
+        container.innerHTML = `
+            <div style="text-align:center;color:#ff4757;margin-top:10px;">
+                通信エラーが発生しました。<br>
+                <button class="btn-retro" style="margin:10px auto;" onclick="openLoadModal()">もう一度試す</button>
+            </div>`;
     }
 }
 
@@ -924,48 +1030,17 @@ async function loadStage(id) {
         const data = await res.json();
         if (res.ok) {
             mapData = JSON.parse(data.stage.map_data);
-            currentStageId = id;
+            currentStageInfo = {
+                id: id,
+                title: data.stage.title,
+                author: data.stage.creator_name,
+                isMine: data.stage.is_mine
+            };
+            updateCourseHUDInfo();
             closeModal('modal-load');
             setMode('play'); 
-        } else {
-            alert("ロード失敗: " + data.detail);
-        }
-    } catch (e) {
-        alert("通信エラー");
-    }
-}
-
-/* --- 国王・管理アクション --- */
-async function deleteStage(id, e) {
-    e.stopPropagation();
-    if(!confirm("本当にこの迷宮を破壊しますか？")) return;
-    try {
-        const res = await fetch(`/api/maker/stages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal(); 
-    } catch(e) { alert("エラーが発生しました。"); }
-}
-
-async function pinStage(id, e) {
-    e.stopPropagation();
-    try {
-        const res = await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal();
-    } catch(e) { alert("エラーが発生しました。"); }
-}
-
-async function confiscateStage(id, e) {
-    e.stopPropagation();
-    if(!confirm("この迷宮の著作権を国庫へ強制接収しますか？")) return;
-    try {
-        const res = await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        alert(data.message);
-        openLoadModal();
-    } catch(e) { alert("エラーが発生しました。"); }
+        } else { alert("ロード失敗: " + data.detail); }
+    } catch (e) { alert("通信エラーが発生しました。"); }
 }
 </script>
 </body>
