@@ -16,7 +16,6 @@
             --accent-gold: #f5c518;
             --accent-cyan: #00f3ff;
             --danger-color: #ff3366;
-            --success-color: #2ed573;
             --chamfer-clip: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
         }
 
@@ -29,7 +28,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-base);
             color: var(--text-primary);
             overflow: hidden;
@@ -55,18 +54,18 @@
         }
 
         #toast-container {
-            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 125px; left: 50%; transform: translateX(-50%);
             display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none;
             width: 90%; max-width: 360px; align-items: center;
         }
         .toast {
-            background: rgba(255, 51, 102, 0.94); backdrop-filter: blur(8px); color: #fff;
+            background: rgba(255, 51, 102, 0.92); backdrop-filter: blur(8px); color: #fff;
             padding: 8px 14px; clip-path: var(--chamfer-clip); font-size: 0.72rem; font-weight: 700;
             box-shadow: 0 6px 20px rgba(255, 51, 102, 0.4); animation: toastAnim 2.8s forwards;
             display: flex; align-items: center; gap: 6px;
         }
-        .toast.success { background: rgba(0, 243, 255, 0.94); color: #030305; box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4); }
-        .toast.gold { background: rgba(245, 197, 24, 0.96); color: #030305; box-shadow: 0 6px 20px rgba(245, 197, 24, 0.4); }
+        .toast.success { background: rgba(0, 243, 255, 0.92); color: #030305; box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4); }
+        .toast.gold { background: rgba(245, 197, 24, 0.94); color: #030305; box-shadow: 0 6px 20px rgba(245, 197, 24, 0.4); }
         @keyframes toastAnim {
             0% { opacity: 0; transform: translateY(12px); }
             12% { opacity: 1; transform: translateY(0); }
@@ -75,13 +74,13 @@
         }
 
         #broadcast-area {
-            position: absolute; top: 125px; left: 0; width: 100%;
+            position: absolute; top: 110px; left: 0; width: 100%;
             display: flex; flex-direction: column; align-items: center; gap: 6px;
             z-index: 80; pointer-events: none;
         }
         .broadcast-msg {
-            background: rgba(14, 15, 20, 0.96); border: 1px solid var(--accent-gold);
-            clip-path: var(--chamfer-clip); padding: 7px 14px; font-size: 0.7rem; font-weight: 800; color: #fff;
+            background: rgba(14, 15, 20, 0.95); border: 1px solid var(--accent-gold);
+            clip-path: var(--chamfer-clip); padding: 7px 16px; font-size: 0.7rem; font-weight: 800; color: #fff;
             box-shadow: 0 4px 15px rgba(0,0,0,0.8); animation: broadcastFade 5.5s forwards;
             display: flex; align-items: center; gap: 6px;
         }
@@ -92,6 +91,7 @@
             100% { transform: translateY(-15px); opacity: 0; }
         }
 
+        /* HUD Top: スマホでも絶対にボタンが画面外へ飛び出さない横並び折り返し設計 */
         .hud-top {
             position: absolute; top: 8px; left: 8px; right: 8px;
             display: flex; flex-direction: column; gap: 4px; z-index: 50; pointer-events: none;
@@ -100,17 +100,8 @@
             background: var(--bg-surface); backdrop-filter: blur(10px);
             border: 1px solid var(--border-subtle); clip-path: var(--chamfer-clip);
             padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;
-            pointer-events: auto; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+            pointer-events: auto; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
         }
-
-        .hud-button-group {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
         .stat-block { display: flex; flex-direction: column; gap: 1px; min-width: 60px; }
         .stat-label { font-size: 0.5rem; color: var(--text-secondary); font-weight: 800; letter-spacing: 0.3px; }
         .stat-value { font-size: 0.82rem; font-weight: 900; color: #fff; }
@@ -126,8 +117,8 @@
         .btn-icon-hud:active { background: rgba(0, 243, 255, 0.2); border-color: var(--accent-cyan); }
         .btn-icon-hud:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
-        .btn-icon-hud.cyan { border-color: rgba(0, 243, 255, 0.5); color: var(--accent-cyan); }
 
+        /* HUD Bottom */
         .hud-bottom {
             position: absolute; bottom: 16px; left: 8px; right: 8px;
             display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none;
@@ -159,6 +150,7 @@
         #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
         .minimap-viewport { position: absolute; border: 1.5px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.25); pointer-events: none; }
 
+        /* モーダル */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); z-index: 9999;
@@ -167,7 +159,7 @@
         }
         .modal-box {
             background: var(--bg-card); border: 1px solid var(--border-subtle);
-            clip-path: var(--chamfer-clip); width: 100%; max-width: 440px; padding: 18px;
+            clip-path: var(--chamfer-clip); width: 100%; max-width: 420px; padding: 18px;
             display: flex; flex-direction: column; gap: 12px;
             max-height: 84vh; overflow-y: scroll; -webkit-overflow-scrolling: touch; touch-action: pan-y;
         }
@@ -190,7 +182,7 @@
         .btn-solid.danger { background: var(--danger-color); color: #fff; border: none; }
 
         input, select {
-            width: 100%; padding: 9px 12px; background: #08090d; border: 1px solid var(--border-subtle);
+            width: 100%; padding: 10px 12px; background: #08090d; border: 1px solid var(--border-subtle);
             color: var(--text-primary); font-size: 0.82rem; clip-path: var(--chamfer-clip); outline: none;
         }
 
@@ -198,16 +190,11 @@
 
         .rule-card {
             background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle);
-            clip-path: var(--chamfer-clip); padding: 10px 12px; display: flex; flex-direction: column; gap: 5px;
+            clip-path: var(--chamfer-clip); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
         }
         .rule-card-title { font-size: 0.78rem; font-weight: 900; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; }
         .rule-card-desc { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.55; }
         .rule-card-desc strong { color: var(--accent-gold); }
-        .rule-tag {
-            display: inline-block; padding: 2px 6px; background: rgba(0, 243, 255, 0.1);
-            border: 1px solid rgba(0, 243, 255, 0.3); color: var(--accent-cyan);
-            font-size: 0.6rem; font-weight: 800; border-radius: 2px; margin-right: 4px;
-        }
     </style>
 </head>
 <body>
@@ -216,7 +203,9 @@
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
 
+<!-- Top HUD -->
 <div class="hud-top">
+    <!-- 段1: ナビゲーションとアクション (スマホでも飛び出さない設計) -->
     <div class="hud-bar">
         <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
             <button class="btn-icon-hud" onclick="location.href='/dashboard'" style="color: var(--accent-cyan); border-color: rgba(0,243,255,0.4);">
@@ -225,26 +214,26 @@
             </button>
             <span class="stat-value" id="hud-pid" style="font-size: 0.75rem; letter-spacing: 0.5px;">#----</span>
         </div>
-        <div class="hud-button-group">
-            <button class="btn-icon-hud" id="btn-manual-sync" onclick="manualSync()" title="情報更新">
+        <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+            <button class="btn-icon-hud" id="btn-manual-sync" onclick="manualSync()" title="更新">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 更新
             </button>
-            <button class="btn-icon-hud gold" onclick="loadLeaderboard()" title="賞金首一覧">
+            <button class="btn-icon-hud gold" onclick="loadLeaderboard()" title="賞金首">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M6 9H4a2 2 0 0 1-2-2V5h4M18 9h2a2 2 0 0 0 2-2V5h-4M4 5h16v6a6 6 0 0 1-12 0V5zM12 17v4M8 21h8"/></svg>
                 賞金首
             </button>
-            <button class="btn-icon-hud" onclick="openModal('rules-modal')" title="ルール確認">
+            <button class="btn-icon-hud" onclick="openModal('rules-modal')" title="ルール">
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
                 ルール
             </button>
-            <button class="btn-icon-hud cyan" onclick="centerCameraOnCore()" title="本陣へカメラを移動">
+            <button class="btn-icon-hud" onclick="centerCameraOnCore()" title="本陣">
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
                 本陣
             </button>
         </div>
     </div>
-
+    <!-- 段2: ステータス表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">INK CAPACITY</span>
@@ -259,7 +248,7 @@
             <span class="stat-value" id="hud-mass">0 マス</span>
         </div>
     </div>
-
+    <!-- 段3: 資金表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">GOLD BALANCE</span>
@@ -267,18 +256,18 @@
         </div>
         <div class="stat-block" style="text-align: right; flex-grow: 1;">
             <span class="stat-label">DAILY INCOME (JST 0:00)</span>
-            <span class="stat-value" id="hud-income" style="font-size: 0.72rem; color: var(--accent-gold);">+0 G / 日 (受取済)</span>
+            <span class="stat-value" id="hud-income" style="font-size: 0.72rem; color: var(--accent-gold);">+0 G / 日 (10G/マス)</span>
         </div>
     </div>
-
     <div class="hud-bar" id="barrier-status-bar" style="display: none; border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.12);">
         <div class="stat-block">
             <span class="stat-label" style="color: var(--accent-cyan);">BARRIER ACTIVE (不可侵モード)</span>
-            <span class="stat-value cyan" style="font-size: 0.7rem;">維持費: 毎分 10 G 自動消費中 (領地収入停止 / 攻撃不可)</span>
+            <span class="stat-value cyan" style="font-size: 0.7rem;">維持費: 毎分 10 G 自動消費中</span>
         </div>
     </div>
 </div>
 
+<!-- Bottom HUD -->
 <div class="hud-bottom">
     <div class="action-menu">
         <div style="display: flex; gap: 8px;">
@@ -288,7 +277,7 @@
             <button class="btn-circle" onclick="openModal('alliance-modal')" title="同盟">
                 <svg viewBox="0 0 24 24" class="icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </button>
-            <button class="btn-circle" onclick="toggleBarrier()" id="btn-barrier" title="バリア切替">
+            <button class="btn-circle" onclick="toggleBarrier()" id="btn-barrier" title="バリア">
                 <svg viewBox="0 0 24 24" class="icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </button>
         </div>
@@ -309,40 +298,11 @@
     </div>
 </div>
 
-<div id="death-modal" class="modal-overlay" style="background: rgba(10, 0, 0, 0.94);">
-    <div class="modal-box" style="border-color: var(--danger-color);">
-        <div class="modal-title" style="color: var(--danger-color);">
-            <span>本陣陥落 - 討伐されました</span>
-        </div>
-        <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6;">
-            あなたの本陣コアが敵プレイヤーにより破壊されました。<br>
-            <span style="color: var(--danger-color); font-weight: 800;">・全領地は蒸発・消滅しました。</span><br>
-            <span style="color: var(--accent-gold); font-weight: 800;">・強化に使用した累計賞金首Goldは討伐者へ強奪されました。</span><br><br>
-            新しい区画を選定し、戦線へ再出撃してください。
-        </div>
-        <button class="btn-solid gold" onclick="openSpawnFromDeath()">出撃準備へ進む</button>
-    </div>
-</div>
-
-<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
-    <div class="modal-box">
-        <div class="modal-title">
-            <span>戦線投入 - 本陣コア出撃</span>
-        </div>
-        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
-            出撃に使用する銀行口座を選択してください。<br>
-            出撃時、ランダムな安全空白区画へコアが生成されます。<br>
-            <span style="color: var(--accent-gold);">※ステータス強化に使用した費用は懸賞金となり、討伐時に相手へ全額強奪されます。</span>
-        </div>
-        <select id="spawn-wallet-select"><option>読込中...</option></select>
-        <button class="btn-solid gold" onclick="spawnCore()">安全区画へ手動出撃</button>
-    </div>
-</div>
-
+<!-- ルール説明モーダル -->
 <div id="rules-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
-            <span>王国紛争地 - 公式戦時規約</span>
+            <span>王国紛争地 - ルール</span>
             <button class="close-icon-btn" onclick="closeModal('rules-modal')">
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -350,74 +310,65 @@
         
         <div class="rule-card">
             <div class="rule-card-title">
-                <span class="rule-tag">領地給付</span>
-                1. 毎日 0:00(JST) マス保有報酬
+                <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                1. 領地を塗って毎日0:00(JST)に報酬
             </div>
-            <div class="rule-card-desc">
-                日本時間(JST)の<strong>午前0:00</strong>を基準として、生存中の領地<strong>1マスにつき10 Gold</strong>が毎日自動で銀行口座へ直接加算されます。<br>
-                領地を広げて翌朝を迎えるほど、莫大なデイリー不労所得を得られます。
-            </div>
+            <div class="rule-card-desc">生存領地<strong>1マスにつき毎日10 Gold</strong>が日本時間0:00に自動加算されます。青枠の隣接マスをタップして領地を拡張します。囲みを作ると最大5,000マスを一括制圧できます。</div>
         </div>
 
         <div class="rule-card">
             <div class="rule-card-title">
-                <span class="rule-tag">戦闘</span>
-                2. 塗りと防壁強化
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                2. 本陣コアが死んだら全滅
             </div>
-            <div class="rule-card-desc">
-                ・<strong>塗る / 攻撃</strong>: インクを1消費し、自陣・同盟領地に隣接する空白マスまたは敵領地を攻撃します。耐久値が残るマスは1削り、耐久1マスを攻撃すると自陣化します。<br>
-                ・<strong>壁強化</strong>: 自陣マスの耐久値を上げます（最大255）。防壁を厚くすることで敵の侵略速度を劇的に遅延できます。
-            </div>
+            <div class="rule-card-desc">王冠マークの「本陣コア」を他者に踏まれると<strong>全領地が一瞬で消滅</strong>し、強化に使った全Goldを相手に強奪されます。自陣の壁を厚くしてコアを守りましょう。</div>
         </div>
 
         <div class="rule-card">
             <div class="rule-card-title">
-                <span class="rule-tag">制圧</span>
-                3. 大規模囲み制圧（フラッドフィル）
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                3. 道を切られた領地は消滅
             </div>
-            <div class="rule-card-desc">
-                自陣のマスで空間を完全に囲い込むと、<strong>内側の全マス（空白・敵地問わず最大5,000マス）が一括で自陣マスへ反転</strong>します。<br>
-                内側にいた敵コアを撃破した場合、残った空洞も自動的に囲み再計算が行われ、即座に領地化されます。<br>
-                ※内部に「同盟相手」のマスが含まれる場合、囲みはブロックされ発動しません。
-            </div>
+            <div class="rule-card-desc">全ての領地は本陣コアと一筆書きで直結している必要があります。侵略によって<strong>コアとの接続を切断された飛び地は即座に消滅</strong>します。</div>
         </div>
 
         <div class="rule-card">
             <div class="rule-card-title">
-                <span class="rule-tag">命運</span>
-                4. 本陣コア陥落と切断消滅
+                <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                4. 同盟と裏切り
             </div>
-            <div class="rule-card-desc">
-                ・<strong>本陣コア</strong>: 王冠マークのマスを踏まれると<strong>即死（全領地消滅）</strong>となり、強化に注ぎ込んだ累計Goldが相手に全額強奪されます。<br>
-                ・<strong>切断消滅</strong>: 全ての領地は本陣コアと一筆書きで直結している必要があります。敵の侵略によって<strong>コアとの接続を絶たれた孤立領地は即座に蒸発</strong>します。
-            </div>
+            <div class="rule-card-desc">同盟相手のマスを踏み台にして遠征できます。囲みの内側に同盟相手がいる場合は誤爆防止のため囲みは成立しません。ただし<strong>同盟は相手の許可なく即座に破棄可能</strong>です。</div>
         </div>
 
         <div class="rule-card">
             <div class="rule-card-title">
-                <span class="rule-tag">外交</span>
-                5. 軍事同盟カルテルと即時破棄
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                5. 不可侵バリア
             </div>
-            <div class="rule-card-desc">
-                同盟を結ぶと相手の領地を踏み台にして遠征できます。<br>
-                ただし<strong>同盟は相手の承諾なく一方的に破棄可能</strong>です。裏切られた瞬間、相手のマスに依存していた飛び地領地はすべて消滅します。
-            </div>
+            <div class="rule-card-desc">毎分10Gで完全無敵になれます。休眠・放置時に有効ですが、バリア中は領地収入も停止し、自分からも攻撃できなくなります。</div>
         </div>
 
-        <div class="rule-card">
-            <div class="rule-card-title">
-                <span class="rule-tag">防衛</span>
-                6. 不可侵バリア
-            </div>
-            <div class="rule-card-desc">
-                毎分10Gの維持費を消費して完全無敵になれます。就寝時や放置に有効ですが、バリア稼働中は<strong>自陣からの攻撃が不可となり、日次マス保有報酬も停止</strong>します。
-            </div>
-        </div>
-
-        <button class="btn-solid gold" onclick="closeModal('rules-modal')" style="margin-top: 4px;">了解して戦場へ</button>
+        <button class="btn-solid gold" onclick="closeModal('rules-modal')" style="margin-top: 8px;">戦場へ戻る</button>
     </div>
 </div>
 
+<!-- 出撃モーダル (元の確実な動作に戻した構造) -->
+<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
+    <div class="modal-box">
+        <div class="modal-title">
+            <span>戦線投入 - 本陣コア出撃</span>
+        </div>
+        <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">
+            出撃する銀行口座を選択してください。<br>
+            ※強化費用の累計額はコアの「懸賞金」となり、コアを踏まれた瞬間に相手へ全額強奪されます。<br>
+            ※インク容量や回復速度の強化値は死亡しても引き継がれます。
+        </div>
+        <select id="spawn-wallet-select"><option>読込中...</option></select>
+        <button class="btn-solid gold" id="btn-spawn-exec" onclick="spawnCore()">安全区画へ出撃</button>
+    </div>
+</div>
+
+<!-- 強化工房 -->
 <div id="shop-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
@@ -427,18 +378,19 @@
             </button>
         </div>
         <div class="rule-card">
-            <div style="font-size: 0.8rem; font-weight: 900;">インクタンク容量拡張 (+1)</div>
-            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 6px;">強化費用: <span id="cost-max-ink" style="color: var(--accent-gold); font-weight: 900;">-</span> G</div>
+            <div style="font-size: 0.82rem; font-weight: 900; margin-bottom: 2px;">インクタンク容量拡張 (+1)</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">強化費用: <span id="cost-max-ink" style="color: var(--accent-gold); font-weight: 900;">-</span> G</div>
             <button class="btn-solid" onclick="upgradeStat('MAX_INK')">容量を拡張する</button>
         </div>
         <div class="rule-card">
-            <div style="font-size: 0.8rem; font-weight: 900;">高純度インク抽出器 (+1 回復/分)</div>
-            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 6px;">強化費用: <span id="cost-regen" style="color: var(--accent-gold); font-weight: 900;">-</span> G</div>
+            <div style="font-size: 0.82rem; font-weight: 900; margin-bottom: 2px;">高純度インク抽出器 (+1 回復/分)</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">強化費用: <span id="cost-regen" style="color: var(--accent-gold); font-weight: 900;">-</span> G</div>
             <button class="btn-solid" onclick="upgradeStat('REGEN')">回復速度を強化する</button>
         </div>
     </div>
 </div>
 
+<!-- 外交同盟モーダル -->
 <div id="alliance-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
@@ -447,21 +399,22 @@
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
-        <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4;">
-            同盟相手のマスを踏み台にして領地を侵略できます。<br>
-            同盟破棄はいつでも可能で、相手依存の領地は即座に消滅します。
+        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4;">
+            同盟相手のマスを踏み台にして遠征できます。<br>
+            破棄された瞬間、相手に依存していた遠征領地は全て蒸発します。
         </div>
         <div style="display: flex; gap: 6px;">
             <input type="number" id="alliance-target-id" placeholder="相手の Player ID (例: 1042)">
             <button class="btn-solid" style="white-space: nowrap;" onclick="addAlliance()">締結</button>
         </div>
         <div style="border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
-            <div style="font-size: 0.72rem; font-weight: 800; margin-bottom: 6px;">締結中の軍事同盟</div>
+            <div style="font-size: 0.75rem; font-weight: 800; margin-bottom: 6px;">締結中の軍事同盟</div>
             <div id="alliance-list" style="max-height: 140px; overflow-y: auto;"></div>
         </div>
     </div>
 </div>
 
+<!-- 賞金首ランキング -->
 <div id="leaderboard-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
@@ -471,7 +424,7 @@
             </button>
         </div>
         <div style="font-size: 0.7rem; color: var(--text-secondary);">
-            本陣コアを破壊した瞬間に、表示されている全Goldを相手から強奪します。
+            コアを破壊した瞬間に、表示されているGoldが手に入ります。
         </div>
         <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
     </div>
@@ -540,14 +493,14 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    function showToast(msg, type = "normal") {
-        if (navigator.vibrate) navigator.vibrate(type === "success" ? 25 : [40, 30, 40]);
+    function showToast(msg, isSuccess = false) {
+        if (navigator.vibrate) navigator.vibrate(isSuccess ? 25 : [40, 30, 40]);
         const c = document.getElementById('toast-container');
         const el = document.createElement('div');
-        el.className = `toast ${type === "success" ? 'success' : (type === "gold" ? 'gold' : '')}`;
+        el.className = `toast ${isSuccess ? 'success' : ''}`;
         el.innerText = msg;
         c.appendChild(el);
-        setTimeout(() => el.remove(), 2800);
+        setTimeout(() => el.remove(), 2600);
     }
 
     function showBroadcast(text, color = "#f5c518") {
@@ -592,10 +545,9 @@
             const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
 
             if (me.daily_reward_granted && me.daily_reward_granted > 0) {
-                showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, "gold");
+                showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
             }
 
-            // 【修正点】生存している場合はモーダルを隠してそのままゲーム開始
             if (me.exists && !me.is_dead) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
@@ -611,8 +563,6 @@
                 });
 
                 document.getElementById("spawn-modal").style.display = "none";
-                document.getElementById("death-modal").style.display = "none";
-
                 centerCameraOnCore();
                 connectWebSocket();
                 updateHUD();
@@ -621,13 +571,11 @@
                 return;
             }
 
-            // 死んでいる、あるいは初回アクセス時のみ出撃画面を表示
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
             updateHUD();
             await syncCores();
-            
             document.getElementById("spawn-modal").style.display = "flex";
 
             if (!localStorage.getItem("pixel_rules_accepted")) {
@@ -639,13 +587,12 @@
         }
     }
 
-    function openSpawnFromDeath() {
-        document.getElementById("death-modal").style.display = "none";
-        document.getElementById("spawn-modal").style.display = "flex";
-    }
-
+    // 元の正常に動いていた spawnCore ロジックに完全復元
     async function spawnCore() {
         const wid = document.getElementById("spawn-wallet-select").value;
+        const btn = document.getElementById("btn-spawn-exec");
+        if (btn) btn.disabled = true;
+
         try {
             const res = await fetch("/api/pixel/spawn", {
                 method: "POST",
@@ -655,16 +602,23 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
-            // リスポーン時はAPIから最新状態を再取得するか、保持されていると信じて手動マージ
+            // 最新のme情報を取得してmaxInk/regenを維持
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-            const me = await meRes.json();
+            const me = meRes.ok ? await meRes.json() : { ink: 1, max_ink: 10, regen: 1 };
 
             Object.assign(gameState, {
-                walletId: wid, playerId: data.player_id,
-                coreX: data.core_x, coreY: data.core_y,
-                ink: me.ink, maxInk: me.max_ink, regen: me.regen, barrierActive: false, isDead: false
+                walletId: wid, 
+                playerId: data.player_id,
+                coreX: data.core_x, 
+                coreY: data.core_y,
+                ink: me.ink || 1, 
+                maxInk: me.max_ink || 10, 
+                regen: me.regen || 1, 
+                barrierActive: false,
+                isDead: false
             });
 
+            // ローカル配列上でコアマスを即座に自陣化
             const coreIdx = (data.core_y * BOARD_SIZE + data.core_x) * 3;
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
@@ -676,9 +630,11 @@
             await syncCores();
             startSyncLoop();
             fastFullRecount();
-            showToast("本陣コアを出撃させました！", "success");
+            showToast("本陣コアを出撃させました！", true);
         } catch (e) {
             showToast(parseError(e));
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -690,16 +646,15 @@
                 if (res.ok) {
                     const d = await res.json();
                     if (d.daily_reward_granted && d.daily_reward_granted > 0) {
-                        showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領しました！`, "gold");
+                        showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
                     }
                     if (!d.is_dead) {
                         Object.assign(gameState, {
                             ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                         });
                     } else {
-                        // サーバー側で死んでいると判明した場合（バックグラウンド死亡検知）
                         gameState.isDead = true;
-                        document.getElementById("death-modal").style.display = "flex";
+                        document.getElementById("spawn-modal").style.display = "flex";
                     }
                 }
                 const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
@@ -726,11 +681,11 @@
             if (res.ok) {
                 const d = await res.json();
                 if (d.daily_reward_granted && d.daily_reward_granted > 0) {
-                    showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領！`, "gold");
+                    showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領！`, true);
                 }
                 if (!d.is_dead) {
                     Object.assign(gameState, {
-                        ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active
+                        ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                     });
                 }
             }
@@ -742,7 +697,7 @@
             }
             updateHUD();
             await syncCores();
-            showToast("最新情報を取得しました", "success");
+            showToast("最新情報を取得しました", true);
         } catch (e) {
             showToast("更新に失敗しました");
         } finally {
@@ -771,12 +726,9 @@
                         updateHUD();
                     } else if (msg.type === "player_killed") {
                         if (msg.victim_id === gameState.playerId) {
+                            showToast("本陣コアが破壊されました！");
                             gameState.isDead = true;
-                            gameState.playerId = null;
-                            gameState.coreX = -1;
-                            gameState.coreY = -1;
-                            gameState.massCount = 0;
-                            document.getElementById("death-modal").style.display = "flex";
+                            document.getElementById("spawn-modal").style.display = "flex";
                         }
                     }
                 } catch (e) {}
@@ -786,6 +738,7 @@
             const buffer = event.data;
             const dv = new DataView(buffer);
 
+            // 初回全盤面受信 (120KB)
             if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
                 boardData.set(new Uint8Array(buffer));
                 if (gameState.coreX >= 0 && gameState.coreY >= 0 && !gameState.isDead) {
@@ -915,14 +868,14 @@
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
 
     function updateHUD() {
-        document.getElementById('hud-pid').innerText = gameState.isDead ? '未出撃' : `#${gameState.playerId || '----'}`;
+        document.getElementById('hud-pid').innerText = gameState.isDead ? '#----' : `#${gameState.playerId || '----'}`;
         document.getElementById('hud-ink').innerText = `${gameState.ink} / ${gameState.maxInk}`;
         document.getElementById('hud-regen').innerText = `+${gameState.regen}/分`;
         document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
         document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス`;
         
         const expectedDaily = gameState.massCount * 10;
-        document.getElementById('hud-income').innerText = `+${expectedDaily.toLocaleString()} G / 日 (10G/マス)`;
+        document.getElementById('hud-income').innerText = `+${expectedDaily.toLocaleString()} G / 日 (JST 0:00)`;
 
         const bar = document.getElementById('barrier-status-bar');
         const btn = document.getElementById('btn-barrier');
@@ -957,7 +910,7 @@
             if (type === 'MAX_INK') gameState.maxInk += 1;
             else gameState.regen += 1;
 
-            showToast(`強化成功！ 懸賞金が ${data.cost.toLocaleString()}G 上昇しました`, "success");
+            showToast(`強化成功！ 懸賞金が ${data.cost.toLocaleString()}G 上昇しました`, true);
             updateHUD();
         } catch (e) {
             showToast(parseError(e));
@@ -975,7 +928,7 @@
             if (!res.ok) throw data;
 
             gameState.barrierActive = data.barrier_active;
-            showToast(gameState.barrierActive ? "不可侵バリアを展開しました" : "バリアを解除しました", "success");
+            showToast(gameState.barrierActive ? "不可侵バリアを展開しました" : "バリアを解除しました", true);
             updateHUD();
         } catch (e) {
             showToast(parseError(e));
@@ -1018,7 +971,7 @@
             if (!res.ok) throw data;
 
             gameState.alliances.add(parseInt(id));
-            showToast(data.message, "success");
+            showToast(data.message, true);
             idInput.value = "";
             renderAllianceList();
             fastFullRecount();
@@ -1104,8 +1057,8 @@
                     ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
-                if (owner === gameState.playerId && !gameState.isDead && camera.zoom >= 10) {
-                    ctx.strokeStyle = "rgba(0, 243, 255, 0.45)";
+                if (owner === gameState.playerId && camera.zoom >= 10) {
+                    ctx.strokeStyle = "rgba(0, 243, 255, 0.4)";
                     ctx.lineWidth = 1;
                     ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
@@ -1122,7 +1075,7 @@
                     ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
                 }
 
-                const isMyCore = (!gameState.isDead && x === gameState.coreX && y === gameState.coreY && owner === gameState.playerId);
+                const isMyCore = (x === gameState.coreX && y === gameState.coreY && owner === gameState.playerId);
                 const coreOwner = activeCores.get(`${x},${y}`);
                 const isEnemyCore = !isMyCore && coreOwner !== undefined && coreOwner !== 0 && owner === coreOwner;
 
@@ -1187,7 +1140,7 @@
             const [cx, cy] = coordStr.split(',').map(Number);
             const currentOwner = dataView.getUint16((cy * BOARD_SIZE + cx) * 3, false);
             if (currentOwner === pId && pId !== 0) {
-                const isMine = (!gameState.isDead && cx === gameState.coreX && cy === gameState.coreY);
+                const isMine = (cx === gameState.coreX && cy === gameState.coreY);
                 miniCtx.fillStyle = isMine ? "#ffffff" : "#f5c518";
                 miniCtx.fillRect(cx - 1, cy - 1, 3, 3);
             }
@@ -1224,12 +1177,10 @@
     }
 
     function centerCameraOnCore() {
-        if (!gameState.isDead && gameState.coreX >= 0) {
+        if (gameState.coreX >= 0) {
             camera.x = gameState.coreX;
             camera.y = gameState.coreY;
             camera.zoom = 22;
-        } else {
-            showToast("本陣コアが存在しません");
         }
     }
 
