@@ -5,93 +5,103 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>村岡王国 - 王立試練迷宮（Maker）</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&family=Press+Start+2P&display=swap');
 
         :root {
-            --bg-base: #060709;
-            --bg-surface: #0f1115;
-            --border-subtle: #242831;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --accent-gold: #d4af37;
+            --bg-base: #1a1e29;
+            --bg-surface: #2c3140;
+            --border-subtle: #454d66;
+            --text-primary: #ffffff;
+            --text-secondary: #a3adc2;
+            --accent-gold: #ffcc00;
             --accent-cyan: #00f3ff;
-            --danger-color: #ff3366;
-            --chamfer-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            --danger-color: #ff477e;
+            --btn-shadow: 0 5px 0 rgba(0,0,0,0.5);
+            --chamfer-clip: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
         }
 
+        /* 100vhではなく100dvhを使用してスマホのアドレスバー等に対応 */
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         
         body {
             background-color: var(--bg-base); color: var(--text-primary);
-            font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-family: 'M PLUS Rounded 1c', -apple-system, sans-serif;
             overflow: hidden; 
-            width: 100vw; height: 100vh;
+            width: 100vw; height: 100dvh;
         }
 
-        /* レトロフォント適用 */
-        .pixel-text { font-family: 'Press Start 2P', monospace; text-transform: uppercase; }
+        .pixel-text { font-family: 'Press Start 2P', 'M PLUS Rounded 1c', monospace; text-transform: uppercase; }
 
-        /* ヘッダー UI */
+        /* ヘッダー UI（圧迫感を減らすため高さを広げ、パディング追加） */
         #top-bar {
-            position: absolute; top: 0; left: 0; width: 100%; height: 50px;
-            background: linear-gradient(to bottom, rgba(15,17,21,0.95), rgba(15,17,21,0));
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0 16px; z-index: 100;
+            position: absolute; top: 0; left: 0; width: 100%; height: 75px;
+            background: linear-gradient(to bottom, rgba(26,30,41,0.95) 40%, rgba(26,30,41,0));
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 15px 16px 0; z-index: 100;
         }
 
+        /* カートゥーン風ボタン */
         .btn-retro {
-            background: rgba(0,0,0,0.6); border: 2px solid var(--border-subtle);
-            color: var(--text-primary); padding: 8px 12px; cursor: pointer;
-            display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: bold;
-            transition: 0.1s; border-radius: 4px;
+            background: var(--bg-surface); border: 3px solid #000;
+            color: var(--text-primary); padding: 8px 14px; cursor: pointer;
+            display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold;
+            border-radius: 12px; box-shadow: var(--btn-shadow);
+            transition: all 0.1s;
         }
-        .btn-retro:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
-        .btn-retro:active { transform: scale(0.95); }
-        .btn-retro svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
-        .btn-retro.active { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+        .btn-retro:hover { background: #3a4156; }
+        .btn-retro:active { transform: translateY(5px); box-shadow: 0 0 0 rgba(0,0,0,0.5); }
+        .btn-retro svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5; }
+        .btn-retro.active { background: var(--accent-gold); color: #000; border-color: #000; }
 
-        /* トグルスイッチ（プレイ / エディット） */
-        .mode-toggle { display: flex; background: rgba(0,0,0,0.8); border: 2px solid var(--border-subtle); border-radius: 6px; overflow: hidden; }
+        /* トグルスイッチ */
+        .mode-toggle { 
+            display: flex; background: var(--bg-surface); border: 3px solid #000; 
+            border-radius: 12px; overflow: hidden; box-shadow: var(--btn-shadow); 
+        }
         .mode-toggle button {
-            background: transparent; border: none; color: #fff; padding: 6px 16px; cursor: pointer;
+            background: transparent; border: none; color: #fff; padding: 8px 18px; cursor: pointer;
             transition: 0.2s; display: flex; align-items: center; justify-content: center;
         }
-        .mode-toggle button svg { width: 18px; height: 18px; fill: currentColor; }
-        .mode-toggle button.active { background: var(--accent-cyan); color: #000; }
+        .mode-toggle button svg { width: 20px; height: 20px; fill: currentColor; }
+        .mode-toggle button.active { background: var(--accent-cyan); color: #000; font-weight: bold;}
         
-        /* ツールパレット (エディタ専用) */
+        /* ツールパレット (カートゥーン風) */
         #palette {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 17, 21, 0.95); border: 2px solid var(--border-subtle);
-            padding: 8px; display: flex; gap: 6px; border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 100;
+            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 50%; transform: translateX(-50%);
+            background: var(--bg-surface); border: 3px solid #000;
+            padding: 10px; display: flex; gap: 8px; border-radius: 16px;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.5); z-index: 100;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 90vw; overflow-x: auto;
+            max-width: 95vw; overflow-x: auto;
         }
-        #palette.hidden { transform: translate(-50%, 150%); }
+        #palette.hidden { transform: translate(-50%, 200%); }
 
         .palette-item {
-            min-width: 44px; height: 44px; background: #000; border: 2px solid #333;
-            border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.1s; position: relative;
+            min-width: 48px; height: 48px; background: #111; border: 3px solid #000;
+            border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.1s; position: relative; box-shadow: 0 3px 0 rgba(0,0,0,0.5);
         }
-        .palette-item:hover { border-color: var(--text-primary); }
-        .palette-item.selected { border-color: var(--accent-cyan); background: rgba(0, 243, 255, 0.1); }
+        .palette-item:active { transform: translateY(3px); box-shadow: 0 0 0; }
+        .palette-item.selected { background: var(--accent-gold); border-color: #000; color: #000 !important; }
         .palette-item svg { width: 28px; height: 28px; }
 
-        /* スマホ用コントローラー (プレイモード専用) */
+        /* スマホ用コントローラー (画面下部の余裕を持たせる) */
         #mobile-controls {
-            position: absolute; bottom: 20px; left: 0; width: 100%;
-            display: none; justify-content: space-between; padding: 0 20px; z-index: 100;
+            position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); left: 0; width: 100%;
+            display: none; justify-content: space-between; padding: 0 25px; z-index: 100;
         }
-        .ctrl-group { display: flex; gap: 12px; }
+        .ctrl-group { display: flex; gap: 15px; }
         .ctrl-btn {
-            width: 60px; height: 60px; background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.2); border-radius: 50%;
+            width: 70px; height: 70px; background: rgba(255, 255, 255, 0.15);
+            border: 4px solid rgba(255,255,255,0.4); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            color: rgba(255,255,255,0.5); font-size: 24px; pointer-events: auto;
+            color: rgba(255,255,255,0.8); font-size: 30px; pointer-events: auto;
+            backdrop-filter: blur(4px); box-shadow: 0 5px 0 rgba(0,0,0,0.2);
         }
-        .ctrl-btn:active { background: rgba(255,255,255,0.3); border-color: var(--accent-gold); color: var(--accent-gold); }
+        .ctrl-btn:active { 
+            background: rgba(255,255,255,0.3); border-color: var(--accent-gold); 
+            color: var(--accent-gold); transform: translateY(5px); box-shadow: 0 0 0;
+        }
 
         /* Canvas */
         #gameCanvas {
@@ -101,19 +111,23 @@
         /* 画面中央メッセージ */
         #center-msg {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: var(--accent-gold); text-shadow: 4px 4px 0 #000;
-            font-size: 1.5rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 150;
-            white-space: nowrap;
+            text-align: center; color: var(--accent-gold); 
+            text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+            font-size: 2.5rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 150;
+            white-space: nowrap; font-weight: bold;
         }
-        #center-msg.show { opacity: 1; }
+        #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(-3deg); }
 
-        /* HUD */
+        /* HUD (圧迫感を避けるため位置を調整) */
         #hud {
-            position: absolute; top: 60px; left: 20px; z-index: 90;
-            display: flex; gap: 16px; font-size: 14px;
+            position: absolute; top: 85px; left: 20px; z-index: 90;
+            display: flex; gap: 20px; font-size: 18px; font-weight: bold;
         }
-        .hud-item { display: flex; align-items: center; gap: 6px; text-shadow: 2px 2px 0 #000; }
-        .hud-item svg { width: 20px; height: 20px; }
+        .hud-item { 
+            display: flex; align-items: center; gap: 8px; 
+            text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; 
+        }
+        .hud-item svg { width: 26px; height: 26px; filter: drop-shadow(2px 2px 0px #000); }
 
         /* モーダル */
         .modal-overlay {
@@ -121,25 +135,30 @@
             justify-content: center; align-items: center; padding: 16px;
         }
         .modal-box {
-            background: var(--bg-card); border: 1px solid var(--accent-gold); clip-path: var(--chamfer-clip);
+            background: var(--bg-surface); border: 4px solid #000; border-radius: 16px;
             width: 100%; max-width: 550px; padding: 24px; position: relative; max-height: 85vh; display: flex; flex-direction: column;
+            box-shadow: 0 10px 0 rgba(0,0,0,0.8);
         }
-        .modal-title { font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+        .modal-title { font-size: 1.3rem; color: var(--accent-gold); margin-bottom: 16px; border-bottom: 3px dashed var(--border-subtle); padding-bottom: 8px; font-weight: bold;}
         
-        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-        .form-group label { font-size: 0.75rem; color: var(--text-secondary); font-weight: bold; }
-        .form-group input { padding: 10px; background: #000; border: 1px solid var(--border-subtle); color: #fff; outline: none; font-family: inherit; }
-        .form-group input:focus { border-color: var(--accent-cyan); }
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .form-group label { font-size: 0.85rem; color: var(--text-primary); font-weight: bold; }
+        .form-group input { 
+            padding: 12px; background: #111; border: 3px solid #000; border-radius: 8px;
+            color: #fff; outline: none; font-family: inherit; font-size: 1rem;
+        }
+        .form-group input:focus { border-color: var(--accent-gold); }
         
-        .stage-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; padding-right: 4px;}
+        .stage-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding-right: 4px;}
         .stage-card {
-            background: #000; border: 1px solid var(--border-subtle); padding: 12px; cursor: pointer;
-            display: flex; justify-content: space-between; align-items: center; transition: 0.2s; border-radius: 4px;
+            background: #1a1e29; border: 3px solid #000; padding: 14px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; transition: 0.2s; border-radius: 12px;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.5);
         }
-        .stage-card:hover { border-color: var(--accent-gold); background: rgba(212,175,55,0.05); }
-        .st-title { font-weight: bold; color: var(--text-primary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;}
-        .st-author { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
-        .st-stats { font-size: 0.7rem; color: #aaa; text-align: right; }
+        .stage-card:active { transform: translateY(4px); box-shadow: 0 0 0; }
+        .st-title { font-weight: bold; color: var(--accent-gold); font-size: 1.1rem; display: flex; align-items: center; gap: 6px;}
+        .st-author { font-size: 0.85rem; color: #fff; margin-top: 6px; }
+        .st-stats { font-size: 0.8rem; color: var(--accent-cyan); text-align: right; font-weight: bold;}
     </style>
 </head>
 <body>
@@ -147,7 +166,7 @@
     <!-- ヘッダー -->
     <div id="top-bar">
         <button class="btn-retro" onclick="location.href='/dashboard'">
-            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> 王国へ戻る
+            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> 戻る
         </button>
 
         <div class="mode-toggle">
@@ -176,7 +195,7 @@
             <span id="hud-coins">0</span>
         </div>
         <div class="hud-item" id="hud-key" style="color: #666;">
-            <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4"></circle><line x1="11" y1="11" x2="20" y2="20"></line><line x1="16" y1="16" x2="19" y2="13"></line></svg>
+            <svg stroke="currentColor" fill="none" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4"></circle><line x1="11" y1="11" x2="20" y2="20"></line><line x1="16" y1="16" x2="19" y2="13"></line></svg>
         </div>
     </div>
 
@@ -192,7 +211,7 @@
             <div class="ctrl-btn" id="btn-left">◀</div>
             <div class="ctrl-btn" id="btn-right">▶</div>
         </div>
-        <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,243,255,0.2);">▲</div>
+        <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,243,255,0.25); border-color: rgba(0,243,255,0.6);">▲</div>
     </div>
 
     <!-- モーダル：保存 -->
@@ -207,7 +226,7 @@
                 <label>説明・煽り文句</label>
                 <input type="text" id="save-desc" placeholder="任意" maxlength="50">
             </div>
-            <button class="btn-retro" style="justify-content: center; background: var(--accent-gold); color:#000; margin-top:10px;" onclick="saveStage()">データベースへ公開する</button>
+            <button class="btn-retro" style="justify-content: center; background: var(--accent-gold); color:#000; margin-top:10px; font-size:1rem;" onclick="saveStage()">データベースへ公開する</button>
         </div>
     </div>
 
@@ -251,24 +270,26 @@ let mapData = [];
 
 // タイル定義
 const TILES = {
-    EMPTY: 0, BLOCK: 1, SPIKE: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, ENEMY: 8, START: 9
+    EMPTY: 0, BLOCK: 1, SPIKE: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, ENEMY: 8, START: 9, PAN: 100
 };
 
+// パレットにスクロール用の「手のひら(PAN)」を追加
 const paletteItems = [
-    { id: 1, color: '#444', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
-    { id: 2, color: '#ff3366', icon: '<polygon points="12 2 2 22 22 22 12 2"/>' },
-    { id: 3, color: '#d4af37', icon: '<circle cx="12" cy="12" r="8"/><line x1="12" y1="8" x2="12" y2="16"/>' },
+    { id: 100, color: '#fff', icon: '<path d="M9 11V4a2 2 0 0 1 4 0v7"/><path d="M13 11V7a2 2 0 0 1 4 0v4"/><path d="M17 11v-1a2 2 0 0 1 4 0v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9a2 2 0 0 1 4 0v2"/>' }, // 手のひら(スクロール)
+    { id: 1, color: '#444', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
+    { id: 2, color: '#ff477e', icon: '<polygon points="12 2 2 22 22 22 12 2" stroke-linejoin="round"/>' },
+    { id: 3, color: '#ffcc00', icon: '<circle cx="12" cy="12" r="8"/><line x1="12" y1="8" x2="12" y2="16"/>' },
     { id: 5, color: '#ff9900', icon: '<circle cx="8" cy="8" r="4"/><line x1="11" y1="11" x2="20" y2="20"/><line x1="16" y1="16" x2="19" y2="13"/>' },
-    { id: 6, color: '#888', icon: '<rect x="5" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' },
+    { id: 6, color: '#888', icon: '<rect x="5" y="11" width="14" height="10" rx="3"/><circle cx="12" cy="16" r="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' },
     { id: 7, color: '#00f3ff', icon: '<path d="M4 18h16"/><path d="M7 14l5-5 5 5"/><path d="M12 9v9"/>' },
-    { id: 8, color: '#a855f7', icon: '<circle cx="12" cy="10" r="5"/><line x1="9" y1="18" x2="15" y2="18"/><polyline points="6 20 8 16 16 16 18 20"/>' },
+    { id: 8, color: '#a855f7', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
     { id: 4, color: '#fff', icon: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>' },
-    { id: 9, color: '#10b981', icon: '<polygon points="5 3 19 12 5 21 5 3"/>' }, // Start
-    { id: 0, color: '#222', icon: '<path d="M7 21L20 8l-5-5L2 16l5 5z"/><path d="M18 14l-4-4"/>' } // 消しゴム
+    { id: 9, color: '#10b981', icon: '<polygon points="5 3 19 12 5 21 5 3" stroke-linejoin="round"/>' }, 
+    { id: 0, color: '#ff3333', icon: '<path d="M18 6L6 18M6 6l12 12"/>' } // バツ印（消しゴム）
 ];
 let currentBrush = 1;
 
-let player = { x: 0, y: 0, vx: 0, vy: 0, w: 24, h: 24, state: 'idle', coins: 0, hasKey: false, grounded: false };
+let player = { x: 0, y: 0, vx: 0, vy: 0, w: 26, h: 26, state: 'idle', coins: 0, hasKey: false, grounded: false, faceDir: 1 };
 let enemies = [];
 let particles = [];
 
@@ -284,7 +305,7 @@ function initMap() {
             for(let r=0; r<MAP_ROWS; r++) mapData[r][c] = 1;
         }
     }
-    mapData[MAP_ROWS-4][3] = 9; // Default start
+    mapData[MAP_ROWS-4][3] = 9; 
 }
 
 function initPalette() {
@@ -292,7 +313,7 @@ function initPalette() {
     let html = '';
     paletteItems.forEach(item => {
         html += `<div class="palette-item ${item.id===currentBrush?'selected':''}" data-id="${item.id}" style="color:${item.color}" onclick="selectBrush(${item.id})">
-            <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24">${item.icon}</svg>
+            <svg stroke="currentColor" fill="none" stroke-width="2.5" viewBox="0 0 24 24">${item.icon}</svg>
         </div>`;
     });
     pal.innerHTML = html;
@@ -348,23 +369,22 @@ function startPlay() {
                 startFound = true;
             } else if (mapData[r][c] === 8) {
                 enemies.push({
-                    x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 24),
-                    vx: -2, w: 24, h: 24
+                    x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28),
+                    vx: -2, w: 28, h: 28, blink: 0
                 });
             }
         }
     }
     if(!startFound) { player.x = 2 * TILE_SIZE; player.y = 2 * TILE_SIZE; }
 
-    // 開始時にカメラをプレイヤーに合わせる
     camera.x = player.x + player.w/2 - canvas.width/2;
     camera.y = player.y + player.h/2 - canvas.height/2;
 }
 
 function die() {
     player.state = 'dead';
-    createParticles(player.x + player.w/2, player.y + player.h/2, '#00f3ff', 20);
-    setTimeout(() => { if(mode === 'play') startPlay(); }, 1000);
+    createParticles(player.x + player.w/2, player.y + player.h/2, '#00f3ff', 30);
+    setTimeout(() => { if(mode === 'play') startPlay(); }, 1200);
 }
 
 function win() {
@@ -384,7 +404,7 @@ function win() {
         }).catch(e=>console.log(e));
     }
 
-    setTimeout(() => setMode('edit'), 2000);
+    setTimeout(() => setMode('edit'), 2500);
 }
 
 function updateHUD() {
@@ -410,20 +430,22 @@ window.addEventListener('keyup', e => {
 });
 function doJump() {
     if (player.state !== 'dead' && player.grounded) {
-        player.vy = -11;
+        player.vy = -12;
         player.grounded = false;
-        createParticles(player.x + player.w/2, player.y + player.h, '#fff', 5);
+        createParticles(player.x + player.w/2, player.y + player.h, '#fff', 8);
     }
 }
 
 canvas.addEventListener('mousedown', e => {
     if(e.button === 0) input.isDown = true;
     if(e.button === 2) input.rightDown = true;
+    if(currentBrush === 100) input.rightDown = true; // PCでもPanツールは右クリ扱い
     handlePaint(e);
 });
 window.addEventListener('mouseup', e => {
     if(e.button === 0) input.isDown = false;
     if(e.button === 2) input.rightDown = false;
+    if(currentBrush === 100) input.rightDown = false;
 });
 canvas.addEventListener('mousemove', e => {
     if(mode === 'edit' && input.rightDown) {
@@ -433,7 +455,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 function handlePaint(e) {
-    if(mode !== 'edit' || !input.isDown) return;
+    if(mode !== 'edit' || !input.isDown || currentBrush === 100) return;
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
@@ -456,20 +478,25 @@ const bindBtn = (id, key) => {
 };
 bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-jump', 'jump');
 
+// スマホの描画/スクロール完全分離
 let lastTouch = null;
 canvas.addEventListener('touchstart', e => {
     if(mode === 'edit' && e.touches.length===1) {
         lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-        input.isDown = true; handlePaint(e.touches[0]);
+        if (currentBrush !== 100) {
+            input.isDown = true; handlePaint(e.touches[0]);
+        }
     }
 });
 canvas.addEventListener('touchmove', e => {
-    if(mode === 'edit' && e.touches.length===1) {
-        if(currentBrush === 0) { // 消しゴム時はドラッグ移動
+    if(mode === 'edit' && e.touches.length===1 && lastTouch) {
+        if(currentBrush === 100) { 
+            // PANツールの場合はスワイプで画面移動
             camera.x -= e.touches[0].clientX - lastTouch.x;
             camera.y -= e.touches[0].clientY - lastTouch.y;
             lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-        } else {
+        } else if (input.isDown) {
+            // 他のツールの場合はなぞって描画
             handlePaint(e.touches[0]);
         }
     }
@@ -490,27 +517,25 @@ function isSolid(t) { return t === 1 || t === 6; }
 function updatePhysics() {
     if (player.state === 'dead' || player.state === 'clear') return;
 
-    if (keys.left) player.vx -= 0.8;
-    if (keys.right) player.vx += 0.8;
-    if (!keys.left && !keys.right) player.vx *= 0.8;
+    if (keys.left) { player.vx -= 0.8; player.faceDir = -1; }
+    if (keys.right) { player.vx += 0.8; player.faceDir = 1; }
+    if (!keys.left && !keys.right) player.vx *= 0.75;
     
-    if (player.vx > 5) player.vx = 5;
-    if (player.vx < -5) player.vx = -5;
+    if (player.vx > 6) player.vx = 6;
+    if (player.vx < -6) player.vx = -6;
     if (Math.abs(player.vx) < 0.1) player.vx = 0;
 
-    player.vy += 0.6; 
-    if (player.vy > 12) player.vy = 12;
+    player.vy += 0.65; 
+    if (player.vy > 14) player.vy = 14;
 
-    // X軸
     player.x += player.vx;
     checkMapCollision(true);
 
-    // Y軸
     player.y += player.vy;
     player.grounded = false;
     checkMapCollision(false);
 
-    if (player.y > MAP_ROWS * TILE_SIZE + 100) die();
+    if (player.y > MAP_ROWS * TILE_SIZE + 200) die();
 
     enemies.forEach(e => {
         e.vy = (e.vy || 0) + 0.6;
@@ -523,10 +548,12 @@ function updatePhysics() {
             e.y = Math.floor((e.y+e.h)/TILE_SIZE)*TILE_SIZE - e.h;
             e.vy = 0;
         }
+        e.blink = (e.blink + 1) % 100;
+
         if (rectIntersect(player, e)) {
-            if (player.vy > 0 && player.y + player.h - e.y < 15) {
-                e.dead = true; player.vy = -8;
-                createParticles(e.x+e.w/2, e.y+e.h/2, '#a855f7', 10);
+            if (player.vy > 0 && player.y + player.h - e.y < 20) {
+                e.dead = true; player.vy = -10;
+                createParticles(e.x+e.w/2, e.y+e.h/2, '#fff', 15);
             } else {
                 die();
             }
@@ -555,22 +582,24 @@ function checkMapCollision(isX) {
             if (t === 2) { die(); return; } 
             if (t === 3) { 
                 mapData[r][c] = 0; player.coins += 10; updateHUD();
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#d4af37', 5);
+                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ffcc00', 8);
             }
             if (t === 5) { 
                 mapData[r][c] = 0; player.hasKey = true; updateHUD();
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ff9900', 8);
+                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#ff9900', 12);
             }
             if (t === 4) { win(); return; }
 
             if (t === 6 && player.hasKey) {
                 mapData[r][c] = 0;
-                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#888', 10);
+                createParticles(c*TILE_SIZE+20, r*TILE_SIZE+20, '#888', 15);
                 continue;
             }
             
             if (t === 7 && !isX && p.vy > 0) {
-                p.vy = -18; p.y = r * TILE_SIZE - p.h; return;
+                p.vy = -20; p.y = r * TILE_SIZE - p.h; 
+                createParticles(p.x+p.w/2, p.y+p.h, '#00f3ff', 10);
+                return;
             }
 
             if (isSolid(t)) {
@@ -591,23 +620,40 @@ function checkMapCollision(isX) {
 function createParticles(x, y, color, count) {
     for(let i=0; i<count; i++) {
         particles.push({
-            x, y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8 - 2, life: 1.0, color
+            x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 2, life: 1.0, color
         });
     }
 }
 
+// 角丸矩形描画ヘルパー
+function roundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+}
+
 /* =========================================================
-   6. 描画
+   6. カートゥーン風 描画
 ========================================================= */
 function draw() {
-    ctx.fillStyle = '#060709';
+    ctx.fillStyle = '#1a1e29';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (mode === 'play') {
         const targetCx = player.x + player.w/2 - canvas.width/2;
         const targetCy = player.y + player.h/2 - canvas.height/2;
-        camera.x += (targetCx - camera.x) * 0.1;
-        camera.y += (targetCy - camera.y) * 0.1;
+        camera.x += (targetCx - camera.x) * 0.15;
+        camera.y += (targetCy - camera.y) * 0.15;
     }
     
     const maxCx = Math.max(0, MAP_COLS * TILE_SIZE - canvas.width);
@@ -637,80 +683,128 @@ function draw() {
     const startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE));
     const endRow = Math.min(MAP_ROWS, Math.ceil((camera.y + canvas.height) / TILE_SIZE));
 
+    ctx.lineWidth = 3; // カートゥーン風の太いアウトライン
+    ctx.lineJoin = 'round';
+
     for (let r = startRow; r < endRow; r++) {
         for (let c = startCol; c < endCol; c++) {
             const t = mapData[r][c];
             if (t === 0) continue;
             
             const x = c * TILE_SIZE, y = r * TILE_SIZE, ts = TILE_SIZE, hc = ts/2;
+            ctx.strokeStyle = '#000'; // すべてのオブジェクトに黒枠
 
-            if (t === 1) { 
-                ctx.fillStyle = '#242831'; ctx.fillRect(x, y, ts, ts);
-                ctx.strokeStyle = '#444'; ctx.strokeRect(x, y, ts, ts);
-                ctx.fillStyle = '#15181e'; ctx.fillRect(x+4, y+4, ts-8, ts-8);
+            if (t === 1) { // ブロック
+                ctx.fillStyle = '#4a5568';
+                roundRect(ctx, x, y, ts, ts, 4);
+                ctx.fillStyle = '#2d3748';
+                ctx.fillRect(x+4, y+4, ts-8, ts-12); // 少し立体感
             }
-            else if (t === 2) { 
-                ctx.fillStyle = '#ff3366';
-                ctx.beginPath(); ctx.moveTo(x+hc, y); ctx.lineTo(x+ts, y+ts); ctx.lineTo(x, y+ts); ctx.fill();
+            else if (t === 2) { // トゲ
+                ctx.fillStyle = '#ff477e';
+                ctx.beginPath(); ctx.moveTo(x+hc, y+4); ctx.lineTo(x+ts-2, y+ts); ctx.lineTo(x+2, y+ts); ctx.closePath();
+                ctx.fill(); ctx.stroke();
+                // ハイライト
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.beginPath(); ctx.moveTo(x+hc, y+10); ctx.lineTo(x+hc+6, y+ts-4); ctx.lineTo(x+hc-2, y+ts-4); ctx.fill();
             }
-            else if (t === 3) { 
-                ctx.fillStyle = '#d4af37';
-                ctx.beginPath(); ctx.arc(x+hc, y+hc, ts/3, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#000'; ctx.fillRect(x+hc-2, y+hc-ts/6, 4, ts/3);
+            else if (t === 3) { // コイン
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath(); ctx.arc(x+hc, y+hc, ts/3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#b38f00'; ctx.fillRect(x+hc-2, y+hc-ts/5, 4, ts/2.5);
             }
-            else if (t === 4) { 
-                ctx.fillStyle = '#fff'; ctx.fillRect(x+ts/4, y, 4, ts);
-                ctx.fillStyle = '#ff0055'; ctx.beginPath(); ctx.moveTo(x+ts/4+4, y); ctx.lineTo(x+ts-4, y+ts/4); ctx.lineTo(x+ts/4+4, y+ts/2); ctx.fill();
+            else if (t === 4) { // ゴール
+                ctx.fillStyle = '#fff'; 
+                ctx.fillRect(x+ts/4, y, 4, ts); ctx.strokeRect(x+ts/4, y, 4, ts);
+                ctx.fillStyle = '#ff3366'; 
+                ctx.beginPath(); ctx.moveTo(x+ts/4+4, y+2); ctx.lineTo(x+ts-2, y+ts/4); ctx.lineTo(x+ts/4+4, y+ts/2); ctx.closePath();
+                ctx.fill(); ctx.stroke();
             }
-            else if (t === 5) { 
+            else if (t === 5) { // カギ
                 ctx.fillStyle = '#ff9900';
-                ctx.beginPath(); ctx.arc(x+ts*0.3, y+hc, ts/6, 0, Math.PI*2); ctx.fill();
-                ctx.fillRect(x+ts*0.3, y+hc-2, ts*0.5, 4); ctx.fillRect(x+ts*0.6, y+hc, 4, 6);
+                ctx.beginPath(); ctx.arc(x+ts*0.3, y+hc, ts/5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.fillRect(x+ts*0.3, y+hc-3, ts*0.5, 6); ctx.strokeRect(x+ts*0.3, y+hc-3, ts*0.5, 6);
+                ctx.fillRect(x+ts*0.6, y+hc, 4, 8); ctx.strokeRect(x+ts*0.6, y+hc, 4, 8);
             }
-            else if (t === 6) { 
-                ctx.fillStyle = '#111'; ctx.fillRect(x, y, ts, ts);
-                ctx.strokeStyle = '#888'; ctx.lineWidth=2; ctx.strokeRect(x+2, y+2, ts-4, ts-4);
-                ctx.fillStyle = '#ff9900'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 4, 0, Math.PI*2); ctx.fill();
+            else if (t === 6) { // ドア
+                ctx.fillStyle = '#8B4513'; 
+                roundRect(ctx, x, y, ts, ts, 4);
+                ctx.fillStyle = '#5C2E0B'; ctx.fillRect(x+4, y+4, ts-8, ts-8);
+                ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(x+hc, y+hc, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             }
-            else if (t === 7) { 
-                ctx.fillStyle = '#00f3ff'; ctx.fillRect(x+4, y+ts-8, ts-8, 8);
-                ctx.fillStyle = '#555'; ctx.fillRect(x+8, y+ts-16, ts-16, 8);
+            else if (t === 7) { // バウンサー(ジャンプ台)
+                ctx.fillStyle = '#00f3ff'; 
+                roundRect(ctx, x+2, y+ts-12, ts-4, 12, 4);
+                ctx.fillStyle = '#fff'; ctx.fillRect(x+6, y+ts-10, ts-12, 4);
             }
-            else if (t === 8 && mode === 'edit') { 
-                ctx.fillStyle = '#a855f7'; ctx.fillRect(x+4, y+ts-24, 24, 24);
-                ctx.fillStyle = '#fff'; ctx.fillRect(x+8, y+ts-20, 4,4); ctx.fillRect(x+18, y+ts-20, 4,4);
+            else if (t === 8 && mode === 'edit') { // 敵（エディット用表示）
+                ctx.fillStyle = '#a855f7';
+                roundRect(ctx, x+4, y+ts-28, 28, 28, 6);
+                // 怒り目
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x+12, y+ts-18, 4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(x+24, y+ts-18, 4, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.fillRect(x+11, y+ts-19, 2, 2); ctx.fillRect(x+23, y+ts-19, 2, 2);
+                ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(x+8, y+ts-22); ctx.lineTo(x+14, y+ts-19); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x+28, y+ts-22); ctx.lineTo(x+22, y+ts-19); ctx.stroke();
             }
-            else if (t === 9) { 
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.3)'; ctx.fillRect(x, y, ts, ts);
-                ctx.strokeStyle = '#10b981'; ctx.strokeRect(x, y, ts, ts);
-                ctx.fillStyle = '#10b981'; ctx.font = "10px sans-serif"; ctx.fillText("START", x+4, y+hc+4);
+            else if (t === 9) { // スタート
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.4)'; 
+                roundRect(ctx, x, y, ts, ts, 4);
+                ctx.fillStyle = '#fff'; ctx.font = "bold 12px sans-serif"; ctx.fillText("START", x+2, y+hc+4);
             }
         }
     }
 
+    // プレイヤー描画
     if (player.state !== 'dead') {
         ctx.fillStyle = '#00f3ff';
-        ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+        roundRect(ctx, player.x, player.y, player.w, player.h, 6);
+        
+        // 目 (向いている方向で変化)
+        ctx.fillStyle = '#fff';
+        const eyeOffsetX = player.faceDir > 0 ? 8 : 4;
+        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10, player.y + 8, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        
         ctx.fillStyle = '#000';
-        const dir = keys.left ? -1 : (keys.right ? 1 : (player.vx>0?1:-1));
-        const eyeX = dir > 0 ? player.x + 14 : player.x + 4;
-        ctx.fillRect(eyeX, player.y + 6, 4, 4);
+        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(player.x + eyeOffsetX + 10 + (player.faceDir>0?1:-1), player.y + 8, 2, 0, Math.PI*2); ctx.fill();
     }
 
+    // 敵描画 (プレイモード)
     if (mode === 'play') {
         enemies.forEach(e => {
-            ctx.fillStyle = '#a855f7'; ctx.fillRect(e.x, e.y, e.w, e.h);
-            ctx.fillStyle = '#fff'; 
-            const ex = e.vx > 0 ? e.x+14 : e.x+4;
-            ctx.fillRect(ex, e.y+4, 6, 2);
+            ctx.fillStyle = '#a855f7'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+            roundRect(ctx, e.x, e.y, e.w, e.h, 6);
+            
+            if(e.blink < 90) { // まばたき処理
+                ctx.fillStyle = '#fff'; 
+                const ex = e.vx > 0 ? e.x+14 : e.x+6;
+                ctx.beginPath(); ctx.arc(ex, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.arc(ex+8, e.y+10, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(ex+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(ex+8+(e.vx>0?1:-1), e.y+10, 1.5, 0, Math.PI*2); ctx.fill();
+                
+                // 怒り眉
+                ctx.beginPath(); ctx.moveTo(ex-3, e.y+5); ctx.lineTo(ex+3, e.y+8); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(ex+11, e.y+5); ctx.lineTo(ex+5, e.y+8); ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.moveTo(e.x+6, e.y+10); ctx.lineTo(e.x+12, e.y+10); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(e.x+16, e.y+10); ctx.lineTo(e.x+22, e.y+10); ctx.stroke();
+            }
         });
     }
 
+    // パーティクル
     for(let i=particles.length-1; i>=0; i--) {
         let p = particles[i];
         p.x += p.vx; p.y += p.vy; p.life -= 0.05;
         ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4);
+        ctx.fillStyle = p.color; 
+        ctx.fillRect(p.x, p.y, 6, 6);
         ctx.globalAlpha = 1.0;
         if(p.life <= 0) particles.splice(i, 1);
     }
@@ -726,7 +820,7 @@ function loop() {
 requestAnimationFrame(loop);
 
 /* =========================================================
-   7. API・モーダル処理 (Save / Load / Admin)
+   7. API・モーダル処理 (Save / Load / Admin) 完全維持
 ========================================================= */
 const token = localStorage.getItem("access_token");
 
@@ -788,17 +882,17 @@ async function openLoadModal() {
             data.stages.forEach(s => {
                 const isKing = data.is_king;
                 const badges = [];
-                if (s.is_pinned) badges.push('<span style="color:var(--accent-gold); font-size:0.6rem;">[👑勅命]</span>');
-                if (s.is_confiscated) badges.push('<span style="color:var(--danger-color); font-size:0.6rem;">[🚨接収済]</span>');
+                if (s.is_pinned) badges.push('<span style="color:var(--accent-gold); font-size:0.7rem;">[👑勅命]</span>');
+                if (s.is_confiscated) badges.push('<span style="color:var(--danger-color); font-size:0.7rem;">[🚨接収済]</span>');
                 
                 let actions = '';
                 if (s.is_mine || isKing) {
-                    actions += `<button class="btn-retro" style="padding:4px 6px; font-size:0.6rem; border-color:var(--danger-color);" onclick="deleteStage(${s.id}, event)">破棄</button>`;
+                    actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem; border-color:var(--danger-color);" onclick="deleteStage(${s.id}, event)">破棄</button>`;
                 }
                 if (isKing) {
-                    actions += `<button class="btn-retro" style="padding:4px 6px; font-size:0.6rem;" onclick="pinStage(${s.id}, event)">勅命</button>`;
+                    actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="pinStage(${s.id}, event)">勅命</button>`;
                     if(!s.is_confiscated) {
-                        actions += `<button class="btn-retro" style="padding:4px 6px; font-size:0.6rem;" onclick="confiscateStage(${s.id}, event)">接収</button>`;
+                        actions += `<button class="btn-retro" style="padding:4px 8px; font-size:0.7rem;" onclick="confiscateStage(${s.id}, event)">接収</button>`;
                     }
                 }
 
@@ -807,11 +901,11 @@ async function openLoadModal() {
                     <div style="flex:1;">
                         <div class="st-title">${badges.join(' ')} ${escapeHtml(s.title)}</div>
                         <div class="st-author">作: ${escapeHtml(s.creator_name)} | ${escapeHtml(s.description||'')}</div>
-                        <div class="st-stats" style="text-align:left; margin-top:4px;">プレイ: ${s.plays_count} / クリア: ${s.clears_count}</div>
+                        <div class="st-stats" style="text-align:left; margin-top:6px;">プレイ: ${s.plays_count} / クリア: ${s.clears_count}</div>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-                        <button class="btn-retro" style="padding:6px 10px; font-size:0.75rem; background:var(--accent-cyan); color:#000;">PLAY</button>
-                        <div style="display:flex; gap:4px; margin-top:4px;">${actions}</div>
+                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                        <button class="btn-retro" style="padding:8px 12px; font-size:0.85rem; background:var(--accent-cyan); color:#000;">PLAY</button>
+                        <div style="display:flex; gap:6px; margin-top:4px;">${actions}</div>
                     </div>
                 </div>`;
             });
@@ -820,7 +914,7 @@ async function openLoadModal() {
             container.innerHTML = '<div style="text-align:center;color:#666;margin-top:20px;">ステージがまだありません。</div>';
         }
     } catch (e) {
-        container.innerHTML = '<div style="text-align:center;color:#ff3366;margin-top:20px;">取得エラー</div>';
+        container.innerHTML = '<div style="text-align:center;color:#ff477e;margin-top:20px;">取得エラー</div>';
     }
 }
 
@@ -829,11 +923,10 @@ async function loadStage(id) {
         const res = await fetch(`/api/maker/stages/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         if (res.ok) {
-            // APIレスポンス構造 data.stage に対応
             mapData = JSON.parse(data.stage.map_data);
             currentStageId = id;
             closeModal('modal-load');
-            setMode('play'); // ロード後自動でプレイ
+            setMode('play'); 
         } else {
             alert("ロード失敗: " + data.detail);
         }
