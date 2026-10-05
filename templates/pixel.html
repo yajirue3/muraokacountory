@@ -513,7 +513,6 @@
         } catch (e) {}
     }
 
-    // 【超高速化】Promise.all で並列リクエストし起動待ち時間を一掃
     async function initGame() {
         try {
             const [wRes, meRes] = await Promise.all([
@@ -539,7 +538,7 @@
                 showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
             }
 
-            // 【完全判定】DB上で生存しているなら即時ゲーム開始、モーダルは一切開かない
+            // 【完全非同期制御】DB側で生存しているなら、絶対にモーダルは表示しない
             if (me.exists && !me.is_dead) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
@@ -563,7 +562,7 @@
                 return;
             }
 
-            // 本当に未登録、または確実に死んでいる時だけ出撃モーダルを表示
+            // 死亡中、または未登録の場合のみ出撃画面を表示
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
@@ -594,7 +593,7 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
-            // 最新ステータス（永続アップグレード値）を取得
+            // 最新ステータス（永続化されたアップグレード値）を取得
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             const me = meRes.ok ? await meRes.json() : { ink: 1, max_ink: 10, regen: 1 };
 
@@ -614,6 +613,7 @@
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
 
+            // モーダルを確実に閉じる
             document.getElementById("spawn-modal").style.display = "none";
             centerCameraOnCore();
             connectWebSocket();
