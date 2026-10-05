@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>村岡王国 - 王立試練迷宮</title>
+    <title>村岡王国 - 王立試練迷宮（Maker DX Pro Max）</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;900&family=Press+Start+2P&display=swap');
 
@@ -740,7 +740,7 @@ let keys = { left: false, right: false, jump: false };
 let mapData = [];
 let savedMapData = null; 
 
-// タイルID定義 (新ギミック追加)
+// タイルID定義
 const T = {
     EMPTY: 0, BLOCK: 1, SPIKE_UP: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, 
     ENEMY: 8, START: 9, BRICK: 10, SPIKE_DOWN: 11, SPIKE_LEFT: 12, SPIKE_RIGHT: 13,
@@ -810,7 +810,7 @@ let screenShake = 0;
 
 let enemies = []; 
 let particles = []; 
-let trails = []; // プレイヤーの残像エフェクト
+let trails = []; 
 let beamEmitters = []; 
 let projectiles = [];
 
@@ -969,7 +969,7 @@ function startPlay() {
                 enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 1 });
             } else if (t === T.ENEMY2) {
                 enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 2, jumpTmr: 0 });
-            } else if (t >= T.BEAM_R && t <= T.BEAM_D) {
+            } else if ([T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D].includes(t)) {
                 beamEmitters.push({ r, c, type: t, tmr: Math.floor(Math.random() * 40) });
             }
         }
@@ -1103,7 +1103,6 @@ function handlePaint(e) {
     const row = Math.floor((cy + camera.y) / TILE_SIZE);
     
     if (row >= 0 && row < MAP_ROWS && col >= 0 && col < MAP_COLS) {
-        // スタート地点は一つだけにする制御
         if (currentBrush === T.START) { 
             for (let r = 0; r < MAP_ROWS; r++) {
                 for (let c = 0; c < MAP_COLS; c++) {
@@ -1214,9 +1213,9 @@ function updatePhysics() {
     if (switchCooldown > 0) switchCooldown--;
     if (player.warpCooldown > 0) player.warpCooldown--;
     if (crossCooldown > 0) crossCooldown--;
+    
     if (player.boostTimer > 0) {
         player.boostTimer--;
-        // ブースト中は残像を生成
         if (player.boostTimer % 2 === 0) {
             trails.push({ x: player.x, y: player.y, faceDir: player.faceDir, life: 1.0 });
         }
@@ -1225,14 +1224,13 @@ function updatePhysics() {
     player.scaleX += (1.0 - player.scaleX) * 0.25;
     player.scaleY += (1.0 - player.scaleY) * 0.25;
 
-    // 左右移動制御 (ブースト中は強制移動)
+    // 移動処理
     if (player.boostTimer === 0) {
         if (keys.left) { player.vx -= 0.8; player.faceDir = -1; }
         if (keys.right) { player.vx += 0.8; player.faceDir = 1; }
         if (!keys.left && !keys.right) player.vx *= 0.75;
         player.vx = Math.max(-6, Math.min(6, player.vx));
     } else {
-        // ブースト中の最高速度引き上げ
         player.vx = player.faceDir * 14;
     }
     
@@ -1269,6 +1267,7 @@ function updatePhysics() {
 
     if (player.y > MAP_ROWS * TILE_SIZE + 200) die();
 
+    // 敵のアニメーションとAI
     enemies.forEach(e => {
         e.vy += 0.6;
         
@@ -1313,13 +1312,11 @@ function updatePhysics() {
         e.blink = (e.blink + 1) % 100;
         
         if (rectIntersect(player, e)) {
-            // ブースト中は敵を無敵状態で吹き飛ばす
             if (player.boostTimer > 0) {
                 e.dead = true;
                 screenShake = 6;
                 createParticles(e.x + e.w/2, e.y + e.h/2, (e.type === 2) ? '#ff2a5f' : '#a855f7', 20);
-            } 
-            else if (player.vy > 0 && player.y + player.h - e.y < 20) {
+            } else if (player.vy > 0 && player.y + player.h - e.y < 20) {
                 e.dead = true; 
                 player.vy = -10; 
                 player.scaleX = 0.6; 
@@ -1333,6 +1330,7 @@ function updatePhysics() {
     });
     enemies = enemies.filter(e => !e.dead);
 
+    // 砲台の発射処理
     beamEmitters.forEach(b => {
         b.tmr++;
         if (b.tmr >= 90) {
@@ -1384,9 +1382,9 @@ function checkCollision(isX) {
             
             let t = mapData[r][c];
 
-            if (t >= T.SPIKE_UP && t <= T.SPIKE_RIGHT) { 
+            if ([T.SPIKE_UP, T.SPIKE_DOWN, T.SPIKE_LEFT, T.SPIKE_RIGHT].includes(t)) { 
                 if (p.boostTimer === 0) { die(); return; }
-                else { continue; } // ブースト中はトゲ無効
+                else { continue; } 
             }
 
             if (t === T.SWITCH) checkSwitchTrigger(r, c, player);
@@ -1421,11 +1419,10 @@ function checkCollision(isX) {
                 return; 
             }
 
-            // ブーストパネル
             if (t === T.BOOST_R && p.y + p.h > r * TILE_SIZE + 10) {
                 p.faceDir = 1;
-                p.boostTimer = 30; // 0.5秒間ブースト
-                p.vy = 0; // 落下をキャンセル
+                p.boostTimer = 30; 
+                p.vy = 0; 
                 screenShake = 4;
                 createParticles(p.x, p.y + p.h/2, '#00e5ff', 15);
             }
@@ -1437,13 +1434,11 @@ function checkCollision(isX) {
                 createParticles(p.x + p.w, p.y + p.h/2, '#00e5ff', 15);
             }
 
-            // 十字ブロック (触れると弾き飛ばされる)
             if (t === T.CROSS && crossCooldown === 0) {
                 screenShake = 8;
                 crossCooldown = 15;
                 createParticles(c * TILE_SIZE + 20, r * TILE_SIZE + 20, '#f39c12', 20);
                 
-                // 進行方向またはランダムな十字方向へ高速で弾く
                 const dirs = [
                     {vx: 18, vy: -5}, {vx: -18, vy: -5}, {vx: 0, vy: -20}
                 ];
@@ -1459,30 +1454,19 @@ function checkCollision(isX) {
                 return;
             }
 
-            // 一方通行ブロック
             if (t === T.ONEWAY_UP && !isX && p.vy > 0 && (p.y + p.h - p.vy) <= r * TILE_SIZE + 8) { 
-                p.y = r * TILE_SIZE - p.h; 
-                p.grounded = true; 
-                p.vy = 0; 
-                return; 
+                p.y = r * TILE_SIZE - p.h; p.grounded = true; p.vy = 0; return; 
             }
             if (t === T.ONEWAY_DOWN && !isX && p.vy < 0 && (p.y - p.vy) >= r * TILE_SIZE + TILE_SIZE - 8) { 
-                p.y = r * TILE_SIZE + TILE_SIZE; 
-                p.vy = 0; 
-                return; 
+                p.y = r * TILE_SIZE + TILE_SIZE; p.vy = 0; return; 
             }
             if (t === T.ONEWAY_LEFT && isX && p.vx > 0 && (p.x + p.w - p.vx) <= c * TILE_SIZE + 8) { 
-                p.x = c * TILE_SIZE - p.w; 
-                p.vx = 0; 
-                return; 
+                p.x = c * TILE_SIZE - p.w; p.vx = 0; return; 
             }
             if (t === T.ONEWAY_RIGHT && isX && p.vx < 0 && (p.x - p.vx) >= c * TILE_SIZE + TILE_SIZE - 8) { 
-                p.x = c * TILE_SIZE + TILE_SIZE; 
-                p.vx = 0; 
-                return; 
+                p.x = c * TILE_SIZE + TILE_SIZE; p.vx = 0; return; 
             }
 
-            // ワープ処理
             if ((t === T.WARP_1 || t === T.WARP_2) && p.warpCooldown === 0) {
                 let tgts = [];
                 for (let tr = 0; tr < MAP_ROWS; tr++) {
@@ -1504,7 +1488,6 @@ function checkCollision(isX) {
             
             if (t === T.GOAL) { win(); return; }
 
-            // 固いブロック処理
             if (isSolid(t)) {
                 if (isX) {
                     if (p.vx > 0) { 
@@ -1515,7 +1498,6 @@ function checkCollision(isX) {
                         p.touchingWall = -1; 
                     }
                     if (p.boostTimer > 0) {
-                        // ブースト中に壁にぶつかったら少し揺らして止まる
                         screenShake = 6;
                         createParticles(p.x + (p.touchingWall===1?p.w:0), p.y + p.h/2, '#fff', 10);
                         p.boostTimer = 0;
@@ -1553,7 +1535,7 @@ function createParticles(x, y, color, count) {
 }
 
 /* =========================================================
-   5. 描画 (アニメーション＆スクリーンシェイク)
+   5. 描画
 ========================================================= */
 function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath(); 
@@ -1710,11 +1692,11 @@ function draw() {
                 ctx.fillStyle = '#d35400'; 
                 ctx.fillRect(x + 4, y + 14, ts - 8, 4); 
                 ctx.fillRect(x + 14, y + 4, 4, ts - 8); 
-            } else if (t >= T.ONEWAY_UP && t <= T.ONEWAY_RIGHT) {
+            } else if ([T.ONEWAY_UP, T.ONEWAY_DOWN, T.ONEWAY_LEFT, T.ONEWAY_RIGHT].includes(t)) {
                 drawOneway(ctx, x, y, ts, t === T.ONEWAY_UP ? 'up' : t === T.ONEWAY_DOWN ? 'down' : t === T.ONEWAY_LEFT ? 'left' : 'right');
-            } else if (t >= T.SPIKE_UP && t <= T.SPIKE_RIGHT) {
+            } else if ([T.SPIKE_UP, T.SPIKE_DOWN, T.SPIKE_LEFT, T.SPIKE_RIGHT].includes(t)) {
                 drawSpike(ctx, x, y, ts, t === T.SPIKE_UP ? 'up' : t === T.SPIKE_DOWN ? 'down' : t === T.SPIKE_LEFT ? 'left' : 'right');
-            } else if (t >= T.BEAM_R && t <= T.BEAM_D) {
+            } else if ([T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D].includes(t)) {
                 ctx.fillStyle = '#e74c3c'; 
                 roundRect(ctx, x, y, ts, ts, 4); 
                 ctx.fillStyle = '#000'; 
@@ -1849,7 +1831,7 @@ function draw() {
         }
     }
 
-    // 残像 (Trails) 描画
+    // 残像 (Trails)
     for (let i = trails.length - 1; i >= 0; i--) {
         let tr = trails[i];
         tr.life -= 0.1;
@@ -1865,7 +1847,7 @@ function draw() {
         ctx.restore();
     }
 
-    // 弾 (プロジェクタイル) 描画
+    // 弾
     projectiles.forEach(p => {
         ctx.fillStyle = 'rgba(255, 42, 95, 0.9)'; 
         ctx.strokeStyle = '#000'; 
@@ -1881,13 +1863,12 @@ function draw() {
         ctx.fill();
     });
 
-    // プレイヤー描画 (Squash & Stretch)
+    // プレイヤー描画
     if (player.state !== 'dead') {
         ctx.save(); 
         ctx.translate(player.x + player.w / 2, player.y + player.h); 
         ctx.scale(player.scaleX, player.scaleY);
         
-        // 無敵ダッシュ中は色を変化させる
         ctx.fillStyle = (player.boostTimer > 0) ? '#fff' : '#00e5ff'; 
         ctx.strokeStyle = '#000'; 
         ctx.lineWidth = 3;
@@ -1907,7 +1888,7 @@ function draw() {
         ctx.restore();
     }
 
-    // 敵描画 (プレイモード)
+    // 敵描画
     if (mode === 'play') {
         enemies.forEach(e => {
             ctx.fillStyle = (e.type === 2) ? '#ff2a5f' : '#a855f7'; 
@@ -1937,7 +1918,7 @@ function draw() {
         });
     }
 
-    // パーティクル描画
+    // パーティクル
     for (let i = particles.length - 1; i >= 0; i--) {
         let p = particles[i]; 
         p.x += p.vx; 
@@ -1964,7 +1945,7 @@ function loop() {
 requestAnimationFrame(loop);
 
 /* =========================================================
-   6. 通信・モーダル処理 (フル維持)
+   6. 通信・モーダル処理
 ========================================================= */
 const token = localStorage.getItem("access_token");
 
@@ -2036,7 +2017,6 @@ async function saveStage() {
 
 async function openLoadModal() {
     if (mode === 'play') setMode('edit'); 
-    
     openModal('modal-load');
     
     const box = document.getElementById('stage-list-container'); 
