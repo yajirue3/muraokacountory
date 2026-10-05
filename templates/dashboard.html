@@ -775,6 +775,8 @@
                 }
                 node.classList.remove('long-pressing');
 
+                if (e.type === 'mouseleave') return;
+
                 if (!isDragging && !hasMoved && e.type !== 'touchmove' && e.type !== 'mousemove') {
                     if (e.target.closest('.node-del-action')) return;
                     const url = node.getAttribute('data-url');
