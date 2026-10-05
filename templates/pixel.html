@@ -40,7 +40,7 @@
         #game-canvas {
             position: absolute;
             top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            width: 100%; height: 100%;
             z-index: 1;
             touch-action: none;
         }
@@ -50,12 +50,6 @@
             stroke: currentColor; fill: none;
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
             vertical-align: middle;
-        }
-
-        #debug-banner {
-            position: absolute; top: 0; left: 0; width: 100%;
-            background: #ff3366; color: #fff; font-size: 0.7rem; font-weight: bold;
-            padding: 6px 10px; z-index: 99999; display: none; word-break: break-all;
         }
 
         #toast-container {
@@ -95,6 +89,7 @@
             100% { transform: translateY(-15px); opacity: 0; }
         }
 
+        /* HUD Top: 余白と配置を整理 */
         .hud-top {
             position: absolute; top: 10px; left: 10px; right: 10px;
             display: flex; flex-direction: column; gap: 5px; z-index: 50; pointer-events: none;
@@ -121,6 +116,7 @@
         .btn-icon-hud:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
 
+        /* HUD Bottom */
         .hud-bottom {
             position: absolute; bottom: 20px; left: 10px; right: 10px;
             display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none;
@@ -152,6 +148,7 @@
         #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
         .minimap-viewport { position: absolute; border: 1.5px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.25); pointer-events: none; }
 
+        /* モーダル */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); z-index: 9999;
@@ -200,12 +197,13 @@
 </head>
 <body>
 
-<div id="debug-banner"></div>
 <canvas id="game-canvas"></canvas>
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
 
+<!-- Top HUD (整理した2段レイアウト) -->
 <div class="hud-top">
+    <!-- 段1: ナビゲーションとアクション -->
     <div class="hud-bar">
         <div style="display: flex; align-items: center; gap: 6px;">
             <button class="btn-icon-hud" onclick="location.href='/dashboard'" style="color: var(--accent-cyan); border-color: rgba(0,243,255,0.4);">
@@ -233,6 +231,7 @@
             </button>
         </div>
     </div>
+    <!-- 段2: ステータス表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">INK CAPACITY</span>
@@ -247,6 +246,7 @@
             <span class="stat-value" id="hud-mass">0 マス</span>
         </div>
     </div>
+    <!-- 段3: 資金表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">GOLD BALANCE</span>
@@ -265,6 +265,7 @@
     </div>
 </div>
 
+<!-- Bottom HUD -->
 <div class="hud-bottom">
     <div class="action-menu">
         <div style="display: flex; gap: 8px;">
@@ -295,6 +296,7 @@
     </div>
 </div>
 
+<!-- ルール説明モーダル -->
 <div id="rules-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
@@ -303,32 +305,74 @@
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
+        
         <div class="rule-card">
-            <div class="rule-card-title">1. 領地を塗って不労所得</div>
-            <div class="rule-card-desc">保持領地<strong>1マスにつき毎分10 Gold</strong>が自動加算されます。</div>
+            <div class="rule-card-title">
+                <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                1. 領地を塗って不労所得
+            </div>
+            <div class="rule-card-desc">保持領地<strong>1マスにつき毎分10 Gold</strong>が自動加算されます。青枠で光っている隣接マスをタップして領地を拡張します。囲みを作ると内側を一括で制圧できます。</div>
         </div>
+
         <div class="rule-card">
-            <div class="rule-card-title">2. 本陣コアが死んだら全滅</div>
-            <div class="rule-card-desc">「本陣コア」を踏まれると<strong>全領地が即座に消滅</strong>し、懸賞金を相手に強奪されます。</div>
+            <div class="rule-card-title">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                2. 本陣コアが死んだら全滅
+            </div>
+            <div class="rule-card-desc">王冠マークの「本陣コア」を他者に踏まれると<strong>全領地が一瞬で消滅</strong>し、強化に使った全Goldを相手に強奪されます。自陣の壁を厚くしてコアを守りましょう。</div>
         </div>
+
+        <div class="rule-card">
+            <div class="rule-card-title">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                3. 道を切られた領地は消滅
+            </div>
+            <div class="rule-card-desc">全ての領地は本陣コアと一筆書きで直結している必要があります。侵略によって<strong>コアとの接続を切断された飛び地は即座に消滅</strong>します。</div>
+        </div>
+
+        <div class="rule-card">
+            <div class="rule-card-title">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                4. 同盟と裏切り
+            </div>
+            <div class="rule-card-desc">同盟相手のマスを踏み台にして遠征できます。ただし<strong>同盟は相手の許可なく即座に破棄可能</strong>です。破棄された瞬間、相手に依存していた領地は全て蒸発します。</div>
+        </div>
+
+        <div class="rule-card">
+            <div class="rule-card-title">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                5. 不可侵バリア
+            </div>
+            <div class="rule-card-desc">毎分10Gで完全無敵になれます。休眠・放置時に有効ですが、バリア中は領地収入も停止し、自分からも攻撃できなくなります。</div>
+        </div>
+
         <button class="btn-solid gold" onclick="closeModal('rules-modal')" style="margin-top: 8px;">戦場へ戻る</button>
     </div>
 </div>
 
+<!-- 出撃モーダル -->
 <div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
     <div class="modal-box">
-        <div class="modal-title"><span>戦線投入 - 本陣コア出撃</span></div>
-        <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">出撃する銀行口座を選択してください。</div>
+        <div class="modal-title">
+            <span>戦線投入 - 本陣コア出撃</span>
+        </div>
+        <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">
+            出撃する銀行口座を選択してください。<br>
+            ※強化費用の累計額はコアの「懸賞金」となり、コアを踏まれた瞬間に相手へ全額強奪されます。
+        </div>
         <select id="spawn-wallet-select"><option>読込中...</option></select>
         <button class="btn-solid gold" onclick="spawnCore()">安全区画へ出撃</button>
     </div>
 </div>
 
+<!-- 強化工房 -->
 <div id="shop-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
             <span>王国インク工房</span>
-            <button class="close-icon-btn" onclick="closeModal('shop-modal')"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <button class="close-icon-btn" onclick="closeModal('shop-modal')">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
         </div>
         <div class="rule-card">
             <div style="font-size: 0.82rem; font-weight: 900; margin-bottom: 2px;">インクタンク容量拡張 (+1)</div>
@@ -343,11 +387,18 @@
     </div>
 </div>
 
+<!-- 外交同盟モーダル -->
 <div id="alliance-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
             <span>軍事同盟カルテル</span>
-            <button class="close-icon-btn" onclick="closeModal('alliance-modal')"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <button class="close-icon-btn" onclick="closeModal('alliance-modal')">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4;">
+            同盟相手のマスを踏み台にして遠征できます。<br>
+            破棄された瞬間、相手に依存していた遠征領地は全て蒸発します。
         </div>
         <div style="display: flex; gap: 6px;">
             <input type="number" id="alliance-target-id" placeholder="相手の Player ID (例: 1042)">
@@ -360,76 +411,36 @@
     </div>
 </div>
 
+<!-- 賞金首ランキング -->
 <div id="leaderboard-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
             <span>指名手配・高額賞金首</span>
-            <button class="close-icon-btn" onclick="closeModal('leaderboard-modal')"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <button class="close-icon-btn" onclick="closeModal('leaderboard-modal')">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary);">
+            コアを破壊した瞬間に、表示されているGoldが手に入ります。
         </div>
         <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
     </div>
 </div>
 
 <script>
-    function reportError(msg) {
-        const b = document.getElementById('debug-banner');
-        if (b) {
-            b.style.display = 'block';
-            b.innerText = msg;
-        }
-    }
-    window.onerror = function(message, source, lineno) {
-        reportError("Script Error: " + message + " (line " + lineno + ")");
-    };
-    window.onunhandledrejection = function(e) {
-        reportError("Promise Error: " + (e.reason ? (e.reason.message || e.reason) : e));
-    };
-
-    const SUPABASE_URL = "{{ supabase_url }}";
-    const SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
-
-    let supabase = null;
-    if (SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.startsWith("{")) {
-        try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: { persistSession: true, autoRefreshToken: true }
-            });
-        } catch (e) {
-            console.warn("Supabase Init Warning:", e);
-        }
-    }
+    const token = localStorage.getItem("access_token");
+    if (!token) window.location.href = "/";
 
     function parseError(err) {
         if (!err) return "エラーが発生しました";
         if (typeof err === "string") return err;
-        if (err.detail) return typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+        if (err.detail) {
+            if (typeof err.detail === "string") return err.detail;
+            if (Array.isArray(err.detail) && err.detail[0]?.msg) return err.detail[0].msg;
+            return JSON.stringify(err.detail);
+        }
         if (err.message) return err.message;
         try { return JSON.stringify(err); } catch (e) { return String(err); }
-    }
-
-    async function getValidToken() {
-        let t = localStorage.getItem("access_token");
-        if (t) return t;
-
-        try {
-            if (supabase) {
-                const { data } = await supabase.auth.getSession();
-                if (data && data.session && data.session.access_token) {
-                    return data.session.access_token;
-                }
-            }
-        } catch (e) {}
-
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
-                try {
-                    const parsed = JSON.parse(localStorage.getItem(key));
-                    if (parsed && parsed.access_token) return parsed.access_token;
-                } catch (e) {}
-            }
-        }
-        return null;
     }
 
     const BOARD_SIZE = 200;
@@ -438,7 +449,7 @@
     const boardData = new Uint8Array(BOARD_SIZE * BOARD_SIZE * 3);
     const dataView = new DataView(boardData.buffer);
 
-    let realtimeChannel = null;
+    let ws = null;
     let gameState = {
         walletId: null, playerId: null, coreX: -1, coreY: -1,
         ink: 0, maxInk: 10, regen: 1, gold: 0, massCount: 0,
@@ -451,44 +462,29 @@
     let camera = { x: 100, y: 100, zoom: 22 };
     const MIN_ZOOM = 4, MAX_ZOOM = 55;
 
-    let token = null;
-
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
     const minimapCanvas = document.getElementById('minimap-canvas');
     const miniCtx = minimapCanvas.getContext('2d', { alpha: false });
 
+    const CROWN_SVG_PATH = new Path2D("M2 4l3 12h14l3-12-5 4-5-6-5 6-5-4zm3 14h14v2H5v-2z");
+
     function drawCrownIcon(targetCtx, cx, cy, size, fillColor) {
         targetCtx.save();
         targetCtx.translate(cx, cy);
-        const s = size / 24;
-        targetCtx.scale(s, s);
+        const scale = size / 24;
+        targetCtx.scale(scale, scale);
         targetCtx.translate(-12, -12);
         targetCtx.fillStyle = fillColor;
-
-        targetCtx.beginPath();
-        targetCtx.moveTo(2, 4);
-        targetCtx.lineTo(5, 16);
-        targetCtx.lineTo(19, 16);
-        targetCtx.lineTo(22, 4);
-        targetCtx.lineTo(17, 8);
-        targetCtx.lineTo(12, 2);
-        targetCtx.lineTo(7, 8);
-        targetCtx.closePath();
-        targetCtx.fill();
-
-        targetCtx.fillRect(5, 18, 14, 2);
+        targetCtx.fill(CROWN_SVG_PATH);
         targetCtx.restore();
     }
 
     function resizeCanvas() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        canvas.style.width = w + "px";
-        canvas.style.height = h + "px";
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -514,90 +510,23 @@
         setTimeout(() => el.remove(), 5500);
     }
 
-    async function loadBoardFromDB() {
-        if (!supabase) return;
-        try {
-            const { data, error } = await supabase.from('pixel_board').select('data').eq('id', 1).single();
-            if (error || !data || !data.data) return;
-
-            let bytes;
-            if (typeof data.data === 'string' && data.data.startsWith('\\x')) {
-                const hex = data.data.slice(2);
-                bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-            } else if (data.data instanceof ArrayBuffer || data.data instanceof Uint8Array) {
-                bytes = new Uint8Array(data.data);
-            }
-
-            if (bytes && bytes.length === BOARD_SIZE * BOARD_HEIGHT * 3) {
-                boardData.set(bytes);
-                fastFullRecount();
-            }
-        } catch (e) {
-            console.error("盤面ロード失敗:", e);
-        }
-    }
-
-    // pixel.py の /api/pixel/cores からアクティブコアを取得
     async function syncCores() {
         try {
             const res = await fetch("/api/pixel/cores");
             if (res.ok) {
-                const cores = await res.json();
+                const list = await res.json();
                 activeCores.clear();
-                for (const c of cores) {
+                for (const c of list) {
                     activeCores.set(`${c.core_x},${c.core_y}`, c.player_id);
                 }
             }
         } catch (e) {}
     }
 
-    function setupRealtime() {
-        if (!supabase) return;
-        realtimeChannel = supabase.channel('pixel_war_realtime', {
-            config: { broadcast: { self: false } }
-        });
-
-        realtimeChannel.on('broadcast', { event: 'paint' }, (event) => {
-            const { x, y, owner, hp } = event.payload;
-            const idx = (y * BOARD_SIZE + x) * 3;
-            const oldOwner = dataView.getUint16(idx, false);
-
-            dataView.setUint16(idx, owner, false);
-            dataView.setUint8(idx + 2, hp);
-
-            if (oldOwner !== owner) {
-                if (oldOwner === gameState.playerId) gameState.massCount = Math.max(0, gameState.massCount - 1);
-                if (owner === gameState.playerId) gameState.massCount++;
-            }
-            updateFrontierAround(x, y);
-            updateHUD();
-        });
-
-        realtimeChannel.on('broadcast', { event: 'announce' }, (event) => {
-            const { message, color } = event.payload;
-            showBroadcast(message, color);
-            syncCores();
-        });
-
-        realtimeChannel.subscribe();
-    }
-
     async function initGame() {
         try {
-            token = await getValidToken();
-            if (!token) {
-                reportError("セッションが見つかりません。ログインしてください。");
-                setTimeout(() => { window.location.href = "/"; }, 1500);
-                return;
-            }
-
-            const wRes = await fetch("/api/wallets", { 
-                headers: { "Authorization": `Bearer ${token}` } 
-            });
-            if (!wRes.ok) {
-                const errText = await wRes.text();
-                throw new Error(`/api/wallets エラー (${wRes.status}): ${errText}`);
-            }
+            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (!wRes.ok) throw await wRes.json();
             const wallets = await wRes.json();
             if (!wallets.length) {
                 alert("口座がありません。中央銀行で作成してください。");
@@ -609,17 +538,8 @@
                 `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()}G)</option>`
             ).join('');
 
-            const meRes = await fetch("/api/pixel/me", { 
-                headers: { "Authorization": `Bearer ${token}` } 
-            });
-            if (!meRes.ok) {
-                const errText = await meRes.text();
-                throw new Error(`/api/pixel/me エラー (${meRes.status}): ${errText}`);
-            }
-            const me = await meRes.json();
-
-            await loadBoardFromDB();
-            setupRealtime();
+            const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
+            const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
 
             if (me.exists && !me.is_dead) {
                 Object.assign(gameState, {
@@ -635,6 +555,7 @@
                 });
 
                 centerCameraOnCore();
+                connectWebSocket();
                 updateHUD();
                 await syncCores();
                 startSyncLoop();
@@ -647,8 +568,12 @@
             await syncCores();
             document.getElementById("spawn-modal").style.display = "flex";
 
+            if (!localStorage.getItem("pixel_rules_accepted")) {
+                openModal('rules-modal');
+                localStorage.setItem("pixel_rules_accepted", "1");
+            }
         } catch (e) {
-            reportError("初期化失敗: " + (e.message || String(e)));
+            showToast("初期化失敗: " + parseError(e));
         }
     }
 
@@ -669,12 +594,14 @@
                 ink: 1, maxInk: 10, regen: 1, barrierActive: false
             });
 
+            // ローカル配列上でコアマスを即座に自陣化
             const coreIdx = (data.core_y * BOARD_SIZE + data.core_x) * 3;
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
 
             document.getElementById("spawn-modal").style.display = "none";
             centerCameraOnCore();
+            connectWebSocket();
             updateShopUI();
             await syncCores();
             startSyncLoop();
@@ -709,11 +636,14 @@
         }, 8000);
     }
 
+    let isManualSyncing = false;
     async function manualSync() {
+        if (isManualSyncing) return;
+        isManualSyncing = true;
         const btn = document.getElementById("btn-manual-sync");
         if (btn) btn.disabled = true;
+
         try {
-            await loadBoardFromDB();
             const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) {
                 const d = await res.json();
@@ -723,82 +653,108 @@
                     });
                 }
             }
+            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            if (wRes.ok) {
+                const ws = await wRes.json();
+                const cw = ws.find(w => w.wallet_id === gameState.walletId);
+                if (cw) gameState.gold = cw.balance;
+            }
             updateHUD();
             await syncCores();
-            showToast("最新同期完了", true);
+            showToast("最新情報を取得しました", true);
         } catch (e) {
-            showToast("同期失敗");
+            showToast("更新に失敗しました");
         } finally {
-            if (btn) btn.disabled = false;
+            setTimeout(() => {
+                isManualSyncing = false;
+                if (btn) btn.disabled = false;
+            }, 1000);
         }
     }
 
-    async function sendActionToServer(bx, by) {
+    function connectWebSocket() {
+        ws = new WebSocket(`${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}/api/pixel/ws`);
+        ws.binaryType = "arraybuffer";
+
+        ws.onmessage = (event) => {
+            if (typeof event.data === "string") {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "broadcast") showBroadcast(msg.message, msg.color);
+                    else if (msg.type === "error") showToast(msg.msg);
+                    else if (msg.type === "status") {
+                        gameState.ink = msg.ink;
+                        updateHUD();
+                    }
+                } catch (e) {}
+                return;
+            }
+
+            const buffer = event.data;
+            const dv = new DataView(buffer);
+
+            // 初回全盤面受信 (120KB)
+            if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
+                boardData.set(new Uint8Array(buffer));
+                // 自陣コアが空白になっていたら強制補正
+                if (gameState.coreX >= 0 && gameState.coreY >= 0) {
+                    const cIdx = (gameState.coreY * BOARD_SIZE + gameState.coreX) * 3;
+                    if (dataView.getUint16(cIdx, false) === 0) {
+                        dataView.setUint16(cIdx, gameState.playerId, false);
+                        dataView.setUint8(cIdx + 2, 1);
+                    }
+                }
+                fastFullRecount();
+            } else if (buffer.byteLength % 5 === 0) {
+                const count = buffer.byteLength / 5;
+                for (let i = 0; i < count; i++) {
+                    const offset = i * 5;
+                    const x = dv.getUint8(offset);
+                    const y = dv.getUint8(offset + 1);
+                    const owner = dv.getUint16(offset + 2, false);
+                    const hp = dv.getUint8(offset + 4);
+
+                    const idx = (y * BOARD_SIZE + x) * 3;
+                    const oldOwner = dataView.getUint16(idx, false);
+                    dataView.setUint16(idx, owner, false);
+                    dataView.setUint8(idx + 2, hp);
+
+                    if (oldOwner !== owner) {
+                        if (oldOwner === gameState.playerId) gameState.massCount = Math.max(0, gameState.massCount - 1);
+                        if (owner === gameState.playerId) gameState.massCount++;
+                    }
+                    updateFrontierAround(x, y);
+                }
+                updateHUD();
+            }
+        };
+
+        ws.onclose = () => setTimeout(connectWebSocket, 2500);
+    }
+
+    function sendActionToServer(bx, by) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const owner = dataView.getUint16((by * BOARD_SIZE + bx) * 3, false);
         if (owner === ROCK_ID) {
             showToast("岩盤は操作できません");
             return;
         }
 
-        if (!supabase) {
-            showToast("通信準備中");
-            return;
-        }
-
-        try {
-            const { data, error } = await supabase.rpc('handle_pixel_action', {
-                p_player_id: gameState.playerId,
-                p_x: bx,
-                p_y: by,
-                p_action: actionMode
-            });
-
-            if (error) {
-                showToast(error.message);
-                return;
-            }
-
-            const idx = (by * BOARD_SIZE + bx) * 3;
-            const oldOwner = dataView.getUint16(idx, false);
-            dataView.setUint16(idx, data.owner, false);
-            dataView.setUint8(idx + 2, data.hp);
-
-            if (oldOwner !== data.owner) {
-                if (oldOwner === gameState.playerId) gameState.massCount = Math.max(0, gameState.massCount - 1);
-                if (data.owner === gameState.playerId) gameState.massCount++;
-            }
-            gameState.ink = data.remaining_ink;
-
-            updateFrontierAround(bx, by);
-            updateHUD();
-
-            if (realtimeChannel) {
-                await realtimeChannel.send({
-                    type: 'broadcast',
-                    event: 'paint',
-                    payload: { x: bx, y: by, owner: data.owner, hp: data.hp }
-                });
-
-                if (data.assassinated) {
-                    const msg = `PLAYER #${gameState.playerId} が #${data.victim_id} を討伐！ 懸賞金 ${data.bounty.toLocaleString()} G 強奪！`;
-                    await realtimeChannel.send({
-                        type: 'broadcast',
-                        event: 'announce',
-                        payload: { message: msg, color: "#e74c3c" }
-                    });
-                    showBroadcast(msg, "#e74c3c");
-                    await syncCores();
-                }
-            }
-        } catch (e) {
-            showToast("通信エラーが発生しました");
-        }
+        const buffer = new ArrayBuffer(5);
+        const dv = new DataView(buffer);
+        dv.setUint8(0, bx);
+        dv.setUint8(1, by);
+        dv.setUint8(2, actionMode);
+        dv.setUint16(3, gameState.playerId, false);
+        ws.send(buffer);
     }
 
+    // 全マスを再集計し、フロンティア（隣接する塗れるマス）を確実に検出
     function fastFullRecount() {
         gameState.massCount = 0;
         frontierSet.clear();
 
+        // コアマスが登録されていれば必ずマス数に反映
         if (gameState.coreX >= 0 && gameState.coreY >= 0) {
             const cIdx = (gameState.coreY * BOARD_SIZE + gameState.coreX) * 3;
             if (dataView.getUint16(cIdx, false) !== gameState.playerId) {
@@ -812,6 +768,7 @@
                 const owner = dataView.getUint16((y * BOARD_SIZE + x) * 3, false);
                 if (owner === gameState.playerId) gameState.massCount++;
 
+                // 自陣または同盟領地に隣接する空白/敵マスを検出
                 if (owner === gameState.playerId || gameState.alliances.has(owner)) {
                     for (let d of [[-1,0],[1,0],[0,-1],[0,1]]) {
                         const nx = x + d[0], ny = y + d[1];
@@ -869,7 +826,7 @@
         document.getElementById('hud-regen').innerText = `+${gameState.regen}/分`;
         document.getElementById('hud-gold').innerText = `${gameState.gold.toLocaleString()} G`;
         document.getElementById('hud-mass').innerText = `${gameState.massCount.toLocaleString()} マス`;
-        document.getElementById('hud-income').innerText = `毎分 +( ${gameState.massCount * 10} G )`;
+        document.getElementById('hud-income').innerText = `毎日1マスにつき10G貰えます`;
 
         const bar = document.getElementById('barrier-status-bar');
         const btn = document.getElementById('btn-barrier');
@@ -989,7 +946,7 @@
     }
 
     async function breakAlliance(targetId) {
-        if (!confirm(`警告: プレイヤー #${targetId} との同盟を即時破棄しますか？`)) return;
+        if (!confirm(`警告: プレイヤー #${targetId} との同盟を即時破棄しますか？\n直結していない孤立領地は全て蒸発します。`)) return;
         try {
             const res = await fetch("/api/pixel/alliance/break", {
                 method: "POST",
@@ -1000,7 +957,7 @@
             if (!res.ok) throw data;
 
             gameState.alliances.delete(parseInt(targetId));
-            showToast("同盟を破棄しました");
+            showToast("同盟を電撃破棄しました");
             renderAllianceList();
             fastFullRecount();
         } catch (e) {
@@ -1008,6 +965,7 @@
         }
     }
 
+    // 全プレイヤー共通カラー生成
     const COLOR_CACHE = new Map();
     COLOR_CACHE.set(0, "#08080a");
     COLOR_CACHE.set(ROCK_ID, "#1e2029");
@@ -1021,14 +979,12 @@
     }
 
     function draw() {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
+        const rect = canvas.getBoundingClientRect();
         ctx.fillStyle = "#030305";
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, rect.width, rect.height);
 
-        const hw = width / 2;
-        const hh = height / 2;
+        const hw = rect.width / 2;
+        const hh = rect.height / 2;
         const startX = Math.max(0, Math.floor(camera.x - hw / camera.zoom));
         const endX = Math.min(BOARD_SIZE, Math.ceil(camera.x + hw / camera.zoom));
         const startY = Math.max(0, Math.floor(camera.y - hh / camera.zoom));
@@ -1045,6 +1001,7 @@
                 const screenX = hw + (x - camera.x) * camera.zoom;
                 const screenY = hh + (y - camera.y) * camera.zoom;
 
+                // 1. ベースマス描画 (共通色)
                 if (owner === ROCK_ID) {
                     ctx.fillStyle = "#1e2029";
                     ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
@@ -1053,24 +1010,28 @@
                     ctx.fillRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
+                // 2. 自陣マス識別枠
                 if (owner === gameState.playerId && camera.zoom >= 10) {
                     ctx.strokeStyle = "rgba(0, 243, 255, 0.4)";
                     ctx.lineWidth = 1;
                     ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
+                // 3. グリッド線
                 if (camera.zoom >= 8) {
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
                     ctx.lineWidth = 1;
                     ctx.strokeRect(screenX, screenY, camera.zoom, camera.zoom);
                 }
 
+                // 4. フロンティア (侵略可能マス) のネオンパルス枠
                 if (actionMode === 1 && frontierSet.has(`${x},${y}`) && camera.zoom >= 9) {
                     ctx.strokeStyle = `rgba(0, 243, 255, ${0.45 + pulse * 0.55})`;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(screenX + 1, screenY + 1, camera.zoom - 2, camera.zoom - 2);
                 }
 
+                // 5. コア表示判定 (盤面の owner と一致している生存コアのみ描画)
                 const isMyCore = (x === gameState.coreX && y === gameState.coreY && owner === gameState.playerId);
                 const coreOwner = activeCores.get(`${x},${y}`);
                 const isEnemyCore = !isMyCore && coreOwner !== undefined && coreOwner !== 0 && owner === coreOwner;
@@ -1089,7 +1050,9 @@
                         ctx.fillStyle = iconColor;
                         ctx.fillRect(screenX + camera.zoom * 0.25, screenY + camera.zoom * 0.25, camera.zoom * 0.5, camera.zoom * 0.5);
                     }
-                } else if (hp > 1 && owner !== ROCK_ID) {
+                }
+                // 6. 防壁 (耐久値2以上)
+                else if (hp > 1 && owner !== ROCK_ID) {
                     ctx.strokeStyle = "rgba(0, 0, 0, 0.65)";
                     ctx.lineWidth = Math.max(1, camera.zoom * 0.12);
                     ctx.strokeRect(screenX + 2, screenY + 2, camera.zoom - 4, camera.zoom - 4);
@@ -1131,6 +1094,7 @@
         }
         miniCtx.putImageData(imgData, 0, 0);
 
+        // ミニマップ上にコアをプロット（盤面の現在の所有者と一致している場合のみ描画）
         for (const [coordStr, pId] of activeCores.entries()) {
             const [cx, cy] = coordStr.split(',').map(Number);
             const currentOwner = dataView.getUint16((cy * BOARD_SIZE + cx) * 3, false);
@@ -1141,11 +1105,10 @@
             }
         }
 
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const rect = canvas.getBoundingClientRect();
         const vp = document.getElementById('minimap-vp');
-        const viewW = (width / camera.zoom) / 200 * 100;
-        const viewH = (height / camera.zoom) / 200 * 100;
+        const viewW = (rect.width / camera.zoom) / 200 * 100;
+        const viewH = (rect.height / camera.zoom) / 200 * 100;
         vp.style.width = `${Math.min(100, Math.max(1, viewW))}%`;
         vp.style.height = `${Math.min(100, Math.max(1, viewH))}%`;
         vp.style.left = `${Math.max(0, (camera.x / 200 * 100) - viewW / 2)}%`;
@@ -1180,6 +1143,9 @@
         }
     }
 
+    // ==========================================================
+    // 5. スマホ・タッチ操作
+    // ==========================================================
     let isDragging = false;
     let touchStartX = 0, touchStartY = 0;
     let cameraStartX = 0, cameraStartY = 0;
