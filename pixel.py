@@ -543,3 +543,27 @@ async def get_active_cores():
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel(request: Request):
     return templates.TemplateResponse(request=request, name="pixel.html")
+
+            # 【追記】コアが自分のマスでなくなったプレイヤーを検知して即死判定
+            active_cores_res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
+            if active_cores_res.data:
+                for target_p in active_cores_res.data:
+                    v_pid = target_p["player_id"]
+                    if v_pid == player_id:
+                        continue
+                    c_owner, _ = get_tile(target_p["core_x"], target_p["core_y"])
+                    # コアマスの所有者が本人ではなくなった場合（囲みによる自陣化を含む）
+                    if c_owner != v_pid:
+                        kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": v_pid}).execute()
+                        await client.table("pixel_players").update({"is_dead": True}).eq("player_id", v_pid).execute()
+                        bounty = kill_res.data.get("bounty", 0) if (kill_res.data and kill_res.data.get("success")) else 0
+                        msg = f"PLAYER #{player_id} が #{v_pid} を討伐！ 懸賞金 {bounty:,} G 強奪！"
+                        await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": msg}).execute()
+                        async with board_lock:
+                            for cy in range(BOARD_HEIGHT):
+                                for cx in range(BOARD_WIDTH):
+                                    if get_tile(cx, cy)[0] == v_pid:
+                                        set_tile(cx, cy, 0, 0)
+                                        diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
+                        await broadcast_event({"type": "broadcast", "message": msg, "color": "#e74c3c"})
+                        await broadcast_event({"type": "player_killed", "victim_id": v_pid, "killer_id": player_id})
