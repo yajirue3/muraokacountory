@@ -19,15 +19,19 @@ BOARD_WIDTH = 200
 BOARD_HEIGHT = 200
 ROCK_ID = 65535
 EXPECTED_BYTE_SIZE = BOARD_WIDTH * BOARD_HEIGHT * 3
-MAX_FILL_LIMIT = 5000
+MAX_FILL_LIMIT = 2000
 
-# 日本時間 (JST: UTC+9) の定義
 JST = timezone(timedelta(hours=9))
 
 board = bytearray(EXPECTED_BYTE_SIZE)
 board_lock = asyncio.Lock()
 player_mass_counts = {}
 connected_clients: list[WebSocket] = []
+
+# 【超高速化】DB問い合わせを毎手行わないためのメモリ内コアキャッシュ
+# (x, y) -> player_id, player_id -> (x, y)
+core_coords = {} 
+player_cores = {}
 
 def get_idx(x: int, y: int) -> int:
     return (y * BOARD_WIDTH + x) * 3
@@ -47,6 +51,25 @@ def set_tile(x: int, y: int, owner: int, hp: int):
             player_mass_counts[old_owner] = max(0, player_mass_counts.get(old_owner, 0) - 1)
         if owner != 0 and owner != ROCK_ID:
             player_mass_counts[owner] = player_mass_counts.get(owner, 0) + 1
+
+async def refresh_cores_cache():
+    """生存プレイヤーのコア情報をメモリへキャッシュ（DB負荷激減）"""
+    global core_coords, player_cores
+    try:
+        client = await get_supabase()
+        res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
+        new_coords = {}
+        new_players = {}
+        if res.data:
+            for p in res.data:
+                pid = p["player_id"]
+                pt = (p["core_x"], p["core_y"])
+                new_coords[pt] = pid
+                new_players[pid] = pt
+        core_coords = new_coords
+        player_cores = new_players
+    except Exception as e:
+        print(f"[Core Cache Error]: {e}")
 
 async def load_board_from_supabase():
     global board
@@ -76,7 +99,6 @@ async def load_board_from_supabase():
         for y in range(BOARD_HEIGHT):
             if 3 <= y < BOARD_HEIGHT - 3:
                 set_tile(100, y, ROCK_ID, 255)
-        
         await save_board_to_supabase()
 
     player_mass_counts.clear()
@@ -85,6 +107,8 @@ async def load_board_from_supabase():
             owner, _ = get_tile(x, y)
             if owner != 0 and owner != ROCK_ID:
                 player_mass_counts[owner] = player_mass_counts.get(owner, 0) + 1
+
+    await refresh_cores_cache()
 
 async def save_board_to_supabase():
     client = await get_supabase()
@@ -143,17 +167,17 @@ def is_adjacent_to_owned(target_x: int, target_y: int, owner_id: int, alliances:
     return False
 
 def get_valid_spawn():
-    for _ in range(500):
+    for _ in range(300):
         cx, cy = random.randint(5, BOARD_WIDTH-6), random.randint(5, BOARD_HEIGHT-6)
         if all(get_tile(cx+dx, cy+dy)[0] == 0 for dx in range(-2, 3) for dy in range(-2, 3)):
             return cx, cy
-    for _ in range(500):
+    for _ in range(300):
         cx, cy = random.randint(1, BOARD_WIDTH-2), random.randint(1, BOARD_HEIGHT-2)
         if get_tile(cx, cy)[0] == 0:
             return cx, cy
     return 10, 10
 
-def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, core_y: int, alliances: set) -> set:
+def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, core_y: int) -> set:
     queue = deque([(start_x, start_y)])
     visited = set([(start_x, start_y)])
     is_connected = False
@@ -166,7 +190,7 @@ def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, c
             nx, ny = cx + dx, cy + dy
             if 0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT and (nx, ny) not in visited:
                 t_owner, _ = get_tile(nx, ny)
-                if t_owner == owner_id or t_owner in alliances:
+                if t_owner == owner_id:
                     visited.add((nx, ny))
                     queue.append((nx, ny))
     return set() if is_connected else visited
@@ -191,6 +215,7 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, alliances: set, 
             if len(visited) > MAX_FILL_LIMIT:
                 is_closed = False
                 break
+
             for ddx, ddy in [(-1,0), (1,0), (0,-1), (0,1)]:
                 nnx, nny = cx + ddx, cy + ddy
                 if 0 <= nnx < BOARD_WIDTH and 0 <= nny < BOARD_HEIGHT and (nnx, nny) not in visited:
@@ -202,6 +227,7 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, alliances: set, 
                             break
                         visited.add((nnx, nny))
                         queue.append((nnx, nny))
+
             if has_ally:
                 break
                         
@@ -227,7 +253,7 @@ async def websocket_pixel(ws: WebSocket):
             x, y, action, player_id = struct.unpack(">BBB H", data)
             client = await get_supabase()
             
-            # 1. バリデーション
+            # 1. 高速バリデーション
             mass_count = player_mass_counts.get(player_id, 0)
             rpc_res = await client.rpc("pixel_lazy_update", {
                 "p_player_id": player_id, "p_mass_count": mass_count, "p_now": datetime.now(timezone.utc).isoformat()
@@ -235,7 +261,7 @@ async def websocket_pixel(ws: WebSocket):
             
             state = rpc_res.data
             if not state or state.get("status") != "ok":
-                await ws.send_json({"type": "error", "msg": "死亡または未登録です。"})
+                await ws.send_json({"type": "error", "msg": "未出撃です。"})
                 continue
             if state.get("barrier", False):
                 await ws.send_json({"type": "error", "msg": "バリア中は攻撃できません。"})
@@ -274,7 +300,7 @@ async def websocket_pixel(ws: WebSocket):
 
             # 3. 盤面書き換えと判定
             diffs = []
-            assassinated = False
+            assassinated_victim = None
             bounty_msg = None
 
             async with board_lock:
@@ -286,85 +312,62 @@ async def websocket_pixel(ws: WebSocket):
                         set_tile(x, y, player_id, 1)
                         diffs.append(struct.pack(">BBHB", x, y, player_id, 1))
                         
-                        # 敵のマス（0以外の他者）を塗った場合のみ切断判定
-                        if target_owner != 0 and target_owner != player_id:
-                            enemy_res = await client.table("pixel_players").select("core_x, core_y").eq("player_id", target_owner).execute()
-                            if enemy_res.data:
-                                ep = enemy_res.data[0]
-                                if x == ep["core_x"] and y == ep["core_y"]:
-                                    assassinated = True
-                                else:
-                                    core_tile_owner, _ = get_tile(ep["core_x"], ep["core_y"])
-                                    if core_tile_owner == target_owner:
-                                        enemy_alliances = await get_alliances(target_owner)
-                                        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
-                                            nx, ny = x + dx, y + dy
-                                            if get_tile(nx, ny)[0] == target_owner:
-                                                disconnected = check_connectivity(nx, ny, target_owner, ep["core_x"], ep["core_y"], enemy_alliances)
-                                                for dx_disc, dy_disc in disconnected:
-                                                    set_tile(dx_disc, dy_disc, 0, 0)
-                                                    diffs.append(struct.pack(">BBHB", dx_disc, dy_disc, 0, 0))
+                        # コア直撃判定（メモリ内キャッシュで即時判定）
+                        if (x, y) in core_coords and core_coords[(x, y)] == target_owner and target_owner != player_id:
+                            assassinated_victim = target_owner
+                        elif target_owner != 0 and target_owner != player_id:
+                            # 切断チェック
+                            if target_owner in player_cores:
+                                ep_cx, ep_cy = player_cores[target_owner]
+                                if get_tile(ep_cx, ep_cy)[0] == target_owner:
+                                    for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+                                        nx, ny = x + dx, y + dy
+                                        if get_tile(nx, ny)[0] == target_owner:
+                                            disconnected = check_connectivity(nx, ny, target_owner, ep_cx, ep_cy)
+                                            for dx_disc, dy_disc in disconnected:
+                                                set_tile(dx_disc, dy_disc, 0, 0)
+                                                diffs.append(struct.pack(">BBHB", dx_disc, dy_disc, 0, 0))
 
                         apply_flood_fill(x, y, player_id, alliances, diffs)
                 elif action == 2:
                     set_tile(x, y, target_owner, target_hp + 1)
                     diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp + 1))
 
-            # コア破壊時の処理
-            if assassinated:
-                kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": target_owner}).execute()
-                if kill_res.data and kill_res.data.get("success"):
-                    await client.table("pixel_players").update({"is_dead": True}).eq("player_id", target_owner).execute()
-                    bounty = kill_res.data.get("bounty", 0)
-                    bounty_msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
-                    await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
-                    
-                    # 敵マス全消去 & 消滅後の空洞に対する再囲み
-                    async with board_lock:
-                        for cy in range(BOARD_HEIGHT):
-                            for cx in range(BOARD_WIDTH):
-                                if get_tile(cx, cy)[0] == target_owner:
-                                    set_tile(cx, cy, 0, 0)
-                                    diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
-                        apply_flood_fill(x, y, player_id, alliances, diffs)
+            # 囲み等によって塗り替わったマスの中に敵コアがあるかチェック（メモリキャッシュ照合）
+            if not assassinated_victim and diffs:
+                converted_set = set()
+                for d_bytes in diffs:
+                    bx, by, b_owner, _ = struct.unpack_from(">BBHB", d_bytes)
+                    if b_owner == player_id:
+                        converted_set.add((bx, by))
+                for pt, c_pid in list(core_coords.items()):
+                    if c_pid != player_id and pt in converted_set:
+                        assassinated_victim = c_pid
+                        break
 
-                    await broadcast_event({
-                        "type": "player_killed",
-                        "victim_id": target_owner,
-                        "killer_id": player_id
-                    })
+            # 討伐処理（DB負荷を最小化）
+            if assassinated_victim:
+                kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": assassinated_victim}).execute()
+                await client.table("pixel_players").update({"is_dead": True}).eq("player_id", assassinated_victim).execute()
+                bounty = kill_res.data.get("bounty", 0) if (kill_res.data and kill_res.data.get("success")) else 0
+                bounty_msg = f"PLAYER #{player_id} が #{assassinated_victim} を討伐！ 懸賞金 {bounty:,} G 強奪！"
+                await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
+                
+                # キャッシュから削除
+                victim_pt = player_cores.pop(assassinated_victim, None)
+                if victim_pt: core_coords.pop(victim_pt, None)
 
-            # 囲み等によって敵コアが奪われた場合の判定
-            if diffs:
-                active_cores_res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
-                if active_cores_res.data:
-                    converted_tiles = set()
-                    for d_bytes in diffs:
-                        bx, by, b_owner, _ = struct.unpack_from(">BBHB", d_bytes)
-                        if b_owner == player_id:
-                            converted_tiles.add((bx, by))
+                # 被害者の領地全消去
+                async with board_lock:
+                    for cy in range(BOARD_HEIGHT):
+                        for cx in range(BOARD_WIDTH):
+                            if get_tile(cx, cy)[0] == assassinated_victim:
+                                set_tile(cx, cy, 0, 0)
+                                diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
+                    apply_flood_fill(x, y, player_id, alliances, diffs)
 
-                    for target_p in active_cores_res.data:
-                        v_pid = target_p["player_id"]
-                        if v_pid == player_id: continue
-                        if (target_p["core_x"], target_p["core_y"]) in converted_tiles:
-                            k_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": v_pid}).execute()
-                            await client.table("pixel_players").update({"is_dead": True}).eq("player_id", v_pid).execute()
-                            b_gold = k_res.data.get("bounty", 0) if (k_res.data and k_res.data.get("success")) else 0
-                            k_msg = f"PLAYER #{player_id} が #{v_pid} を囲み討伐！ 懸賞金 {b_gold:,} G 強奪！"
-                            await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": k_msg}).execute()
-                            
-                            async with board_lock:
-                                for cy in range(BOARD_HEIGHT):
-                                    for cx in range(BOARD_WIDTH):
-                                        if get_tile(cx, cy)[0] == v_pid:
-                                            set_tile(cx, cy, 0, 0)
-                                            diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
-                            
-                            await broadcast_event({"type": "broadcast", "message": k_msg, "color": "#e74c3c"})
-                            await broadcast_event({"type": "player_killed", "victim_id": v_pid, "killer_id": player_id})
+                await broadcast_event({"type": "player_killed", "victim_id": assassinated_victim, "killer_id": player_id})
 
-            # ブロードキャスト
             if diffs:
                 payload = b"".join(diffs)
                 for c in connected_clients:
@@ -386,11 +389,12 @@ async def get_my_pixel_status(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
-    if not res.data: return {"exists": False, "is_dead": True}
+    if not res.data: 
+        return {"exists": False, "is_dead": True}
     p = res.data[0]
     
     daily_reward_granted = 0
-    # JST 0:00 判定によるマス保有報酬
+    # JST 0:00 基準給付
     if not p.get("is_dead", True):
         now_jst = datetime.now(JST)
         today_str = now_jst.strftime("%Y-%m-%d")
@@ -400,38 +404,32 @@ async def get_my_pixel_status(authorization: str = Header(None)):
             mass_count = player_mass_counts.get(p["player_id"], 0)
             if mass_count > 0:
                 reward = mass_count * 10
-                w_res = await client.table("wallets").select("*").eq("wallet_id", p["wallet_id"]).execute()
+                w_res = await client.table("wallets").select("id, balance").eq("wallet_id", p["wallet_id"]).execute()
                 if w_res.data:
                     current_bal = w_res.data[0]["balance"]
-                    new_bal = current_bal + reward
-                    await client.table("wallets").update({"balance": new_bal}).eq("id", w_res.data[0]["id"]).execute()
+                    await client.table("wallets").update({"balance": current_bal + reward}).eq("id", w_res.data[0]["id"]).execute()
                     daily_reward_granted = reward
-            
             await client.table("pixel_players").update({"last_daily_claim": today_str}).eq("id", p["id"]).execute()
 
     if not p.get("is_dead", True):
         mass_count = player_mass_counts.get(p["player_id"], 0)
         rpc_res = await client.rpc("pixel_lazy_update", {
-            "p_player_id": p["player_id"],
-            "p_mass_count": mass_count,
-            "p_now": datetime.now(timezone.utc).isoformat()
+            "p_player_id": p["player_id"], "p_mass_count": mass_count, "p_now": datetime.now(timezone.utc).isoformat()
         }).execute()
         if rpc_res.data and rpc_res.data.get("status") == "ok":
-            latest = await client.table("pixel_players").select("*").eq("id", p["id"]).execute()
-            if latest.data:
-                p = latest.data[0]
+            p["ink"] = rpc_res.data.get("ink", p["ink"])
 
     return { 
         "exists": True, 
-        "is_dead": p["is_dead"], 
+        "is_dead": p.get("is_dead", True), 
         "player_id": p["player_id"], 
         "core_x": p["core_x"], 
         "core_y": p["core_y"], 
-        "ink": p["ink"], 
-        "max_ink": p["max_ink"], 
-        "regen": p["regen"], 
-        "barrier_active": p["barrier_active"], 
-        "wallet_id": p["wallet_id"],
+        "ink": p.get("ink", 1), 
+        "max_ink": p.get("max_ink", 10), 
+        "regen": p.get("regen", 1), 
+        "barrier_active": p.get("barrier_active", False), 
+        "wallet_id": p.get("wallet_id", ""),
         "daily_reward_granted": daily_reward_granted
     }
 
@@ -444,10 +442,13 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
     async with board_lock:
         if res.data:
             p = res.data[0]
-            if not p["is_dead"]: return p
+            # すでに生存中ならそのまま返し、出撃画面を出さない
+            if not p.get("is_dead", True):
+                return p
+                
             core_x, core_y = get_valid_spawn()
             
-            # 【重要】max_ink と regen は初期化せず既存の強化値を保持する
+            # 【重要】max_ink, regenは一切触らず保持（既存のアップグレードを永続利用）
             await client.table("pixel_players").update({
                 "is_dead": False, "core_x": core_x, "core_y": core_y, 
                 "ink": 1, "bounty_gold": 0, "barrier_active": False,
@@ -462,7 +463,12 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
                 "user_id": str(user.id), "wallet_id": data.wallet_id, "player_id": player_id, 
                 "core_x": core_x, "core_y": core_y, "ink": 1, "max_ink": 10, "regen": 1
             }).execute()
+            
         set_tile(core_x, core_y, player_id, 1)
+        # キャッシュ更新
+        core_coords[(core_x, core_y)] = player_id
+        player_cores[player_id] = (core_x, core_y)
+
     return {"player_id": player_id, "core_x": core_x, "core_y": core_y}
 
 class UpgradeRequest(BaseModel):
@@ -554,9 +560,8 @@ async def break_alliance(data: AllianceRequest, authorization: str = Header(None
 
 @router.get("/api/pixel/cores")
 async def get_active_cores():
-    client = await get_supabase()
-    res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
-    return res.data or []
+    # メモリ内から即座に返す（DBを叩かない）
+    return [{"player_id": pid, "core_x": pt[0], "core_y": pt[1]} for pid, pt in player_cores.items()]
 
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel(request: Request):
