@@ -65,6 +65,7 @@
             display: flex; align-items: center; gap: 6px;
         }
         .toast.success { background: rgba(0, 243, 255, 0.92); color: #030305; box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4); }
+        .toast.gold { background: rgba(245, 197, 24, 0.94); color: #030305; box-shadow: 0 6px 20px rgba(245, 197, 24, 0.4); }
         @keyframes toastAnim {
             0% { opacity: 0; transform: translateY(12px); }
             12% { opacity: 1; transform: translateY(0); }
@@ -339,8 +340,8 @@
     </div>
 </div>
 
-<!-- 出撃モーダル -->
-<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
+<!-- 出撃モーダル (初期状態では絶対に非表示) -->
+<div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base); display: none;">
     <div class="modal-box">
         <div class="modal-title">
             <span>戦線投入 - 本陣コア出撃</span>
@@ -513,14 +514,19 @@
         } catch (e) {}
     }
 
+    // 【完全改修】遅延・通信不調で勝手に0リセットしない確実な初期化処理
     async function initGame() {
         try {
+            // まず並列フェッチ
             const [wRes, meRes] = await Promise.all([
                 fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } }),
                 fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } })
             ]);
 
-            if (!wRes.ok) throw await wRes.json();
+            if (!wRes.ok) {
+                showToast("口座データの取得に失敗しました");
+                return;
+            }
             const wallets = await wRes.json();
             if (!wallets.length) {
                 alert("口座がありません。中央銀行で作成してください。");
@@ -532,14 +538,20 @@
                 `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()}G)</option>`
             ).join('');
 
-            const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
+            if (!meRes.ok) {
+                showToast("通信が不安定です。再接続中...");
+                // 失敗したからといって出撃画面は出さない！
+                return;
+            }
+
+            const me = await meRes.json();
 
             if (me.daily_reward_granted && me.daily_reward_granted > 0) {
                 showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
             }
 
-            // 【完全非同期制御】DB側で生存しているなら、絶対にモーダルは表示しない
-            if (me.exists && !me.is_dead) {
+            // 【超重要】明示的に is_dead === false のときは何があってもゲーム画面を維持
+            if (me.exists && me.is_dead === false) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
                     playerId: me.player_id,
@@ -553,6 +565,7 @@
                     gold: (wallets.find(w => w.wallet_id === me.wallet_id) || wallets[0]).balance
                 });
 
+                // モーダルを確実に隠す
                 document.getElementById("spawn-modal").style.display = "none";
                 centerCameraOnCore();
                 connectWebSocket();
@@ -562,7 +575,7 @@
                 return;
             }
 
-            // 死亡中、または未登録の場合のみ出撃画面を表示
+            // サーバーから明示的に「未登録」または「死亡中(is_dead: true)」と返された場合のみ出撃モーダルを開く
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
@@ -575,7 +588,8 @@
                 localStorage.setItem("pixel_rules_accepted", "1");
             }
         } catch (e) {
-            showToast("初期化失敗: " + parseError(e));
+            console.error(e);
+            showToast("接続エラーが発生しました。リトライしてください。");
         }
     }
 
@@ -593,18 +607,21 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
-            // 最新ステータス（永続化されたアップグレード値）を取得
+            // 即座にモーダルを消す（画面をフリーズさせない）
+            document.getElementById("spawn-modal").style.display = "none";
+
+            // 最新ステータス（永続アップグレード値）を取得
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-            const me = meRes.ok ? await meRes.json() : { ink: 1, max_ink: 10, regen: 1 };
+            const me = meRes.ok ? await meRes.json() : {};
 
             Object.assign(gameState, {
                 walletId: wid, 
                 playerId: data.player_id,
                 coreX: data.core_x, 
                 coreY: data.core_y,
-                ink: me.ink || 1, 
-                maxInk: me.max_ink || 10, 
-                regen: me.regen || 1, 
+                ink: me.ink !== undefined ? me.ink : 1, 
+                maxInk: me.max_ink !== undefined ? me.max_ink : 10, 
+                regen: me.regen !== undefined ? me.regen : 1, 
                 barrierActive: false,
                 isDead: false
             });
@@ -613,8 +630,6 @@
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
 
-            // モーダルを確実に閉じる
-            document.getElementById("spawn-modal").style.display = "none";
             centerCameraOnCore();
             connectWebSocket();
             updateShopUI();
@@ -638,16 +653,18 @@
                     fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } })
                 ]);
 
+                // 通信失敗時は何もしない（勝手に0リセットしない！）
                 if (mRes.ok) {
                     const d = await mRes.json();
                     if (d.daily_reward_granted && d.daily_reward_granted > 0) {
                         showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
                     }
-                    if (!d.is_dead) {
+                    if (d.is_dead === false) {
                         Object.assign(gameState, {
                             ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                         });
-                    } else {
+                    } else if (d.is_dead === true) {
+                        // サーバー側で確実に死亡判定された時のみモーダルを表示
                         gameState.isDead = true;
                         document.getElementById("spawn-modal").style.display = "flex";
                     }
@@ -659,7 +676,9 @@
                 }
                 updateHUD();
                 syncCores();
-            } catch (e) {}
+            } catch (e) {
+                // 通信エラー時もローカルの生存状態を信じて維持する
+            }
         }, 12000);
     }
 
@@ -681,7 +700,7 @@
                 if (d.daily_reward_granted && d.daily_reward_granted > 0) {
                     showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領！`, true);
                 }
-                if (!d.is_dead) {
+                if (d.is_dead === false) {
                     Object.assign(gameState, {
                         ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                     });
@@ -696,7 +715,7 @@
             syncCores();
             showToast("最新情報を取得しました", true);
         } catch (e) {
-            showToast("更新に失敗しました");
+            showToast("更新に失敗しました（再接続中）");
         } finally {
             setTimeout(() => {
                 isManualSyncing = false;
@@ -722,6 +741,7 @@
                         gameState.ink = msg.ink;
                         updateHUD();
                     } else if (msg.type === "player_killed") {
+                        // 明示的に自分が殺されたイベントを受信した時のみ出撃モーダルを開く
                         if (msg.victim_id === gameState.playerId) {
                             showToast("本陣コアが破壊されました！");
                             gameState.isDead = true;
@@ -888,8 +908,11 @@
     }
 
     function updateShopUI() {
-        document.getElementById('cost-max-ink').innerText = Math.floor(10000 * Math.pow(1.066, gameState.maxInk - 10)).toLocaleString();
-        document.getElementById('cost-regen').innerText = Math.floor(10000000 * Math.pow(4, gameState.regen - 1)).toLocaleString();
+        // 現在の強化値に応じた正確な計算式
+        const maxInkLvl = Math.max(10, gameState.maxInk);
+        const regenLvl = Math.max(1, gameState.regen);
+        document.getElementById('cost-max-ink').innerText = Math.floor(10000 * Math.pow(1.066, maxInkLvl - 10)).toLocaleString();
+        document.getElementById('cost-regen').innerText = Math.floor(10000000 * Math.pow(4, regenLvl - 1)).toLocaleString();
     }
 
     async function upgradeStat(type) {
