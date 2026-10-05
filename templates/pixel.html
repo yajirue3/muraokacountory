@@ -92,7 +92,6 @@
             100% { transform: translateY(-15px); opacity: 0; }
         }
 
-        /* HUD Top: スマホの幅でも確実に収まる設計 */
         .hud-top {
             position: absolute; top: 8px; left: 8px; right: 8px;
             display: flex; flex-direction: column; gap: 4px; z-index: 50; pointer-events: none;
@@ -129,7 +128,6 @@
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
         .btn-icon-hud.cyan { border-color: rgba(0, 243, 255, 0.5); color: var(--accent-cyan); }
 
-        /* HUD Bottom */
         .hud-bottom {
             position: absolute; bottom: 16px; left: 8px; right: 8px;
             display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none;
@@ -161,7 +159,6 @@
         #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
         .minimap-viewport { position: absolute; border: 1.5px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.25); pointer-events: none; }
 
-        /* モーダル */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); z-index: 9999;
@@ -199,7 +196,6 @@
 
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 0.74rem; }
 
-        /* 詳細ルールブック用カード */
         .rule-card {
             background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle);
             clip-path: var(--chamfer-clip); padding: 10px 12px; display: flex; flex-direction: column; gap: 5px;
@@ -220,9 +216,7 @@
 <div id="toast-container"></div>
 <div id="broadcast-area"></div>
 
-<!-- Top HUD (スマホ完全対応レスポンシブ設計) -->
 <div class="hud-top">
-    <!-- 段1: プレイヤー情報 ＆ 各種アクションボタン -->
     <div class="hud-bar">
         <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
             <button class="btn-icon-hud" onclick="location.href='/dashboard'" style="color: var(--accent-cyan); border-color: rgba(0,243,255,0.4);">
@@ -251,7 +245,6 @@
         </div>
     </div>
 
-    <!-- 段2: 戦力・領地・給付情報 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">INK CAPACITY</span>
@@ -267,7 +260,6 @@
         </div>
     </div>
 
-    <!-- 段3: 資金・給付レート -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">GOLD BALANCE</span>
@@ -287,7 +279,6 @@
     </div>
 </div>
 
-<!-- Bottom HUD -->
 <div class="hud-bottom">
     <div class="action-menu">
         <div style="display: flex; gap: 8px;">
@@ -318,7 +309,6 @@
     </div>
 </div>
 
-<!-- 討伐通知ダイアログ（自動再出撃させず手動選択させる） -->
 <div id="death-modal" class="modal-overlay" style="background: rgba(10, 0, 0, 0.94);">
     <div class="modal-box" style="border-color: var(--danger-color);">
         <div class="modal-title" style="color: var(--danger-color);">
@@ -334,7 +324,6 @@
     </div>
 </div>
 
-<!-- 出撃モーダル (手動出撃) -->
 <div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
     <div class="modal-box">
         <div class="modal-title">
@@ -350,7 +339,6 @@
     </div>
 </div>
 
-<!-- 詳細ルール説明モーダル -->
 <div id="rules-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
@@ -389,7 +377,8 @@
             </div>
             <div class="rule-card-desc">
                 自陣のマスで空間を完全に囲い込むと、<strong>内側の全マス（空白・敵地問わず最大5,000マス）が一括で自陣マスへ反転</strong>します。<br>
-                内側にいた敵コアを撃破した場合、残った空洞も自動的に囲み再計算が行われ、即座に領地化されます。
+                内側にいた敵コアを撃破した場合、残った空洞も自動的に囲み再計算が行われ、即座に領地化されます。<br>
+                ※内部に「同盟相手」のマスが含まれる場合、囲みはブロックされ発動しません。
             </div>
         </div>
 
@@ -400,7 +389,7 @@
             </div>
             <div class="rule-card-desc">
                 ・<strong>本陣コア</strong>: 王冠マークのマスを踏まれると<strong>即死（全領地消滅）</strong>となり、強化に注ぎ込んだ累計Goldが相手に全額強奪されます。<br>
-                ・<strong>切断消滅</strong>: 全ての領地は本陣コアと一筆書きで繋がっている必要があります。敵の侵略によって<strong>コアとの接続を絶たれた孤立領地は即座に蒸発</strong>します。
+                ・<strong>切断消滅</strong>: 全ての領地は本陣コアと一筆書きで直結している必要があります。敵の侵略によって<strong>コアとの接続を絶たれた孤立領地は即座に蒸発</strong>します。
             </div>
         </div>
 
@@ -429,7 +418,6 @@
     </div>
 </div>
 
-<!-- 強化工房 -->
 <div id="shop-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title">
@@ -451,7 +439,6 @@
     </div>
 </div>
 
-<!-- 外交同盟モーダル -->
 <div id="alliance-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
@@ -475,7 +462,6 @@
     </div>
 </div>
 
-<!-- 賞金首ランキング -->
 <div id="leaderboard-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-title" style="color: var(--danger-color);">
@@ -609,6 +595,7 @@
                 showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, "gold");
             }
 
+            // 【修正点】生存している場合はモーダルを隠してそのままゲーム開始
             if (me.exists && !me.is_dead) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
@@ -623,6 +610,9 @@
                     gold: (wallets.find(w => w.wallet_id === me.wallet_id) || wallets[0]).balance
                 });
 
+                document.getElementById("spawn-modal").style.display = "none";
+                document.getElementById("death-modal").style.display = "none";
+
                 centerCameraOnCore();
                 connectWebSocket();
                 updateHUD();
@@ -631,13 +621,13 @@
                 return;
             }
 
+            // 死んでいる、あるいは初回アクセス時のみ出撃画面を表示
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
             updateHUD();
             await syncCores();
             
-            // 死んでいる・未出撃の場合は手動出撃モーダルを開く
             document.getElementById("spawn-modal").style.display = "flex";
 
             if (!localStorage.getItem("pixel_rules_accepted")) {
@@ -665,13 +655,16 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
+            // リスポーン時はAPIから最新状態を再取得するか、保持されていると信じて手動マージ
+            const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
+            const me = await meRes.json();
+
             Object.assign(gameState, {
                 walletId: wid, playerId: data.player_id,
                 coreX: data.core_x, coreY: data.core_y,
-                ink: 1, maxInk: 10, regen: 1, barrierActive: false, isDead: false
+                ink: me.ink, maxInk: me.max_ink, regen: me.regen, barrierActive: false, isDead: false
             });
 
-            // ローカル盤面上でコアを即時自陣化
             const coreIdx = (data.core_y * BOARD_SIZE + data.core_x) * 3;
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
@@ -691,6 +684,7 @@
 
     function startSyncLoop() {
         setInterval(async () => {
+            if (gameState.isDead) return;
             try {
                 const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
                 if (res.ok) {
@@ -702,6 +696,10 @@
                         Object.assign(gameState, {
                             ink: d.ink, maxInk: d.max_ink, regen: d.regen, barrierActive: d.barrier_active, isDead: false
                         });
+                    } else {
+                        // サーバー側で死んでいると判明した場合（バックグラウンド死亡検知）
+                        gameState.isDead = true;
+                        document.getElementById("death-modal").style.display = "flex";
                     }
                 }
                 const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
@@ -772,7 +770,6 @@
                         gameState.ink = msg.ink;
                         updateHUD();
                     } else if (msg.type === "player_killed") {
-                        // 自分が討伐された場合（自動再出撃は行わず手動モーダル表示）
                         if (msg.victim_id === gameState.playerId) {
                             gameState.isDead = true;
                             gameState.playerId = null;
@@ -789,7 +786,6 @@
             const buffer = event.data;
             const dv = new DataView(buffer);
 
-            // 初回全盤面受信 (120KB)
             if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
                 boardData.set(new Uint8Array(buffer));
                 if (gameState.coreX >= 0 && gameState.coreY >= 0 && !gameState.isDead) {
