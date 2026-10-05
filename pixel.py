@@ -19,9 +19,9 @@ BOARD_WIDTH = 200
 BOARD_HEIGHT = 200
 ROCK_ID = 65535
 EXPECTED_BYTE_SIZE = BOARD_WIDTH * BOARD_HEIGHT * 3
-MAX_FILL_LIMIT = 5000  # 囲み判定上限（400から拡張）
+MAX_FILL_LIMIT = 5000
 
-# JST (UTC+9) タイムゾーン定義
+# 日本時間 (JST: UTC+9) の定義
 JST = timezone(timedelta(hours=9))
 
 board = bytearray(EXPECTED_BYTE_SIZE)
@@ -169,21 +169,30 @@ def check_connectivity(start_x: int, start_y: int, owner_id: int, core_x: int, c
             nx, ny = cx + dx, cy + dy
             if 0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT and (nx, ny) not in visited:
                 t_owner, _ = get_tile(nx, ny)
-                if t_owner == owner_id or t_owner in alliances:
+                # 切断判定は自身のマスのみを探索（同盟マス巻き込み消滅を防止）
+                if t_owner == owner_id:
                     visited.add((nx, ny))
                     queue.append((nx, ny))
     return set() if is_connected else visited
 
-def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
+def apply_flood_fill(start_x: int, start_y: int, owner_id: int, alliances: set, diffs: list):
+    """
+    囲み判定 (Flood Fill):
+    内側に同盟相手のマス（領地またはコア）が含まれる場合は、囲みの成立をブロックする。
+    """
     for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
         nx, ny = start_x + dx, start_y + dy
-        if not (0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT): continue
+        if not (0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT): 
+            continue
         t_owner, _ = get_tile(nx, ny)
-        if t_owner == owner_id or t_owner == ROCK_ID: continue
+        if t_owner == owner_id or t_owner == ROCK_ID: 
+            continue
             
         queue = deque([(nx, ny)])
         visited = set([(nx, ny)])
         is_closed = True
+        has_ally = False
+
         while queue:
             cx, cy = queue.popleft()
             if cx == 0 or cx == BOARD_WIDTH - 1 or cy == 0 or cy == BOARD_HEIGHT - 1:
@@ -192,15 +201,24 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
             if len(visited) > MAX_FILL_LIMIT:
                 is_closed = False
                 break
+
             for ddx, ddy in [(-1,0), (1,0), (0,-1), (0,1)]:
                 nnx, nny = cx + ddx, cy + ddy
                 if 0 <= nnx < BOARD_WIDTH and 0 <= nny < BOARD_HEIGHT and (nnx, nny) not in visited:
                     no, _ = get_tile(nnx, nny)
                     if no != owner_id and no != ROCK_ID:
+                        # 内側に同盟相手が存在する場合は囲みをブロック
+                        if no in alliances:
+                            has_ally = True
+                            is_closed = False
+                            break
                         visited.add((nnx, nny))
                         queue.append((nnx, nny))
+
+            if has_ally:
+                break
                         
-        if is_closed and len(visited) <= MAX_FILL_LIMIT:
+        if is_closed and not has_ally and len(visited) <= MAX_FILL_LIMIT:
             for vx, vy in visited:
                 set_tile(vx, vy, owner_id, 1)
                 diffs.append(struct.pack(">BBHB", vx, vy, owner_id, 1))
@@ -281,29 +299,33 @@ async def websocket_pixel(ws: WebSocket):
                         set_tile(x, y, player_id, 1)
                         diffs.append(struct.pack(">BBHB", x, y, player_id, 1))
                         
-                        if target_owner != 0:
+                        # 実際に敵領地（0や自分以外）を削りきった場合のみ切断判定を実施
+                        if target_owner != 0 and target_owner != player_id:
                             enemy_res = await client.table("pixel_players").select("core_x, core_y").eq("player_id", target_owner).execute()
                             if enemy_res.data:
                                 ep = enemy_res.data[0]
                                 if x == ep["core_x"] and y == ep["core_y"]:
                                     assassinated = True
                                 else:
-                                    enemy_alliances = await get_alliances(target_owner)
-                                    for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
-                                        nx, ny = x + dx, y + dy
-                                        if get_tile(nx, ny)[0] == target_owner:
-                                            disconnected = check_connectivity(nx, ny, target_owner, ep["core_x"], ep["core_y"], enemy_alliances)
-                                            for dx_disc, dy_disc in disconnected:
-                                                set_tile(dx_disc, dy_disc, 0, 0)
-                                                diffs.append(struct.pack(">BBHB", dx_disc, dy_disc, 0, 0))
+                                    # コアが盤面上に実在しているか確認（近づいた際の誤爆切断防止）
+                                    core_tile_owner, _ = get_tile(ep["core_x"], ep["core_y"])
+                                    if core_tile_owner == target_owner:
+                                        enemy_alliances = await get_alliances(target_owner)
+                                        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+                                            nx, ny = x + dx, y + dy
+                                            if get_tile(nx, ny)[0] == target_owner:
+                                                disconnected = check_connectivity(nx, ny, target_owner, ep["core_x"], ep["core_y"], enemy_alliances)
+                                                for dx_disc, dy_disc in disconnected:
+                                                    set_tile(dx_disc, dy_disc, 0, 0)
+                                                    diffs.append(struct.pack(">BBHB", dx_disc, dy_disc, 0, 0))
 
-                        # 塗り後の囲み判定
-                        apply_flood_fill(x, y, player_id, diffs)
+                        # 塗り後の囲み判定（同盟保護フラグ付き）
+                        apply_flood_fill(x, y, player_id, alliances, diffs)
                 elif action == 2:
                     set_tile(x, y, target_owner, target_hp + 1)
                     diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp + 1))
 
-            # コア破壊時の処理
+            # コア直接破壊時の処理
             if assassinated:
                 kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": target_owner}).execute()
                 if kill_res.data and kill_res.data.get("success"):
@@ -312,7 +334,7 @@ async def websocket_pixel(ws: WebSocket):
                     bounty_msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
                     await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
                     
-                    # 敵マス全消去 & 消滅後の空間に対する囲み再計算
+                    # 敵マス全消去 & 消滅後の空洞に対する再囲み判定
                     async with board_lock:
                         for cy in range(BOARD_HEIGHT):
                             for cx in range(BOARD_WIDTH):
@@ -320,15 +342,40 @@ async def websocket_pixel(ws: WebSocket):
                                     set_tile(cx, cy, 0, 0)
                                     diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
                         
-                        # 内部にいた敵が消滅したため、自陣からの囲みを再評価
-                        apply_flood_fill(x, y, player_id, diffs)
+                        apply_flood_fill(x, y, player_id, alliances, diffs)
 
-                    # 被害者本人への死亡通知
                     await broadcast_event({
                         "type": "player_killed",
                         "victim_id": target_owner,
                         "killer_id": player_id
                     })
+
+            # 【囲み等による巻き込みコア討伐判定】
+            # 生存プレイヤーのコアマスが、攻撃者(player_id)に塗り替えられた場合、即座に討伐処理を発火
+            active_cores_res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
+            if active_cores_res.data:
+                for target_p in active_cores_res.data:
+                    v_pid = target_p["player_id"]
+                    if v_pid == player_id:
+                        continue
+                    c_owner, _ = get_tile(target_p["core_x"], target_p["core_y"])
+                    # コアマスがplayer_idに奪われた場合（囲みによる自陣化を含む）
+                    if c_owner == player_id:
+                        k_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": v_pid}).execute()
+                        await client.table("pixel_players").update({"is_dead": True}).eq("player_id", v_pid).execute()
+                        b_gold = k_res.data.get("bounty", 0) if (k_res.data and k_res.data.get("success")) else 0
+                        k_msg = f"PLAYER #{player_id} が #{v_pid} を囲み討伐！ 懸賞金 {b_gold:,} G 強奪！"
+                        await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": k_msg}).execute()
+                        
+                        async with board_lock:
+                            for cy in range(BOARD_HEIGHT):
+                                for cx in range(BOARD_WIDTH):
+                                    if get_tile(cx, cy)[0] == v_pid:
+                                        set_tile(cx, cy, 0, 0)
+                                        diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
+                        
+                        await broadcast_event({"type": "broadcast", "message": k_msg, "color": "#e74c3c"})
+                        await broadcast_event({"type": "player_killed", "victim_id": v_pid, "killer_id": player_id})
 
             # ブロードキャスト
             if diffs:
@@ -352,11 +399,12 @@ async def get_my_pixel_status(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
-    if not res.data: return {"exists": False, "is_dead": True}
+    if not res.data: 
+        return {"exists": False, "is_dead": True}
     p = res.data[0]
     
     daily_reward_granted = 0
-    # JST(UTC+9) 0:00 基準のデイリー報酬判定
+    # JST(UTC+9) 0:00 を更新判定ラインとする領地保有給付金処理
     if not p.get("is_dead", True):
         now_jst = datetime.now(JST)
         today_str = now_jst.strftime("%Y-%m-%d")
@@ -411,9 +459,10 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
     async with board_lock:
         if res.data:
             p = res.data[0]
-            if not p["is_dead"]: return p
+            if not p["is_dead"]: 
+                return p
             
-            # 再出撃時：古い残留マスが存在していれば初期化消去
+            # 再出撃時：古い残留マスを更地化して初期化
             old_pid = p["player_id"]
             for cy in range(BOARD_HEIGHT):
                 for cx in range(BOARD_WIDTH):
@@ -456,10 +505,16 @@ async def pixel_upgrade(data: UpgradeRequest, authorization: str = Header(None))
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     p_res = await client.table("pixel_players").select("player_id").eq("user_id", user.id).execute()
-    if not p_res.data: raise HTTPException(status_code=400, detail="未登録")
-    rpc_res = await client.rpc("pixel_upgrade_stat", { "p_player_id": p_res.data[0]["player_id"], "p_wallet_id": data.wallet_id, "p_type": data.upgrade_type }).execute()
+    if not p_res.data: 
+        raise HTTPException(status_code=400, detail="未登録")
+    rpc_res = await client.rpc("pixel_upgrade_stat", { 
+        "p_player_id": p_res.data[0]["player_id"], 
+        "p_wallet_id": data.wallet_id, 
+        "p_type": data.upgrade_type 
+    }).execute()
     result = rpc_res.data
-    if not result.get("success"): raise HTTPException(status_code=400, detail=result.get("detail", "エラー"))
+    if not result.get("success"): 
+        raise HTTPException(status_code=400, detail=result.get("detail", "エラー"))
     return result
 
 @router.post("/api/pixel/barrier/toggle")
@@ -468,7 +523,10 @@ async def toggle_barrier(data: BasePixelRequest, authorization: str = Header(Non
     client = await get_supabase()
     p_res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
     new_state = not p_res.data[0]["barrier_active"]
-    await client.table("pixel_players").update({"barrier_active": new_state, "last_tick": datetime.now(timezone.utc).isoformat()}).eq("id", p_res.data[0]["id"]).execute()
+    await client.table("pixel_players").update({
+        "barrier_active": new_state, 
+        "last_tick": datetime.now(timezone.utc).isoformat()
+    }).eq("id", p_res.data[0]["id"]).execute()
     return {"barrier_active": new_state}
 
 @router.get("/api/pixel/leaderboard")
@@ -485,9 +543,15 @@ async def add_alliance(data: AllianceRequest, authorization: str = Header(None))
     user = await get_user_from_token(authorization)
     client = await get_supabase()
     p = await client.table("pixel_players").select("player_id").eq("user_id", user.id).execute()
-    if p.data[0]["player_id"] == data.target_player_id: raise HTTPException(status_code=400, detail="自己指定不可")
-    try: await client.table("pixel_alliances").insert({"player1_id": min(p.data[0]["player_id"], data.target_player_id), "player2_id": max(p.data[0]["player_id"], data.target_player_id)}).execute()
-    except: pass
+    if p.data[0]["player_id"] == data.target_player_id: 
+        raise HTTPException(status_code=400, detail="自己指定不可")
+    try: 
+        await client.table("pixel_alliances").insert({
+            "player1_id": min(p.data[0]["player_id"], data.target_player_id), 
+            "player2_id": max(p.data[0]["player_id"], data.target_player_id)
+        }).execute()
+    except: 
+        pass
     return {"success": True, "message": "同盟締結完了"}
 
 @router.post("/api/pixel/alliance/break")
@@ -543,27 +607,3 @@ async def get_active_cores():
 @router.get("/pixel", response_class=HTMLResponse)
 async def get_pixel(request: Request):
     return templates.TemplateResponse(request=request, name="pixel.html")
-
-            # 【追記】コアが自分のマスでなくなったプレイヤーを検知して即死判定
-            active_cores_res = await client.table("pixel_players").select("player_id, core_x, core_y").eq("is_dead", False).execute()
-            if active_cores_res.data:
-                for target_p in active_cores_res.data:
-                    v_pid = target_p["player_id"]
-                    if v_pid == player_id:
-                        continue
-                    c_owner, _ = get_tile(target_p["core_x"], target_p["core_y"])
-                    # コアマスの所有者が本人ではなくなった場合（囲みによる自陣化を含む）
-                    if c_owner != v_pid:
-                        kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": v_pid}).execute()
-                        await client.table("pixel_players").update({"is_dead": True}).eq("player_id", v_pid).execute()
-                        bounty = kill_res.data.get("bounty", 0) if (kill_res.data and kill_res.data.get("success")) else 0
-                        msg = f"PLAYER #{player_id} が #{v_pid} を討伐！ 懸賞金 {bounty:,} G 強奪！"
-                        await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": msg}).execute()
-                        async with board_lock:
-                            for cy in range(BOARD_HEIGHT):
-                                for cx in range(BOARD_WIDTH):
-                                    if get_tile(cx, cy)[0] == v_pid:
-                                        set_tile(cx, cy, 0, 0)
-                                        diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
-                        await broadcast_event({"type": "broadcast", "message": msg, "color": "#e74c3c"})
-                        await broadcast_event({"type": "player_killed", "victim_id": v_pid, "killer_id": player_id})
