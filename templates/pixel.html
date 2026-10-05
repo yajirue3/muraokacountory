@@ -65,7 +65,6 @@
             display: flex; align-items: center; gap: 6px;
         }
         .toast.success { background: rgba(0, 243, 255, 0.92); color: #030305; box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4); }
-        .toast.gold { background: rgba(245, 197, 24, 0.94); color: #030305; box-shadow: 0 6px 20px rgba(245, 197, 24, 0.4); }
         @keyframes toastAnim {
             0% { opacity: 0; transform: translateY(12px); }
             12% { opacity: 1; transform: translateY(0); }
@@ -91,7 +90,6 @@
             100% { transform: translateY(-15px); opacity: 0; }
         }
 
-        /* HUD Top: スマホでも絶対にボタンが画面外へ飛び出さない横並び折り返し設計 */
         .hud-top {
             position: absolute; top: 8px; left: 8px; right: 8px;
             display: flex; flex-direction: column; gap: 4px; z-index: 50; pointer-events: none;
@@ -118,7 +116,6 @@
         .btn-icon-hud:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-icon-hud.gold { border-color: rgba(245, 197, 24, 0.5); color: var(--accent-gold); }
 
-        /* HUD Bottom */
         .hud-bottom {
             position: absolute; bottom: 16px; left: 8px; right: 8px;
             display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none;
@@ -150,7 +147,6 @@
         #minimap-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
         .minimap-viewport { position: absolute; border: 1.5px solid var(--accent-cyan); background: rgba(0, 243, 255, 0.25); pointer-events: none; }
 
-        /* モーダル */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); z-index: 9999;
@@ -205,7 +201,6 @@
 
 <!-- Top HUD -->
 <div class="hud-top">
-    <!-- 段1: ナビゲーションとアクション (スマホでも飛び出さない設計) -->
     <div class="hud-bar">
         <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
             <button class="btn-icon-hud" onclick="location.href='/dashboard'" style="color: var(--accent-cyan); border-color: rgba(0,243,255,0.4);">
@@ -233,7 +228,6 @@
             </button>
         </div>
     </div>
-    <!-- 段2: ステータス表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">INK CAPACITY</span>
@@ -248,7 +242,6 @@
             <span class="stat-value" id="hud-mass">0 マス</span>
         </div>
     </div>
-    <!-- 段3: 資金表示 -->
     <div class="hud-bar">
         <div class="stat-block">
             <span class="stat-label">GOLD BALANCE</span>
@@ -307,15 +300,13 @@
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
-        
         <div class="rule-card">
             <div class="rule-card-title">
                 <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
                 1. 領地を塗って毎日0:00(JST)に報酬
             </div>
-            <div class="rule-card-desc">生存領地<strong>1マスにつき毎日10 Gold</strong>が日本時間0:00に自動加算されます。青枠の隣接マスをタップして領地を拡張します。囲みを作ると最大5,000マスを一括制圧できます。</div>
+            <div class="rule-card-desc">生存領地<strong>1マスにつき毎日10 Gold</strong>が日本時間0:00に自動加算されます。青枠の隣接マスをタップして領地を拡張します。囲みを作ると一括制圧できます。</div>
         </div>
-
         <div class="rule-card">
             <div class="rule-card-title">
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
@@ -323,7 +314,6 @@
             </div>
             <div class="rule-card-desc">王冠マークの「本陣コア」を他者に踏まれると<strong>全領地が一瞬で消滅</strong>し、強化に使った全Goldを相手に強奪されます。自陣の壁を厚くしてコアを守りましょう。</div>
         </div>
-
         <div class="rule-card">
             <div class="rule-card-title">
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -331,7 +321,6 @@
             </div>
             <div class="rule-card-desc">全ての領地は本陣コアと一筆書きで直結している必要があります。侵略によって<strong>コアとの接続を切断された飛び地は即座に消滅</strong>します。</div>
         </div>
-
         <div class="rule-card">
             <div class="rule-card-title">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -339,7 +328,6 @@
             </div>
             <div class="rule-card-desc">同盟相手のマスを踏み台にして遠征できます。囲みの内側に同盟相手がいる場合は誤爆防止のため囲みは成立しません。ただし<strong>同盟は相手の許可なく即座に破棄可能</strong>です。</div>
         </div>
-
         <div class="rule-card">
             <div class="rule-card-title">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -347,12 +335,11 @@
             </div>
             <div class="rule-card-desc">毎分10Gで完全無敵になれます。休眠・放置時に有効ですが、バリア中は領地収入も停止し、自分からも攻撃できなくなります。</div>
         </div>
-
         <button class="btn-solid gold" onclick="closeModal('rules-modal')" style="margin-top: 8px;">戦場へ戻る</button>
     </div>
 </div>
 
-<!-- 出撃モーダル (元の確実な動作に戻した構造) -->
+<!-- 出撃モーダル -->
 <div id="spawn-modal" class="modal-overlay" style="background: var(--bg-base);">
     <div class="modal-box">
         <div class="modal-title">
@@ -361,7 +348,7 @@
         <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">
             出撃する銀行口座を選択してください。<br>
             ※強化費用の累計額はコアの「懸賞金」となり、コアを踏まれた瞬間に相手へ全額強奪されます。<br>
-            ※インク容量や回復速度の強化値は死亡しても引き継がれます。
+            ※インク容量や回復速度の強化値は引き継がれます。
         </div>
         <select id="spawn-wallet-select"><option>読込中...</option></select>
         <button class="btn-solid gold" id="btn-spawn-exec" onclick="spawnCore()">安全区画へ出撃</button>
@@ -526,9 +513,14 @@
         } catch (e) {}
     }
 
+    // 【超高速化】Promise.all で並列リクエストし起動待ち時間を一掃
     async function initGame() {
         try {
-            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
+            const [wRes, meRes] = await Promise.all([
+                fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } }),
+                fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } })
+            ]);
+
             if (!wRes.ok) throw await wRes.json();
             const wallets = await wRes.json();
             if (!wallets.length) {
@@ -541,13 +533,13 @@
                 `<option value="${w.wallet_id}">${w.wallet_name} (${w.balance.toLocaleString()}G)</option>`
             ).join('');
 
-            const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             const me = meRes.ok ? await meRes.json() : { exists: false, is_dead: true };
 
             if (me.daily_reward_granted && me.daily_reward_granted > 0) {
                 showToast(`【デイリー報酬】本日のマス保有給付金 +${me.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
             }
 
+            // 【完全判定】DB上で生存しているなら即時ゲーム開始、モーダルは一切開かない
             if (me.exists && !me.is_dead) {
                 Object.assign(gameState, {
                     walletId: me.wallet_id,
@@ -566,16 +558,17 @@
                 centerCameraOnCore();
                 connectWebSocket();
                 updateHUD();
-                await syncCores();
+                syncCores();
                 startSyncLoop();
                 return;
             }
 
+            // 本当に未登録、または確実に死んでいる時だけ出撃モーダルを表示
             gameState.isDead = true;
             gameState.walletId = wallets[0].wallet_id;
             gameState.gold = wallets[0].balance;
             updateHUD();
-            await syncCores();
+            syncCores();
             document.getElementById("spawn-modal").style.display = "flex";
 
             if (!localStorage.getItem("pixel_rules_accepted")) {
@@ -587,7 +580,6 @@
         }
     }
 
-    // 元の正常に動いていた spawnCore ロジックに完全復元
     async function spawnCore() {
         const wid = document.getElementById("spawn-wallet-select").value;
         const btn = document.getElementById("btn-spawn-exec");
@@ -602,7 +594,7 @@
             const data = await res.json();
             if (!res.ok) throw data;
 
-            // 最新のme情報を取得してmaxInk/regenを維持
+            // 最新ステータス（永続アップグレード値）を取得
             const meRes = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
             const me = meRes.ok ? await meRes.json() : { ink: 1, max_ink: 10, regen: 1 };
 
@@ -618,7 +610,6 @@
                 isDead: false
             });
 
-            // ローカル配列上でコアマスを即座に自陣化
             const coreIdx = (data.core_y * BOARD_SIZE + data.core_x) * 3;
             dataView.setUint16(coreIdx, data.player_id, false);
             dataView.setUint8(coreIdx + 2, 1);
@@ -627,7 +618,7 @@
             centerCameraOnCore();
             connectWebSocket();
             updateShopUI();
-            await syncCores();
+            syncCores();
             startSyncLoop();
             fastFullRecount();
             showToast("本陣コアを出撃させました！", true);
@@ -642,9 +633,13 @@
         setInterval(async () => {
             if (gameState.isDead) return;
             try {
-                const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-                if (res.ok) {
-                    const d = await res.json();
+                const [mRes, wRes] = await Promise.all([
+                    fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } }),
+                    fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } })
+                ]);
+
+                if (mRes.ok) {
+                    const d = await mRes.json();
                     if (d.daily_reward_granted && d.daily_reward_granted > 0) {
                         showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領しました！`, true);
                     }
@@ -657,16 +652,15 @@
                         document.getElementById("spawn-modal").style.display = "flex";
                     }
                 }
-                const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
                 if (wRes.ok) {
                     const ws = await wRes.json();
                     const cw = ws.find(w => w.wallet_id === gameState.walletId);
                     if (cw) gameState.gold = cw.balance;
                 }
                 updateHUD();
-                await syncCores();
+                syncCores();
             } catch (e) {}
-        }, 8000);
+        }, 12000);
     }
 
     let isManualSyncing = false;
@@ -677,9 +671,13 @@
         if (btn) btn.disabled = true;
 
         try {
-            const res = await fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } });
-            if (res.ok) {
-                const d = await res.json();
+            const [mRes, wRes] = await Promise.all([
+                fetch("/api/pixel/me", { headers: { "Authorization": `Bearer ${token}` } }),
+                fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } })
+            ]);
+
+            if (mRes.ok) {
+                const d = await mRes.json();
                 if (d.daily_reward_granted && d.daily_reward_granted > 0) {
                     showToast(`【デイリー報酬】本日のマス保有給付金 +${d.daily_reward_granted.toLocaleString()} G を受領！`, true);
                 }
@@ -689,14 +687,13 @@
                     });
                 }
             }
-            const wRes = await fetch("/api/wallets", { headers: { "Authorization": `Bearer ${token}` } });
             if (wRes.ok) {
                 const ws = await wRes.json();
                 const cw = ws.find(w => w.wallet_id === gameState.walletId);
                 if (cw) gameState.gold = cw.balance;
             }
             updateHUD();
-            await syncCores();
+            syncCores();
             showToast("最新情報を取得しました", true);
         } catch (e) {
             showToast("更新に失敗しました");
@@ -738,7 +735,6 @@
             const buffer = event.data;
             const dv = new DataView(buffer);
 
-            // 初回全盤面受信 (120KB)
             if (buffer.byteLength === BOARD_SIZE * BOARD_SIZE * 3) {
                 boardData.set(new Uint8Array(buffer));
                 if (gameState.coreX >= 0 && gameState.coreY >= 0 && !gameState.isDead) {
