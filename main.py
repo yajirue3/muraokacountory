@@ -1302,3 +1302,139 @@ async def unlock_title(data: UnlockTitleRequest, authorization: str = Header(Non
         }).execute()
         
     return {"message": f"称号「{data.title}」を獲得しました！"}
+
+# ==================================================
+# 王立試練迷宮（Doodle風ステージメイカー）モジュール
+# ==================================================
+
+# 1. 画面配信
+@app.get("/maker", response_class=HTMLResponse)
+def get_maker_page(request: Request):
+    return templates.TemplateResponse(request=request, name="maker.html")
+
+
+# 2. モデル定義
+class MakerStageCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=40, description="ステージ名")
+    description: str = Field("", max_length=150, description="紹介・ヒント")
+    map_data: str = Field(..., min_length=10, description="ステージのタイル・オブジェクトデータ(JSON/文字列)")
+
+class MakerStageClear(BaseModel):
+    clear_time_sec: Optional[float] = None
+    wallet_id: Optional[str] = None
+
+
+# 3. ステージ一覧取得 (新着順)
+@app.get("/api/maker/stages")
+async def get_maker_stages(authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    try:
+        res = await client.table("maker_stages").select(
+            "id, title, description, creator_id, creator_name, plays_count, clears_count, created_at"
+        ).order("created_at", desc=True).limit(50).execute()
+        
+        stages = res.data or []
+        for s in stages:
+            s["is_mine"] = (s.get("creator_id") == str(user.id))
+            
+        return {
+            "stages": stages,
+            "is_king": await is_king(user.id)
+        }
+    except Exception as e:
+        # テーブル未作成などのフォールバック
+        return {"stages": [], "is_king": await is_king(user.id), "error": str(e)}
+
+
+# 4. 特定ステージの詳細（マップデータ）ロード
+@app.get("/api/maker/stages/{stage_id}")
+async def get_maker_stage_detail(stage_id: int, authorization: str = Header(None)):
+    await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    res = await client.table("maker_stages").select("*").eq("id", stage_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ステージが見つかりません。")
+    
+    stage = res.data[0]
+    
+    # プレイ回数を1加算
+    try:
+        await client.table("maker_stages").update({
+            "plays_count": stage.get("plays_count", 0) + 1
+        }).eq("id", stage_id).execute()
+    except Exception:
+        pass
+        
+    return stage
+
+
+# 5. ステージ新規投稿・保存
+@app.post("/api/maker/stages")
+async def create_maker_stage(data: MakerStageCreate, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    # 投稿者ニックネーム取得
+    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
+    creator_name = prof_res.data[0]["nickname"] if prof_res.data else "名無しの設計士"
+
+    try:
+        insert_res = await client.table("maker_stages").insert({
+            "creator_id": str(user.id),
+            "creator_name": creator_name,
+            "title": data.title.strip(),
+            "description": data.description.strip(),
+            "map_data": data.map_data,
+            "plays_count": 0,
+            "clears_count": 0
+        }).execute()
+        
+        created = insert_res.data[0] if insert_res.data else {}
+        return {"message": "ステージを公開しました！", "stage_id": created.get("id")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"ステージ保存に失敗しました: {str(e)}")
+
+
+# 6. ステージクリア報告 & 初回クリア報酬 (50G)
+@app.post("/api/maker/stages/{stage_id}/clear")
+async def report_maker_stage_clear(stage_id: int, data: MakerStageClear, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    stage_res = await client.table("maker_stages").select("clears_count").eq("id", stage_id).execute()
+    if not stage_res.data:
+        raise HTTPException(status_code=404, detail="ステージが存在しません。")
+        
+    current_clears = stage_res.data[0].get("clears_count", 0)
+    await client.table("maker_stages").update({"clears_count": current_clears + 1}).eq("id", stage_id).execute()
+    
+    # クリア報酬（指定口座があれば50G配給）
+    reward_msg = ""
+    if data.wallet_id:
+        try:
+            w_res = await client.table("wallets").select("balance").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
+            if w_res.data:
+                new_bal = w_res.data[0]["balance"] + 50
+                await client.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
+                reward_msg = "（踏破報酬 50G を受取口座に付与しました）"
+        except Exception:
+            pass
+
+    return {"message": f"🎉 ステージクリア！{reward_msg}"}
+
+
+# 7. ステージ削除（作成者 or 国王のみ）
+@app.delete("/api/maker/stages/{stage_id}")
+async def delete_maker_stage(stage_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    client = await get_supabase()
+    
+    res = await client.table("maker_stages").select("creator_id").eq("id", stage_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ステージが見つかりません。")
+        
+    is_owner = (res.data[0]["creator_id"] == str(user.id))
+    if not is
