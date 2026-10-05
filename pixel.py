@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import random
 import struct
 import asyncio
@@ -19,6 +19,10 @@ BOARD_WIDTH = 200
 BOARD_HEIGHT = 200
 ROCK_ID = 65535
 EXPECTED_BYTE_SIZE = BOARD_WIDTH * BOARD_HEIGHT * 3
+MAX_FILL_LIMIT = 5000  # 囲み判定上限（400から拡張）
+
+# JST (UTC+9) タイムゾーン定義
+JST = timezone(timedelta(hours=9))
 
 board = bytearray(EXPECTED_BYTE_SIZE)
 board_lock = asyncio.Lock()
@@ -54,7 +58,6 @@ async def load_board_from_supabase():
     if res.data and len(res.data) > 0:
         raw_data = res.data[0].get("data")
         if raw_data:
-            # Supabase Python SDK が bytes/bytearray で返すか hex 文字列 (\x...) で返す場合に対応
             if isinstance(raw_data, (bytes, bytearray)):
                 data_bytes = bytes(raw_data)
             elif isinstance(raw_data, str) and raw_data.startswith("\\x"):
@@ -66,7 +69,6 @@ async def load_board_from_supabase():
                 board[:] = data_bytes
                 loaded = True
 
-    # DBに有効なデータがない場合は岩盤付きの初期状態を生成してDBへ保存
     if not loaded:
         board[:] = bytearray(EXPECTED_BYTE_SIZE)
         for x in range(BOARD_WIDTH):
@@ -78,7 +80,6 @@ async def load_board_from_supabase():
         
         await save_board_to_supabase()
 
-    # マスカウントの集計
     player_mass_counts.clear()
     for y in range(BOARD_HEIGHT):
         for x in range(BOARD_WIDTH):
@@ -187,7 +188,10 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
             cx, cy = queue.popleft()
             if cx == 0 or cx == BOARD_WIDTH - 1 or cy == 0 or cy == BOARD_HEIGHT - 1:
                 is_closed = False
-                if len(visited) > 400: break
+                break
+            if len(visited) > MAX_FILL_LIMIT:
+                is_closed = False
+                break
             for ddx, ddy in [(-1,0), (1,0), (0,-1), (0,1)]:
                 nnx, nny = cx + ddx, cy + ddy
                 if 0 <= nnx < BOARD_WIDTH and 0 <= nny < BOARD_HEIGHT and (nnx, nny) not in visited:
@@ -196,7 +200,7 @@ def apply_flood_fill(start_x: int, start_y: int, owner_id: int, diffs: list):
                         visited.add((nnx, nny))
                         queue.append((nnx, nny))
                         
-        if is_closed and len(visited) <= 400:
+        if is_closed and len(visited) <= MAX_FILL_LIMIT:
             for vx, vy in visited:
                 set_tile(vx, vy, owner_id, 1)
                 diffs.append(struct.pack(">BBHB", vx, vy, owner_id, 1))
@@ -293,27 +297,38 @@ async def websocket_pixel(ws: WebSocket):
                                                 set_tile(dx_disc, dy_disc, 0, 0)
                                                 diffs.append(struct.pack(">BBHB", dx_disc, dy_disc, 0, 0))
 
+                        # 塗り後の囲み判定
                         apply_flood_fill(x, y, player_id, diffs)
                 elif action == 2:
                     set_tile(x, y, target_owner, target_hp + 1)
                     diffs.append(struct.pack(">BBHB", x, y, target_owner, target_hp + 1))
 
-            # ロック解除後の重いDB処理 (コア破壊)
+            # コア破壊時の処理
             if assassinated:
                 kill_res = await client.rpc("pixel_assassinate_core", {"p_killer_id": player_id, "p_victim_id": target_owner}).execute()
                 if kill_res.data and kill_res.data.get("success"):
                     await client.table("pixel_players").update({"is_dead": True}).eq("player_id", target_owner).execute()
-                    bounty = kill_res.data["bounty"]
+                    bounty = kill_res.data.get("bounty", 0)
                     bounty_msg = f"PLAYER #{player_id} が #{target_owner} を討伐！ 懸賞金 {bounty:,} G 強奪！"
                     await client.table("pixel_logs").insert({"event_type": "ASSASSINATE", "message": bounty_msg}).execute()
                     
-                    # 敵マス全消去
+                    # 敵マス全消去 & 消滅後の空間に対する囲み再計算
                     async with board_lock:
                         for cy in range(BOARD_HEIGHT):
                             for cx in range(BOARD_WIDTH):
                                 if get_tile(cx, cy)[0] == target_owner:
                                     set_tile(cx, cy, 0, 0)
                                     diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
+                        
+                        # 内部にいた敵が消滅したため、自陣からの囲みを再評価
+                        apply_flood_fill(x, y, player_id, diffs)
+
+                    # 被害者本人への死亡通知
+                    await broadcast_event({
+                        "type": "player_killed",
+                        "victim_id": target_owner,
+                        "killer_id": player_id
+                    })
 
             # ブロードキャスト
             if diffs:
@@ -340,6 +355,26 @@ async def get_my_pixel_status(authorization: str = Header(None)):
     if not res.data: return {"exists": False, "is_dead": True}
     p = res.data[0]
     
+    daily_reward_granted = 0
+    # JST(UTC+9) 0:00 基準のデイリー報酬判定
+    if not p.get("is_dead", True):
+        now_jst = datetime.now(JST)
+        today_str = now_jst.strftime("%Y-%m-%d")
+        last_claim_date = p.get("last_daily_claim")
+        
+        if last_claim_date != today_str:
+            mass_count = player_mass_counts.get(p["player_id"], 0)
+            if mass_count > 0:
+                reward = mass_count * 10
+                w_res = await client.table("wallets").select("*").eq("wallet_id", p["wallet_id"]).execute()
+                if w_res.data:
+                    current_bal = w_res.data[0]["balance"]
+                    new_bal = current_bal + reward
+                    await client.table("wallets").update({"balance": new_bal}).eq("id", w_res.data[0]["id"]).execute()
+                    daily_reward_granted = reward
+            
+            await client.table("pixel_players").update({"last_daily_claim": today_str}).eq("id", p["id"]).execute()
+
     if not p.get("is_dead", True):
         mass_count = player_mass_counts.get(p["player_id"], 0)
         rpc_res = await client.rpc("pixel_lazy_update", {
@@ -352,7 +387,19 @@ async def get_my_pixel_status(authorization: str = Header(None)):
             if latest.data:
                 p = latest.data[0]
 
-    return { "exists": True, "is_dead": p["is_dead"], "player_id": p["player_id"], "core_x": p["core_x"], "core_y": p["core_y"], "ink": p["ink"], "max_ink": p["max_ink"], "regen": p["regen"], "barrier_active": p["barrier_active"], "wallet_id": p["wallet_id"] }
+    return {
+        "exists": True, 
+        "is_dead": p["is_dead"], 
+        "player_id": p["player_id"], 
+        "core_x": p["core_x"], 
+        "core_y": p["core_y"], 
+        "ink": p["ink"], 
+        "max_ink": p["max_ink"], 
+        "regen": p["regen"], 
+        "barrier_active": p["barrier_active"], 
+        "wallet_id": p["wallet_id"],
+        "daily_reward_granted": daily_reward_granted
+    }
 
 @router.post("/api/pixel/spawn")
 async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None)):
@@ -360,14 +407,26 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
     client = await get_supabase()
     res = await client.table("pixel_players").select("*").eq("user_id", user.id).execute()
     
+    diffs = []
     async with board_lock:
         if res.data:
             p = res.data[0]
             if not p["is_dead"]: return p
+            
+            # 再出撃時：古い残留マスが存在していれば初期化消去
+            old_pid = p["player_id"]
+            for cy in range(BOARD_HEIGHT):
+                for cx in range(BOARD_WIDTH):
+                    if get_tile(cx, cy)[0] == old_pid:
+                        set_tile(cx, cy, 0, 0)
+                        diffs.append(struct.pack(">BBHB", cx, cy, 0, 0))
+            
             core_x, core_y = get_valid_spawn()
             await client.table("pixel_players").update({
                 "is_dead": False, "core_x": core_x, "core_y": core_y, 
-                "ink": 1, "max_ink": 10, "regen": 1, "bounty_gold": 0, "barrier_active": False, "last_tick": datetime.now(timezone.utc).isoformat()
+                "ink": 1, "max_ink": 10, "regen": 1, "bounty_gold": 0, "barrier_active": False,
+                "wallet_id": data.wallet_id,
+                "last_tick": datetime.now(timezone.utc).isoformat()
             }).eq("id", p["id"]).execute()
             player_id = p["player_id"]
         else:
@@ -376,7 +435,16 @@ async def pixel_spawn(data: BasePixelRequest, authorization: str = Header(None))
             await client.table("pixel_players").insert({
                 "user_id": str(user.id), "wallet_id": data.wallet_id, "player_id": player_id, "core_x": core_x, "core_y": core_y, "ink": 1
             }).execute()
+            
         set_tile(core_x, core_y, player_id, 1)
+        diffs.append(struct.pack(">BBHB", core_x, core_y, player_id, 1))
+
+    if diffs:
+        payload = b"".join(diffs)
+        for c in connected_clients:
+            try: await c.send_bytes(payload)
+            except: pass
+
     return {"player_id": player_id, "core_x": core_x, "core_y": core_y}
 
 class UpgradeRequest(BaseModel):
