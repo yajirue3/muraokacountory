@@ -1307,7 +1307,7 @@ async def unlock_title(data: UnlockTitleRequest, authorization: str = Header(Non
 # 王立試練迷宮（Doodle風ステージメイカー）モジュール
 # ==================================================
 
-# 1. 画面配信
+# 1. 画面配信（URLパラメータ ?stage_id=... で特定ステージの直通プレイに対応）
 @app.get("/maker", response_class=HTMLResponse)
 def get_maker_page(request: Request):
     return templates.TemplateResponse(request=request, name="maker.html")
@@ -1316,24 +1316,25 @@ def get_maker_page(request: Request):
 # 2. モデル定義
 class MakerStageCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=40, description="ステージ名")
-    description: str = Field("", max_length=150, description="紹介・ヒント")
-    map_data: str = Field(..., min_length=10, description="ステージのタイル・オブジェクトデータ(JSON/文字列)")
+    description: str = Field("", max_length=150, description="ステージ概要・煽り文句")
+    map_data: str = Field(..., min_length=10, description="マップデータ(JSON)")
 
 class MakerStageClear(BaseModel):
     clear_time_sec: Optional[float] = None
-    wallet_id: Optional[str] = None
 
 
-# 3. ステージ一覧取得 (新着順)
+# 3. ステージ一覧取得（他国民のステージ一覧・国王勅命ピン留めが最優先表示）
 @app.get("/api/maker/stages")
 async def get_maker_stages(authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
+    user_is_king = await is_king(user.id)
     client = await get_supabase()
     
     try:
+        # 国王勅命(ピン留め)を先頭、次点で新着順
         res = await client.table("maker_stages").select(
-            "id, title, description, creator_id, creator_name, plays_count, clears_count, created_at"
-        ).order("created_at", desc=True).limit(50).execute()
+            "id, title, description, creator_id, creator_name, plays_count, clears_count, is_pinned, is_confiscated, created_at"
+        ).order("is_pinned", desc=True).order("created_at", desc=True).limit(60).execute()
         
         stages = res.data or []
         for s in stages:
@@ -1341,26 +1342,25 @@ async def get_maker_stages(authorization: str = Header(None)):
             
         return {
             "stages": stages,
-            "is_king": await is_king(user.id)
+            "is_king": user_is_king
         }
     except Exception as e:
-        # テーブル未作成などのフォールバック
-        return {"stages": [], "is_king": await is_king(user.id), "error": str(e)}
+        return {"stages": [], "is_king": user_is_king, "error": str(e)}
 
 
-# 4. 特定ステージの詳細（マップデータ）ロード
+# 4. ステージ詳細（マップデータ）ロード（他人のステージを読み込んでプレイ）
 @app.get("/api/maker/stages/{stage_id}")
 async def get_maker_stage_detail(stage_id: int, authorization: str = Header(None)):
-    await get_user_from_token(authorization)
+    user = await get_user_from_token(authorization)
     client = await get_supabase()
     
     res = await client.table("maker_stages").select("*").eq("id", stage_id).execute()
     if not res.data:
-        raise HTTPException(status_code=404, detail="ステージが見つかりません。")
+        raise HTTPException(status_code=404, detail="指定されたステージは存在しないか、粛清されました。")
     
     stage = res.data[0]
     
-    # プレイ回数を1加算
+    # プレイ回数加算
     try:
         await client.table("maker_stages").update({
             "plays_count": stage.get("plays_count", 0) + 1
@@ -1368,18 +1368,22 @@ async def get_maker_stage_detail(stage_id: int, authorization: str = Header(None
     except Exception:
         pass
         
-    return stage
+    return {
+        "stage": stage,
+        "is_mine": (stage.get("creator_id") == str(user.id)),
+        "is_king": await is_king(user.id)
+    }
 
 
-# 5. ステージ新規投稿・保存
+# 5. ステージ新規投稿（国民の投稿）
 @app.post("/api/maker/stages")
 async def create_maker_stage(data: MakerStageCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
+    user_is_king = await is_king(user.id)
     client = await get_supabase()
     
-    # 投稿者ニックネーム取得
     prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-    creator_name = prof_res.data[0]["nickname"] if prof_res.data else "名無しの設計士"
+    creator_name = "村岡国王" if user_is_king else (prof_res.data[0]["nickname"] if prof_res.data else "名無しの労働者")
 
     try:
         insert_res = await client.table("maker_stages").insert({
@@ -1389,19 +1393,21 @@ async def create_maker_stage(data: MakerStageCreate, authorization: str = Header
             "description": data.description.strip(),
             "map_data": data.map_data,
             "plays_count": 0,
-            "clears_count": 0
+            "clears_count": 0,
+            "is_pinned": user_is_king, # 国王が作れば最初から勅命固定
+            "is_confiscated": False
         }).execute()
         
         created = insert_res.data[0] if insert_res.data else {}
-        return {"message": "ステージを公開しました！", "stage_id": created.get("id")}
+        return {"message": "ステージを公開しました。", "stage_id": created.get("id")}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"ステージ保存に失敗しました: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"ステージ保存失敗: {str(e)}")
 
 
-# 6. ステージクリア報告 & 初回クリア報酬 (50G)
+# 6. ステージクリア報告（金は1ゴールドも渡さない・クリア数のみ加算）
 @app.post("/api/maker/stages/{stage_id}/clear")
 async def report_maker_stage_clear(stage_id: int, data: MakerStageClear, authorization: str = Header(None)):
-    user = await get_user_from_token(authorization)
+    await get_user_from_token(authorization)
     client = await get_supabase()
     
     stage_res = await client.table("maker_stages").select("clears_count").eq("id", stage_id).execute()
@@ -1410,23 +1416,11 @@ async def report_maker_stage_clear(stage_id: int, data: MakerStageClear, authori
         
     current_clears = stage_res.data[0].get("clears_count", 0)
     await client.table("maker_stages").update({"clears_count": current_clears + 1}).eq("id", stage_id).execute()
-    
-    # クリア報酬（指定口座があれば50G配給）
-    reward_msg = ""
-    if data.wallet_id:
-        try:
-            w_res = await client.table("wallets").select("balance").eq("wallet_id", data.wallet_id).eq("user_id", user.id).execute()
-            if w_res.data:
-                new_bal = w_res.data[0]["balance"] + 50
-                await client.table("wallets").update({"balance": new_bal}).eq("wallet_id", data.wallet_id).execute()
-                reward_msg = "（踏破報酬 50G を受取口座に付与しました）"
-        except Exception:
-            pass
 
-    return {"message": f"🎉 ステージクリア！{reward_msg}"}
+    return {"message": "ステージクリア！踏破の事実のみが記録されました。"}
 
 
-# 7. ステージ削除（作成者 or 国王のみ）
+# 7. ステージ消去（作者本人 or 国王の絶対権力で消去）
 @app.delete("/api/maker/stages/{stage_id}")
 async def delete_maker_stage(stage_id: int, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
@@ -1437,8 +1431,57 @@ async def delete_maker_stage(stage_id: int, authorization: str = Header(None)):
         raise HTTPException(status_code=404, detail="ステージが見つかりません。")
         
     is_owner = (res.data[0]["creator_id"] == str(user.id))
-    if not is_owner and not await is_king(user.id):
-        raise HTTPException(status_code=403, detail="削除権限がありません。")
+    user_is_king = await is_king(user.id)
+
+    if not is_owner and not user_is_king:
+        raise HTTPException(status_code=403, detail="不敬罪：他人の迷宮を破壊する権限はありません。")
         
     await client.table("maker_stages").delete().eq("id", stage_id).execute()
-    return {"message": "ステージを消去しました。"}
+    
+    msg = "【勅命執行】不届きな迷宮を跡形もなく爆破しました。" if user_is_king and not is_owner else "ステージを削除しました。"
+    return {"message": msg}
+
+
+# ==================================================
+# 👑 国王専用の絶対特権 API
+# ==================================================
+
+# 8. 【国王専用】勅命指定（ピン留め・解除）
+@app.post("/api/admin/maker/stages/{stage_id}/pin")
+async def admin_toggle_pin_stage(stage_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="貴様には国王の権限がない。")
+
+    client = await get_supabase()
+    stage = await client.table("maker_stages").select("is_pinned").eq("id", stage_id).execute()
+    if not stage.data:
+        raise HTTPException(status_code=404, detail="ステージが見つかりません。")
+
+    new_pin = not stage.data[0].get("is_pinned", False)
+    await client.table("maker_stages").update({"is_pinned": new_pin}).eq("id", stage_id).execute()
+
+    status_str = "【国王公認・勅命指定】として最上部に固定しました。" if new_pin else "勅命固定を解除しました。"
+    return {"message": status_str, "is_pinned": new_pin}
+
+
+# 9. 【国王専用】国庫接収（他人のステージを強制的に国王のものに書き換え）
+@app.post("/api/admin/maker/stages/{stage_id}/confiscate")
+async def admin_confiscate_stage(stage_id: int, authorization: str = Header(None)):
+    user = await get_user_from_token(authorization)
+    if not await is_king(user.id):
+        raise HTTPException(status_code=403, detail="貴様には国王の権限がない。")
+
+    client = await get_supabase()
+    stage = await client.table("maker_stages").select("*").eq("id", stage_id).execute()
+    if not stage.data:
+        raise HTTPException(status_code=404, detail="ステージが見つかりません。")
+
+    # 所有者を国王に変更し、接収フラグを立てる
+    await client.table("maker_stages").update({
+        "creator_id": str(user.id),
+        "creator_name": "村岡国王（※接収済）",
+        "is_confiscated": True
+    }).execute()
+
+    return {"message": "この迷宮の著作権および所有権を国庫へ強制接収しました。"}
