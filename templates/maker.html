@@ -980,7 +980,11 @@ function updatePhysics() {
         }
     } else if (player.boostTimer > 0) {
     player.vx = player.faceDir * 18;
-    if (player.vy >= 0) {
+
+    // ダッシュ中でもジャンプの上昇を維持する
+    if (player.vy < 0) {
+        player.vy += 0.65;
+    } else {
         player.vy = 0;
     }
 } else {
