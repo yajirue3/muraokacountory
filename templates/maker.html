@@ -979,9 +979,11 @@ function updatePhysics() {
             trails.push({ x: player.x, y: player.y, w: player.w, h: player.h, life: 0.8 }); 
         }
     } else if (player.boostTimer > 0) {
-        player.vx = player.faceDir * 18;
-        player.vy = 0; 
-    } else {
+    player.vx = player.faceDir * 18;
+    if (player.vy >= 0) {
+        player.vy = 0;
+    }
+} else {
         if (keys.left) { player.vx -= 0.8; player.faceDir = -1; }
         if (keys.right) { player.vx += 0.8; player.faceDir = 1; }
         if (!keys.left && !keys.right) player.vx *= 0.75;
