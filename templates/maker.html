@@ -979,15 +979,9 @@ function updatePhysics() {
             trails.push({ x: player.x, y: player.y, w: player.w, h: player.h, life: 0.8 }); 
         }
     } else if (player.boostTimer > 0) {
-    player.vx = player.faceDir * 18;
-
-    // ダッシュ中でもジャンプの上昇を維持する
-    if (player.vy < 0) {
-        player.vy += 0.65;
+        player.vx = player.faceDir * 18;
+        player.vy = 0; 
     } else {
-        player.vy = 0;
-    }
-} else {
         if (keys.left) { player.vx -= 0.8; player.faceDir = -1; }
         if (keys.right) { player.vx += 0.8; player.faceDir = 1; }
         if (!keys.left && !keys.right) player.vx *= 0.75;
@@ -1244,6 +1238,7 @@ function checkCollision(isX) {
             
             if (t === T.BOUNCER && !isX && p.vy > 0) { 
                 p.vy = -22; 
+                p.boostTimer = 0; 
                 p.y = r * TILE_SIZE - p.h; 
                 p.scaleX = 0.4; 
                 p.scaleY = 1.8; 
