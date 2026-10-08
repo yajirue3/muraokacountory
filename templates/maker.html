@@ -1248,7 +1248,7 @@ function checkCollision(isX) {
             
             if (t === T.BOOST_R && rectIntersect(p, {x: c*TILE_SIZE, y: r*TILE_SIZE+20, w: TILE_SIZE, h: 20})) { 
                 p.faceDir = 1; 
-                p.boostTimer = 30; 
+                p.boostTimer = 25; 
                 p.vx = 18; 
                 p.vy = 0; 
                 screenShake = 8; 
@@ -1260,7 +1260,7 @@ function checkCollision(isX) {
             
             if (t === T.BOOST_L && rectIntersect(p, {x: c*TILE_SIZE, y: r*TILE_SIZE+20, w: TILE_SIZE, h: 20})) { 
                 p.faceDir = -1; 
-                p.boostTimer = 30; 
+                p.boostTimer = 25; 
                 p.vx = -18; 
                 p.vy = 0; 
                 screenShake = 8; 
