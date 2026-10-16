@@ -1633,3 +1633,15 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
             "name": nickname,
             "total_players": len(lobby_manager.active_connections)
         })
+
+            # チャットメッセージの中継
+            elif msg_type == "chat":
+                chat_text = str(data.get("text", "")).strip()[:60]  # 最大60文字制限
+                if chat_text:
+                    await lobby_manager.broadcast_all({
+                        "type": "chat",
+                        "id": user_id,
+                        "name": nickname,
+                        "is_king": user_is_king,
+                        "text": chat_text
+                    })
