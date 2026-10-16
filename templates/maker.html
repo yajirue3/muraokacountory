@@ -90,7 +90,6 @@
             <button class="zoom-btn" onclick="adjustZoom(-0.15)">－</button><span class="zoom-val" id="zoom-text">100%</span><button class="zoom-btn" onclick="adjustZoom(0.15)">＋</button>
         </div>
         <div style="display: flex; gap: 6px;">
-            <!-- マルチプレイ・日替わりロビー参加ボタン -->
             <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わりロビー</span></button>
             <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
             <button class="btn-retro btn-cyan" onclick="openLoadModal()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><span class="hide-sm">探す</span></button>
@@ -143,7 +142,7 @@
         <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,229,255,0.3); border-color: #00e5ff;"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg></div>
     </div>
 
-    <!-- モーダル群 (I/O, 公開, ロード) -->
+    <!-- モーダル群 -->
     <div id="modal-io" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-io')">
         <div class="modal-box">
             <div class="modal-header">
@@ -186,6 +185,15 @@
 <script>
 function escapeHtml(str) { return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; }
 
+function showToast(text) {
+    const t = document.getElementById('toast-msg');
+    const txt = document.getElementById('toast-text');
+    if (!t || !txt) return;
+    txt.innerText = text;
+    t.classList.add('show');
+    setTimeout(() => { t.classList.remove('show'); }, 2500);
+}
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
 
@@ -197,7 +205,6 @@ const COLOR_SW_ON = '#00e5ff';
 const COLOR_SW_OFF = '#ff2a5f';
 const W_COLORS = ['#9b59b6', '#3498db', '#1abc9c', '#e67e22', '#e74c3c', '#f1c40f', '#34495e'];
 
-// タイルID定義
 const T = {
     EMPTY: 0, BLOCK: 1, SPIKE_UP: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, 
     ENEMY: 8, START: 9, BRICK: 10, SPIKE_DOWN: 11, SPIKE_LEFT: 12, SPIKE_RIGHT: 13,
@@ -212,12 +219,9 @@ const T = {
     TOGGLE_DOOR: 48, GRAVITY_PANEL: 49, BEAM_HOMING: 50, DOUBLE_JUMP: 51, DASH_SHOES: 52, ENEMY_SHELL: 53, ENEMY_GHOST: 54
 };
 
-// パレット登録
 const paletteItems = [
     { id: T.PAN, cat: 'all', color: '#fff', label: '移動', icon: '<path d="M9 11V4a2 2 0 0 1 4 0v7M13 11V7a2 2 0 0 1 4 0v4M17 11v-1a2 2 0 0 1 4 0v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9a2 2 0 0 1 4 0v2"/>' },
     { id: T.EMPTY, cat: 'terrain', color: '#ff2a5f', label: '消しゴム', icon: '<path d="M18 6L6 18M6 6l12 12"/>' },
-    
-    // 地形
     { id: T.BLOCK, cat: 'terrain', color: '#aaa', label: 'ブロック', icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
     { id: T.BRICK, cat: 'terrain', color: '#e67e22', label: '壊れる', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v9M8 12v9M16 12v9"/>' },
     { id: T.ICE_BLOCK, cat: 'terrain', color: '#a0e6ff', label: '氷床', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M6 18L18 6" stroke="#fff"/>' },
@@ -229,8 +233,6 @@ const paletteItems = [
     { id: T.ONEWAY_DOWN, cat: 'terrain', color: '#2ecc71', label: '一方(下)', icon: '<rect x="3" y="3" width="18" height="6" rx="2"/><path d="M12 9v10M8 15l4 4 4-4"/>' },
     { id: T.ONEWAY_LEFT, cat: 'terrain', color: '#2ecc71', label: '一方(左)', icon: '<rect x="15" y="3" width="6" height="18" rx="2"/><path d="M15 12H5M9 8l-4 4 4 4"/>' },
     { id: T.ONEWAY_RIGHT, cat: 'terrain', color: '#2ecc71', label: '一方(右)', icon: '<rect x="3" y="3" width="6" height="18" rx="2"/><path d="M9 12h10M15 8l4 4-4 4"/>' },
-
-    // 仕掛
     { id: T.SWITCH, cat: 'gimmick', color: '#00e5ff', label: '感圧板', icon: '<rect x="4" y="14" width="16" height="6" rx="2"/><circle cx="12" cy="14" r="3" fill="currentColor"/>' },
     { id: T.LEVER, cat: 'gimmick', color: '#f39c12', label: 'レバー', icon: '<rect x="6" y="18" width="12" height="4"/><line x1="12" y1="18" x2="8" y2="6"/><circle cx="8" cy="6" r="3" fill="currentColor"/>' },
     { id: T.SW_BLOCK_A, cat: 'gimmick', color: '#ff2a5f', label: '赤(消)', icon: '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="2 2"/>' },
@@ -245,15 +247,11 @@ const paletteItems = [
     { id: T.BOOST_U, cat: 'gimmick', color: '#00e5ff', label: 'ハイパー上', icon: '<path d="M12 21V9M6 15l6-6 6 6M6 9l6-6 6 6" stroke-width="3"/>' },
     { id: T.LIFT_H, cat: 'gimmick', color: '#3498db', label: 'リフト横', icon: '<rect x="4" y="10" width="16" height="4"/><path d="M2 12l4-4v8zM22 12l-4-4v8z" fill="currentColor"/>' },
     { id: T.LIFT_V, cat: 'gimmick', color: '#3498db', label: 'リフト縦', icon: '<rect x="10" y="4" width="4" height="16"/><path d="M12 2l-4 4h8zM12 22l-4-4h8z" fill="currentColor"/>' },
-
-    // アイテム・強化
     { id: T.STAR, cat: 'item', color: '#ffd700', label: 'スター', icon: '<polygon points="12,2 15.2,8.5 22.2,9.5 17.1,14.5 18.3,21.5 12,18.2 5.7,21.5 6.9,14.5 1.8,9.5 8.8,8.5" fill="#ffd700" stroke="#000" stroke-width="2"/><line x1="10" y1="10" x2="10" y2="13" stroke="#000" stroke-width="2"/><line x1="14" y1="10" x2="14" y2="13" stroke="#000" stroke-width="2"/>' },
     { id: T.SPIDER, cat: 'item', color: '#ff1744', label: '旧クモ糸', icon: '<path d="M5 4l3 5M3 10l5 1M3 16l5-1M5 21l3-4M19 4l-3 5M21 10l-5 1M21 16l-5-1M19 21l-3-4" stroke="#ff1744" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="14" r="5" fill="#111" stroke="#ff1744" stroke-width="1.8"/><circle cx="12" cy="7" r="3" fill="#111" stroke="#ff1744" stroke-width="1.8"/><polygon points="12,11 10,13 12,17 14,13" fill="#ff1744"/>' },
     { id: T.SPIDER_NEW, cat: 'item', color: '#00e5ff', label: '新クモ糸', icon: '<path d="M5 4l3 5M3 10l5 1M3 16l5-1M5 21l3-4M19 4l-3 5M21 10l-5 1M21 16l-5-1M19 21l-3-4" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="14" r="5" fill="#111" stroke="#00e5ff" stroke-width="1.8"/><circle cx="12" cy="7" r="3" fill="#111" stroke="#00e5ff" stroke-width="1.8"/><polygon points="12,11 10,13 12,17 14,13" fill="#00e5ff"/>' },
     { id: T.DOUBLE_JUMP, cat: 'item', color: '#a29bfe', label: '2段J羽', icon: '<path d="M4 12c4-8 12-8 16 0M4 18c4-8 12-8 16 0" stroke-width="2"/>' },
     { id: T.DASH_SHOES, cat: 'item', color: '#ff7675', label: 'ダッシュ靴', icon: '<path d="M4 16h16v4H4zM16 10l4 6H4l4-6z" fill="currentColor" stroke="none"/>' },
-
-    // 危険
     { id: T.SPIKE_UP, cat: 'danger', color: '#ff2a5f', label: '上針', icon: '<polygon points="12 2 2 22 22 22"/>' },
     { id: T.SPIKE_DOWN, cat: 'danger', color: '#ff2a5f', label: '下針', icon: '<polygon points="12 22 2 2 22 2"/>' },
     { id: T.SPIKE_LEFT, cat: 'danger', color: '#ff2a5f', label: '左針', icon: '<polygon points="2 12 22 2 22 22"/>' },
@@ -264,8 +262,6 @@ const paletteItems = [
     { id: T.BEAM_U, cat: 'danger', color: '#e74c3c', label: '砲台(上)', icon: '<rect x="6" y="10" width="12" height="12" rx="3"/><circle cx="12" cy="6" r="3"/>' },
     { id: T.BEAM_D, cat: 'danger', color: '#e74c3c', label: '砲台(下)', icon: '<rect x="6" y="2" width="12" height="12" rx="3"/><circle cx="12" cy="18" r="3"/>' },
     { id: T.BEAM_HOMING, cat: 'danger', color: '#d35400', label: '誘導砲台', icon: '<rect x="4" y="4" width="16" height="16" rx="8"/><circle cx="12" cy="12" r="3" fill="#fff"/>' },
-
-    // キャラ
     { id: T.ENEMY, cat: 'entity', color: '#a855f7', label: '敵(歩)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
     { id: T.ENEMY2, cat: 'entity', color: '#ff2a5f', label: '敵(跳)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M7 9l3 2M17 9l-3 2"/>' },
     { id: T.ENEMY_H, cat: 'entity', color: '#e67e22', label: '敵(横飛)', icon: '<rect x="4" y="8" width="16" height="8" rx="2"/><circle cx="12" cy="12" r="2" fill="#fff"/>' },
@@ -283,7 +279,7 @@ const paletteItems = [
 
 let mode = 'edit'; 
 let zoomScale = 1.0;
-let currentStageInfo = { id: null, title: '新規作成コース', author: '自分', isMine: true };
+let currentStageInfo = { id: null, title: '新規作成コース', author: '自分', isMine: true, isDaily: false };
 let isMobile = (window.innerWidth <= 768 || 'ontouchstart' in window);
 
 let camera = { x: 0, y: 0 };
@@ -302,7 +298,7 @@ let player = {
     warpCooldown: 0, scaleX: 1, scaleY: 1, boostTimer: 0, invincibleTimer: 0,
     hasSpider: false, hasNewSpider: false, hook: null, hookDist: 0,
     lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false,
-    startX: 0, startY: 0
+    startX: 0, startY: 0, chatTimer: 0, chatMessage: ""
 };
 
 let isCircuitActive = false; 
@@ -323,12 +319,9 @@ let crumbleBlocks = {};
 let globalFrame = 0;
 let slowFrames = 0;
 
-/* =========================================================
-   マルチプレイ（WebSocket & Chat）管理
-========================================================= */
 let isMultiplayer = false;
 let socket = null;
-let otherPlayers = {}; // id -> { x, y, targetX, targetY, vx, vy, faceDir, state, chatMessage, chatTimer, name, isKing ... }
+let otherPlayers = {};
 let syncInterval = null;
 
 function joinDailyLobby() {
@@ -363,7 +356,7 @@ function initWebSocket() {
     otherPlayers = {};
     
     socket.onopen = () => {
-        syncInterval = setInterval(syncPlayerPos, 50); // 20 FPS sync
+        syncInterval = setInterval(syncPlayerPos, 50);
     };
     
     socket.onmessage = (event) => {
@@ -415,7 +408,6 @@ function syncPlayerPos() {
 function sendChatMessage(text) {
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: 'chat', text: text }));
-        // 自分自身にも表示
         displayChatBubble('self', text);
         addChatLog("自分", text, false);
     }
@@ -424,7 +416,7 @@ function sendChatMessage(text) {
 function displayChatBubble(id, text) {
     if (id === 'self') {
         player.chatMessage = text;
-        player.chatTimer = 240; // 4 seconds
+        player.chatTimer = 240; 
     } else if (otherPlayers[id]) {
         otherPlayers[id].chatMessage = text;
         otherPlayers[id].chatTimer = 240;
@@ -440,11 +432,9 @@ function addChatLog(name, text, isKing) {
     el.innerHTML = `<span class="c-name" style="color:${nameColor}">${prefix}${escapeHtml(name)}:</span> ${escapeHtml(text)}`;
     container.appendChild(el);
     if (container.children.length > 5) container.removeChild(container.firstChild);
-    // 自動消去はCSS Animation (fadeOut) に任せる
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 8000);
 }
 
-// チャット入力管理
 const chatInput = document.getElementById('chat-input');
 const chatWrapper = document.getElementById('chat-input-wrapper');
 
@@ -475,9 +465,6 @@ function toggleChatMobile() {
     }
 }
 
-/* =========================================================
-   初期化・リサイズ処理
-========================================================= */
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
     for (let c = 0; c < MAP_COLS; c++) { 
@@ -555,9 +542,6 @@ setPalCat('all', document.querySelector('.pal-tab.active'));
 resize(); 
 focusCameraOnStart();
 
-/* =========================================================
-   モード切り替え & ゲームロジック
-========================================================= */
 function setMode(newMode) {
     mode = newMode;
     
@@ -600,7 +584,6 @@ function startPlay() {
     totalCoinsInStage = 0; 
     let startFound = false;
 
-    // マップスキャン
     for (let r = 0; r < MAP_ROWS; r++) {
         for (let c = 0; c < MAP_COLS; c++) {
             const t = activeMapData[r][c];
@@ -696,7 +679,6 @@ function die() {
     if (player.state === 'dead' || player.state === 'clear') return;
     
     if (isMultiplayer) {
-        // マルチプレイ時は脱落なし（即リスポーン）
         createParticles(player.x + player.w/2, player.y + player.h/2, '#ff2a5f', 30);
         if(socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({type: 'respawn', x: player.x, y: player.y}));
@@ -747,9 +729,6 @@ function win() {
     setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
 }
 
-/* =========================================================
-   入力・イベント処理
-========================================================= */
 function isChatFocused() { return document.activeElement === chatInput; }
 
 window.addEventListener('keydown', e => {
@@ -859,9 +838,6 @@ canvas.addEventListener('touchstart', e => { if (e.touches.length === 1 && !isCh
 canvas.addEventListener('touchmove', e => { if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } }, { passive: false });
 canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
 
-/* =========================================================
-   物理演算 & ギミック
-========================================================= */
 function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.HIDDEN_BLOCK, T.ICE_BLOCK, T.CRUMBLE_BLOCK].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
 function rectIntersect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
 
@@ -897,7 +873,6 @@ function updatePhysics() {
     player.scaleX += (1.0 - player.scaleX) * 0.25; 
     player.scaleY += (1.0 - player.scaleY) * 0.25;
 
-    // 論理回路
     let p = player, pCount = 0, curLevers = new Set(), inter = [p, ...crosses, ...enemies.filter(e => e.type !== 8)];
     for (let r = 0; r < MAP_ROWS; r++) {
         for (let c = 0; c < MAP_COLS; c++) {
@@ -931,7 +906,6 @@ function updatePhysics() {
     }
     isCircuitActive = (activeSwitchCount % 2 !== 0); 
 
-    // リフト
     lifts.forEach(lf => {
         let ox = lf.x, oy = lf.y; 
         lf.x += lf.vx; lf.y += lf.vy; 
@@ -940,7 +914,6 @@ function updatePhysics() {
         if (p.vy >= 0 && rectIntersect(p, { x: lf.x, y: lf.y - 8, w: lf.w, h: 8 }) && p.y + p.h <= lf.y + 12) { p.y = lf.y - p.h; p.x += lf.vx; p.y += lf.vy; p.grounded = true; p.vy = 0; }
     });
 
-    // 十字箱
     crosses.forEach(cr => {
         cr.vy += 0.65; if (cr.vy > 14) cr.vy = 14;
         if (rectIntersect(p, cr)) {
@@ -958,7 +931,6 @@ function updatePhysics() {
         if (cr.vy < 0 && (isSolid(activeMapData[r1]?.[c1]) || isSolid(activeMapData[r1]?.[c2]))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
     });
 
-    // プレイヤー移動
     if (p.hook) {
         let dx = p.hook.x - (p.x + p.w / 2), dy = p.hook.y - (p.y + p.h / 2), dist = Math.hypot(dx, dy); 
         if (!p.hookDist) p.hookDist = dist;
@@ -1003,7 +975,6 @@ function updatePhysics() {
     }
     if (p.y > MAP_ROWS * 40 + 200 || p.y < -200) die();
 
-    // 他プレイヤーの補間 (Lerp)
     if (isMultiplayer) {
         for (let id in otherPlayers) {
             let op = otherPlayers[id];
@@ -1013,7 +984,6 @@ function updatePhysics() {
         }
     }
 
-    // 敵の更新
     enemies.forEach(e => {
         if ([1, 2, 7].includes(e.type)) e.vy += 0.6;
         if (e.type === 2) { e.vx += (p.x > e.x ? 0.15 : -0.15); e.vx = Math.max(-2.5, Math.min(2.5, e.vx)); e.jumpTmr++; }
@@ -1073,7 +1043,6 @@ function updatePhysics() {
     }); 
     enemies = enemies.filter(e => !e.dead);
 
-    // 砲台と弾
     beamEmitters.forEach(b => {
         b.tmr++;
         if (b.tmr >= 90) {
@@ -1157,11 +1126,7 @@ function checkColl(isX) {
         }
     }
 }
-function createParticles(x, y, col, cnt) { for (let i = 0; i < cnt; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 16, vy: (Math.random() - 0.5) * 16 - 2, life: 1, color: col }); }
 
-/* =========================================================
-   描画 (Canvas + SVG Graphics)
-========================================================= */
 function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
 
 function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
@@ -1213,7 +1178,6 @@ function drawChatBubble(ctx, x, y, text) {
     ctx.lineWidth = 2;
     roundRect(ctx, bx, by, bw, bh, 6);
     
-    // しっぽ
     ctx.beginPath();
     ctx.moveTo(x - 5, by + bh);
     ctx.lineTo(x, by + bh + 6);
@@ -1253,7 +1217,6 @@ function drawPlayer(ctx, p, isSelf) {
     }
     ctx.restore();
 
-    // 他人の名前表示
     if (!isSelf && p.name) {
         ctx.save();
         ctx.font = '900 10px sans-serif';
@@ -1267,13 +1230,11 @@ function drawPlayer(ctx, p, isSelf) {
         ctx.restore();
     }
     
-    // クモ糸
     if (p.hook) {
         ctx.strokeStyle = isSelf ? '#fff' : 'rgba(255,255,255,0.4)'; 
         ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x + 13, p.y + 13); ctx.lineTo(p.hook.x, p.hook.y); ctx.stroke();
     }
     
-    // チャットバブル
     if (p.chatTimer > 0 && p.chatMessage) {
         drawChatBubble(ctx, p.x + 13, p.y - (isSelf ? 0 : 15), p.chatMessage);
     }
@@ -1348,12 +1309,10 @@ function draw() {
             else { ctx.fillStyle = pr.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pr.x + 6, pr.y + 6, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(pr.x + 6, pr.y + 6, 3, 0, Math.PI * 2); ctx.fill(); } 
         });
         
-        // 他プレイヤー描画
         if (isMultiplayer) {
             for (let id in otherPlayers) { drawPlayer(ctx, otherPlayers[id], false); }
         }
         
-        // 自プレイヤー描画
         drawPlayer(ctx, player, true);
     }
     
@@ -1369,11 +1328,7 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
-/* =========================================================
-   通信・モーダル処理
-========================================================= */
 const token = localStorage.getItem("access_token");
-
 function openModal(id) { document.getElementById(id).style.display = 'flex'; } 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
