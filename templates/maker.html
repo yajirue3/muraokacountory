@@ -90,6 +90,7 @@
             <button class="zoom-btn" onclick="adjustZoom(-0.15)">－</button><span class="zoom-val" id="zoom-text">100%</span><button class="zoom-btn" onclick="adjustZoom(0.15)">＋</button>
         </div>
         <div style="display: flex; gap: 6px;">
+            <!-- マルチプレイ・日替わりロビー参加ボタン -->
             <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わりロビー</span></button>
             <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span class="hide-sm">I/O</span></button>
             <button class="btn-retro btn-cyan" onclick="openLoadModal()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><span class="hide-sm">探す</span></button>
@@ -142,7 +143,7 @@
         <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,229,255,0.3); border-color: #00e5ff;"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg></div>
     </div>
 
-    <!-- モーダル群 -->
+    <!-- モーダル群 (I/O, 公開, ロード) -->
     <div id="modal-io" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-io')">
         <div class="modal-box">
             <div class="modal-header">
@@ -183,7 +184,9 @@
     </div>
 
 <script>
-function escapeHtml(str) { return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; }
+function escapeHtml(str) { 
+    return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; 
+}
 
 function showToast(text) {
     const t = document.getElementById('toast-msg');
@@ -324,6 +327,9 @@ let socket = null;
 let otherPlayers = {};
 let syncInterval = null;
 
+// ==========================================
+// マルチプレイ・チャット機能
+// ==========================================
 function joinDailyLobby() {
     fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } })
     .then(r => {
@@ -466,6 +472,9 @@ function toggleChatMobile() {
     }
 }
 
+// ==========================================
+// 画面・マップ初期化
+// ==========================================
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
     for (let c = 0; c < MAP_COLS; c++) { 
@@ -562,7 +571,8 @@ function setMode(newMode) {
 
 function startPlay() {
     activeMapData = JSON.parse(savedMapDataStr);
-    
+    if (!activeMapData || activeMapData.length === 0) activeMapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
+
     enemies = []; beamEmitters = []; projectiles = []; particles = []; trails = []; crosses = []; lifts = []; leverStates = {}; crumbleBlocks = {};
     
     player = { 
@@ -580,8 +590,10 @@ function startPlay() {
     let startFound = false;
 
     for (let r = 0; r < MAP_ROWS; r++) {
+        if (!activeMapData[r]) continue;
         for (let c = 0; c < MAP_COLS; c++) {
             const t = activeMapData[r][c];
+            if (!t || t === 0) continue;
             
             if (t === T.COIN) {
                 totalCoinsInStage++;
@@ -724,6 +736,9 @@ function win() {
     setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
 }
 
+// ==========================================
+// 入力・操作
+// ==========================================
 function isChatFocused() { return document.activeElement === chatInput; }
 
 window.addEventListener('keydown', e => {
@@ -788,6 +803,7 @@ function handleInputCoords(clientX, clientY, isRightClick) {
             let bestDist = Infinity;
             let target = null;
             for (let r = row - 2; r <= row + 2; r++) {
+                if (!activeMapData[r]) continue;
                 for (let c = col - 2; c <= col + 2; c++) {
                     if (r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(activeMapData[r][c])) {
                         let d = Math.hypot(c * TILE_SIZE + 20 - wx, r * TILE_SIZE + 20 - wy);
@@ -801,6 +817,8 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     }
     
     if (row >= 0 && row < MAP_ROWS && col >= 0 && col < MAP_COLS) {
+        if (!mapData[row]) mapData[row] = new Array(MAP_COLS).fill(0);
+
         if (input.rightDown || isRightClick) {
             if (mapData[row][col] === T.WARP) { 
                 warpPairs = warpPairs.filter(wp => !(wp.r1===row && wp.c1===col) && !(wp.r2===row && wp.c2===col)); 
@@ -808,7 +826,12 @@ function handleInputCoords(clientX, clientY, isRightClick) {
             }
             mapData[row][col] = 0; 
         } else if (currentBrush === T.START) { 
-            for (let y = 0; y < MAP_ROWS; y++) for (let x = 0; x < MAP_COLS; x++) if (mapData[y][x] === T.START) mapData[y][x] = 0; 
+            for (let y = 0; y < MAP_ROWS; y++) {
+                if (!mapData[y]) continue;
+                for (let x = 0; x < MAP_COLS; x++) {
+                    if (mapData[y][x] === T.START) mapData[y][x] = 0; 
+                }
+            }
             mapData[row][col] = T.START;
         } else if (currentBrush === T.WARP) {
             if (mapData[row][col] !== T.WARP) {
@@ -833,6 +856,9 @@ canvas.addEventListener('touchstart', e => { if (e.touches.length === 1 && !isCh
 canvas.addEventListener('touchmove', e => { if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } }, { passive: false });
 canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
 
+// ==========================================
+// 物理・ギミック処理
+// ==========================================
 function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.HIDDEN_BLOCK, T.ICE_BLOCK, T.CRUMBLE_BLOCK].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
 function rectIntersect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
 
@@ -870,8 +896,11 @@ function updatePhysics() {
 
     let p = player, pCount = 0, curLevers = new Set(), inter = [p, ...crosses, ...enemies.filter(e => e.type !== 8)];
     for (let r = 0; r < MAP_ROWS; r++) {
+        if (!activeMapData[r]) continue;
         for (let c = 0; c < MAP_COLS; c++) {
             let t = activeMapData[r][c];
+            if (!t || t === 0) continue;
+
             if (t === T.SWITCH) {
                 if (inter.some(i => rectIntersect(i, { x: c * 40 + 2, y: r * 40 + 16, w: 36, h: 24 }))) pCount++;
             } else if (t === T.LEVER) {
@@ -905,7 +934,7 @@ function updatePhysics() {
         let ox = lf.x, oy = lf.y; 
         lf.x += lf.vx; lf.y += lf.vy; 
         let cx = Math.floor((lf.vx > 0 ? lf.x + lf.w : lf.x) / 40), cy = Math.floor((lf.vy > 0 ? lf.y + lf.h : lf.y) / 40);
-        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS || isSolid(activeMapData[cy]?.[cx])) { lf.x = ox; lf.y = oy; lf.vx *= -1; lf.vy *= -1; screenShake = Math.max(screenShake, 1); }
+        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS || (activeMapData[cy] && isSolid(activeMapData[cy][cx]))) { lf.x = ox; lf.y = oy; lf.vx *= -1; lf.vy *= -1; screenShake = Math.max(screenShake, 1); }
         if (p.vy >= 0 && rectIntersect(p, { x: lf.x, y: lf.y - 8, w: lf.w, h: 8 }) && p.y + p.h <= lf.y + 12) { p.y = lf.y - p.h; p.x += lf.vx; p.y += lf.vy; p.grounded = true; p.vy = 0; }
     });
 
@@ -918,12 +947,12 @@ function updatePhysics() {
         cr.vx *= 0.8; if (Math.abs(cr.vx) < 0.1) cr.vx = 0;
         cr.x += cr.vx; 
         let c1 = Math.floor(cr.x / 40), c2 = Math.floor((cr.x + cr.w - 0.1) / 40), r1 = Math.floor(cr.y / 40), r2 = Math.floor((cr.y + cr.h - 0.1) / 40);
-        if (cr.vx > 0 && (isSolid(activeMapData[r1]?.[c2]) || isSolid(activeMapData[r2]?.[c2]))) { cr.x = c2 * 40 - cr.w; cr.vx = 0; }
-        if (cr.vx < 0 && (isSolid(activeMapData[r1]?.[c1]) || isSolid(activeMapData[r2]?.[c1]))) { cr.x = c1 * 40 + 40; cr.vx = 0; }
+        if (cr.vx > 0 && ((activeMapData[r1] && isSolid(activeMapData[r1][c2])) || (activeMapData[r2] && isSolid(activeMapData[r2][c2])))) { cr.x = c2 * 40 - cr.w; cr.vx = 0; }
+        if (cr.vx < 0 && ((activeMapData[r1] && isSolid(activeMapData[r1][c1])) || (activeMapData[r2] && isSolid(activeMapData[r2][c1])))) { cr.x = c1 * 40 + 40; cr.vx = 0; }
         cr.y += cr.vy; 
         c1 = Math.floor(cr.x / 40); c2 = Math.floor((cr.x + cr.w - 0.1) / 40); r1 = Math.floor(cr.y / 40); r2 = Math.floor((cr.y + cr.h - 0.1) / 40);
-        if (cr.vy > 0 && (isSolid(activeMapData[r2]?.[c1]) || isSolid(activeMapData[r2]?.[c2]))) { cr.y = r2 * 40 - cr.h; cr.vy = 0; }
-        if (cr.vy < 0 && (isSolid(activeMapData[r1]?.[c1]) || isSolid(activeMapData[r1]?.[c2]))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
+        if (cr.vy > 0 && ((activeMapData[r2] && isSolid(activeMapData[r2][c1])) || (activeMapData[r2] && isSolid(activeMapData[r2][c2])))) { cr.y = r2 * 40 - cr.h; cr.vy = 0; }
+        if (cr.vy < 0 && ((activeMapData[r1] && isSolid(activeMapData[r1][c1])) || (activeMapData[r1] && isSolid(activeMapData[r1][c2])))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
     });
 
     if (p.hook) {
@@ -945,7 +974,7 @@ function updatePhysics() {
         let oi = false; 
         if (p.grounded) {
             let fr = p.gravityDir > 0 ? Math.floor((p.y + p.h + 2) / 40) : Math.floor((p.y - 2) / 40); 
-            if (activeMapData[fr]?.[Math.floor((p.x + p.w / 2) / 40)] === T.ICE_BLOCK) oi = true;
+            if (activeMapData[fr] && activeMapData[fr][Math.floor((p.x + p.w / 2) / 40)] === T.ICE_BLOCK) oi = true;
         }
         if (!keys.left && !keys.right) p.vx *= (oi ? 0.98 : 0.75); 
         p.vx = Math.max(-max, Math.min(max, p.vx));
@@ -1007,16 +1036,16 @@ function updatePhysics() {
         if (e.type !== 8) {
             e.x += e.vx; 
             let ec1 = Math.floor(e.x / 40), ec2 = Math.floor((e.x + e.w - 0.1) / 40), er1 = Math.floor(e.y / 40), er2 = Math.floor((e.y + e.h - 0.1) / 40);
-            if (e.vx > 0 && (isSolid(activeMapData[er1]?.[ec2]) || isSolid(activeMapData[er2]?.[ec2]))) { e.x = ec2 * 40 - e.w; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
-            if (e.vx < 0 && (isSolid(activeMapData[er1]?.[ec1]) || isSolid(activeMapData[er2]?.[ec1]))) { e.x = ec1 * 40 + 40; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
+            if (e.vx > 0 && ((activeMapData[er1] && isSolid(activeMapData[er1][ec2])) || (activeMapData[er2] && isSolid(activeMapData[er2][ec2])))) { e.x = ec2 * 40 - e.w; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
+            if (e.vx < 0 && ((activeMapData[er1] && isSolid(activeMapData[er1][ec1])) || (activeMapData[er2] && isSolid(activeMapData[er2][ec1])))) { e.x = ec1 * 40 + 40; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
             
             e.y += e.vy; 
             ec1 = Math.floor(e.x / 40); ec2 = Math.floor((e.x + e.w - 0.1) / 40); er1 = Math.floor(e.y / 40); er2 = Math.floor((e.y + e.h - 0.1) / 40);
-            if (e.vy > 0 && (isSolid(activeMapData[er2]?.[ec1]) || isSolid(activeMapData[er2]?.[ec2]))) { 
+            if (e.vy > 0 && ((activeMapData[er2] && isSolid(activeMapData[er2][ec1])) || (activeMapData[er2] && isSolid(activeMapData[er2][ec2])))) { 
                 e.y = er2 * 40 - e.h; e.vy = 0; 
                 if (e.type === 2 && e.jumpTmr > 50 && Math.abs(p.x - e.x) < 300) { e.vy = -10; e.jumpTmr = 0; } 
             }
-            if (e.vy < 0 && (isSolid(activeMapData[er1]?.[ec1]) || isSolid(activeMapData[er1]?.[ec2]))) { 
+            if (e.vy < 0 && ((activeMapData[er1] && isSolid(activeMapData[er1][ec1])) || (activeMapData[er1] && isSolid(activeMapData[er1][ec2])))) { 
                 e.y = er1 * 40 + 40; e.vy = 0; 
                 if (e.type === 4) e.vy = 2; 
             }
@@ -1065,7 +1094,7 @@ function updatePhysics() {
         }
         
         let c = Math.floor((pr.x + pr.w / 2) / 40), r = Math.floor((pr.y + pr.h / 2) / 40); 
-        if (!pr.pierce && r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(activeMapData[r][c])) { pr.active = false; createParticles(pr.x, pr.y, pr.color, 6); }
+        if (!pr.pierce && r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && (activeMapData[r] && isSolid(activeMapData[r][c]))) { pr.active = false; createParticles(pr.x, pr.y, pr.color, 6); }
     }); 
     projectiles = projectiles.filter(p => p.active);
     
@@ -1078,10 +1107,11 @@ function updatePhysics() {
 function checkColl(isX) {
     let p = player, l = Math.floor(Math.max(0, p.x) / 40), r = Math.floor(Math.min(MAP_COLS * 40 - 1, p.x + p.w - 0.1) / 40), t = Math.floor(Math.max(0, p.y) / 40), b = Math.floor(Math.min(MAP_ROWS * 40 - 1, p.y + p.h - 0.1) / 40);
     for (let row = t; row <= b; row++) {
+        if (!activeMapData[row]) continue;
         for (let col = l; col <= r; col++) {
             if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) continue; 
             let tl = activeMapData[row][col]; 
-            if (tl === 0) continue;
+            if (!tl || tl === 0) continue;
             
             if ([T.SPIKE_UP, T.SPIKE_DOWN, T.SPIKE_LEFT, T.SPIKE_RIGHT, T.SPIKE_TOGGLE].includes(tl)) {
                 if (p.invincibleTimer > 0 || (tl === T.SPIKE_TOGGLE && globalFrame % 120 < 60)) continue; 
@@ -1122,7 +1152,15 @@ function checkColl(isX) {
     }
 }
 
-function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+// ==========================================
+// 描画関連
+// ==========================================
+function roundRect(ctx, x, y, w, h, r) { 
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); 
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); 
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); 
+    ctx.closePath(); ctx.fill(); ctx.stroke(); 
+}
 
 function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
@@ -1264,10 +1302,13 @@ function draw() {
     }
     
     let md = mode === 'play' ? activeMapData : mapData; 
-    ctx.lineWidth = 3; ctx.lineJoin = 'round';
-    for (let r = 0; r < MAP_ROWS; r++) {
-        for (let c = 0; c < MAP_COLS; c++) {
-            if (md[r][c] !== 0) drawTileGraphics(ctx, md[r][c], r, c, c * 40, r * 40, 40, 20);
+    if (md && md.length > 0) {
+        ctx.lineWidth = 3; ctx.lineJoin = 'round';
+        for (let r = 0; r < MAP_ROWS; r++) {
+            if (!md[r]) continue;
+            for (let c = 0; c < MAP_COLS; c++) {
+                if (md[r][c] !== 0) drawTileGraphics(ctx, md[r][c], r, c, c * 40, r * 40, 40, 20);
+            }
         }
     }
 
@@ -1323,6 +1364,9 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
+// ==========================================
+// API・保存通信・イベント系
+// ==========================================
 const token = localStorage.getItem("access_token");
 function openModal(id) { document.getElementById(id).style.display = 'flex'; } 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -1352,7 +1396,13 @@ function importDataMRM1(e) {
 function openSaveModal() {
     if (mode === 'play') setMode('edit');
     let hasStart = false, hasGoal = false;
-    for (let r = 0; r < MAP_ROWS; r++) { for (let c = 0; c < MAP_COLS; c++) { if (mapData[r][c] === T.START) hasStart = true; if (mapData[r][c] === T.GOAL) hasGoal = true; } }
+    for (let r = 0; r < MAP_ROWS; r++) { 
+        if (!mapData[r]) continue;
+        for (let c = 0; c < MAP_COLS; c++) { 
+            if (mapData[r][c] === T.START) hasStart = true; 
+            if (mapData[r][c] === T.GOAL) hasGoal = true; 
+        } 
+    }
     if (!hasStart || !hasGoal) { alert("公開には「スタート(S)」と「ゴール(旗)」が必要です。"); return; }
     openModal('modal-save');
 }
@@ -1371,7 +1421,7 @@ async function saveStage() {
         const d = await res.json();
         if (res.ok) { 
             alert(d.message || "公開しました！"); 
-            currentStageInfo = { id: d.id, title: title, author: '自分', isMine: true, isDaily: false }; 
+            currentStageInfo = { id: d.stage_id || d.id, title: title, author: '自分', isMine: true, isDaily: false }; 
             updateCourseHUDInfo(); closeModal('modal-save'); 
         } else { alert("エラー: " + (d.detail || "保存失敗")); }
     } catch (e) { alert("通信エラーが発生しました。"); }
@@ -1430,7 +1480,6 @@ async function deleteStage(id, e) { e.stopPropagation(); if (!confirm("破壊し
 async function pinStage(id, e) { e.stopPropagation(); try { await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
 async function confiscateStage(id, e) { e.stopPropagation(); if (!confirm("接収しますか？")) return; try { await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
 
-// URLパラメータ(stage_id)とlocalStorageオートセーブからのロード
 window.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const stageId = params.get('stage_id');
@@ -1441,9 +1490,18 @@ window.addEventListener('DOMContentLoaded', () => {
         if (saved) {
             try {
                 const d = JSON.parse(saved);
-                mapData = d.map || d;
-                warpPairs = d.warps || [];
-            } catch(e) {}
+                const loadedMap = d.map || d;
+                if (loadedMap && loadedMap.length > 0 && loadedMap[0] && loadedMap[0].length > 0) {
+                    mapData = loadedMap;
+                    warpPairs = d.warps || [];
+                } else {
+                    initMap();
+                }
+            } catch(e) {
+                initMap();
+            }
+        } else {
+            initMap();
         }
     }
 });
