@@ -8,7 +8,6 @@
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;900&family=Press+Start+2P&display=swap');
         :root { --bg-base: #0f121a; --bg-surface: #1e2430; --border-bold: #000000; --text-primary: #ffffff; --text-secondary: #8a99a8; --accent-gold: #ffd700; --accent-cyan: #00e5ff; --danger-color: #ff2a5f; --switch-off: #ff2a5f; --switch-on: #00e5ff; --btn-shadow: 0 4px 0 rgba(0,0,0,0.8); --safe-bottom: env(safe-area-inset-bottom, 0px); }
         
-        /* 画面全体の予期せぬスクロールを防止（UIのタッチは生かす） */
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-base); color: var(--text-primary); font-family: 'M PLUS Rounded 1c', sans-serif; overflow: hidden; width: 100vw; height: 100dvh; overscroll-behavior: none; }
         
@@ -46,10 +45,8 @@
         #toast-msg { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); background: rgba(255,42,95,0.95); color: #fff; border: 3px solid #000; padding: 8px 16px; border-radius: 20px; font-weight: 900; font-size: 0.9rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 140; box-shadow: 0 4px 0 #000; }
         #toast-msg.show { opacity: 1; }
         
-        /* キャンバス部分だけはスワイプ戻るなどブラウザアクションを完全ブロック */
-        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
         
-        /* チャットUI */
         #chat-log-container { position: absolute; bottom: 80px; left: 10px; width: 300px; max-height: 150px; overflow-y: hidden; z-index: 92; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
         .chat-line { background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #fff; font-weight: bold; text-shadow: 1px 1px 0 #000; animation: fadeOut 8s forwards; }
         .chat-line .c-name { color: var(--accent-cyan); margin-right: 4px; }
@@ -101,7 +98,6 @@
         <div class="hud-badge" id="hud-mp-status" style="display:none; background: rgba(255,71,87,0.8); color:#fff;">👥 接続: <span id="hud-mp-count">1</span>人</div>
     </div>
 
-    <!-- チャットログ -->
     <div id="chat-log-container"></div>
     <div id="chat-input-wrapper">
         <input type="text" id="chat-input" placeholder="Enterで送信..." maxlength="60" autocomplete="off">
@@ -136,7 +132,6 @@
         <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,229,255,0.3); border-color: #00e5ff;"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg></div>
     </div>
 
-    <!-- モーダル群 -->
     <div id="modal-io" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-io')">
         <div class="modal-box">
             <div class="modal-header">
@@ -149,6 +144,8 @@
                 <div style="text-align: center; margin: 10px 0; color: #aaa; font-weight: bold;">または</div>
                 <input type="file" id="file-upload" accept=".mrm1" style="display: none;" onchange="importDataMRM1(event)">
                 <button class="btn-retro btn-gold" style="justify-content:center; padding: 12px;" onclick="document.getElementById('file-upload').click()">⬆️ .mrm1ファイルをアップロード</button>
+                <div style="text-align: center; margin: 10px 0; color: #aaa; font-weight: bold;">データリセット</div>
+                <button class="btn-retro btn-fire" style="justify-content:center; padding: 12px;" onclick="if(confirm('ステージをすべて初期化しますか？')) { localStorage.removeItem('maker_autosave_map'); initMap(); setMode('edit'); closeModal('modal-io'); focusCameraOnStart(); }">🗑️ 全て消去して初期化</button>
             </div>
         </div>
     </div>
@@ -177,9 +174,6 @@
     </div>
 
 <script>
-// ==========================================
-// ユーティリティ・安全装置
-// ==========================================
 function escapeHtml(str) { return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; }
 function showToast(text) {
     const t = document.getElementById('toast-msg'); 
@@ -199,7 +193,6 @@ const COLOR_SW_ON = '#00e5ff';
 const COLOR_SW_OFF = '#ff2a5f';
 const W_COLORS = ['#9b59b6', '#3498db', '#1abc9c', '#e67e22', '#e74c3c', '#f1c40f', '#34495e'];
 
-// 破損したマップデータでも絶対にエラーを出さない正規化関数
 function normalizeMap(m) {
     let res = Array.from({length: MAP_ROWS}, () => new Array(MAP_COLS).fill(0));
     if (m && Array.isArray(m)) {
@@ -262,7 +255,7 @@ const paletteItems = [
     { id: T.DOUBLE_JUMP, cat: 'item', color: '#a29bfe', label: '2段J羽', icon: '<path d="M4 12c4-8 12-8 16 0M4 18c4-8 12-8 16 0" stroke-width="2"/>' },
     { id: T.DASH_SHOES, cat: 'item', color: '#ff7675', label: 'ダッシュ靴', icon: '<path d="M4 16h16v4H4zM16 10l4 6H4l4-6z" fill="currentColor" stroke="none"/>' },
     { id: T.SPIKE_UP, cat: 'danger', color: '#ff2a5f', label: '上針', icon: '<polygon points="12 2 2 22 22 22"/>' },
-    { id: T.SPIKE_DOWN, cat: 'danger', color: '#ff2a5f', label: '下針', icon: '<polygon points="12 22 2 2 22 2"/>' },
+    { id: T.SPIKE_DOWN, cat: 'danger', color: '#ff2a5f', label: '下針', icon: '<polygon points="12 22 2 2 2 2 22 2"/>' },
     { id: T.SPIKE_LEFT, cat: 'danger', color: '#ff2a5f', label: '左針', icon: '<polygon points="2 12 22 2 22 22"/>' },
     { id: T.SPIKE_RIGHT, cat: 'danger', color: '#ff2a5f', label: '右針', icon: '<polygon points="22 12 2 2 2 22"/>' },
     { id: T.SPIKE_TOGGLE, cat: 'danger', color: '#ff2a5f', label: '周期針', icon: '<polygon points="12 2 2 22 22 22" stroke-dasharray="2 2"/>' },
@@ -324,9 +317,17 @@ let socket = null;
 let otherPlayers = {};
 let syncInterval = null;
 
-// ==========================================
-// マルチプレイ・チャット同期
-// ==========================================
+// 追加・修正: 欠落していたパーティクル生成関数
+function createParticles(x, y, color, count = 10) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+            life: 1.0, color: color
+        });
+    }
+}
+
 function joinDailyLobby() {
     fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } })
     .then(r => { if (!r.ok) throw new Error("ロビーが見つかりません。"); return r.json(); })
@@ -435,9 +436,6 @@ function toggleChatMobile() {
     else { chatWrapper.classList.add('show'); chatInput.focus(); }
 }
 
-// ==========================================
-// 初期化・リサイズ・カメラ制御
-// ==========================================
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
     for (let c = 0; c < MAP_COLS; c++) { 
@@ -462,6 +460,12 @@ function focusCameraOnStart() {
         }
         if (found) break;
     }
+    // 修正: スタートが見つからない場合は地面が見える位置に設定
+    if (!found) {
+        camera.x = 0;
+        camera.y = Math.max(0, MAP_ROWS * TILE_SIZE - vH);
+    }
+    
     if (isNaN(camera.x) || !isFinite(camera.x)) camera.x = 0;
     if (isNaN(camera.y) || !isFinite(camera.y)) camera.y = 0;
     
@@ -479,6 +483,7 @@ function setPalCat(cat, btn) {
         </div>
     `).join('');
 }
+
 function selectBrush(id) { currentBrush = id; document.querySelectorAll('.palette-item').forEach(el => el.classList.toggle('selected', parseInt(el.dataset.id) === id)); }
 function togglePalette() { document.getElementById('palette-wrap').classList.toggle('collapsed'); }
 function adjustZoom(delta) { zoomScale = Math.min(Math.max(0.5, zoomScale + delta), 1.8); document.getElementById('zoom-text').innerText = Math.round(zoomScale * 100) + '%'; resize(); }
@@ -518,7 +523,6 @@ function setMode(newMode) {
 
 function startPlay() {
     activeMapData = normalizeMap(JSON.parse(savedMapDataStr));
-
     enemies = []; beamEmitters = []; projectiles = []; particles = []; trails = []; crosses = []; lifts = []; leverStates = {}; crumbleBlocks = {};
     
     player = { 
@@ -621,9 +625,6 @@ function win() {
     setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
 }
 
-// ==========================================
-// 入力イベント（完全復旧版）
-// ==========================================
 window.addEventListener('keydown', e => {
     if (mode !== 'play' || isChatFocused()) return;
     if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
@@ -662,6 +663,9 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     const wy = (clientY - rect.top)  / zoomScale + camera.y;
     const col = Math.floor(wx / TILE_SIZE); const row = Math.floor(wy / TILE_SIZE);
     
+    // 修正: PANツールが選択されている場合はブロックを置かない
+    if (mode === 'edit' && currentBrush === T.PAN) return;
+
     if (mode === 'play') {
         if ((player.hasSpider || player.hasNewSpider) && !isRightClick && player.boostTimer === 0) {
             let bestDist = Infinity; let target = null;
@@ -697,11 +701,39 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     }
 }
 
-// Canvas操作イベント (Canvas上のみブラウザアクションをブロック)
-canvas.addEventListener('mousedown', e => { if (e.button === 0) input.isDown = true; if (e.button === 2) input.rightDown = true; handleInputCoords(e.clientX, e.clientY, e.button === 2); });
+canvas.addEventListener('mousedown', e => { 
+    if (e.button === 0) input.isDown = true; 
+    if (e.button === 2) input.rightDown = true; 
+    if (mode === 'play' || (mode === 'edit' && currentBrush !== T.PAN && e.button !== 1)) {
+        handleInputCoords(e.clientX, e.clientY, e.button === 2); 
+    }
+});
 window.addEventListener('mouseup', () => { input.isDown = false; input.rightDown = false; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
-canvas.addEventListener('mousemove', e => { if (mode === 'edit' && input.rightDown && currentBrush === T.PAN) { camera.x -= e.movementX / zoomScale; camera.y -= e.movementY / zoomScale; if(isNaN(camera.x)) camera.x=0; if(isNaN(camera.y)) camera.y=0; } else if (mode === 'edit' && input.isDown && currentBrush !== T.PAN) handleInputCoords(e.clientX, e.clientY, false); });
+
+// 修正: マウス移動でのパン（視点移動）処理の完全化
+canvas.addEventListener('mousemove', e => { 
+    if (mode === 'edit') {
+        // 右ドラッグ または (左ドラッグかつPAN選択時) または 中ボタンドラッグ で視点移動
+        if (input.rightDown || (input.isDown && currentBrush === T.PAN) || e.buttons === 4) { 
+            camera.x -= e.movementX / zoomScale; 
+            camera.y -= e.movementY / zoomScale; 
+            if(isNaN(camera.x)) camera.x=0; 
+            if(isNaN(camera.y)) camera.y=0; 
+            return;
+        } else if (input.isDown && currentBrush !== T.PAN) {
+            handleInputCoords(e.clientX, e.clientY, false); 
+        }
+    }
+});
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ズーム（マウスホイール対応）
+canvas.addEventListener('wheel', e => {
+    if (mode === 'edit') {
+        e.preventDefault();
+        adjustZoom(e.deltaY > 0 ? -0.10 : 0.10);
+    }
+}, {passive: false});
 
 const bindBtn = (id, k) => { 
     const b = document.getElementById(id); if(!b) return;
@@ -724,9 +756,6 @@ canvas.addEventListener('touchend', e => {
     input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } 
 }, { passive: false });
 
-/* =========================================================
-   物理演算
-========================================================= */
 function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.HIDDEN_BLOCK, T.ICE_BLOCK, T.CRUMBLE_BLOCK].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
 function rectIntersect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
 function getSpikeBox(r, c, t) { const bx = c * TILE_SIZE, by = r * TILE_SIZE, ts = TILE_SIZE; if (t === T.SPIKE_UP || t === T.SPIKE_TOGGLE) return { x: bx + 6, y: by + 24, w: 28, h: 16 }; if (t === T.SPIKE_DOWN) return { x: bx + 6, y: by, w: 28, h: 16 }; if (t === T.SPIKE_LEFT) return { x: bx + 24, y: by + 6, w: 16, h: 28 }; if (t === T.SPIKE_RIGHT) return { x: bx, y: by + 6, w: 16, h: 28 }; return { x: bx, y: by, w: ts, h: ts }; }
@@ -886,9 +915,6 @@ function checkColl(isX) {
     }
 }
 
-/* =========================================================
-   描画
-========================================================= */
 function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
 function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
@@ -973,7 +999,8 @@ function draw() {
     ctx.translate(-Math.round(camera.x - sx), -Math.round(camera.y - sy));
     
     if (mode === 'edit') {
-        ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1; ctx.beginPath();
+        // 修正: グリッド線を少し明るくして視認性を改善
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath();
         let sC = Math.max(0, Math.floor(camera.x / 40)), eC = Math.min(MAP_COLS, Math.ceil((camera.x + vW) / 40)), sR = Math.max(0, Math.floor(camera.y / 40)), eR = Math.min(MAP_ROWS, Math.ceil((camera.y + vH) / 40));
         for (let c = sC; c <= eC; c++) { ctx.moveTo(c * 40, sR * 40); ctx.lineTo(c * 40, eR * 40); }
         for (let r = sR; r <= eR; r++) { ctx.moveTo(sC * 40, r * 40); ctx.lineTo(eC * 40, r * 40); }
@@ -1020,9 +1047,6 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
-/* =========================================================
-   API通信・保存
-========================================================= */
 const token = localStorage.getItem("access_token");
 function openModal(id) { document.getElementById(id).style.display = 'flex'; } 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -1069,10 +1093,7 @@ async function loadStage(id) {
     } catch (e) { alert("通信エラー"); } 
 }
 
-async function deleteStage(id, e) { e.stopPropagation(); if (!confirm("破壊しますか？")) return; try { await fetch(`/api/maker/stages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
-async function pinStage(id, e) { e.stopPropagation(); try { await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
-async function confiscateStage(id, e) { e.stopPropagation(); if (!confirm("接収しますか？")) return; try { await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
-
+// 修正: セーブデータが完全に空だったり壊れている場合の安全装置を追加
 window.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const stageId = params.get('stage_id');
@@ -1083,7 +1104,8 @@ window.addEventListener('DOMContentLoaded', () => {
         if (saved) {
             try {
                 const d = JSON.parse(saved); const loadedMap = d.map || d;
-                if(loadedMap && loadedMap.length > 0) {
+                const hasAnyBlock = Array.isArray(loadedMap) && loadedMap.some(row => Array.isArray(row) && row.some(cell => cell !== 0 && cell !== T.PAN));
+                if(hasAnyBlock) {
                     mapData = normalizeMap(loadedMap); warpPairs = d.warps || [];
                 } else { initMap(); }
             } catch(e) { initMap(); }
