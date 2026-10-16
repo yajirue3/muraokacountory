@@ -1485,3 +1485,151 @@ async def admin_confiscate_stage(stage_id: int, authorization: str = Header(None
     }).execute()
 
     return {"message": "この迷宮の著作権および所有権を国庫へ強制接収しました。"}
+
+# ==================================================
+# 🌐 日替わりリアルタイム並走ロビー（WebSocket）
+# ==================================================
+import datetime
+import hashlib
+from fastapi import WebSocket, WebSocketDisconnect
+
+# 1. 接続中クライアントのコネクション管理
+class DailyLobbyManager:
+    def __init__(self):
+        # user_id -> WebSocket
+        self.active_connections: dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def broadcast(self, sender_id: str, message: dict):
+        # 送信者以外の全プレイヤーにデータを中継
+        disconnected = []
+        for uid, ws in self.active_connections.items():
+            if uid != sender_id:
+                try:
+                    await ws.send_json(message)
+                except Exception:
+                    disconnected.append(uid)
+        for uid in disconnected:
+            self.disconnect(uid)
+
+    async def broadcast_all(self, message: dict):
+        # 全員に一斉送信（参加・退出通知など）
+        disconnected = []
+        for uid, ws in self.active_connections.items():
+            try:
+                await ws.send_json(message)
+            except Exception:
+                disconnected.append(uid)
+        for uid in disconnected:
+            self.disconnect(uid)
+
+lobby_manager = DailyLobbyManager()
+
+
+# 2. 本日の日替わりステージ取得 API
+@app.get("/api/maker/daily")
+async def get_daily_stage(authorization: str = Header(None)):
+    await get_user_from_token(authorization)
+    client = await get_supabase()
+
+    # 公開済みステージを全件取得（接収されていても可、ID順）
+    res = await client.table("maker_stages").select(
+        "id, title, description, creator_name, map_data"
+    ).order("id", desc=False).execute()
+
+    stages = res.data or []
+    if not stages:
+        raise HTTPException(status_code=404, detail="日替わりロビー用のステージがまだ1つもありません。")
+
+    # 今日の日付（YYYY-MM-DD）からハッシュ値を生成し、毎日決まった1ステージを選出
+    today_str = datetime.date.today().isoformat()
+    hash_val = int(hashlib.md5(today_str.encode()).hexdigest(), 16)
+    selected_stage = stages[hash_val % len(stages)]
+
+    return {
+        "date": today_str,
+        "stage": selected_stage
+    }
+
+
+# 3. 日替わりロビー WebSocket エンドポイント（脱落なし・フリー並走）
+@app.websocket("/ws/maker/daily")
+async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = None):
+    # クエリパラメータ ?token=... から認証
+    try:
+        user = await get_user_from_token(f"Bearer {token}" if token else None)
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    client = await get_supabase()
+    user_is_king = await is_king(user.id)
+    prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
+    nickname = "村岡国王" if user_is_king else (prof.data[0]["nickname"] if prof.data else "名無しの労働者")
+
+    user_id = str(user.id)
+    await lobby_manager.connect(user_id, websocket)
+
+    # 全員に参加通知と現在人数を共有
+    await lobby_manager.broadcast_all({
+        "type": "player_join",
+        "id": user_id,
+        "name": nickname,
+        "is_king": user_is_king,
+        "total_players": len(lobby_manager.active_connections)
+    })
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+
+            # 座標・向き・クモ糸同期（そのまま他プレイヤーに転送）
+            if msg_type == "pos":
+                await lobby_manager.broadcast(user_id, {
+                    "type": "pos",
+                    "id": user_id,
+                    "x": data.get("x"),
+                    "y": data.get("y"),
+                    "vx": data.get("vx"),
+                    "vy": data.get("vy"),
+                    "faceDir": data.get("faceDir"),
+                    "gravityDir": data.get("gravityDir", 1),
+                    "hook": data.get("hook"),
+                    "isSpider": data.get("isSpider", false)
+                })
+
+            # リスポーン・死亡エフェクト（脱落なし：その場所で花火/煙を散らすだけ）
+            elif msg_type == "respawn":
+                await lobby_manager.broadcast(user_id, {
+                    "type": "respawn",
+                    "id": user_id,
+                    "x": data.get("x"),
+                    "y": data.get("y")
+                })
+
+            # ゴール報告
+            elif msg_type == "clear":
+                await lobby_manager.broadcast_all({
+                    "type": "clear",
+                    "id": user_id,
+                    "name": nickname,
+                    "time": data.get("time")
+                })
+
+    except WebSocketDisconnect:
+        lobby_manager.disconnect(user_id)
+        # 退出通知
+        await lobby_manager.broadcast_all({
+            "type": "player_leave",
+            "id": user_id,
+            "name": nickname,
+            "total_players": len(lobby_manager.active_connections)
+        })
