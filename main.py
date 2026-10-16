@@ -1486,6 +1486,7 @@ async def admin_confiscate_stage(stage_id: int, authorization: str = Header(None
 
     return {"message": "この迷宮の著作権および所有権を国庫へ強制接収しました。"}
 
+
 # ==================================================
 # 🌐 日替わりリアルタイム並走ロビー（WebSocket）
 # ==================================================
@@ -1510,7 +1511,7 @@ class DailyLobbyManager:
     async def broadcast(self, sender_id: str, message: dict):
         # 送信者以外の全プレイヤーにデータを中継
         disconnected = []
-        for uid, ws in self.active_connections.items():
+        for uid, ws in list(self.active_connections.items()):
             if uid != sender_id:
                 try:
                     await ws.send_json(message)
@@ -1522,7 +1523,7 @@ class DailyLobbyManager:
     async def broadcast_all(self, message: dict):
         # 全員に一斉送信（参加・退出通知など）
         disconnected = []
-        for uid, ws in self.active_connections.items():
+        for uid, ws in list(self.active_connections.items()):
             try:
                 await ws.send_json(message)
             except Exception:
@@ -1603,7 +1604,7 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
                     "faceDir": data.get("faceDir"),
                     "gravityDir": data.get("gravityDir", 1),
                     "hook": data.get("hook"),
-                    "isSpider": data.get("isSpider", false)
+                    "isSpider": data.get("isSpider", False)
                 })
 
             # リスポーン・死亡エフェクト（脱落なし：その場所で花火/煙を散らすだけ）
@@ -1614,6 +1615,18 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
                     "x": data.get("x"),
                     "y": data.get("y")
                 })
+
+            # チャットメッセージの中継
+            elif msg_type == "chat":
+                chat_text = str(data.get("text", "")).strip()[:60]  # 最大60文字制限
+                if chat_text:
+                    await lobby_manager.broadcast_all({
+                        "type": "chat",
+                        "id": user_id,
+                        "name": nickname,
+                        "is_king": user_is_king,
+                        "text": chat_text
+                    })
 
             # ゴール報告
             elif msg_type == "clear":
@@ -1633,15 +1646,3 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
             "name": nickname,
             "total_players": len(lobby_manager.active_connections)
         })
-
-            # チャットメッセージの中継
-            elif msg_type == "chat":
-                chat_text = str(data.get("text", "")).strip()[:60]  # 最大60文字制限
-                if chat_text:
-                    await lobby_manager.broadcast_all({
-                        "type": "chat",
-                        "id": user_id,
-                        "name": nickname,
-                        "is_king": user_is_king,
-                        "text": chat_text
-                    })
