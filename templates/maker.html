@@ -91,7 +91,7 @@
         </div>
         <div style="display: flex; gap: 6px;">
             <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わりロビー</span></button>
-            <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+            <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span class="hide-sm">I/O</span></button>
             <button class="btn-retro btn-cyan" onclick="openLoadModal()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><span class="hide-sm">探す</span></button>
             <button class="btn-retro btn-gold" onclick="openSaveModal()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg><span class="hide-sm">公開</span></button>
         </div>
@@ -455,6 +455,7 @@ window.addEventListener('keydown', (e) => {
         }
     }
 });
+
 function toggleChatMobile() {
     if (chatWrapper.classList.contains('show')) {
         chatWrapper.classList.remove('show');
@@ -535,12 +536,6 @@ function resize() {
         camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, camera.y));
     }
 }
-
-window.addEventListener('resize', resize);
-initMap(); 
-setPalCat('all', document.querySelector('.pal-tab.active')); 
-resize(); 
-focusCameraOnStart();
 
 function setMode(newMode) {
     mode = newMode;
@@ -723,7 +718,7 @@ function win() {
         return;
     }
     
-    if (currentStageInfo.id) {
+    if (currentStageInfo.id && !currentStageInfo.isDaily) {
         fetch(`/api/maker/stages/${currentStageInfo.id}/clear`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } }).catch(() => {});
     }
     setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
@@ -1434,6 +1429,30 @@ async function loadStage(id) {
 async function deleteStage(id, e) { e.stopPropagation(); if (!confirm("破壊しますか？")) return; try { await fetch(`/api/maker/stages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
 async function pinStage(id, e) { e.stopPropagation(); try { await fetch(`/api/admin/maker/stages/${id}/pin`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
 async function confiscateStage(id, e) { e.stopPropagation(); if (!confirm("接収しますか？")) return; try { await fetch(`/api/admin/maker/stages/${id}/confiscate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }); openLoadModal(); } catch (err) {} }
+
+// URLパラメータ(stage_id)とlocalStorageオートセーブからのロード
+window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const stageId = params.get('stage_id');
+    if (stageId) {
+        loadStage(stageId);
+    } else {
+        const saved = localStorage.getItem('maker_autosave_map');
+        if (saved) {
+            try {
+                const d = JSON.parse(saved);
+                mapData = d.map || d;
+                warpPairs = d.warps || [];
+            } catch(e) {}
+        }
+    }
+});
+
+setInterval(() => {
+    if (mode === 'edit') {
+        localStorage.setItem('maker_autosave_map', JSON.stringify({ map: mapData, warps: warpPairs }));
+    }
+}, 3000);
 </script>
 </body>
 </html>
