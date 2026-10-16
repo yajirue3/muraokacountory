@@ -10,19 +10,24 @@
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-base); color: var(--text-primary); font-family: 'M PLUS Rounded 1c', sans-serif; overflow: hidden; width: 100vw; height: 100dvh; }
         .pixel-text { font-family: 'Press Start 2P', monospace; text-transform: uppercase; }
+        
         #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 56px; background: rgba(15, 18, 26, 0.9); backdrop-filter: blur(10px); border-bottom: 3px solid var(--border-bold); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 100; gap: 6px; }
         .btn-retro { background: var(--bg-surface); border: 3px solid #000; color: var(--text-primary); padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 900; border-radius: 8px; box-shadow: var(--btn-shadow); transition: transform 0.1s, box-shadow 0.1s; white-space: nowrap; }
         .btn-retro:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0); }
         .btn-retro svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-        .btn-cyan { background: var(--accent-cyan); color: #000; } .btn-gold { background: var(--accent-gold); color: #000; }
+        .btn-cyan { background: var(--accent-cyan); color: #000; } .btn-gold { background: var(--accent-gold); color: #000; } .btn-fire { background: #ff4757; color: #fff; }
+        
         .mode-toggle { display: flex; background: #000; border: 3px solid #000; border-radius: 10px; overflow: hidden; box-shadow: var(--btn-shadow); }
         .mode-toggle button { background: #1a1e29; border: none; color: #fff; padding: 6px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 900; font-size: 0.8rem; }
         .mode-toggle button svg { width: 16px; height: 16px; fill: currentColor; } .mode-toggle button.active { background: var(--accent-cyan); color: #000; }
+        
         .zoom-controls { display: flex; align-items: center; background: #000; border-radius: 8px; border: 2px solid #000; }
         .zoom-btn { background: var(--bg-surface); color: #fff; border: none; padding: 4px 8px; font-weight: 900; cursor: pointer; } .zoom-btn:active { background: var(--accent-gold); color: #000; } .zoom-val { font-size: 0.75rem; padding: 0 8px; color: var(--accent-gold); font-weight: 900; }
+        
         #hud { position: absolute; top: 66px; left: 10px; z-index: 90; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; max-width: 90vw; }
         .hud-badge { background: rgba(0,0,0,0.8); border: 2.5px solid #000; border-radius: 8px; padding: 4px 10px; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 900; }
-        .hud-badge svg { width: 16px; height: 16px; } .course-tag { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 900; } .tag-my { background: var(--accent-gold); color: #000; } .tag-other { background: var(--accent-cyan); color: #000; }
+        .hud-badge svg { width: 16px; height: 16px; } .course-tag { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 900; } .tag-my { background: var(--accent-gold); color: #000; } .tag-other { background: var(--accent-cyan); color: #000; } .tag-lobby { background: #ff4757; color: #fff; }
+        
         #palette-wrap { position: absolute; bottom: calc(var(--safe-bottom) + 10px); left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; transition: transform 0.3s cubic-bezier(0.2,1,0.3,1); }
         #palette-wrap.collapsed { transform: translate(-50%, calc(100% - 28px)); }
         #palette-toggle { background: #000; color: #fff; border: 2px solid #fff; border-bottom: none; border-radius: 12px 12px 0 0; padding: 4px 24px; font-size: 0.75rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -34,15 +39,29 @@
         .palette-item { min-width: 44px; height: 44px; background: #111; border: 2.5px solid #000; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; flex-shrink: 0; box-shadow: 0 3px 0 #000; transition: transform 0.1s; }
         .palette-item:active { transform: translateY(3px); box-shadow: none; } .palette-item.selected { background: var(--accent-gold) !important; color: #000 !important; }
         .palette-item svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; } .palette-label { font-size: 0.5rem; font-weight: 900; margin-top: 2px; }
+        
         #mobile-controls { position: absolute; bottom: calc(var(--safe-bottom) + 20px); left: 0; width: 100%; display: none; justify-content: space-between; padding: 0 20px; z-index: 95; pointer-events: none; }
         .ctrl-group { display: flex; gap: 12px; pointer-events: auto; }
         .ctrl-btn { width: 65px; height: 65px; background: rgba(0,0,0,0.5); border: 3px solid rgba(255,255,255,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; pointer-events: auto; backdrop-filter: blur(4px); box-shadow: 0 4px 0 rgba(0,0,0,0.5); }
         .ctrl-btn svg { width: 32px; height: 32px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .ctrl-btn:active { background: var(--accent-cyan); color: #000; border-color: #000; transform: translateY(4px); box-shadow: none; }
+        
         #center-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 5px solid var(--accent-gold); border-radius: 16px; padding: 16px 32px; text-align: center; color: var(--accent-gold); font-size: 2rem; font-weight: 900; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 150; box-shadow: 0 10px 0 #000; white-space: nowrap; }
         #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(-3deg); }
         #toast-msg { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); background: rgba(255,42,95,0.95); color: #fff; border: 3px solid #000; padding: 8px 16px; border-radius: 20px; font-weight: 900; font-size: 0.9rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 140; box-shadow: 0 4px 0 #000; }
         #toast-msg.show { opacity: 1; }
         #gameCanvas { display: block; width: 100vw; height: 100vh; }
+        
+        /* チャット関連UI */
+        #chat-log-container { position: absolute; bottom: 80px; left: 10px; width: 300px; max-height: 150px; overflow-y: hidden; z-index: 92; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+        .chat-line { background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #fff; font-weight: bold; text-shadow: 1px 1px 0 #000; animation: fadeOut 8s forwards; }
+        .chat-line .c-name { color: var(--accent-cyan); margin-right: 4px; }
+        @keyframes fadeOut { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+        
+        #chat-input-wrapper { display: none; position: absolute; bottom: 20px; left: 10px; z-index: 98; align-items: center; gap: 6px; width: calc(100% - 20px); max-width: 400px; }
+        #chat-input-wrapper.show { display: flex; }
+        #chat-input { flex: 1; background: rgba(15,18,26,0.9); border: 3px solid var(--accent-cyan); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 1rem; font-weight: bold; outline: none; box-shadow: 0 4px 0 #000; pointer-events: auto; }
+        
+        /* モーダル群 */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px; backdrop-filter: blur(4px); }
         .modal-box { background: var(--bg-surface); border: 4px solid #000; border-radius: 16px; width: 100%; max-width: 550px; padding: 20px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 10px 0 #000; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px dashed var(--border-bold); padding-bottom: 10px; margin-bottom: 16px; }
@@ -55,6 +74,7 @@
         .stage-card:active { transform: translateY(3px); box-shadow: none; } .st-title { font-weight: 900; color: var(--accent-gold); font-size: 1.05rem; } .st-author { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; } .st-stats { font-size: 0.8rem; color: var(--accent-cyan); font-weight: bold; margin-top: 4px; }
         .flex-btns { display: flex; gap: 8px; margin-top: 10px; }
         #screen-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 200; transition: opacity 0.1s; }
+        
         @media (max-width: 650px) { .hide-sm { display: none; } .btn-retro { padding: 6px 8px; } #top-bar { padding: 6px 8px; } #hud { top: 62px; } }
     </style>
 </head>
@@ -70,7 +90,9 @@
             <button class="zoom-btn" onclick="adjustZoom(-0.15)">－</button><span class="zoom-val" id="zoom-text">100%</span><button class="zoom-btn" onclick="adjustZoom(0.15)">＋</button>
         </div>
         <div style="display: flex; gap: 6px;">
-            <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span class="hide-sm">I/O</span></button>
+            <!-- マルチプレイ・日替わりロビー参加ボタン -->
+            <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わりロビー</span></button>
+            <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
             <button class="btn-retro btn-cyan" onclick="openLoadModal()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><span class="hide-sm">探す</span></button>
             <button class="btn-retro btn-gold" onclick="openSaveModal()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg><span class="hide-sm">公開</span></button>
         </div>
@@ -82,6 +104,14 @@
         <div class="hud-badge" id="hud-switch-status" style="display:none; color: var(--accent-cyan);"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg><span id="hud-sw-text">回路: OFF</span></div>
         <div class="hud-badge" id="hud-star-status" style="display:none; color: var(--accent-gold); border-color: var(--accent-gold);"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.2,8.5 22.2,9.5 17.1,14.5 18.3,21.5 12,18.2 5.7,21.5 6.9,14.5 1.8,9.5 8.8,8.5"/></svg><span id="hud-star-text">0.0s</span></div>
         <div class="hud-badge" id="hud-course-info"><span id="hud-course-tag" class="course-tag tag-my">MY COURSE</span><span id="hud-course-title">新規作成コース</span></div>
+        <div class="hud-badge" id="hud-mp-status" style="display:none; background: rgba(255,71,87,0.8); color:#fff;">👥 接続: <span id="hud-mp-count">1</span>人</div>
+    </div>
+
+    <!-- チャットログ表示エリア -->
+    <div id="chat-log-container"></div>
+    <!-- チャット入力枠 -->
+    <div id="chat-input-wrapper">
+        <input type="text" id="chat-input" placeholder="Enterでチャット送信..." maxlength="60" autocomplete="off">
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -109,10 +139,11 @@
             <div class="ctrl-btn" id="btn-left"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg></div>
             <div class="ctrl-btn" id="btn-right"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
         </div>
+        <div class="ctrl-btn" id="btn-chat" onclick="toggleChatMobile()" style="background: rgba(255,255,255,0.3); border-color: #fff;"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
         <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,229,255,0.3); border-color: #00e5ff;"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg></div>
     </div>
 
-    <!-- モーダル群 -->
+    <!-- モーダル群 (I/O, 公開, ロード) -->
     <div id="modal-io" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-io')">
         <div class="modal-box">
             <div class="modal-header">
@@ -166,7 +197,7 @@ const COLOR_SW_ON = '#00e5ff';
 const COLOR_SW_OFF = '#ff2a5f';
 const W_COLORS = ['#9b59b6', '#3498db', '#1abc9c', '#e67e22', '#e74c3c', '#f1c40f', '#34495e'];
 
-// タイルID定義 (新要素追加)
+// タイルID定義
 const T = {
     EMPTY: 0, BLOCK: 1, SPIKE_UP: 2, COIN: 3, GOAL: 4, KEY: 5, DOOR: 6, BOUNCER: 7, 
     ENEMY: 8, START: 9, BRICK: 10, SPIKE_DOWN: 11, SPIKE_LEFT: 12, SPIKE_RIGHT: 13,
@@ -177,17 +208,16 @@ const T = {
     CROSS: 28, BOOST_R: 29, BOOST_L: 30,
     HIDDEN_BLOCK: 31, LEVER: 32, ENEMY_H: 33, ENEMY_V: 34, BOOST_U: 35, LIFT_H: 36, LIFT_V: 37,
     STAR: 38, SPIDER: 39, ENEMY_SNIPER: 40, ENEMY_GOLGO: 41,
-    // 新要素
     SPIDER_NEW: 42, SPIKE_TOGGLE: 43, CONVEYOR_R: 44, CONVEYOR_L: 45, ICE_BLOCK: 46, CRUMBLE_BLOCK: 47,
     TOGGLE_DOOR: 48, GRAVITY_PANEL: 49, BEAM_HOMING: 50, DOUBLE_JUMP: 51, DASH_SHOES: 52, ENEMY_SHELL: 53, ENEMY_GHOST: 54
 };
 
-// パレット登録 (適切なカテゴリ分けとSVGアイコン)[span_0](start_span)[span_0](end_span)
+// パレット登録
 const paletteItems = [
     { id: T.PAN, cat: 'all', color: '#fff', label: '移動', icon: '<path d="M9 11V4a2 2 0 0 1 4 0v7M13 11V7a2 2 0 0 1 4 0v4M17 11v-1a2 2 0 0 1 4 0v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V9a2 2 0 0 1 4 0v2"/>' },
     { id: T.EMPTY, cat: 'terrain', color: '#ff2a5f', label: '消しゴム', icon: '<path d="M18 6L6 18M6 6l12 12"/>' },
     
-    // ---------------- 地形 ----------------
+    // 地形
     { id: T.BLOCK, cat: 'terrain', color: '#aaa', label: 'ブロック', icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="8" y1="9" x2="8" y2="15"/><line x1="16" y1="9" x2="16" y2="15"/>' },
     { id: T.BRICK, cat: 'terrain', color: '#e67e22', label: '壊れる', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v9M8 12v9M16 12v9"/>' },
     { id: T.ICE_BLOCK, cat: 'terrain', color: '#a0e6ff', label: '氷床', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M6 18L18 6" stroke="#fff"/>' },
@@ -200,7 +230,7 @@ const paletteItems = [
     { id: T.ONEWAY_LEFT, cat: 'terrain', color: '#2ecc71', label: '一方(左)', icon: '<rect x="15" y="3" width="6" height="18" rx="2"/><path d="M15 12H5M9 8l-4 4 4 4"/>' },
     { id: T.ONEWAY_RIGHT, cat: 'terrain', color: '#2ecc71', label: '一方(右)', icon: '<rect x="3" y="3" width="6" height="18" rx="2"/><path d="M9 12h10M15 8l4 4-4 4"/>' },
 
-    // ---------------- 仕掛 ----------------
+    // 仕掛
     { id: T.SWITCH, cat: 'gimmick', color: '#00e5ff', label: '感圧板', icon: '<rect x="4" y="14" width="16" height="6" rx="2"/><circle cx="12" cy="14" r="3" fill="currentColor"/>' },
     { id: T.LEVER, cat: 'gimmick', color: '#f39c12', label: 'レバー', icon: '<rect x="6" y="18" width="12" height="4"/><line x1="12" y1="18" x2="8" y2="6"/><circle cx="8" cy="6" r="3" fill="currentColor"/>' },
     { id: T.SW_BLOCK_A, cat: 'gimmick', color: '#ff2a5f', label: '赤(消)', icon: '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="2 2"/>' },
@@ -216,14 +246,14 @@ const paletteItems = [
     { id: T.LIFT_H, cat: 'gimmick', color: '#3498db', label: 'リフト横', icon: '<rect x="4" y="10" width="16" height="4"/><path d="M2 12l4-4v8zM22 12l-4-4v8z" fill="currentColor"/>' },
     { id: T.LIFT_V, cat: 'gimmick', color: '#3498db', label: 'リフト縦', icon: '<rect x="10" y="4" width="4" height="16"/><path d="M12 2l-4 4h8zM12 22l-4-4h8z" fill="currentColor"/>' },
 
-    // ---------------- アイテム・強化 ----------------
+    // アイテム・強化
     { id: T.STAR, cat: 'item', color: '#ffd700', label: 'スター', icon: '<polygon points="12,2 15.2,8.5 22.2,9.5 17.1,14.5 18.3,21.5 12,18.2 5.7,21.5 6.9,14.5 1.8,9.5 8.8,8.5" fill="#ffd700" stroke="#000" stroke-width="2"/><line x1="10" y1="10" x2="10" y2="13" stroke="#000" stroke-width="2"/><line x1="14" y1="10" x2="14" y2="13" stroke="#000" stroke-width="2"/>' },
     { id: T.SPIDER, cat: 'item', color: '#ff1744', label: '旧クモ糸', icon: '<path d="M5 4l3 5M3 10l5 1M3 16l5-1M5 21l3-4M19 4l-3 5M21 10l-5 1M21 16l-5-1M19 21l-3-4" stroke="#ff1744" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="14" r="5" fill="#111" stroke="#ff1744" stroke-width="1.8"/><circle cx="12" cy="7" r="3" fill="#111" stroke="#ff1744" stroke-width="1.8"/><polygon points="12,11 10,13 12,17 14,13" fill="#ff1744"/>' },
     { id: T.SPIDER_NEW, cat: 'item', color: '#00e5ff', label: '新クモ糸', icon: '<path d="M5 4l3 5M3 10l5 1M3 16l5-1M5 21l3-4M19 4l-3 5M21 10l-5 1M21 16l-5-1M19 21l-3-4" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="14" r="5" fill="#111" stroke="#00e5ff" stroke-width="1.8"/><circle cx="12" cy="7" r="3" fill="#111" stroke="#00e5ff" stroke-width="1.8"/><polygon points="12,11 10,13 12,17 14,13" fill="#00e5ff"/>' },
     { id: T.DOUBLE_JUMP, cat: 'item', color: '#a29bfe', label: '2段J羽', icon: '<path d="M4 12c4-8 12-8 16 0M4 18c4-8 12-8 16 0" stroke-width="2"/>' },
     { id: T.DASH_SHOES, cat: 'item', color: '#ff7675', label: 'ダッシュ靴', icon: '<path d="M4 16h16v4H4zM16 10l4 6H4l4-6z" fill="currentColor" stroke="none"/>' },
 
-    // ---------------- 危険 ----------------
+    // 危険
     { id: T.SPIKE_UP, cat: 'danger', color: '#ff2a5f', label: '上針', icon: '<polygon points="12 2 2 22 22 22"/>' },
     { id: T.SPIKE_DOWN, cat: 'danger', color: '#ff2a5f', label: '下針', icon: '<polygon points="12 22 2 2 22 2"/>' },
     { id: T.SPIKE_LEFT, cat: 'danger', color: '#ff2a5f', label: '左針', icon: '<polygon points="2 12 22 2 22 22"/>' },
@@ -235,7 +265,7 @@ const paletteItems = [
     { id: T.BEAM_D, cat: 'danger', color: '#e74c3c', label: '砲台(下)', icon: '<rect x="6" y="2" width="12" height="12" rx="3"/><circle cx="12" cy="18" r="3"/>' },
     { id: T.BEAM_HOMING, cat: 'danger', color: '#d35400', label: '誘導砲台', icon: '<rect x="4" y="4" width="16" height="16" rx="8"/><circle cx="12" cy="12" r="3" fill="#fff"/>' },
 
-    // ---------------- キャラ・エンティティ ----------------
+    // キャラ
     { id: T.ENEMY, cat: 'entity', color: '#a855f7', label: '敵(歩)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9 16h6"/>' },
     { id: T.ENEMY2, cat: 'entity', color: '#ff2a5f', label: '敵(跳)', icon: '<rect x="4" y="6" width="16" height="14" rx="4"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M7 9l3 2M17 9l-3 2"/>' },
     { id: T.ENEMY_H, cat: 'entity', color: '#e67e22', label: '敵(横飛)', icon: '<rect x="4" y="8" width="16" height="8" rx="2"/><circle cx="12" cy="12" r="2" fill="#fff"/>' },
@@ -271,7 +301,8 @@ let player = {
     coins: 0, hasKey: false, grounded: false, touchingWall: 0, faceDir: 1, 
     warpCooldown: 0, scaleX: 1, scaleY: 1, boostTimer: 0, invincibleTimer: 0,
     hasSpider: false, hasNewSpider: false, hook: null, hookDist: 0,
-    lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false
+    lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false,
+    startX: 0, startY: 0
 };
 
 let isCircuitActive = false; 
@@ -287,10 +318,162 @@ let beamEmitters = [];
 let projectiles = []; 
 let crosses = []; 
 let lifts = []; 
-let leverStates = {}; // 型エラー修正: Objectとして初期化
+let leverStates = {}; 
 let crumbleBlocks = {};
 let globalFrame = 0;
 let slowFrames = 0;
+
+/* =========================================================
+   マルチプレイ（WebSocket & Chat）管理
+========================================================= */
+let isMultiplayer = false;
+let socket = null;
+let otherPlayers = {}; // id -> { x, y, targetX, targetY, vx, vy, faceDir, state, chatMessage, chatTimer, name, isKing ... }
+let syncInterval = null;
+
+function joinDailyLobby() {
+    fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } })
+    .then(r => {
+        if (!r.ok) throw new Error("ロビーが見つかりません。");
+        return r.json();
+    })
+    .then(data => {
+        const stage = data.stage;
+        let p = JSON.parse(stage.map_data);
+        if (Array.isArray(p)) { mapData = p; warpPairs = []; } else { mapData = p.map; warpPairs = p.warps || []; }
+        currentStageInfo = { id: stage.id, title: "本日のロビー: " + stage.title, author: stage.creator_name, isMine: false, isDaily: true };
+        
+        setMode('play');
+        isMultiplayer = true;
+        updateCourseHUDInfo();
+        document.getElementById('hud-mp-status').style.display = 'flex';
+        
+        initWebSocket();
+        showToast("🔥 日替わりロビーに参加しました！");
+    })
+    .catch(err => alert(err.message));
+}
+
+function initWebSocket() {
+    if (socket) { socket.close(); }
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = protocol + '//' + location.host + '/ws/maker/daily?token=' + localStorage.getItem('access_token');
+    
+    socket = new WebSocket(wsUrl);
+    otherPlayers = {};
+    
+    socket.onopen = () => {
+        syncInterval = setInterval(syncPlayerPos, 50); // 20 FPS sync
+    };
+    
+    socket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'player_join') {
+            document.getElementById('hud-mp-count').innerText = msg.total_players;
+        } else if (msg.type === 'player_leave') {
+            delete otherPlayers[msg.id];
+            document.getElementById('hud-mp-count').innerText = msg.total_players;
+        } else if (msg.type === 'pos') {
+            if (!otherPlayers[msg.id]) {
+                otherPlayers[msg.id] = { ...msg, x: msg.x, y: msg.y, targetX: msg.x, targetY: msg.y, chatTimer: 0, chatMessage: "" };
+            } else {
+                let op = otherPlayers[msg.id];
+                op.targetX = msg.x; op.targetY = msg.y;
+                op.vx = msg.vx; op.vy = msg.vy; op.faceDir = msg.faceDir;
+                op.gravityDir = msg.gravityDir; op.hook = msg.hook; op.isSpider = msg.isSpider;
+                if(msg.name) op.name = msg.name;
+                if(msg.is_king !== undefined) op.is_king = msg.is_king;
+            }
+        } else if (msg.type === 'respawn') {
+            createParticles(msg.x + 13, msg.y + 13, '#ff2a5f', 20);
+        } else if (msg.type === 'chat') {
+            displayChatBubble(msg.id, msg.text);
+            addChatLog(msg.name, msg.text, msg.is_king);
+        } else if (msg.type === 'clear') {
+            addChatLog("システム", `${msg.name} がゴールしました！（${msg.time}秒）`);
+            for(let i=0; i<30; i++) createParticles(player.x + (Math.random()-0.5)*200, player.y - 100 + (Math.random()-0.5)*200, '#ffd700', 3);
+        }
+    };
+    
+    socket.onclose = () => {
+        clearInterval(syncInterval);
+        document.getElementById('hud-mp-status').style.display = 'none';
+        isMultiplayer = false;
+    };
+}
+
+function syncPlayerPos() {
+    if (socket && socket.readyState === WebSocket.OPEN && player.state !== 'dead') {
+        socket.send(JSON.stringify({
+            type: 'pos', x: player.x, y: player.y, vx: player.vx, vy: player.vy, 
+            faceDir: player.faceDir, gravityDir: player.gravityDir,
+            hook: player.hook, isSpider: (player.hasSpider || player.hasNewSpider)
+        }));
+    }
+}
+
+function sendChatMessage(text) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'chat', text: text }));
+        // 自分自身にも表示
+        displayChatBubble('self', text);
+        addChatLog("自分", text, false);
+    }
+}
+
+function displayChatBubble(id, text) {
+    if (id === 'self') {
+        player.chatMessage = text;
+        player.chatTimer = 240; // 4 seconds
+    } else if (otherPlayers[id]) {
+        otherPlayers[id].chatMessage = text;
+        otherPlayers[id].chatTimer = 240;
+    }
+}
+
+function addChatLog(name, text, isKing) {
+    const container = document.getElementById('chat-log-container');
+    const el = document.createElement('div');
+    el.className = 'chat-line';
+    const nameColor = isKing ? '#ffd700' : 'var(--accent-cyan)';
+    const prefix = isKing ? '👑 ' : '';
+    el.innerHTML = `<span class="c-name" style="color:${nameColor}">${prefix}${escapeHtml(name)}:</span> ${escapeHtml(text)}`;
+    container.appendChild(el);
+    if (container.children.length > 5) container.removeChild(container.firstChild);
+    // 自動消去はCSS Animation (fadeOut) に任せる
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 8000);
+}
+
+// チャット入力管理
+const chatInput = document.getElementById('chat-input');
+const chatWrapper = document.getElementById('chat-input-wrapper');
+
+window.addEventListener('keydown', (e) => {
+    if (mode === 'play' && isMultiplayer) {
+        if (e.key === 'Enter') {
+            if (document.activeElement === chatInput) {
+                const text = chatInput.value.trim();
+                if (text) sendChatMessage(text);
+                chatInput.value = '';
+                chatInput.blur();
+                chatWrapper.classList.remove('show');
+            } else {
+                chatWrapper.classList.add('show');
+                chatInput.focus();
+                e.preventDefault();
+            }
+        }
+    }
+});
+function toggleChatMobile() {
+    if (chatWrapper.classList.contains('show')) {
+        chatWrapper.classList.remove('show');
+        chatInput.blur();
+    } else {
+        chatWrapper.classList.add('show');
+        chatInput.focus();
+    }
+}
 
 /* =========================================================
    初期化・リサイズ処理
@@ -301,9 +484,7 @@ function initMap() {
         mapData[MAP_ROWS-1][c] = T.BLOCK; 
         mapData[MAP_ROWS-2][c] = T.BLOCK; 
         if (c === 0 || c === MAP_COLS-1) {
-            for (let r = 0; r < MAP_ROWS; r++) {
-                mapData[r][c] = T.BLOCK;
-            }
+            for (let r = 0; r < MAP_ROWS; r++) { mapData[r][c] = T.BLOCK; }
         }
     }
     mapData[MAP_ROWS-4][3] = T.START; 
@@ -321,7 +502,6 @@ function focusCameraOnStart() {
                 const viewH = window.innerHeight / zoomScale;
                 const startX = c * TILE_SIZE + TILE_SIZE / 2;
                 const startY = r * TILE_SIZE + TILE_SIZE / 2;
-                
                 camera.x = Math.max(0, Math.min(MAP_COLS * TILE_SIZE - viewW, startX - viewW / 2));
                 camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, startY - viewH / 2));
                 return;
@@ -333,7 +513,6 @@ function focusCameraOnStart() {
 function setPalCat(cat, btn) {
     document.querySelectorAll('.pal-tab').forEach(el => el.classList.remove('active'));
     if (btn) btn.classList.add('active');
-    
     document.getElementById('palette').innerHTML = paletteItems.filter(i => cat === 'all' || i.cat === 'all' || i.cat === cat).map(item => `
         <div class="palette-item ${item.id === currentBrush ? 'selected' : ''}" data-id="${item.id}" style="color:${item.color}" onclick="selectBrush(${item.id})">
             <svg viewBox="0 0 24 24">${item.icon}</svg>
@@ -344,9 +523,7 @@ function setPalCat(cat, btn) {
 
 function selectBrush(id) { 
     currentBrush = id; 
-    document.querySelectorAll('.palette-item').forEach(el => {
-        el.classList.toggle('selected', parseInt(el.dataset.id) === id);
-    });
+    document.querySelectorAll('.palette-item').forEach(el => { el.classList.toggle('selected', parseInt(el.dataset.id) === id); });
 }
 
 function togglePalette() { document.getElementById('palette-wrap').classList.toggle('collapsed'); }
@@ -396,6 +573,9 @@ function setMode(newMode) {
         savedMapDataStr = JSON.stringify(mapData);
         startPlay();
     } else {
+        if(socket) { socket.close(); socket = null; isMultiplayer = false; }
+        document.getElementById('hud-mp-status').style.display = 'none';
+        chatWrapper.classList.remove('show');
         activeMapData = []; 
         focusCameraOnStart(); 
     }
@@ -411,7 +591,8 @@ function startPlay() {
         coins: 0, hasKey: false, grounded: false, touchingWall: 0, faceDir: 1, 
         warpCooldown: 0, scaleX: 1, scaleY: 1, boostTimer: 0, invincibleTimer: 0,
         hasSpider: false, hasNewSpider: false, hook: null, hookDist: 0,
-        lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false
+        lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false,
+        startX: 2*TILE_SIZE, startY: 2*TILE_SIZE, chatTimer: 0, chatMessage: ""
     };
     
     isCircuitActive = false; activeSwitchCount = 0; screenShake = 0;
@@ -419,7 +600,7 @@ function startPlay() {
     totalCoinsInStage = 0; 
     let startFound = false;
 
-    // マップスキャン[span_1](start_span)[span_1](end_span) - 敵の登録を修正 (配置後にマップから消す)
+    // マップスキャン
     for (let r = 0; r < MAP_ROWS; r++) {
         for (let c = 0; c < MAP_COLS; c++) {
             const t = activeMapData[r][c];
@@ -427,8 +608,9 @@ function startPlay() {
             if (t === T.COIN) {
                 totalCoinsInStage++;
             } else if (t === T.START) { 
-                player.x = c * TILE_SIZE + (TILE_SIZE - player.w) / 2; 
-                player.y = r * TILE_SIZE + (TILE_SIZE - player.h); 
+                player.startX = c * TILE_SIZE + (TILE_SIZE - player.w) / 2; 
+                player.startY = r * TILE_SIZE + (TILE_SIZE - player.h); 
+                player.x = player.startX; player.y = player.startY;
                 startFound = true; 
             } else if (t === T.ENEMY) {
                 enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 1 });
@@ -481,17 +663,11 @@ function startPlay() {
     camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, player.y + player.h/2 - viewH / 2));
 }
 
-function showToast(text) {
-    const t = document.getElementById('toast-msg'); 
-    document.getElementById('toast-text').innerText = text;
-    t.classList.add('show'); 
-    setTimeout(() => { t.classList.remove('show'); }, 2500);
-}
-
 function updateCourseHUDInfo() {
     const tag = document.getElementById('hud-course-tag'); 
     const title = document.getElementById('hud-course-title');
-    if (currentStageInfo.isMine) { tag.className = 'course-tag tag-my'; tag.innerText = 'MY COURSE'; } 
+    if (currentStageInfo.isDaily) { tag.className = 'course-tag tag-lobby'; tag.innerText = '日替わり'; }
+    else if (currentStageInfo.isMine) { tag.className = 'course-tag tag-my'; tag.innerText = 'MY COURSE'; } 
     else { tag.className = 'course-tag tag-other'; tag.innerText = '作: ' + currentStageInfo.author; }
     title.innerText = currentStageInfo.title;
 }
@@ -499,7 +675,6 @@ function updateCourseHUDInfo() {
 function updateHUD() {
     document.getElementById('hud-coins').innerText = player.coins; 
     document.getElementById('hud-total-coins').innerText = totalCoinsInStage;
-    
     document.getElementById('hud-key-text').innerText = player.hasKey ? 'あり' : 'なし';
     document.getElementById('hud-key').style.color = player.hasKey ? '#ff9900' : '#666';
 
@@ -519,9 +694,24 @@ function updateHUD() {
 
 function die() {
     if (player.state === 'dead' || player.state === 'clear') return;
+    
+    if (isMultiplayer) {
+        // マルチプレイ時は脱落なし（即リスポーン）
+        createParticles(player.x + player.w/2, player.y + player.h/2, '#ff2a5f', 30);
+        if(socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({type: 'respawn', x: player.x, y: player.y}));
+        }
+        player.x = player.startX; player.y = player.startY;
+        player.vx = 0; player.vy = 0; player.gravityDir = 1;
+        player.hasKey = false; player.coins = 0; player.invincibleTimer = 0;
+        screenShake = 10;
+        document.getElementById('screen-flash').style.opacity = '1'; 
+        setTimeout(() => document.getElementById('screen-flash').style.opacity = '0', 50);
+        return;
+    }
+
     player.state = 'dead'; 
     screenShake = 20; 
-    // 重力反転時も必ず画面外（下方向または重力方向）へ落下するように
     player.vy = -12 * player.gravityDir; 
     player.vx = 0;
     
@@ -540,12 +730,19 @@ function win() {
     const centerMsg = document.getElementById('center-msg');
     centerMsg.innerText = "STAGE CLEAR!"; centerMsg.classList.add('show');
     
-    // オリジナルAPIエンドポイント呼び出し[span_2](start_span)[span_2](end_span)
+    if (isMultiplayer && socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'clear', time: (globalFrame / 60).toFixed(1) }));
+        for(let i=0; i<50; i++) createParticles(player.x + (Math.random()-0.5)*200, player.y - 100 + (Math.random()-0.5)*200, '#ffd700', 3);
+        setTimeout(() => { 
+            player.x = player.startX; player.y = player.startY; player.state = 'idle';
+            centerMsg.classList.remove('show');
+            player.coins = 0;
+        }, 3000);
+        return;
+    }
+    
     if (currentStageInfo.id) {
-        fetch(`/api/maker/stages/${currentStageInfo.id}/clear`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } 
-        }).catch(() => {});
+        fetch(`/api/maker/stages/${currentStageInfo.id}/clear`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } }).catch(() => {});
     }
     setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
 }
@@ -553,8 +750,10 @@ function win() {
 /* =========================================================
    入力・イベント処理
 ========================================================= */
+function isChatFocused() { return document.activeElement === chatInput; }
+
 window.addEventListener('keydown', e => {
-    if (mode !== 'play') return;
+    if (mode !== 'play' || isChatFocused()) return;
     if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
     if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { 
@@ -563,6 +762,7 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('keyup', e => {
+    if (isChatFocused()) return;
     if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
     if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
@@ -655,7 +855,7 @@ const bindBtn = (id, k) => { const b = document.getElementById(id); b.addEventLi
 bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-jump', 'jump');
 
 let lastTouch = null;
-canvas.addEventListener('touchstart', e => { if (e.touches.length === 1) { lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; input.isDown = true; if (mode === 'play' || currentBrush !== T.PAN) handleInputCoords(lastTouch.x, lastTouch.y, false); } });
+canvas.addEventListener('touchstart', e => { if (e.touches.length === 1 && !isChatFocused()) { lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; input.isDown = true; if (mode === 'play' || currentBrush !== T.PAN) handleInputCoords(lastTouch.x, lastTouch.y, false); } });
 canvas.addEventListener('touchmove', e => { if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } }, { passive: false });
 canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
 
@@ -679,16 +879,15 @@ function updatePhysics() {
     if (player.invincibleTimer > 0) player.invincibleTimer--; 
     updateHUD();
     
-    // 死亡アニメーション処理
     if (player.state === 'dead') {
         player.y += player.vy; 
         player.vy += 0.6 * player.gravityDir; 
-        // 死亡中はパーティクル等の更新のみ行う
         particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.life -= 0.06; }); 
         particles = particles.filter(pt => pt.life > 0);
         return; 
     }
     
+    if (player.chatTimer > 0) player.chatTimer--;
     if (player.warpCooldown > 0) player.warpCooldown--; 
     if (player.boostTimer > 0) { 
         player.boostTimer--; 
@@ -698,7 +897,7 @@ function updatePhysics() {
     player.scaleX += (1.0 - player.scaleX) * 0.25; 
     player.scaleY += (1.0 - player.scaleY) * 0.25;
 
-    // --- 論理回路（スイッチとレバー） ---
+    // 論理回路
     let p = player, pCount = 0, curLevers = new Set(), inter = [p, ...crosses, ...enemies.filter(e => e.type !== 8)];
     for (let r = 0; r < MAP_ROWS; r++) {
         for (let c = 0; c < MAP_COLS; c++) {
@@ -731,9 +930,8 @@ function updatePhysics() {
         else if (activeSwitchCount % 2 === 0 && isCircuitActive) { screenShake = 3; createParticles(p.x + 13, p.y + 13, '#ff2a5f', 10); }
     }
     isCircuitActive = (activeSwitchCount % 2 !== 0); 
-    updateHUD();
 
-    // --- リフト ---
+    // リフト
     lifts.forEach(lf => {
         let ox = lf.x, oy = lf.y; 
         lf.x += lf.vx; lf.y += lf.vy; 
@@ -742,7 +940,7 @@ function updatePhysics() {
         if (p.vy >= 0 && rectIntersect(p, { x: lf.x, y: lf.y - 8, w: lf.w, h: 8 }) && p.y + p.h <= lf.y + 12) { p.y = lf.y - p.h; p.x += lf.vx; p.y += lf.vy; p.grounded = true; p.vy = 0; }
     });
 
-    // --- 十字箱 ---
+    // 十字箱
     crosses.forEach(cr => {
         cr.vy += 0.65; if (cr.vy > 14) cr.vy = 14;
         if (rectIntersect(p, cr)) {
@@ -760,7 +958,7 @@ function updatePhysics() {
         if (cr.vy < 0 && (isSolid(activeMapData[r1]?.[c1]) || isSolid(activeMapData[r1]?.[c2]))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
     });
 
-    // --- プレイヤー移動 ---
+    // プレイヤー移動
     if (p.hook) {
         let dx = p.hook.x - (p.x + p.w / 2), dy = p.hook.y - (p.y + p.h / 2), dist = Math.hypot(dx, dy); 
         if (!p.hookDist) p.hookDist = dist;
@@ -805,7 +1003,17 @@ function updatePhysics() {
     }
     if (p.y > MAP_ROWS * 40 + 200 || p.y < -200) die();
 
-    // --- 敵の更新 (元の安定版ロジック + 新敵)[span_3](start_span)[span_3](end_span) ---
+    // 他プレイヤーの補間 (Lerp)
+    if (isMultiplayer) {
+        for (let id in otherPlayers) {
+            let op = otherPlayers[id];
+            op.x += (op.targetX - op.x) * 0.3;
+            op.y += (op.targetY - op.y) * 0.3;
+            if (op.chatTimer > 0) op.chatTimer--;
+        }
+    }
+
+    // 敵の更新
     enemies.forEach(e => {
         if ([1, 2, 7].includes(e.type)) e.vy += 0.6;
         if (e.type === 2) { e.vx += (p.x > e.x ? 0.15 : -0.15); e.vx = Math.max(-2.5, Math.min(2.5, e.vx)); e.jumpTmr++; }
@@ -831,7 +1039,6 @@ function updatePhysics() {
             e.vx = Math.max(-2, Math.min(2, e.vx)); e.vy = Math.max(-2, Math.min(2, e.vy));
         }
         
-        // オバケ(8)以外は地形判定を行う
         if (e.type !== 8) {
             e.x += e.vx; 
             let ec1 = Math.floor(e.x / 40), ec2 = Math.floor((e.x + e.w - 0.1) / 40), er1 = Math.floor(e.y / 40), er2 = Math.floor((e.y + e.h - 0.1) / 40);
@@ -866,7 +1073,7 @@ function updatePhysics() {
     }); 
     enemies = enemies.filter(e => !e.dead);
 
-    // --- 砲台と弾 ---
+    // 砲台と弾
     beamEmitters.forEach(b => {
         b.tmr++;
         if (b.tmr >= 90) {
@@ -953,7 +1160,7 @@ function checkColl(isX) {
 function createParticles(x, y, col, cnt) { for (let i = 0; i < cnt; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 16, vy: (Math.random() - 0.5) * 16 - 2, life: 1, color: col }); }
 
 /* =========================================================
-   描画 (元の緻密なCanvas描画を完全に復元＋新要素の描写)[span_4](start_span)[span_4](end_span)
+   描画 (Canvas + SVG Graphics)
 ========================================================= */
 function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
 
@@ -988,6 +1195,88 @@ function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
     else if ([T.ENEMY, T.ENEMY2, T.ENEMY_H, T.ENEMY_V, T.ENEMY_SNIPER, T.ENEMY_GOLGO, T.ENEMY_SHELL, T.ENEMY_GHOST].includes(t)) { if (mode === 'edit') { ctx.fillStyle = t === T.ENEMY2 ? '#ff2a5f' : t === T.ENEMY_H ? '#e67e22' : t === T.ENEMY_V ? '#34495e' : t === T.ENEMY_SNIPER ? '#ff4757' : t === T.ENEMY_GOLGO ? '#2c3e50' : t === T.ENEMY_SHELL ? '#27ae60' : t === T.ENEMY_GHOST ? '#ecf0f1' : '#a855f7'; roundRect(ctx, x + 4, y + ts - 28, 28, 28, 6); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + 12, y + ts - 18, 4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x + 24, y + ts - 18, 4, 0, Math.PI * 2); ctx.fill(); } }
     else if (t === T.GOAL) { ctx.fillStyle = '#fff'; ctx.fillRect(x + ts / 4, y, 4, ts); ctx.strokeRect(x + ts / 4, y, 4, ts); ctx.fillStyle = '#ff2a5f'; ctx.beginPath(); ctx.moveTo(x + ts / 4 + 4, y + 2); ctx.lineTo(x + ts - 2, y + ts / 4); ctx.lineTo(x + ts / 4 + 4, y + ts / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); }
     else if (t === T.START) { ctx.fillStyle = 'rgba(16,185,129,0.4)'; roundRect(ctx, x, y, ts, ts, 4); ctx.fillStyle = '#fff'; ctx.font = "900 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText("START", x + hc, y + hc + 4); }
+}
+
+function drawChatBubble(ctx, x, y, text) {
+    ctx.save();
+    ctx.font = '900 12px sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const paddingX = 8;
+    const paddingY = 6;
+    const bw = textWidth + paddingX * 2;
+    const bh = 14 + paddingY * 2;
+    const bx = x - bw / 2;
+    const by = y - bh - 10;
+    
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    roundRect(ctx, bx, by, bw, bh, 6);
+    
+    // しっぽ
+    ctx.beginPath();
+    ctx.moveTo(x - 5, by + bh);
+    ctx.lineTo(x, by + bh + 6);
+    ctx.lineTo(x + 5, by + bh);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, by + bh / 2);
+    ctx.restore();
+}
+
+function drawPlayer(ctx, p, isSelf) {
+    ctx.save(); 
+    ctx.translate(p.x + 13, p.y + (p.gravityDir > 0 ? 26 : 0)); 
+    ctx.scale(p.scaleX || 1, (p.scaleY || 1) * p.gravityDir);
+    
+    if (p.state === 'dead') {
+        ctx.fillStyle = '#555'; roundRect(ctx, -13, -26, 26, 26, 6); 
+        ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-6, -16); ctx.lineTo(0, -10); ctx.moveTo(0, -16); ctx.lineTo(-6, -10); ctx.stroke(); ctx.beginPath(); ctx.moveTo(6, -16); ctx.lineTo(12, -10); ctx.moveTo(12, -16); ctx.lineTo(6, -10); ctx.stroke();
+    } else {
+        if (p.invincibleTimer > 0) { ctx.shadowColor = ctx.fillStyle = `hsl(${(globalFrame * 10) % 360},100%,50%)`; ctx.shadowBlur = 15; } 
+        else { ctx.fillStyle = isSelf ? '#00e5ff' : 'rgba(0, 229, 255, 0.5)'; }
+        
+        ctx.strokeStyle = isSelf ? '#000' : 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3; 
+        roundRect(ctx, -13, -26, 26, 26, 6); ctx.shadowBlur = 0;
+        
+        if (p.boostTimer > 0) { ctx.fillStyle = '#fff'; ctx.fillRect(p.faceDir > 0 ? 6 : -14, -20, 8, 2); } 
+        else { 
+            ctx.fillStyle = isSelf ? '#fff' : 'rgba(255,255,255,0.7)'; let ex = p.faceDir > 0 ? 8 : -6; 
+            ctx.beginPath(); ctx.arc(ex - 5, -18, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); 
+            ctx.beginPath(); ctx.arc(ex + 5, -18, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); 
+            ctx.fillStyle = isSelf ? '#000' : 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.arc(ex - 5 + (p.faceDir > 0 ? 1 : -1), -18, 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(ex + 5 + (p.faceDir > 0 ? 1 : -1), -18, 2, 0, Math.PI * 2); ctx.fill(); 
+        }
+    }
+    ctx.restore();
+
+    // 他人の名前表示
+    if (!isSelf && p.name) {
+        ctx.save();
+        ctx.font = '900 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        const nText = (p.is_king ? '👑 ' : '') + p.name;
+        ctx.strokeText(nText, p.x + 13, p.y - 8);
+        ctx.fillText(nText, p.x + 13, p.y - 8);
+        ctx.restore();
+    }
+    
+    // クモ糸
+    if (p.hook) {
+        ctx.strokeStyle = isSelf ? '#fff' : 'rgba(255,255,255,0.4)'; 
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x + 13, p.y + 13); ctx.lineTo(p.hook.x, p.hook.y); ctx.stroke();
+    }
+    
+    // チャットバブル
+    if (p.chatTimer > 0 && p.chatMessage) {
+        drawChatBubble(ctx, p.x + 13, p.y - (isSelf ? 0 : 15), p.chatMessage);
+    }
 }
 
 function draw() {
@@ -1040,7 +1329,6 @@ function draw() {
                 ctx.beginPath(); ctx.arc(e.x + 14, e.y + 9, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); 
                 ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x + 14, e.y + 9, 6, 0, Math.PI * 2); ctx.fill(); 
             } else if (e.type === 8) {
-                // オバケの描画 (しっぽ付き)
                 ctx.beginPath(); ctx.moveTo(e.x, e.y + e.h); ctx.lineTo(e.x, e.y + 10); ctx.quadraticCurveTo(e.x, e.y, e.x + 14, e.y); ctx.quadraticCurveTo(e.x + e.w, e.y, e.x + e.w, e.y + 10); ctx.lineTo(e.x + e.w, e.y + e.h); ctx.lineTo(e.x + 20, e.y + e.h - 4); ctx.lineTo(e.x + 14, e.y + e.h); ctx.lineTo(e.x + 8, e.y + e.h - 4); ctx.closePath(); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(e.x + 10, e.y + 10, 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(e.x + 18, e.y + 10, 2, 0, Math.PI * 2); ctx.fill();
             } else {
@@ -1055,30 +1343,20 @@ function draw() {
             }
         });
         
-        if (player.hook) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(player.x + 13, player.y + 13); ctx.lineTo(player.hook.x, player.hook.y); ctx.stroke(); }
-        
         projectiles.forEach(pr => { 
             if (pr.isGolgo) { ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(pr.x + 4, pr.y + 4); ctx.lineTo(pr.x + 4 - pr.vx, pr.y + 4 - pr.vy); ctx.stroke(); } 
             else { ctx.fillStyle = pr.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pr.x + 6, pr.y + 6, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(pr.x + 6, pr.y + 6, 3, 0, Math.PI * 2); ctx.fill(); } 
         });
         
-        ctx.save(); ctx.translate(player.x + 13, player.y + (player.gravityDir > 0 ? 26 : 0)); ctx.scale(player.scaleX, player.scaleY * player.gravityDir);
-        if (player.state === 'dead') {
-            ctx.fillStyle = '#555'; roundRect(ctx, -13, -26, 26, 26, 6); 
-            ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-6, -16); ctx.lineTo(0, -10); ctx.moveTo(0, -16); ctx.lineTo(-6, -10); ctx.stroke(); ctx.beginPath(); ctx.moveTo(6, -16); ctx.lineTo(12, -10); ctx.moveTo(12, -16); ctx.lineTo(6, -10); ctx.stroke();
-        } else {
-            if (player.invincibleTimer > 0) { ctx.shadowColor = ctx.fillStyle = `hsl(${(globalFrame * 10) % 360},100%,50%)`; ctx.shadowBlur = 15; } else { ctx.fillStyle = '#00e5ff'; }
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 3; roundRect(ctx, -13, -26, 26, 26, 6); ctx.shadowBlur = 0;
-            if (player.boostTimer > 0) { ctx.fillStyle = '#fff'; ctx.fillRect(player.faceDir > 0 ? 6 : -14, -20, 8, 2); } 
-            else { 
-                ctx.fillStyle = '#fff'; let ex = player.faceDir > 0 ? 8 : -6; 
-                ctx.beginPath(); ctx.arc(ex - 5, -18, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); 
-                ctx.beginPath(); ctx.arc(ex + 5, -18, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); 
-                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(ex - 5 + (player.faceDir > 0 ? 1 : -1), -18, 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(ex + 5 + (player.faceDir > 0 ? 1 : -1), -18, 2, 0, Math.PI * 2); ctx.fill(); 
-            }
+        // 他プレイヤー描画
+        if (isMultiplayer) {
+            for (let id in otherPlayers) { drawPlayer(ctx, otherPlayers[id], false); }
         }
-        ctx.restore();
+        
+        // 自プレイヤー描画
+        drawPlayer(ctx, player, true);
     }
+    
     particles.forEach(pt => { ctx.globalAlpha = Math.max(0, pt.life); ctx.fillStyle = pt.color; ctx.fillRect(pt.x, pt.y, 5, 5); ctx.globalAlpha = 1.0; });
     ctx.restore();
 }
@@ -1092,7 +1370,7 @@ function loop() {
 requestAnimationFrame(loop);
 
 /* =========================================================
-   通信・モーダル処理 (完全復元)[span_5](start_span)[span_5](end_span)
+   通信・モーダル処理
 ========================================================= */
 const token = localStorage.getItem("access_token");
 
@@ -1143,7 +1421,7 @@ async function saveStage() {
         const d = await res.json();
         if (res.ok) { 
             alert(d.message || "公開しました！"); 
-            currentStageInfo = { id: d.id, title: title, author: '自分', isMine: true }; 
+            currentStageInfo = { id: d.id, title: title, author: '自分', isMine: true, isDaily: false }; 
             updateCourseHUDInfo(); closeModal('modal-save'); 
         } else { alert("エラー: " + (d.detail || "保存失敗")); }
     } catch (e) { alert("通信エラーが発生しました。"); }
@@ -1192,7 +1470,7 @@ async function loadStage(id) {
         if (res.ok) {
             let p = JSON.parse(d.stage.map_data);
             if (Array.isArray(p)) { mapData = p; warpPairs = []; } else { mapData = p.map; warpPairs = p.warps || []; }
-            currentStageInfo = { id: id, title: d.stage.title, author: d.stage.creator_name, isMine: d.stage.is_mine };
+            currentStageInfo = { id: id, title: d.stage.title, author: d.stage.creator_name, isMine: d.stage.is_mine, isDaily: false };
             updateCourseHUDInfo(); closeModal('modal-load'); setMode('play');
         } else { alert("失敗: " + d.detail); }
     } catch (e) { alert("通信エラー"); } 
