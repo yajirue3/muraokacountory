@@ -7,27 +7,25 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;900&family=Press+Start+2P&display=swap');
         :root { --bg-base: #0f121a; --bg-surface: #1e2430; --border-bold: #000000; --text-primary: #ffffff; --text-secondary: #8a99a8; --accent-gold: #ffd700; --accent-cyan: #00e5ff; --danger-color: #ff2a5f; --switch-off: #ff2a5f; --switch-on: #00e5ff; --btn-shadow: 0 4px 0 rgba(0,0,0,0.8); --safe-bottom: env(safe-area-inset-bottom, 0px); }
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-base); color: var(--text-primary); font-family: 'M PLUS Rounded 1c', sans-serif; overflow: hidden; width: 100vw; height: 100dvh; }
-        .pixel-text { font-family: 'Press Start 2P', monospace; text-transform: uppercase; }
         
+        /* スワイプによるブラウザバックとスクロールを完全に禁止 */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-base); color: var(--text-primary); font-family: 'M PLUS Rounded 1c', sans-serif; overflow: hidden; width: 100vw; height: 100dvh; overscroll-behavior: none; touch-action: none; }
+        
+        .pixel-text { font-family: 'Press Start 2P', monospace; text-transform: uppercase; }
         #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 56px; background: rgba(15, 18, 26, 0.9); backdrop-filter: blur(10px); border-bottom: 3px solid var(--border-bold); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 100; gap: 6px; }
         .btn-retro { background: var(--bg-surface); border: 3px solid #000; color: var(--text-primary); padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 900; border-radius: 8px; box-shadow: var(--btn-shadow); transition: transform 0.1s, box-shadow 0.1s; white-space: nowrap; }
         .btn-retro:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0); }
         .btn-retro svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
         .btn-cyan { background: var(--accent-cyan); color: #000; } .btn-gold { background: var(--accent-gold); color: #000; } .btn-fire { background: #ff4757; color: #fff; }
-        
         .mode-toggle { display: flex; background: #000; border: 3px solid #000; border-radius: 10px; overflow: hidden; box-shadow: var(--btn-shadow); }
         .mode-toggle button { background: #1a1e29; border: none; color: #fff; padding: 6px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 900; font-size: 0.8rem; }
         .mode-toggle button svg { width: 16px; height: 16px; fill: currentColor; } .mode-toggle button.active { background: var(--accent-cyan); color: #000; }
-        
         .zoom-controls { display: flex; align-items: center; background: #000; border-radius: 8px; border: 2px solid #000; }
         .zoom-btn { background: var(--bg-surface); color: #fff; border: none; padding: 4px 8px; font-weight: 900; cursor: pointer; } .zoom-btn:active { background: var(--accent-gold); color: #000; } .zoom-val { font-size: 0.75rem; padding: 0 8px; color: var(--accent-gold); font-weight: 900; }
-        
         #hud { position: absolute; top: 66px; left: 10px; z-index: 90; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; max-width: 90vw; }
         .hud-badge { background: rgba(0,0,0,0.8); border: 2.5px solid #000; border-radius: 8px; padding: 4px 10px; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 900; }
         .hud-badge svg { width: 16px; height: 16px; } .course-tag { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 900; } .tag-my { background: var(--accent-gold); color: #000; } .tag-other { background: var(--accent-cyan); color: #000; } .tag-lobby { background: #ff4757; color: #fff; }
-        
         #palette-wrap { position: absolute; bottom: calc(var(--safe-bottom) + 10px); left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; transition: transform 0.3s cubic-bezier(0.2,1,0.3,1); }
         #palette-wrap.collapsed { transform: translate(-50%, calc(100% - 28px)); }
         #palette-toggle { background: #000; color: #fff; border: 2px solid #fff; border-bottom: none; border-radius: 12px 12px 0 0; padding: 4px 24px; font-size: 0.75rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -39,17 +37,15 @@
         .palette-item { min-width: 44px; height: 44px; background: #111; border: 2.5px solid #000; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; flex-shrink: 0; box-shadow: 0 3px 0 #000; transition: transform 0.1s; }
         .palette-item:active { transform: translateY(3px); box-shadow: none; } .palette-item.selected { background: var(--accent-gold) !important; color: #000 !important; }
         .palette-item svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; } .palette-label { font-size: 0.5rem; font-weight: 900; margin-top: 2px; }
-        
         #mobile-controls { position: absolute; bottom: calc(var(--safe-bottom) + 20px); left: 0; width: 100%; display: none; justify-content: space-between; padding: 0 20px; z-index: 95; pointer-events: none; }
         .ctrl-group { display: flex; gap: 12px; pointer-events: auto; }
         .ctrl-btn { width: 65px; height: 65px; background: rgba(0,0,0,0.5); border: 3px solid rgba(255,255,255,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; pointer-events: auto; backdrop-filter: blur(4px); box-shadow: 0 4px 0 rgba(0,0,0,0.5); }
         .ctrl-btn svg { width: 32px; height: 32px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .ctrl-btn:active { background: var(--accent-cyan); color: #000; border-color: #000; transform: translateY(4px); box-shadow: none; }
-        
         #center-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 5px solid var(--accent-gold); border-radius: 16px; padding: 16px 32px; text-align: center; color: var(--accent-gold); font-size: 2rem; font-weight: 900; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 150; box-shadow: 0 10px 0 #000; white-space: nowrap; }
         #center-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(-3deg); }
         #toast-msg { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); background: rgba(255,42,95,0.95); color: #fff; border: 3px solid #000; padding: 8px 16px; border-radius: 20px; font-weight: 900; font-size: 0.9rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 140; box-shadow: 0 4px 0 #000; }
         #toast-msg.show { opacity: 1; }
-        #gameCanvas { display: block; width: 100vw; height: 100vh; }
+        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; } /* Canvas上のスワイプバックをブロック */
         
         /* チャット関連UI */
         #chat-log-container { position: absolute; bottom: 80px; left: 10px; width: 300px; max-height: 150px; overflow-y: hidden; z-index: 92; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
@@ -57,11 +53,10 @@
         .chat-line .c-name { color: var(--accent-cyan); margin-right: 4px; }
         @keyframes fadeOut { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
         
-        #chat-input-wrapper { display: none; position: absolute; bottom: 20px; left: 10px; z-index: 98; align-items: center; gap: 6px; width: calc(100% - 20px); max-width: 400px; }
+        #chat-input-wrapper { display: none; position: absolute; bottom: calc(var(--safe-bottom) + 20px); left: 10px; z-index: 98; align-items: center; gap: 6px; width: calc(100% - 20px); max-width: 400px; }
         #chat-input-wrapper.show { display: flex; }
         #chat-input { flex: 1; background: rgba(15,18,26,0.9); border: 3px solid var(--accent-cyan); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 1rem; font-weight: bold; outline: none; box-shadow: 0 4px 0 #000; pointer-events: auto; }
         
-        /* モーダル群 */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 16px; backdrop-filter: blur(4px); }
         .modal-box { background: var(--bg-surface); border: 4px solid #000; border-radius: 16px; width: 100%; max-width: 550px; padding: 20px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 10px 0 #000; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px dashed var(--border-bold); padding-bottom: 10px; margin-bottom: 16px; }
@@ -74,7 +69,6 @@
         .stage-card:active { transform: translateY(3px); box-shadow: none; } .st-title { font-weight: 900; color: var(--accent-gold); font-size: 1.05rem; } .st-author { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; } .st-stats { font-size: 0.8rem; color: var(--accent-cyan); font-weight: bold; margin-top: 4px; }
         .flex-btns { display: flex; gap: 8px; margin-top: 10px; }
         #screen-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 200; transition: opacity 0.1s; }
-        
         @media (max-width: 650px) { .hide-sm { display: none; } .btn-retro { padding: 6px 8px; } #top-bar { padding: 6px 8px; } #hud { top: 62px; } }
     </style>
 </head>
@@ -90,8 +84,7 @@
             <button class="zoom-btn" onclick="adjustZoom(-0.15)">－</button><span class="zoom-val" id="zoom-text">100%</span><button class="zoom-btn" onclick="adjustZoom(0.15)">＋</button>
         </div>
         <div style="display: flex; gap: 6px;">
-            <!-- マルチプレイ・日替わりロビー参加ボタン -->
-            <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わりロビー</span></button>
+            <button class="btn-retro btn-fire" onclick="joinDailyLobby()">🔥 <span class="hide-sm">日替わり</span></button>
             <button class="btn-retro" onclick="openModal('modal-io')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span class="hide-sm">I/O</span></button>
             <button class="btn-retro btn-cyan" onclick="openLoadModal()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><span class="hide-sm">探す</span></button>
             <button class="btn-retro btn-gold" onclick="openSaveModal()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg><span class="hide-sm">公開</span></button>
@@ -107,9 +100,7 @@
         <div class="hud-badge" id="hud-mp-status" style="display:none; background: rgba(255,71,87,0.8); color:#fff;">👥 接続: <span id="hud-mp-count">1</span>人</div>
     </div>
 
-    <!-- チャットログ表示エリア -->
     <div id="chat-log-container"></div>
-    <!-- チャット入力枠 -->
     <div id="chat-input-wrapper">
         <input type="text" id="chat-input" placeholder="Enterでチャット送信..." maxlength="60" autocomplete="off">
     </div>
@@ -143,7 +134,6 @@
         <div class="ctrl-btn" id="btn-jump" style="background: rgba(0,229,255,0.3); border-color: #00e5ff;"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg></div>
     </div>
 
-    <!-- モーダル群 (I/O, 公開, ロード) -->
     <div id="modal-io" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-io')">
         <div class="modal-box">
             <div class="modal-header">
@@ -184,16 +174,11 @@
     </div>
 
 <script>
-function escapeHtml(str) { 
-    return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; 
-}
-
+function escapeHtml(str) { return str ? String(str).replace(/[&<>"']/g, match => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[match])) : ''; }
 function showToast(text) {
-    const t = document.getElementById('toast-msg');
-    const txt = document.getElementById('toast-text');
-    if (!t || !txt) return;
-    txt.innerText = text;
-    t.classList.add('show');
+    const t = document.getElementById('toast-msg'); 
+    document.getElementById('toast-text').innerText = text;
+    t.classList.add('show'); 
     setTimeout(() => { t.classList.remove('show'); }, 2500);
 }
 
@@ -301,7 +286,7 @@ let player = {
     warpCooldown: 0, scaleX: 1, scaleY: 1, boostTimer: 0, invincibleTimer: 0,
     hasSpider: false, hasNewSpider: false, hook: null, hookDist: 0,
     lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false,
-    startX: 0, startY: 0, chatTimer: 0, chatMessage: ""
+    startX: 80, startY: 80, chatTimer: 0, chatMessage: ""
 };
 
 let isCircuitActive = false; 
@@ -328,14 +313,11 @@ let otherPlayers = {};
 let syncInterval = null;
 
 // ==========================================
-// マルチプレイ・チャット機能
+// マルチプレイ・チャット
 // ==========================================
 function joinDailyLobby() {
     fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } })
-    .then(r => {
-        if (!r.ok) throw new Error("ロビーが見つかりません。");
-        return r.json();
-    })
+    .then(r => { if (!r.ok) throw new Error("ロビーが見つかりません。"); return r.json(); })
     .then(data => {
         const stage = data.stage;
         let p = JSON.parse(stage.map_data);
@@ -346,7 +328,6 @@ function joinDailyLobby() {
         isMultiplayer = true;
         updateCourseHUDInfo();
         document.getElementById('hud-mp-status').style.display = 'flex';
-        
         initWebSocket();
         showToast("🔥 日替わりロビーに参加しました！");
     })
@@ -354,17 +335,14 @@ function joinDailyLobby() {
 }
 
 function initWebSocket() {
-    if (socket) { socket.close(); }
+    if (socket) socket.close();
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = protocol + '//' + location.host + '/ws/maker/daily?token=' + localStorage.getItem('access_token');
     
     socket = new WebSocket(wsUrl);
     otherPlayers = {};
     
-    socket.onopen = () => {
-        syncInterval = setInterval(syncPlayerPos, 50);
-    };
-    
+    socket.onopen = () => { syncInterval = setInterval(syncPlayerPos, 50); };
     socket.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'player_join') {
@@ -393,7 +371,6 @@ function initWebSocket() {
             for(let i=0; i<30; i++) createParticles(player.x + (Math.random()-0.5)*200, player.y - 100 + (Math.random()-0.5)*200, '#ffd700', 3);
         }
     };
-    
     socket.onclose = () => {
         clearInterval(syncInterval);
         document.getElementById('hud-mp-status').style.display = 'none';
@@ -421,11 +398,9 @@ function sendChatMessage(text) {
 
 function displayChatBubble(id, text) {
     if (id === 'self') {
-        player.chatMessage = text;
-        player.chatTimer = 240; 
+        player.chatMessage = text; player.chatTimer = 240; 
     } else if (otherPlayers[id]) {
-        otherPlayers[id].chatMessage = text;
-        otherPlayers[id].chatTimer = 240;
+        otherPlayers[id].chatMessage = text; otherPlayers[id].chatTimer = 240;
     }
 }
 
@@ -473,7 +448,7 @@ function toggleChatMobile() {
 }
 
 // ==========================================
-// 画面・マップ初期化
+// 初期化・リサイズ・カメラ
 // ==========================================
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
@@ -481,30 +456,35 @@ function initMap() {
         mapData[MAP_ROWS-1][c] = T.BLOCK; 
         mapData[MAP_ROWS-2][c] = T.BLOCK; 
         if (c === 0 || c === MAP_COLS-1) {
-            for (let r = 0; r < MAP_ROWS; r++) { mapData[r][c] = T.BLOCK; }
+            for (let r = 0; r < MAP_ROWS; r++) mapData[r][c] = T.BLOCK;
         }
     }
     mapData[MAP_ROWS-4][3] = T.START; 
     mapData[MAP_ROWS-4][15] = T.GOAL;
-    warpPairs = []; 
-    pendingWarp = null; 
+    warpPairs = []; pendingWarp = null; 
     updateCourseHUDInfo();
 }
 
 function focusCameraOnStart() {
+    const viewW = window.innerWidth / zoomScale;
+    const viewH = window.innerHeight / zoomScale;
+    let found = false;
     for (let r = 0; r < MAP_ROWS; r++) {
+        if(!mapData[r]) continue;
         for (let c = 0; c < MAP_COLS; c++) {
             if (mapData[r][c] === T.START) {
-                const viewW = window.innerWidth / zoomScale;
-                const viewH = window.innerHeight / zoomScale;
                 const startX = c * TILE_SIZE + TILE_SIZE / 2;
                 const startY = r * TILE_SIZE + TILE_SIZE / 2;
                 camera.x = Math.max(0, Math.min(MAP_COLS * TILE_SIZE - viewW, startX - viewW / 2));
                 camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, startY - viewH / 2));
-                return;
+                found = true; break;
             }
         }
+        if(found) break;
     }
+    // NaN回避（画面サイズ0の時など）
+    if(isNaN(camera.x)) camera.x = 0;
+    if(isNaN(camera.y)) camera.y = 0;
 }
 
 function setPalCat(cat, btn) {
@@ -520,9 +500,8 @@ function setPalCat(cat, btn) {
 
 function selectBrush(id) { 
     currentBrush = id; 
-    document.querySelectorAll('.palette-item').forEach(el => { el.classList.toggle('selected', parseInt(el.dataset.id) === id); });
+    document.querySelectorAll('.palette-item').forEach(el => el.classList.toggle('selected', parseInt(el.dataset.id) === id));
 }
-
 function togglePalette() { document.getElementById('palette-wrap').classList.toggle('collapsed'); }
 
 function adjustZoom(delta) { 
@@ -543,15 +522,21 @@ function resize() {
         const viewH = window.innerHeight / zoomScale;
         camera.x = Math.max(0, Math.min(MAP_COLS * TILE_SIZE - viewW, camera.x));
         camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, camera.y));
+        if(isNaN(camera.x)) camera.x = 0;
+        if(isNaN(camera.y)) camera.y = 0;
     }
 }
 
+window.addEventListener('resize', resize);
+initMap(); 
+setPalCat('all', document.querySelector('.pal-tab.active')); 
+resize(); 
+focusCameraOnStart();
+
 function setMode(newMode) {
     mode = newMode;
-    
     document.getElementById('btn-edit').classList.toggle('active', mode === 'edit');
     document.getElementById('btn-play').classList.toggle('active', mode === 'play');
-    
     document.getElementById('palette-wrap').style.display = (mode === 'play') ? 'none' : 'flex';
     document.getElementById('mobile-controls').style.display = (mode === 'play' && isMobile) ? 'flex' : 'none';
     document.getElementById('hud-switch-status').style.display = (mode === 'play') ? 'flex' : 'none';
@@ -565,12 +550,13 @@ function setMode(newMode) {
         document.getElementById('hud-mp-status').style.display = 'none';
         chatWrapper.classList.remove('show');
         activeMapData = []; 
+        resize();
         focusCameraOnStart(); 
     }
 }
 
 function startPlay() {
-    activeMapData = JSON.parse(savedMapDataStr);
+    try { activeMapData = JSON.parse(savedMapDataStr); } catch(e) { activeMapData = []; }
     if (!activeMapData || activeMapData.length === 0) activeMapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
 
     enemies = []; beamEmitters = []; projectiles = []; particles = []; trails = []; crosses = []; lifts = []; leverStates = {}; crumbleBlocks = {};
@@ -581,7 +567,7 @@ function startPlay() {
         warpCooldown: 0, scaleX: 1, scaleY: 1, boostTimer: 0, invincibleTimer: 0,
         hasSpider: false, hasNewSpider: false, hook: null, hookDist: 0,
         lastLevers: new Set(), gravityDir: 1, doubleJump: false, dashShoes: false, doubleJumpUsed: false,
-        startX: 2*TILE_SIZE, startY: 2*TILE_SIZE, chatTimer: 0, chatMessage: ""
+        startX: 80, startY: 80, chatTimer: 0, chatMessage: ""
     };
     
     isCircuitActive = false; activeSwitchCount = 0; screenShake = 0;
@@ -595,62 +581,39 @@ function startPlay() {
             const t = activeMapData[r][c];
             if (!t || t === 0) continue;
             
-            if (t === T.COIN) {
-                totalCoinsInStage++;
-            } else if (t === T.START) { 
+            if (t === T.COIN) { totalCoinsInStage++; }
+            else if (t === T.START) { 
                 player.startX = c * TILE_SIZE + (TILE_SIZE - player.w) / 2; 
                 player.startY = r * TILE_SIZE + (TILE_SIZE - player.h); 
                 player.x = player.startX; player.y = player.startY;
                 startFound = true; 
-            } else if (t === T.ENEMY) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 1 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY2) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 2, jumpTmr: 0 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_H) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 24)/2, vx: 2, vy: 0, w: 28, h: 24, blink: 0, type: 3 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_V) {
-                enemies.push({ x: c * TILE_SIZE + (TILE_SIZE - 24)/2, y: r * TILE_SIZE, vx: 0, vy: 2, w: 24, h: 28, blink: 0, type: 4 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_SNIPER) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: 0, vy: 0, w: 28, h: 28, blink: 0, type: 5, tmr: 0 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_GOLGO) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 36), vx: 0, vy: 0, w: 28, h: 36, blink: 0, type: 6, tmr: 0, aimAngle: 0 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_SHELL) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -1.5, vy: 0, w: 28, h: 28, blink: 0, type: 7, state: 'walk' });
-                activeMapData[r][c] = 0;
-            } else if (t === T.ENEMY_GHOST) {
-                enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: 0, vy: 0, w: 28, h: 28, blink: 0, type: 8 });
-                activeMapData[r][c] = 0;
-            } else if ([T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING].includes(t)) {
-                beamEmitters.push({ r, c, type: t, tmr: Math.floor(Math.random() * 90) });
-            } else if (t === T.CROSS) {
-                crosses.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 0, vy: 0, w: TILE_SIZE, h: TILE_SIZE });
-                activeMapData[r][c] = 0; 
-            } else if (t === T.LIFT_H) {
-                lifts.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 2, vy: 0, w: TILE_SIZE, h: 12 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.LIFT_V) {
-                lifts.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 0, vy: 2, w: TILE_SIZE, h: 12 });
-                activeMapData[r][c] = 0;
-            } else if (t === T.LEVER) {
-                leverStates[`${r},${c}`] = false;
             }
+            else if (t === T.ENEMY) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 1 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY2) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -2, vy: 0, w: 28, h: 28, blink: 0, type: 2, jumpTmr: 0 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_H) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 24)/2, vx: 2, vy: 0, w: 28, h: 24, blink: 0, type: 3 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_V) { enemies.push({ x: c * TILE_SIZE + (TILE_SIZE - 24)/2, y: r * TILE_SIZE, vx: 0, vy: 2, w: 24, h: 28, blink: 0, type: 4 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_SNIPER) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: 0, vy: 0, w: 28, h: 28, blink: 0, type: 5, tmr: 0 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_GOLGO) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 36), vx: 0, vy: 0, w: 28, h: 36, blink: 0, type: 6, tmr: 0, aimAngle: 0 }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_SHELL) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: -1.5, vy: 0, w: 28, h: 28, blink: 0, type: 7, state: 'walk' }); activeMapData[r][c] = 0; }
+            else if (t === T.ENEMY_GHOST) { enemies.push({ x: c * TILE_SIZE, y: r * TILE_SIZE + (TILE_SIZE - 28), vx: 0, vy: 0, w: 28, h: 28, blink: 0, type: 8 }); activeMapData[r][c] = 0; }
+            else if ([T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING].includes(t)) { beamEmitters.push({ r, c, type: t, tmr: Math.floor(Math.random() * 90) }); }
+            else if (t === T.CROSS) { crosses.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 0, vy: 0, w: TILE_SIZE, h: TILE_SIZE }); activeMapData[r][c] = 0; }
+            else if (t === T.LIFT_H) { lifts.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 2, vy: 0, w: TILE_SIZE, h: 12 }); activeMapData[r][c] = 0; }
+            else if (t === T.LIFT_V) { lifts.push({ x: c*TILE_SIZE, y: r*TILE_SIZE, vx: 0, vy: 2, w: TILE_SIZE, h: 12 }); activeMapData[r][c] = 0; }
+            else if (t === T.LEVER) { leverStates[`${r},${c}`] = false; }
         }
     }
     
-    if (!startFound) { player.x = 2 * TILE_SIZE; player.y = 2 * TILE_SIZE; }
+    if (!startFound) { player.x = player.startX; player.y = player.startY; }
     
     updateHUD(); 
-    
+    resize();
     const viewW = window.innerWidth / zoomScale;
     const viewH = window.innerHeight / zoomScale;
     camera.x = Math.max(0, Math.min(MAP_COLS * TILE_SIZE - viewW, player.x + player.w/2 - viewW / 2)); 
     camera.y = Math.max(0, Math.min(MAP_ROWS * TILE_SIZE - viewH, player.y + player.h/2 - viewH / 2));
+    if(isNaN(camera.x)) camera.x = 0;
+    if(isNaN(camera.y)) camera.y = 0;
 }
 
 function updateCourseHUDInfo() {
@@ -737,7 +700,7 @@ function win() {
 }
 
 // ==========================================
-// 入力・操作
+// 入力イベント（スワイプバック完全防止）
 // ==========================================
 function isChatFocused() { return document.activeElement === chatInput; }
 
@@ -761,31 +724,21 @@ function doJump() {
     if (player.state !== 'idle') return;
     
     if (player.hook) { 
-        player.hook = null; 
-        player.vy = -10 * player.gravityDir; 
+        player.hook = null; player.vy = -10 * player.gravityDir; 
         if (player.hasSpider) player.vx *= 1.2;
-        screenShake = 6;
-        createParticles(player.x + player.w/2, player.y + (player.gravityDir>0?player.h:0), '#fff', 15);
+        screenShake = 6; createParticles(player.x + player.w/2, player.y + (player.gravityDir>0?player.h:0), '#fff', 15);
         return; 
     }
     
     if (player.grounded) { 
-        player.vy = -12 * player.gravityDir; 
-        player.grounded = false; 
-        player.doubleJumpUsed = false;
-        player.scaleX = 0.6; player.scaleY = 1.4; 
-        createParticles(player.x + player.w/2, player.y + (player.gravityDir>0?player.h:0), '#fff', 8); 
+        player.vy = -12 * player.gravityDir; player.grounded = false; player.doubleJumpUsed = false;
+        player.scaleX = 0.6; player.scaleY = 1.4; createParticles(player.x + player.w/2, player.y + (player.gravityDir>0?player.h:0), '#fff', 8); 
     } else if (player.doubleJump && !player.doubleJumpUsed) { 
-        player.vy = -12 * player.gravityDir; 
-        player.doubleJumpUsed = true;
-        player.scaleX = 0.6; player.scaleY = 1.4; 
-        createParticles(player.x + player.w/2, player.y + player.h/2, '#a29bfe', 15); 
+        player.vy = -12 * player.gravityDir; player.doubleJumpUsed = true;
+        player.scaleX = 0.6; player.scaleY = 1.4; createParticles(player.x + player.w/2, player.y + player.h/2, '#a29bfe', 15); 
     } else if (player.touchingWall !== 0) { 
-        player.vy = -11.5 * player.gravityDir; 
-        player.vx = player.touchingWall * -9; 
-        player.faceDir = -player.touchingWall; 
-        player.scaleX = 0.6; player.scaleY = 1.4; 
-        screenShake = 4; 
+        player.vy = -11.5 * player.gravityDir; player.vx = player.touchingWall * -9; player.faceDir = -player.touchingWall; 
+        player.scaleX = 0.6; player.scaleY = 1.4; screenShake = 4; 
         const px = player.x + player.w/2 + (player.touchingWall === 1 ? player.w/2 : -player.w/2);
         createParticles(px, player.y + player.h/2, '#00e5ff', 12); 
     }
@@ -800,8 +753,7 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     
     if (mode === 'play') {
         if ((player.hasSpider || player.hasNewSpider) && !isRightClick && player.boostTimer === 0) {
-            let bestDist = Infinity;
-            let target = null;
+            let bestDist = Infinity; let target = null;
             for (let r = row - 2; r <= row + 2; r++) {
                 if (!activeMapData[r]) continue;
                 for (let c = col - 2; c <= col + 2; c++) {
@@ -818,20 +770,11 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     
     if (row >= 0 && row < MAP_ROWS && col >= 0 && col < MAP_COLS) {
         if (!mapData[row]) mapData[row] = new Array(MAP_COLS).fill(0);
-
         if (input.rightDown || isRightClick) {
-            if (mapData[row][col] === T.WARP) { 
-                warpPairs = warpPairs.filter(wp => !(wp.r1===row && wp.c1===col) && !(wp.r2===row && wp.c2===col)); 
-                if (pendingWarp && pendingWarp.r===row && pendingWarp.c===col) pendingWarp = null; 
-            }
+            if (mapData[row][col] === T.WARP) { warpPairs = warpPairs.filter(wp => !(wp.r1===row && wp.c1===col) && !(wp.r2===row && wp.c2===col)); if (pendingWarp && pendingWarp.r===row && pendingWarp.c===col) pendingWarp = null; }
             mapData[row][col] = 0; 
         } else if (currentBrush === T.START) { 
-            for (let y = 0; y < MAP_ROWS; y++) {
-                if (!mapData[y]) continue;
-                for (let x = 0; x < MAP_COLS; x++) {
-                    if (mapData[y][x] === T.START) mapData[y][x] = 0; 
-                }
-            }
+            for (let y = 0; y < MAP_ROWS; y++) { if (!mapData[y]) continue; for (let x = 0; x < MAP_COLS; x++) { if (mapData[y][x] === T.START) mapData[y][x] = 0; } }
             mapData[row][col] = T.START;
         } else if (currentBrush === T.WARP) {
             if (mapData[row][col] !== T.WARP) {
@@ -843,22 +786,39 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     }
 }
 
+// マウスイベント
 canvas.addEventListener('mousedown', e => { if (e.button === 0) input.isDown = true; if (e.button === 2) input.rightDown = true; handleInputCoords(e.clientX, e.clientY, e.button === 2); });
 window.addEventListener('mouseup', () => { input.isDown = false; input.rightDown = false; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
 canvas.addEventListener('mousemove', e => { if (mode === 'edit' && input.rightDown && currentBrush === T.PAN) { camera.x -= e.movementX / zoomScale; camera.y -= e.movementY / zoomScale; } else if (mode === 'edit' && input.isDown && currentBrush !== T.PAN) handleInputCoords(e.clientX, e.clientY, false); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-const bindBtn = (id, k) => { const b = document.getElementById(id); b.addEventListener('touchstart', e => { e.preventDefault(); if (k === 'jump' && !keys.jump) doJump(); keys[k] = true; }, { passive: false }); b.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; }, { passive: false }); };
+// ボタンイベント (preventDefaultで操作奪われを防止)
+const bindBtn = (id, k) => { 
+    const b = document.getElementById(id);
+    if(!b) return;
+    b.addEventListener('touchstart', e => { e.preventDefault(); if (k === 'jump' && !keys.jump) doJump(); keys[k] = true; }, { passive: false }); 
+    b.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; }, { passive: false }); 
+};
 bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-jump', 'jump');
 
+// Canvasタッチイベント（preventDefaultでスワイプバックを強力にブロック）
 let lastTouch = null;
-canvas.addEventListener('touchstart', e => { if (e.touches.length === 1 && !isChatFocused()) { lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; input.isDown = true; if (mode === 'play' || currentBrush !== T.PAN) handleInputCoords(lastTouch.x, lastTouch.y, false); } });
-canvas.addEventListener('touchmove', e => { if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } }, { passive: false });
-canvas.addEventListener('touchend', () => { input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
+canvas.addEventListener('touchstart', e => { 
+    e.preventDefault(); 
+    if (e.touches.length === 1 && !isChatFocused()) { lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; input.isDown = true; if (mode === 'play' || currentBrush !== T.PAN) handleInputCoords(lastTouch.x, lastTouch.y, false); } 
+}, { passive: false });
+canvas.addEventListener('touchmove', e => { 
+    e.preventDefault(); 
+    if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } 
+}, { passive: false });
+canvas.addEventListener('touchend', e => { 
+    e.preventDefault(); 
+    input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } 
+}, { passive: false });
 
-// ==========================================
-// 物理・ギミック処理
-// ==========================================
+/* =========================================================
+   物理演算 & ギミック
+========================================================= */
 function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.HIDDEN_BLOCK, T.ICE_BLOCK, T.CRUMBLE_BLOCK].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
 function rectIntersect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
 
@@ -1152,15 +1112,10 @@ function checkColl(isX) {
     }
 }
 
-// ==========================================
-// 描画関連
-// ==========================================
-function roundRect(ctx, x, y, w, h, r) { 
-    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); 
-    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); 
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); 
-    ctx.closePath(); ctx.fill(); ctx.stroke(); 
-}
+/* =========================================================
+   描画
+========================================================= */
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
 
 function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
@@ -1211,16 +1166,10 @@ function drawChatBubble(ctx, x, y, text) {
     ctx.lineWidth = 2;
     roundRect(ctx, bx, by, bw, bh, 6);
     
-    ctx.beginPath();
-    ctx.moveTo(x - 5, by + bh);
-    ctx.lineTo(x, by + bh + 6);
-    ctx.lineTo(x + 5, by + bh);
-    ctx.fill();
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 5, by + bh); ctx.lineTo(x, by + bh + 6); ctx.lineTo(x + 5, by + bh); ctx.fill(); ctx.stroke();
     
     ctx.fillStyle = '#000';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, x, by + bh / 2);
     ctx.restore();
 }
@@ -1252,14 +1201,9 @@ function drawPlayer(ctx, p, isSelf) {
 
     if (!isSelf && p.name) {
         ctx.save();
-        ctx.font = '900 10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
+        ctx.font = '900 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
         const nText = (p.is_king ? '👑 ' : '') + p.name;
-        ctx.strokeText(nText, p.x + 13, p.y - 8);
-        ctx.fillText(nText, p.x + 13, p.y - 8);
+        ctx.strokeText(nText, p.x + 13, p.y - 8); ctx.fillText(nText, p.x + 13, p.y - 8);
         ctx.restore();
     }
     
@@ -1281,6 +1225,9 @@ function draw() {
         camera.x += (player.x + player.w / 2 - vW / 2 - camera.x) * 0.15; 
         camera.y += (player.y + player.h / 2 - vH / 2 + (isMobile ? 80 / zoomScale : 0) - camera.y) * 0.15; 
     }
+    // NaN回避
+    if(isNaN(camera.x)) camera.x = 0; if(isNaN(camera.y)) camera.y = 0;
+    
     camera.x = Math.max(0, Math.min(MAP_COLS * 40 - vW, camera.x)); 
     camera.y = Math.max(0, Math.min(MAP_ROWS * 40 - vH, camera.y));
     
@@ -1348,7 +1295,6 @@ function draw() {
         if (isMultiplayer) {
             for (let id in otherPlayers) { drawPlayer(ctx, otherPlayers[id], false); }
         }
-        
         drawPlayer(ctx, player, true);
     }
     
@@ -1364,9 +1310,9 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
-// ==========================================
-// API・保存通信・イベント系
-// ==========================================
+/* =========================================================
+   API・通信系
+========================================================= */
 const token = localStorage.getItem("access_token");
 function openModal(id) { document.getElementById(id).style.display = 'flex'; } 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -1385,8 +1331,7 @@ function importDataMRM1(e) {
     r.onload = ev => { 
         try { 
             const d = JSON.parse(ev.target.result); 
-            mapData = d.map || d; 
-            warpPairs = d.warps || []; 
+            mapData = d.map || d; warpPairs = d.warps || []; 
             setMode('edit'); closeModal('modal-io'); showToast("ロード完了"); 
         } catch(err) { alert("不正なファイルです"); } 
     }; 
@@ -1492,17 +1437,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 const d = JSON.parse(saved);
                 const loadedMap = d.map || d;
                 if (loadedMap && loadedMap.length > 0 && loadedMap[0] && loadedMap[0].length > 0) {
-                    mapData = loadedMap;
-                    warpPairs = d.warps || [];
-                } else {
-                    initMap();
-                }
-            } catch(e) {
-                initMap();
-            }
-        } else {
-            initMap();
-        }
+                    mapData = loadedMap; warpPairs = d.warps || [];
+                } else { initMap(); }
+            } catch(e) { initMap(); }
+        } else { initMap(); }
     }
 });
 
