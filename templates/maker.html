@@ -45,7 +45,7 @@
         #toast-msg { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); background: rgba(255,42,95,0.95); color: #fff; border: 3px solid #000; padding: 8px 16px; border-radius: 20px; font-weight: 900; font-size: 0.9rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 140; box-shadow: 0 4px 0 #000; }
         #toast-msg.show { opacity: 1; }
         
-        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
+        #gameCanvas { display: block; width: 100vw; height: 100dvh; touch-action: none; cursor: crosshair; }
         
         #chat-log-container { position: absolute; bottom: 80px; left: 10px; width: 300px; max-height: 150px; overflow-y: hidden; z-index: 92; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
         .chat-line { background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #fff; font-weight: bold; text-shadow: 1px 1px 0 #000; animation: fadeOut 8s forwards; }
@@ -328,18 +328,29 @@ function createParticles(x, y, color, count = 10) {
     }
 }
 
+function leaveLobby(restore) {
+    wsGen++; clearInterval(syncInterval); syncInterval = null;
+    if (socket) { const o = socket; socket = null; o.onclose = o.onmessage = o.onopen = null; try { o.close(); } catch (e) {} }
+    isMultiplayer = false; otherPlayers = {}; playerNames = {};
+    document.getElementById('hud-mp-status').style.display = 'none';
+    if (restore && editBackup) { const bk = editBackup; editBackup = null; mapData = normalizeMap(bk.map); warpPairs = bk.warps; currentStageInfo = bk.info; updateCourseHUDInfo(); }
+}
+
 function joinDailyLobby() {
-    fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } })
-    .then(r => { if (!r.ok) throw new Error("ロビーが見つかりません。"); return r.json(); })
+    const tk = localStorage.getItem('access_token');
+    if (!tk) { alert('ログインが必要です。'); return; }
+    fetch('/api/maker/daily', { headers: { 'Authorization': `Bearer ${tk}` } })
+    .then(async r => { if (!r.ok) { let d = {}; try { d = await r.json(); } catch (e) {} throw new Error(d.detail || `ロビー取得失敗 (${r.status})`); } return r.json(); })
     .then(data => {
-        const stage = data.stage;
-        let p = JSON.parse(stage.map_data);
+        const stage = data.stage; let p;
+        try { p = JSON.parse(stage.map_data); } catch (e) { throw new Error('今日のステージデータが壊れています。'); }
+        if (!currentStageInfo.isDaily) editBackup = { map: JSON.parse(JSON.stringify(mapData)), warps: JSON.parse(JSON.stringify(warpPairs)), info: currentStageInfo }; // 編集中データを退避
+        leaveLobby(false);
         mapData = normalizeMap(Array.isArray(p) ? p : p.map);
         warpPairs = Array.isArray(p) ? [] : (p.warps || []);
         currentStageInfo = { id: stage.id, title: "本日のロビー: " + stage.title, author: stage.creator_name, isMine: false, isDaily: true };
-        
         setMode('play');
-        isMultiplayer = true;
+        isMultiplayer = true; wsRetry = 0;
         updateCourseHUDInfo();
         document.getElementById('hud-mp-status').style.display = 'flex';
         initWebSocket();
@@ -348,47 +359,52 @@ function joinDailyLobby() {
 }
 
 function initWebSocket() {
-    if (socket) socket.close();
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = protocol + '//' + location.host + '/ws/maker/daily?token=' + localStorage.getItem('access_token');
-    
-    socket = new WebSocket(wsUrl);
-    otherPlayers = {};
-    
-    socket.onopen = () => { syncInterval = setInterval(syncPlayerPos, 50); };
-    socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'player_join') {
-            document.getElementById('hud-mp-count').innerText = msg.total_players;
-        } else if (msg.type === 'player_leave') {
-            delete otherPlayers[msg.id];
-            document.getElementById('hud-mp-count').innerText = msg.total_players;
-        } else if (msg.type === 'pos') {
-            if (!otherPlayers[msg.id]) {
-                otherPlayers[msg.id] = { ...msg, x: msg.x, y: msg.y, targetX: msg.x, targetY: msg.y, chatTimer: 0, chatMessage: "" };
-            } else {
-                let op = otherPlayers[msg.id];
-                op.targetX = msg.x; op.targetY = msg.y; op.vx = msg.vx; op.vy = msg.vy; op.faceDir = msg.faceDir;
-                op.gravityDir = msg.gravityDir; op.hook = msg.hook; op.isSpider = msg.isSpider;
-                if(msg.name) op.name = msg.name; if(msg.is_king !== undefined) op.is_king = msg.is_king;
-            }
-        } else if (msg.type === 'respawn') {
-            createParticles(msg.x + 13, msg.y + 13, '#ff2a5f', 20);
-        } else if (msg.type === 'chat') {
-            displayChatBubble(msg.id, msg.text); addChatLog(msg.name, msg.text, msg.is_king);
-        } else if (msg.type === 'clear') {
-            addChatLog("システム", `${msg.name} がゴールしました！（${msg.time}秒）`);
-            for(let i=0; i<30; i++) createParticles(player.x + (Math.random()-0.5)*200, player.y - 100 + (Math.random()-0.5)*200, '#ffd700', 3);
-        }
+    const gen = ++wsGen; clearInterval(syncInterval); syncInterval = null;
+    if (socket) { const o = socket; socket = null; o.onclose = o.onmessage = o.onopen = null; try { o.close(); } catch (e) {} }
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws/maker/daily?token=${encodeURIComponent(localStorage.getItem('access_token') || '')}`);
+    socket = ws;
+    ws.onopen = () => { if (gen !== wsGen) return; wsRetry = 0; syncInterval = setInterval(syncPlayerPos, 50); };
+    ws.onmessage = ev => { if (gen !== wsGen) return; let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; } handleLobbyMsg(msg); };
+    ws.onclose = ev => {
+        if (gen !== wsGen) return;
+        clearInterval(syncInterval); syncInterval = null; otherPlayers = {};
+        if (!(mode === 'play' && isMultiplayer)) return;
+        if (ev.code === 4401) { showToast('認証に失敗しました。再ログインしてください'); leaveLobby(false); return; }
+        if (ev.code === 4000) { showToast('別の画面で接続されました'); leaveLobby(false); return; }
+        if (wsRetry < 5) { wsRetry++; showToast(`接続が切れました。再接続中... (${wsRetry}/5)`); setTimeout(() => { if (gen === wsGen && mode === 'play' && isMultiplayer) initWebSocket(); }, 1000 * wsRetry); }
+        else { showToast('ロビーとの接続が切れました'); leaveLobby(false); }
     };
-    socket.onclose = () => {
-        clearInterval(syncInterval); document.getElementById('hud-mp-status').style.display = 'none'; isMultiplayer = false;
-    };
+}
+
+function handleLobbyMsg(msg) {
+    const cnt = document.getElementById('hud-mp-count');
+    if (msg.type === 'welcome') {
+        myLobbyId = msg.self; playerNames = {}; (msg.players || []).forEach(p => { playerNames[p.id] = p; }); cnt.innerText = (msg.players || []).length + 1;
+    } else if (msg.type === 'player_join') {
+        playerNames[msg.id] = { name: msg.name, is_king: msg.is_king }; cnt.innerText = msg.total_players;
+        if (otherPlayers[msg.id]) { otherPlayers[msg.id].name = msg.name; otherPlayers[msg.id].is_king = msg.is_king; }
+    } else if (msg.type === 'player_leave') {
+        delete otherPlayers[msg.id]; delete playerNames[msg.id]; cnt.innerText = msg.total_players;
+    } else if (msg.type === 'pos') {
+        let op = otherPlayers[msg.id];
+        if (!op) { const nm = playerNames[msg.id] || {}; op = otherPlayers[msg.id] = { x: msg.x, y: msg.y, targetX: msg.x, targetY: msg.y, scaleX: 1, scaleY: 1, chatTimer: 0, chatMessage: "", name: nm.name, is_king: nm.is_king }; }
+        op.targetX = msg.x; op.targetY = msg.y; op.vx = msg.vx; op.vy = msg.vy; op.faceDir = msg.faceDir; op.gravityDir = msg.gravityDir; op.hook = msg.hook; op.isSpider = msg.isSpider; op.seen = Date.now();
+    } else if (msg.type === 'respawn') {
+        createParticles(msg.x + 13, msg.y + 13, '#ff2a5f', 20);
+    } else if (msg.type === 'chat') {
+        if (msg.id === myLobbyId) return;
+        if (msg.id !== undefined && otherPlayers[msg.id]) displayChatBubble(msg.id, msg.text);
+        addChatLog(msg.name, msg.text, msg.is_king);
+    } else if (msg.type === 'clear') {
+        addChatLog("システム", `${msg.name} がゴールしました！（${msg.time}秒）`);
+        for (let i = 0; i < 30; i++) createParticles(player.x + (Math.random() - 0.5) * 200, player.y - 100 + (Math.random() - 0.5) * 200, '#ffd700', 3);
+    }
 }
 
 function syncPlayerPos() {
     if (socket && socket.readyState === WebSocket.OPEN && player.state !== 'dead') {
-        socket.send(JSON.stringify({ type: 'pos', x: player.x, y: player.y, vx: player.vx, vy: player.vy, faceDir: player.faceDir, gravityDir: player.gravityDir, hook: player.hook, isSpider: (player.hasSpider || player.hasNewSpider) }));
+        socket.send(JSON.stringify({ type: 'pos', x: player.x, y: player.y, vx: player.vx, vy: player.vy, faceDir: player.faceDir, gravityDir: player.gravityDir, hook: player.hook ? { x: player.hook.x, y: player.hook.y } : null, isSpider: (player.hasSpider || player.hasNewSpider) }));
     }
 }
 
@@ -432,6 +448,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function toggleChatMobile() {
+    if (!isMultiplayer) { showToast('チャットは日替わりロビー専用です'); return; }
     if (chatWrapper.classList.contains('show')) { chatWrapper.classList.remove('show'); chatInput.blur(); } 
     else { chatWrapper.classList.add('show'); chatInput.focus(); }
 }
@@ -515,7 +532,7 @@ function setMode(newMode) {
     if (mode === 'play') {
         savedMapDataStr = JSON.stringify(mapData); startPlay();
     } else {
-        if(socket) { socket.close(); socket = null; isMultiplayer = false; }
+        leaveLobby(true);
         document.getElementById('hud-mp-status').style.display = 'none'; chatWrapper.classList.remove('show');
         activeMapData = []; resize(); focusCameraOnStart(); 
     }
@@ -523,7 +540,7 @@ function setMode(newMode) {
 
 function startPlay() {
     activeMapData = normalizeMap(JSON.parse(savedMapDataStr));
-    enemies = []; beamEmitters = []; projectiles = []; particles = []; trails = []; crosses = []; lifts = []; leverStates = {}; crumbleBlocks = {};
+    globalFrame = 0; slowFrames = 0; jumpBuf = 0; input.isDown = false; enemies = []; beamEmitters = []; projectiles = []; particles = []; trails = []; crosses = []; lifts = []; leverStates = {}; crumbleBlocks = {};
     
     player = { 
         x: 0, y: 0, vx: 0, vy: 0, w: 26, h: 26, state: 'idle', coins: 0, hasKey: false, grounded: false, touchingWall: 0, faceDir: 1, 
@@ -560,7 +577,7 @@ function startPlay() {
             else if (t === T.LEVER) { leverStates[`${r},${c}`] = false; }
         }
     }
-    if (!startFound) { player.x = player.startX; player.y = player.startY; }
+    if (!startFound) { player.startX = 60; player.startY = (MAP_ROWS - 2) * 40 - player.h; player.x = player.startX; player.y = player.startY; }
     
     updateHUD(); resize();
     const vW = Math.max(1, window.innerWidth) / zoomScale; const vH = Math.max(1, window.innerHeight) / zoomScale;
@@ -593,11 +610,10 @@ function updateHUD() {
 
 function die() {
     if (player.state === 'dead' || player.state === 'clear') return;
-    if (isMultiplayer) {
+    if (isMultiplayer) { if (dieLock) return; dieLock = true;
         createParticles(player.x + player.w/2, player.y + player.h/2, '#ff2a5f', 30);
         if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type: 'respawn', x: player.x, y: player.y}));
-        player.x = player.startX; player.y = player.startY; player.vx = 0; player.vy = 0; player.gravityDir = 1;
-        player.hasKey = false; player.coins = 0; player.invincibleTimer = 0; screenShake = 10;
+        startPlay(); screenShake = 10;
         document.getElementById('screen-flash').style.opacity = '1'; setTimeout(() => document.getElementById('screen-flash').style.opacity = '0', 50);
         return;
     }
@@ -609,20 +625,20 @@ function die() {
 
 function win() {
     if (player.state === 'clear' || player.state === 'dead') return;
-    if (player.coins < totalCoinsInStage) { showToast(`コイン残り: ${totalCoinsInStage - player.coins}枚`); return; }
+    if (player.coins < totalCoinsInStage) { if (Date.now() - lastCoinToast > 1500) { lastCoinToast = Date.now(); showToast(`コイン残り: ${totalCoinsInStage - player.coins}枚`); } return; }
     player.state = 'clear'; player.vx = 0; player.vy = 0; 
     const centerMsg = document.getElementById('center-msg'); centerMsg.innerText = "STAGE CLEAR!"; centerMsg.classList.add('show');
     
     if (isMultiplayer && socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'clear', time: (globalFrame / 60).toFixed(1) }));
+        socket.send(JSON.stringify({ type: 'clear' }));
         for(let i=0; i<50; i++) createParticles(player.x + (Math.random()-0.5)*200, player.y - 100 + (Math.random()-0.5)*200, '#ffd700', 3);
-        setTimeout(() => { player.x = player.startX; player.y = player.startY; player.state = 'idle'; centerMsg.classList.remove('show'); player.coins = 0; }, 3000);
+        setTimeout(() => { if (isMultiplayer && mode === 'play') startPlay(); centerMsg.classList.remove('show'); }, 3000);
         return;
     }
     if (currentStageInfo.id && !currentStageInfo.isDaily) {
         fetch(`/api/maker/stages/${currentStageInfo.id}/clear`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("access_token")}` } }).catch(() => {});
     }
-    setTimeout(() => { setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
+    setTimeout(() => { if (mode === 'play' && player.state === 'clear') setMode('edit'); centerMsg.classList.remove('show'); }, 2500);
 }
 
 window.addEventListener('keydown', e => {
@@ -632,13 +648,25 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { if (!keys.jump) { keys.jump = true; doJump(); } }
 });
 window.addEventListener('keyup', e => {
-    if (isChatFocused()) return;
+    
     if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
     if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
-    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { keys.jump = false; cutJump(); }
 });
 
+let myLobbyId = null, wsGen = 0, wsRetry = 0, editBackup = null, playerNames = {}, rightStart = null, jumpBuf = 0, dieLock = false, lastCoinToast = 0;
+function tileAt(r, c) { const row = activeMapData[r]; return row ? row[c] : 0; }
+function cutJump() { if (mode === 'play' && player.varJump && !player.hook && player.vy * player.gravityDir < -4) player.vy = -4 * player.gravityDir; player.varJump = false; }
 function doJump() {
+    if (player.state !== 'idle') return;
+    const vy0 = player.vy, vx0 = player.vx, hk = player.hook, wasG = player.grounded;
+    if (!player.grounded && player.coyote > 0 && !player.hook) player.grounded = true; // コヨーテタイム
+    doJumpCore();
+    const jumped = player.vy !== vy0 || player.vx !== vx0 || hk !== player.hook;
+    if (jumped) { player.coyote = 0; player.varJump = (wasG || player.coyote === 0) && !hk; jumpBuf = 0; }
+    else { player.grounded = wasG; jumpBuf = 8; } // 先行入力
+}
+function doJumpCore() {
     if (player.state !== 'idle') return;
     if (player.hook) { 
         player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2;
@@ -647,7 +675,7 @@ function doJump() {
     if (player.grounded) { 
         player.vy = -12 * player.gravityDir; player.grounded = false; player.doubleJumpUsed = false;
         player.scaleX = 0.6; player.scaleY = 1.4; createParticles(player.x + player.w/2, player.y + (player.gravityDir>0?player.h:0), '#fff', 8); 
-    } else if (player.doubleJump && !player.doubleJumpUsed) { 
+    } else if (player.touchingWall === 0 && player.doubleJump && !player.doubleJumpUsed) { 
         player.vy = -12 * player.gravityDir; player.doubleJumpUsed = true;
         player.scaleX = 0.6; player.scaleY = 1.4; createParticles(player.x + player.w/2, player.y + player.h/2, '#a29bfe', 15); 
     } else if (player.touchingWall !== 0) { 
@@ -672,9 +700,9 @@ function handleInputCoords(clientX, clientY, isRightClick) {
             for (let r = row - 2; r <= row + 2; r++) {
                 if (!activeMapData[r]) continue;
                 for (let c = col - 2; c <= col + 2; c++) {
-                    if (r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(activeMapData[r][c])) {
+                    if (r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(tileAt(r, c))) {
                         let d = Math.hypot(c * TILE_SIZE + 20 - wx, r * TILE_SIZE + 20 - wy);
-                        if (d < bestDist && d < 100) { bestDist = d; target = { x: c * TILE_SIZE + 20, y: r * TILE_SIZE + 20 }; }
+                        if (d < bestDist && d < 100 && Math.hypot(c * TILE_SIZE + 20 - (player.x + 13), r * TILE_SIZE + 20 - (player.y + 13)) < 480) { bestDist = d; target = { x: c * TILE_SIZE + 20, y: r * TILE_SIZE + 20 }; }
                     }
                 }
             }
@@ -685,6 +713,7 @@ function handleInputCoords(clientX, clientY, isRightClick) {
     
     if (row >= 0 && row < MAP_ROWS && col >= 0 && col < MAP_COLS) {
         if (!mapData[row]) mapData[row] = new Array(MAP_COLS).fill(0);
+        if (mapData[row][col] === T.WARP && (input.rightDown || isRightClick || currentBrush !== T.WARP)) removeWarpAt(row, col);
         if (input.rightDown || isRightClick) {
             if (mapData[row][col] === T.WARP) { warpPairs = warpPairs.filter(wp => !(wp.r1===row && wp.c1===col) && !(wp.r2===row && wp.c2===col)); if (pendingWarp && pendingWarp.r===row && pendingWarp.c===col) pendingWarp = null; }
             mapData[row][col] = 0; 
@@ -693,7 +722,7 @@ function handleInputCoords(clientX, clientY, isRightClick) {
             mapData[row][col] = T.START;
         } else if (currentBrush === T.WARP) {
             if (mapData[row][col] !== T.WARP) {
-                if (pendingWarp) { warpPairs.push({ id: warpPairs.length + 1, r1: pendingWarp.r, c1: pendingWarp.c, r2: row, c2: col }); pendingWarp = null; } 
+                if (pendingWarp) { warpPairs.push({ id: warpPairs.reduce((m, w) => Math.max(m, w.id || 0), 0) + 1, r1: pendingWarp.r, c1: pendingWarp.c, r2: row, c2: col }); pendingWarp = null; } 
                 else { pendingWarp = { r: row, c: col }; }
                 mapData[row][col] = T.WARP;
             }
@@ -703,12 +732,12 @@ function handleInputCoords(clientX, clientY, isRightClick) {
 
 canvas.addEventListener('mousedown', e => { 
     if (e.button === 0) input.isDown = true; 
-    if (e.button === 2) input.rightDown = true; 
-    if (mode === 'play' || (mode === 'edit' && currentBrush !== T.PAN && e.button !== 1)) {
+    if (e.button === 2) { input.rightDown = true; rightStart = { x: e.clientX, y: e.clientY }; } 
+    if (mode === 'play' || (mode === 'edit' && currentBrush !== T.PAN && e.button === 0)) {
         handleInputCoords(e.clientX, e.clientY, e.button === 2); 
     }
 });
-window.addEventListener('mouseup', () => { input.isDown = false; input.rightDown = false; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
+window.addEventListener('mouseup', (e) => { if (mode === 'edit' && rightStart && Math.hypot(e.clientX - rightStart.x, e.clientY - rightStart.y) < 5) handleInputCoords(e.clientX, e.clientY, true); rightStart = null; input.isDown = false; input.rightDown = false; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } });
 
 // 修正: マウス移動でのパン（視点移動）処理の完全化
 canvas.addEventListener('mousemove', e => { 
@@ -721,7 +750,7 @@ canvas.addEventListener('mousemove', e => {
             if(isNaN(camera.y)) camera.y=0; 
             return;
         } else if (input.isDown && currentBrush !== T.PAN) {
-            handleInputCoords(e.clientX, e.clientY, false); 
+            if (currentBrush !== T.WARP && currentBrush !== T.START) handleInputCoords(e.clientX, e.clientY, false); 
         }
     }
 });
@@ -738,7 +767,7 @@ canvas.addEventListener('wheel', e => {
 const bindBtn = (id, k) => { 
     const b = document.getElementById(id); if(!b) return;
     b.addEventListener('touchstart', e => { e.preventDefault(); if (k === 'jump' && !keys.jump) doJump(); keys[k] = true; }, { passive: false }); 
-    b.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; }, { passive: false }); 
+    b.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; if (k === 'jump') cutJump(); }, { passive: false }); 
 };
 bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-jump', 'jump');
 
@@ -749,31 +778,32 @@ canvas.addEventListener('touchstart', e => {
 }, { passive: false });
 canvas.addEventListener('touchmove', e => { 
     e.preventDefault(); 
-    if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; if(isNaN(camera.x))camera.x=0; if(isNaN(camera.y))camera.y=0; } else if (mode === 'edit' && input.isDown) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } 
+    if (e.touches.length === 1 && lastTouch) { if (mode === 'edit' && currentBrush === T.PAN) { camera.x -= (e.touches[0].clientX - lastTouch.x) / zoomScale; camera.y -= (e.touches[0].clientY - lastTouch.y) / zoomScale; lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; if(isNaN(camera.x))camera.x=0; if(isNaN(camera.y))camera.y=0; } else if (mode === 'edit' && input.isDown && currentBrush !== T.WARP && currentBrush !== T.START) handleInputCoords(e.touches[0].clientX, e.touches[0].clientY, false); } 
 }, { passive: false });
 canvas.addEventListener('touchend', e => { 
     e.preventDefault(); 
     input.isDown = false; lastTouch = null; if (mode === 'play' && player.hook) { player.hook = null; player.vy = -10 * player.gravityDir; if (player.hasSpider) player.vx *= 1.2; screenShake = 6; } 
 }, { passive: false });
 
-function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.HIDDEN_BLOCK, T.ICE_BLOCK, T.CRUMBLE_BLOCK].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
+function isSolid(t) { return [T.BLOCK, T.BRICK, T.DOOR, T.BEAM_R, T.BEAM_L, T.BEAM_U, T.BEAM_D, T.BEAM_HOMING, T.ICE_BLOCK, T.CRUMBLE_BLOCK, T.CONVEYOR_R, T.CONVEYOR_L].includes(t) || (t === T.SW_BLOCK_A && !isCircuitActive) || (t === T.SW_BLOCK_B && isCircuitActive) || (t === T.TOGGLE_DOOR && !isCircuitActive); }
 function rectIntersect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
 function getSpikeBox(r, c, t) { const bx = c * TILE_SIZE, by = r * TILE_SIZE, ts = TILE_SIZE; if (t === T.SPIKE_UP || t === T.SPIKE_TOGGLE) return { x: bx + 6, y: by + 24, w: 28, h: 16 }; if (t === T.SPIKE_DOWN) return { x: bx + 6, y: by, w: 28, h: 16 }; if (t === T.SPIKE_LEFT) return { x: bx + 24, y: by + 6, w: 16, h: 28 }; if (t === T.SPIKE_RIGHT) return { x: bx, y: by + 6, w: 16, h: 28 }; return { x: bx, y: by, w: ts, h: ts }; }
 
 function updatePhysics() {
-    globalFrame++; if (player.invincibleTimer > 0) player.invincibleTimer--; updateHUD();
+    dieLock = false; globalFrame++; if (player.invincibleTimer > 0) player.invincibleTimer--; if (globalFrame % 5 === 0) updateHUD();
     if (player.state === 'dead') { player.y += player.vy; player.vy += 0.6 * player.gravityDir; particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.life -= 0.06; }); particles = particles.filter(pt => pt.life > 0); return; }
+    if (player.state === 'clear') { particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.life -= 0.06; }); particles = particles.filter(pt => pt.life > 0); return; }
     if (player.chatTimer > 0) player.chatTimer--; if (player.warpCooldown > 0) player.warpCooldown--; 
     if (player.boostTimer > 0) { player.boostTimer--; if (player.boostTimer % 2 === 0) trails.push({ x: player.x, y: player.y, w: player.w, h: player.h, life: 1, color: '#00e5ff' }); }
     player.scaleX += (1.0 - player.scaleX) * 0.25; player.scaleY += (1.0 - player.scaleY) * 0.25;
 
-    let p = player, pCount = 0, curLevers = new Set(), inter = [p, ...crosses, ...enemies.filter(e => e.type !== 8)];
+    player.riding = false; let p = player, pCount = 0, curLevers = new Set(), inter = [p, ...crosses, ...enemies.filter(e => e.type !== 8)];
     for (let r = 0; r < MAP_ROWS; r++) {
         for (let c = 0; c < MAP_COLS; c++) {
             let t = activeMapData[r][c]; if (!t || t === 0) continue;
             if (t === T.SWITCH) { if (inter.some(i => rectIntersect(i, { x: c * 40 + 2, y: r * 40 + 16, w: 36, h: 24 }))) pCount++; }
             else if (t === T.LEVER) { let k = `${r},${c}`; if (inter.some(i => rectIntersect(i, { x: c * 40, y: r * 40, w: 40, h: 40 }))) { curLevers.add(k); if (!p.lastLevers.has(k)) { leverStates[k] = !leverStates[k]; screenShake = 6; createParticles(c * 40 + 20, r * 40 + 20, '#f39c12', 20); } } }
-            else if (t === T.CRUMBLE_BLOCK) { if (rectIntersect(p, { x: c * 40, y: r * 40 - 2, w: 40, h: 44 })) { crumbleBlocks[`${r},${c}`] = (crumbleBlocks[`${r},${c}`] || 0) + 1; if (crumbleBlocks[`${r},${c}`] > 30) { activeMapData[r][c] = 0; createParticles(c * 40 + 20, r * 40 + 20, '#d2b48c', 15); } } }
+            else if (t === T.CRUMBLE_BLOCK) { if (p.grounded && rectIntersect(p, { x: c * 40, y: r * 40 - 2, w: 40, h: 6 })) { crumbleBlocks[`${r},${c}`] = (crumbleBlocks[`${r},${c}`] || 0) + 1; if (crumbleBlocks[`${r},${c}`] > 30) { activeMapData[r][c] = 0; createParticles(c * 40 + 20, r * 40 + 20, '#d2b48c', 15); } } }
             else if (t === T.CONVEYOR_R || t === T.CONVEYOR_L) { let cv = { x: c * 40, y: r * 40 - 2, w: 40, h: 12 }; if (rectIntersect(p, cv) && p.vy * p.gravityDir >= 0) p.vx += (t === T.CONVEYOR_R ? 2 : -2); crosses.forEach(cr => { if (rectIntersect(cr, cv)) cr.vx += (t === T.CONVEYOR_R ? 1 : -1); }); }
         }
     }
@@ -783,20 +813,20 @@ function updatePhysics() {
 
     lifts.forEach(lf => {
         let ox = lf.x, oy = lf.y; lf.x += lf.vx; lf.y += lf.vy; let cx = Math.floor((lf.vx > 0 ? lf.x + lf.w : lf.x) / 40), cy = Math.floor((lf.vy > 0 ? lf.y + lf.h : lf.y) / 40);
-        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS || isSolid(activeMapData[cy][cx])) { lf.x = ox; lf.y = oy; lf.vx *= -1; lf.vy *= -1; screenShake = Math.max(screenShake, 1); }
-        if (p.vy >= 0 && rectIntersect(p, { x: lf.x, y: lf.y - 8, w: lf.w, h: 8 }) && p.y + p.h <= lf.y + 12) { p.y = lf.y - p.h; p.x += lf.vx; p.y += lf.vy; p.grounded = true; p.vy = 0; }
+        if (cx < 0 || cx >= MAP_COLS || cy < 0 || cy >= MAP_ROWS || isSolid(tileAt(cy, cx))) { lf.x = ox; lf.y = oy; lf.vx *= -1; lf.vy *= -1; screenShake = Math.max(screenShake, 1); }
+        if (p.vy >= 0 && rectIntersect(p, { x: lf.x, y: lf.y - 8, w: lf.w, h: 8 }) && p.y + p.h <= lf.y + 12) { p.y = lf.y - p.h; p.x += lf.vx; p.y += lf.vy; p.grounded = true; p.riding = true; p.vy = 0; }
     });
 
     crosses.forEach(cr => {
         cr.vy += 0.65; if (cr.vy > 14) cr.vy = 14;
-        if (rectIntersect(p, cr)) { if (p.y + p.h <= cr.y + 10 && p.vy >= 0) { p.y = cr.y - p.h; p.grounded = true; p.vy = 0; } else { cr.vx = p.vx * 0.8; if (p.vx > 0) p.x = cr.x - p.w; else if (p.vx < 0) p.x = cr.x + cr.w; } }
+        if (rectIntersect(p, cr)) { if (p.y + p.h <= cr.y + 10 && p.vy >= 0) { p.y = cr.y - p.h; p.grounded = true; p.riding = true; p.vy = 0; } else { cr.vx = p.vx * 0.8; if (p.vx > 0) p.x = cr.x - p.w; else if (p.vx < 0) p.x = cr.x + cr.w; } }
         cr.vx *= 0.8; if (Math.abs(cr.vx) < 0.1) cr.vx = 0; cr.x += cr.vx; 
         let c1 = Math.floor(cr.x / 40), c2 = Math.floor((cr.x + cr.w - 0.1) / 40), r1 = Math.floor(cr.y / 40), r2 = Math.floor((cr.y + cr.h - 0.1) / 40);
-        if (cr.vx > 0 && (isSolid(activeMapData[r1][c2]) || isSolid(activeMapData[r2][c2]))) { cr.x = c2 * 40 - cr.w; cr.vx = 0; }
-        if (cr.vx < 0 && (isSolid(activeMapData[r1][c1]) || isSolid(activeMapData[r2][c1]))) { cr.x = c1 * 40 + 40; cr.vx = 0; }
+        if (cr.vx > 0 && (isSolid(tileAt(r1, c2)) || isSolid(tileAt(r2, c2)))) { cr.x = c2 * 40 - cr.w; cr.vx = 0; }
+        if (cr.vx < 0 && (isSolid(tileAt(r1, c1)) || isSolid(tileAt(r2, c1)))) { cr.x = c1 * 40 + 40; cr.vx = 0; }
         cr.y += cr.vy; c1 = Math.floor(cr.x / 40); c2 = Math.floor((cr.x + cr.w - 0.1) / 40); r1 = Math.floor(cr.y / 40); r2 = Math.floor((cr.y + cr.h - 0.1) / 40);
-        if (cr.vy > 0 && (isSolid(activeMapData[r2][c1]) || isSolid(activeMapData[r2][c2]))) { cr.y = r2 * 40 - cr.h; cr.vy = 0; }
-        if (cr.vy < 0 && (isSolid(activeMapData[r1][c1]) || isSolid(activeMapData[r1][c2]))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
+        if (cr.vy > 0 && (isSolid(tileAt(r2, c1)) || isSolid(tileAt(r2, c2)))) { cr.y = r2 * 40 - cr.h; cr.vy = 0; }
+        if (cr.vy < 0 && (isSolid(tileAt(r1, c1)) || isSolid(tileAt(r1, c2)))) { cr.y = r1 * 40 + 40; cr.vy = 0; }
     });
 
     if (p.hook) {
@@ -815,13 +845,18 @@ function updatePhysics() {
     }
     if (Math.abs(p.vx) < 0.1) p.vx = 0;
     
-    let wG = p.grounded; p.touchingWall = 0; p.x += p.vx; checkColl(true); p.y += p.vy; p.grounded = false; checkColl(false);
+    let wG = p.grounded || p.riding; p.touchingWall = 0; p.x += p.vx; checkColl(true);
+    if (p.x < 0) { p.x = 0; p.vx = 0; } if (p.x > MAP_COLS * 40 - p.w) { p.x = MAP_COLS * 40 - p.w; p.vx = 0; }
+    if (p.riding) p.vy = 0; p.y += p.vy; p.grounded = false; checkColl(false); if (p.riding) p.grounded = true;
+    if (p.grounded) p.coyote = 6; else if (p.coyote > 0) p.coyote--;
+    if (jumpBuf > 0) { jumpBuf--; if (p.grounded) { jumpBuf = 0; doJump(); } }
     
     if (!p.grounded && p.touchingWall !== 0 && p.vy * p.gravityDir > 0 && !p.hook && p.boostTimer === 0) { if ((keys.left && p.touchingWall === -1) || (keys.right && p.touchingWall === 1)) { p.vy = Math.min(p.vy * p.gravityDir, 2.5) * p.gravityDir; if (Math.random() < 0.5) createParticles(p.x + (p.touchingWall === 1 ? p.w : 0), p.y + p.h, '#fff', 1); } }
+    if (p.grounded) { p.doubleJumpUsed = false; p.varJump = false; }
     if (!wG && p.grounded) { p.scaleX = 1.4; p.scaleY = 0.7; screenShake = Math.max(screenShake, 2); createParticles(p.x + p.w / 2, p.y + (p.gravityDir > 0 ? p.h : 0), '#fff', 8); }
     if (p.y > MAP_ROWS * 40 + 200 || p.y < -200) die();
 
-    if (isMultiplayer) { for (let id in otherPlayers) { let op = otherPlayers[id]; op.x += (op.targetX - op.x) * 0.3; op.y += (op.targetY - op.y) * 0.3; if (op.chatTimer > 0) op.chatTimer--; } }
+    if (isMultiplayer) { for (let id in otherPlayers) { let op = otherPlayers[id]; if (Date.now() - (op.seen || 0) > 8000) { delete otherPlayers[id]; continue; } op.x += (op.targetX - op.x) * 0.3; op.y += (op.targetY - op.y) * 0.3; if (op.chatTimer > 0) op.chatTimer--; } }
 
     enemies.forEach(e => {
         if ([1, 2, 7].includes(e.type)) e.vy += 0.6;
@@ -833,11 +868,11 @@ function updatePhysics() {
         
         if (e.type !== 8) {
             e.x += e.vx; let ec1 = Math.floor(e.x / 40), ec2 = Math.floor((e.x + e.w - 0.1) / 40), er1 = Math.floor(e.y / 40), er2 = Math.floor((e.y + e.h - 0.1) / 40);
-            if (e.vx > 0 && (isSolid(activeMapData[er1][ec2]) || isSolid(activeMapData[er2][ec2]))) { e.x = ec2 * 40 - e.w; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
-            if (e.vx < 0 && (isSolid(activeMapData[er1][ec1]) || isSolid(activeMapData[er2][ec1]))) { e.x = ec1 * 40 + 40; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
+            if (e.vx > 0 && (isSolid(tileAt(er1, ec2)) || isSolid(tileAt(er2, ec2)))) { e.x = ec2 * 40 - e.w; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
+            if (e.vx < 0 && (isSolid(tileAt(er1, ec1)) || isSolid(tileAt(er2, ec1)))) { e.x = ec1 * 40 + 40; e.vx = (e.type === 3 || (e.type === 7 && e.state === 'shell') || e.type === 1) ? -e.vx : 0; }
             e.y += e.vy; ec1 = Math.floor(e.x / 40); ec2 = Math.floor((e.x + e.w - 0.1) / 40); er1 = Math.floor(e.y / 40); er2 = Math.floor((e.y + e.h - 0.1) / 40);
-            if (e.vy > 0 && (isSolid(activeMapData[er2][ec1]) || isSolid(activeMapData[er2][ec2]))) { e.y = er2 * 40 - e.h; e.vy = 0; if (e.type === 2 && e.jumpTmr > 50 && Math.abs(p.x - e.x) < 300) { e.vy = -10; e.jumpTmr = 0; } }
-            if (e.vy < 0 && (isSolid(activeMapData[er1][ec1]) || isSolid(activeMapData[er1][ec2]))) { e.y = er1 * 40 + 40; e.vy = 0; if (e.type === 4) e.vy = 2; }
+            if (e.vy > 0 && (isSolid(tileAt(er2, ec1)) || isSolid(tileAt(er2, ec2)))) { e.y = er2 * 40 - e.h; e.vy = 0; if (e.type === 2 && e.jumpTmr > 50 && Math.abs(p.x - e.x) < 300) { e.vy = -10; e.jumpTmr = 0; } }
+            if (e.vy < 0 && (isSolid(tileAt(er1, ec1)) || isSolid(tileAt(er1, ec2)))) { e.y = er1 * 40 + 40; e.vy = 0; if (e.type === 4) e.vy = 2; }
         } else { e.x += e.vx; e.y += e.vy; }
         
         e.blink = (e.blink + 1) % 100;
@@ -848,7 +883,8 @@ function updatePhysics() {
         }
         if (e.type === 7 && e.state === 'shell' && Math.abs(e.vx) > 5) enemies.forEach(oe => { if (oe !== e && rectIntersect(e, oe)) oe.dead = true; });
     }); 
-    enemies = enemies.filter(e => !e.dead);
+    enemies = enemies.filter(e => !e.dead && e.y < MAP_ROWS * 40 + 300 && e.y > -300);
+    crosses = crosses.filter(cr => cr.y < MAP_ROWS * 40 + 300);
 
     beamEmitters.forEach(b => {
         b.tmr++; if (b.tmr >= 90) {
@@ -864,7 +900,7 @@ function updatePhysics() {
         pr.x += pr.vx; pr.y += pr.vy; if (pr.x < -100 || pr.x > MAP_COLS * 40 + 100 || pr.y < -100 || pr.y > MAP_ROWS * 40 + 100) pr.active = false;
         if (rectIntersect(p, pr)) { if (p.invincibleTimer > 0) { pr.active = false; createParticles(pr.x, pr.y, '#ffd700', 5); } else { if (p.boostTimer === 0) die(); pr.active = false; } }
         let c = Math.floor((pr.x + pr.w / 2) / 40), r = Math.floor((pr.y + pr.h / 2) / 40); 
-        if (!pr.pierce && r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(activeMapData[r][c])) { pr.active = false; createParticles(pr.x, pr.y, pr.color, 6); }
+        if (!pr.pierce && r >= 0 && r < MAP_ROWS && c >= 0 && c < MAP_COLS && isSolid(tileAt(r, c))) { pr.active = false; createParticles(pr.x, pr.y, pr.color, 6); }
     }); 
     projectiles = projectiles.filter(p => p.active);
     
@@ -889,14 +925,15 @@ function checkColl(isX) {
             if (tl === T.DASH_SHOES) { activeMapData[row][col] = 0; p.dashShoes = true; showToast("ダッシュ靴!"); }
             if (tl === T.GRAVITY_PANEL) { activeMapData[row][col] = 0; p.gravityDir *= -1; p.vy = 0; screenShake = 10; createParticles(col * 40 + 20, row * 40 + 20, '#ff00ff', 20); }
             if (tl === T.DOOR && p.hasKey) { activeMapData[row][col] = 0; screenShake = 3; createParticles(col * 40 + 20, row * 40 + 20, '#8e44ad', 20); continue; }
-            if (tl === T.BOUNCER && !isX && p.vy * p.gravityDir > 0) { p.vy = -22 * p.gravityDir; p.y = (p.gravityDir > 0 ? row * 40 - p.h : row * 40 + 40); p.scaleX = 0.4; p.scaleY = 1.8; createParticles(p.x + 13, p.y + 13, '#00e5ff', 12); return; }
+            if (tl === T.BOUNCER && !isX && p.vy * p.gravityDir > 0) { p.vy = -22 * p.gravityDir; p.varJump = false; p.y = (p.gravityDir > 0 ? row * 40 - p.h : row * 40 + 40); p.scaleX = 0.4; p.scaleY = 1.8; createParticles(p.x + 13, p.y + 13, '#00e5ff', 12); return; }
             if (tl === T.BOOST_R && rectIntersect(p, { x: col * 40, y: row * 40 + 20, w: 40, h: 20 })) { p.faceDir = 1; p.boostTimer = 25; p.vx = 18; p.vy = 0; p.scaleX = 1.6; p.scaleY = 0.7; screenShake = 8; }
             if (tl === T.BOOST_L && rectIntersect(p, { x: col * 40, y: row * 40 + 20, w: 40, h: 20 })) { p.faceDir = -1; p.boostTimer = 25; p.vx = -18; p.vy = 0; p.scaleX = 1.6; p.scaleY = 0.7; screenShake = 8; }
-            if (tl === T.BOOST_U && rectIntersect(p, { x: col * 40, y: row * 40 + 20, w: 40, h: 20 })) { p.vy = -24 * p.gravityDir; screenShake = 10; p.scaleX = 0.3; p.scaleY = 2.0; }
+            if (tl === T.BOOST_U && rectIntersect(p, { x: col * 40, y: row * 40 + 20, w: 40, h: 20 })) { p.vy = -24 * p.gravityDir; p.varJump = false; screenShake = 10; p.scaleX = 0.3; p.scaleY = 2.0; }
             if (tl === T.ONEWAY_UP && !isX && p.vy > 0 && (p.y + p.h - p.vy) <= row * 40 + 8) { p.y = row * 40 - p.h; p.grounded = (p.gravityDir > 0); p.vy = 0; return; }
             if (tl === T.ONEWAY_DOWN && !isX && p.vy < 0 && (p.y - p.vy) >= row * 40 + 32) { p.y = row * 40 + 40; p.grounded = (p.gravityDir < 0); p.vy = 0; return; }
             if (tl === T.ONEWAY_LEFT && isX && p.vx > 0 && (p.x + p.w - p.vx) <= col * 40 + 8) { p.x = col * 40 - p.w; p.vx = 0; return; }
             if (tl === T.ONEWAY_RIGHT && isX && p.vx < 0 && (p.x - p.vx) >= col * 40 + 32) { p.x = col * 40 + 40; p.vx = 0; return; }
+            if (tl === T.WARP && p.warpCooldown > 0) p.warpCooldown = Math.max(p.warpCooldown, 2);
             if (tl === T.WARP && p.warpCooldown === 0) { let pr = warpPairs.find(w => (w.r1 === row && w.c1 === col) || (w.r2 === row && w.c2 === col)); if (pr && pr.r2 !== undefined) { let dr = (pr.r1 === row && pr.c1 === col) ? pr.r2 : pr.r1, dc = (pr.r1 === row && pr.c1 === col) ? pr.c2 : pr.c1; p.x = dc * 40 + 7; p.y = dr * 40 + 14; p.warpCooldown = 60; screenShake = 12; p.scaleX = 0.2; p.scaleY = 2.0; return; } }
             if (tl === T.GOAL) { win(); return; }
             if (tl === T.HIDDEN_BLOCK && !isX && p.vy < 0 && (p.y - p.vy) >= row * 40 + 32) { activeMapData[row][col] = T.BLOCK; p.vy = 2; p.y = row * 40 + 40; screenShake = 10; createParticles(col * 40 + 20, row * 40 + 20, '#f1c40f', 25); return; }
@@ -907,7 +944,7 @@ function checkColl(isX) {
                     if (p.boostTimer > 0 && p.vy >= -15) { screenShake = 6; p.boostTimer = 0; } 
                     p.vx = 0; 
                 } else { 
-                    if (p.vy > 0) { p.y = row * 40 - p.h; p.grounded = true; } else if (p.vy < 0) { p.y = row * 40 + 40; if (tl === T.BRICK || tl === T.ICE_BLOCK) { activeMapData[row][col] = 0; createParticles(col * 40 + 20, row * 40 + 20, tl === T.BRICK ? '#e67e22' : '#a0e6ff', 15); } } 
+                    if (p.vy > 0) { p.y = row * 40 - p.h; if (p.gravityDir > 0) p.grounded = true; } else if (p.vy < 0) { p.y = row * 40 + 40; if (p.gravityDir < 0) p.grounded = true; if (p.gravityDir > 0 && (tl === T.BRICK || tl === T.ICE_BLOCK)) { activeMapData[row][col] = 0; createParticles(col * 40 + 20, row * 40 + 20, tl === T.BRICK ? '#e67e22' : '#a0e6ff', 15); } } 
                     p.vy = 0; 
                 }
             }
@@ -1010,8 +1047,9 @@ function draw() {
     let md = mode === 'play' ? activeMapData : mapData; 
     if (md && md.length > 0) {
         ctx.lineWidth = 3; ctx.lineJoin = 'round';
-        for (let r = 0; r < MAP_ROWS; r++) {
-            for (let c = 0; c < MAP_COLS; c++) {
+        const dr0 = Math.max(0, Math.floor(camera.y / 40) - 1), dr1 = Math.min(MAP_ROWS, Math.ceil((camera.y + vH) / 40) + 1), dc0 = Math.max(0, Math.floor(camera.x / 40) - 1), dc1 = Math.min(MAP_COLS, Math.ceil((camera.x + vW) / 40) + 1);
+        for (let r = dr0; r < dr1; r++) {
+            for (let c = dc0; c < dc1; c++) {
                 if (md[r][c] !== 0 && md[r][c] !== undefined) drawTileGraphics(ctx, md[r][c], r, c, c * 40, r * 40, 40, 20);
             }
         }
@@ -1039,11 +1077,19 @@ function draw() {
     ctx.restore();
 }
 
-function loop() {
-    let isAiming = (mode === 'play' && (player.hasSpider || player.hasNewSpider) && input.isDown && !player.hook), doUpdate = true;
-    if (isAiming) { slowFrames++; if (slowFrames % 3 !== 0) doUpdate = false; }
-    if (mode === 'play' && doUpdate) updatePhysics(); 
-    draw(); requestAnimationFrame(loop);
+let lastT = performance.now(), acc = 0; const STEP = 1000 / 60;
+function loop(now) {
+    now = now || performance.now(); acc += Math.min(100, now - lastT); lastT = now;
+    let n = 0;
+    while (acc >= STEP && n < 5) {
+        acc -= STEP; n++;
+        let doUpdate = true;
+        if (mode === 'play' && (player.hasSpider || player.hasNewSpider) && input.isDown && !player.hook) { slowFrames++; if (slowFrames % 3 !== 0) doUpdate = false; }
+        if (mode === 'play' && doUpdate) { try { updatePhysics(); } catch (err) { console.error(err); } }
+    }
+    if (n >= 5) acc = 0;
+    try { draw(); } catch (err) { console.error(err); }
+    requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
@@ -1086,7 +1132,7 @@ async function loadStage(id) {
         const res = await fetch(`/api/maker/stages/${id}`, { headers: { 'Authorization': `Bearer ${token}` } }); const d = await res.json();
         if (res.ok) {
             let p = JSON.parse(d.stage.map_data); const loadedMap = p.map || p;
-            if(loadedMap && loadedMap.length > 0) { mapData = normalizeMap(loadedMap); warpPairs = p.warps || []; }
+            if(loadedMap && loadedMap.length > 0) { try { localStorage.setItem('maker_backup_map', JSON.stringify({ map: mapData, warps: warpPairs })); } catch (e) {} leaveLobby(false); mapData = normalizeMap(loadedMap); warpPairs = p.warps || []; }
             currentStageInfo = { id: id, title: d.stage.title, author: d.stage.creator_name, isMine: d.stage.is_mine, isDaily: false };
             updateCourseHUDInfo(); closeModal('modal-load'); setMode('play');
         } else { alert("失敗: " + d.detail); }
@@ -1114,7 +1160,29 @@ window.addEventListener('DOMContentLoaded', () => {
     resize(); focusCameraOnStart();
 });
 
-setInterval(() => { if (mode === 'edit') localStorage.setItem('maker_autosave_map', JSON.stringify({ map: mapData, warps: warpPairs })); }, 3000);
+setInterval(() => { if (mode === 'edit' && !currentStageInfo.isDaily) localStorage.setItem('maker_autosave_map', JSON.stringify({ map: mapData, warps: warpPairs })); }, 3000);
+
+function removeWarpAt(r, c) {
+    const pr = warpPairs.find(w => (w.r1 === r && w.c1 === c) || (w.r2 === r && w.c2 === c));
+    if (pr) { const orr = (pr.r1 === r && pr.c1 === c) ? pr.r2 : pr.r1, occ = (pr.r1 === r && pr.c1 === c) ? pr.c2 : pr.c1; if (mapData[orr]) mapData[orr][occ] = 0; warpPairs = warpPairs.filter(w => w !== pr); }
+    if (pendingWarp && pendingWarp.r === r && pendingWarp.c === c) pendingWarp = null;
+    if (mapData[r]) mapData[r][c] = 0;
+}
+function authH() { return { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }; }
+async function stageAction(method, url, ev, confirmMsg) {
+    if (ev) ev.stopPropagation();
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    try { const res = await fetch(url, { method, headers: authH() }); const d = await res.json().catch(() => ({})); showToast(d.message || d.detail || (res.ok ? '完了' : '失敗')); } catch (e) { showToast('通信エラー'); }
+    openLoadModal();
+}
+function deleteStage(id, ev) { stageAction('DELETE', `/api/maker/stages/${id}`, ev, 'このステージを破棄しますか？'); }
+function pinStage(id, ev) { stageAction('POST', `/api/admin/maker/stages/${id}/pin`, ev); }
+function confiscateStage(id, ev) { stageAction('POST', `/api/admin/maker/stages/${id}/confiscate`, ev, '国庫に接収しますか？'); }
+
+window.addEventListener('blur', () => { keys.left = keys.right = keys.jump = false; input.isDown = false; input.rightDown = false; rightStart = null; });
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) setTimeout(() => b.blur(), 0); }); // Space/Enterでボタンが誤作動しない
+[['btn-left', 'left'], ['btn-right', 'right'], ['btn-jump', 'jump']].forEach(([id, k]) => { const b = document.getElementById(id); if (b) b.addEventListener('touchcancel', () => { keys[k] = false; }); });
+canvas.addEventListener('touchcancel', () => { input.isDown = false; lastTouch = null; });
 </script>
 </body>
 </html>
