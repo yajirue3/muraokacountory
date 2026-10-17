@@ -1306,6 +1306,72 @@ async def unlock_title(data: UnlockTitleRequest, authorization: str = Header(Non
 # ==================================================
 # 王立試練迷宮（Doodle風ステージメイカー）モジュール
 # ==================================================
+import hashlib
+import json
+import math
+import time
+import asyncio
+from fastapi import WebSocket
+
+# ※ 旧セクションにあった `import datetime` は削除しています。
+#   あれが `from datetime import datetime` を上書きして、
+#   日次没収・投票・ギフトなど他のAPIが全部壊れていました。
+
+JST = timezone(timedelta(hours=9))
+MAKER_ROWS, MAKER_COLS = 25, 100
+MAKER_MAX_BYTES = 200_000
+MAKER_PAGE_SIZE = 40
+
+# 補助: マップ検証（壊れたデータ・スタート/ゴール無しを弾く）
+def validate_maker_map(map_data: str) -> None:
+    if len(map_data.encode("utf-8")) > MAKER_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="マップデータが大きすぎます。")
+    try:
+        obj = json.loads(map_data)
+    except Exception:
+        raise HTTPException(status_code=400, detail="マップデータがJSONではありません。")
+    grid = obj.get("map") if isinstance(obj, dict) else obj
+    if not isinstance(grid, list) or not (1 <= len(grid) <= MAKER_ROWS):
+        raise HTTPException(status_code=400, detail="マップの行数が不正です。")
+    starts = goals = 0
+    for row in grid:
+        if not isinstance(row, list) or len(row) > MAKER_COLS:
+            raise HTTPException(status_code=400, detail="マップの列数が不正です。")
+        for cell in row:
+            if not isinstance(cell, int) or isinstance(cell, bool) or not (0 <= cell <= 100):
+                raise HTTPException(status_code=400, detail="マップに不正なタイルがあります。")
+            starts += cell == 9
+            goals += cell == 4
+    if starts < 1 or goals < 1:
+        raise HTTPException(status_code=400, detail="スタートとゴールが必要です。")
+
+# 補助: 競合に強いカウントアップ（同時アクセスでも加算が失われない）
+async def bump_maker_count(client, stage_id: int, col: str) -> None:
+    for _ in range(6):
+        r = await client.table("maker_stages").select(col).eq("id", stage_id).execute()
+        if not r.data:
+            return
+        cur = r.data[0].get(col) or 0
+        u = await client.table("maker_stages").update({col: cur + 1}).eq("id", stage_id).eq(col, cur).execute()
+        if u.data:
+            return
+
+# 補助: 「このユーザーがこのステージを開いた時刻」「クリア済み」の記録（水増し防止）
+maker_played: dict = {}
+maker_cleared: set = set()
+
+async def get_maker_nickname(user_id: str, king: bool) -> str:
+    if king:
+        return "村岡国王"
+    try:
+        client = await get_supabase()
+        res = await client.table("profiles").select("nickname").eq("id", user_id).execute()
+        if res.data and res.data[0].get("nickname"):
+            return res.data[0]["nickname"]
+    except Exception:
+        pass
+    return "名無しの労働者"
+
 
 # 1. 画面配信（URLパラメータ ?stage_id=... で特定ステージの直通プレイに対応）
 @app.get("/maker", response_class=HTMLResponse)
@@ -1325,24 +1391,29 @@ class MakerStageClear(BaseModel):
 
 # 3. ステージ一覧取得（他国民のステージ一覧・国王勅命ピン留めが最優先表示）
 @app.get("/api/maker/stages")
-async def get_maker_stages(authorization: str = Header(None)):
+async def get_maker_stages(page: int = 1, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     user_is_king = await is_king(user.id)
     client = await get_supabase()
-    
+
+    page = max(1, page)
+    offset = (page - 1) * MAKER_PAGE_SIZE
     try:
-        # 国王勅命(ピン留め)を先頭、次点で新着順
+        # 国王勅命(ピン留め)を先頭、次点で新着順（ページング対応）
         res = await client.table("maker_stages").select(
             "id, title, description, creator_id, creator_name, plays_count, clears_count, is_pinned, is_confiscated, created_at"
-        ).order("is_pinned", desc=True).order("created_at", desc=True).limit(60).execute()
-        
+        ).order("is_pinned", desc=True).order("created_at", desc=True).range(offset, offset + MAKER_PAGE_SIZE - 1).execute()
+
         stages = res.data or []
         for s in stages:
-            s["is_mine"] = (s.get("creator_id") == str(user.id))
-            
+            # 作者のUUIDは他人に返さない
+            s["is_mine"] = (s.pop("creator_id", None) == str(user.id))
+
         return {
             "stages": stages,
-            "is_king": user_is_king
+            "is_king": user_is_king,
+            "page": page,
+            "has_more": len(stages) == MAKER_PAGE_SIZE
         }
     except Exception as e:
         return {"stages": [], "is_king": user_is_king, "error": str(e)}
@@ -1353,24 +1424,26 @@ async def get_maker_stages(authorization: str = Header(None)):
 async def get_maker_stage_detail(stage_id: int, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
-    
+
     res = await client.table("maker_stages").select("*").eq("id", stage_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="指定されたステージは存在しないか、粛清されました。")
-    
+
     stage = res.data[0]
-    
-    # プレイ回数加算
-    try:
-        await client.table("maker_stages").update({
-            "plays_count": stage.get("plays_count", 0) + 1
-        }).eq("id", stage_id).execute()
-    except Exception:
-        pass
-        
+    is_mine = (stage.get("creator_id") == str(user.id))
+
+    # プレイ回数加算（自作の試遊は数えない）
+    if not is_mine:
+        maker_played[(str(user.id), stage_id)] = time.time()
+        try:
+            await bump_maker_count(client, stage_id, "plays_count")
+        except Exception:
+            pass
+
+    stage.pop("creator_id", None)
     return {
         "stage": stage,
-        "is_mine": (stage.get("creator_id") == str(user.id)),
+        "is_mine": is_mine,
         "is_king": await is_king(user.id)
     }
 
@@ -1381,15 +1454,19 @@ async def create_maker_stage(data: MakerStageCreate, authorization: str = Header
     user = await get_user_from_token(authorization)
     user_is_king = await is_king(user.id)
     client = await get_supabase()
-    
-    prof_res = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-    creator_name = "村岡国王" if user_is_king else (prof_res.data[0]["nickname"] if prof_res.data else "名無しの労働者")
+
+    title = data.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="ステージ名が空です。")
+    validate_maker_map(data.map_data)
+
+    creator_name = await get_maker_nickname(str(user.id), user_is_king)
 
     try:
         insert_res = await client.table("maker_stages").insert({
             "creator_id": str(user.id),
             "creator_name": creator_name,
-            "title": data.title.strip(),
+            "title": title,
             "description": data.description.strip(),
             "map_data": data.map_data,
             "plays_count": 0,
@@ -1397,7 +1474,7 @@ async def create_maker_stage(data: MakerStageCreate, authorization: str = Header
             "is_pinned": user_is_king, # 国王が作れば最初から勅命固定
             "is_confiscated": False
         }).execute()
-        
+
         created = insert_res.data[0] if insert_res.data else {}
         return {"message": "ステージを公開しました。", "stage_id": created.get("id")}
     except Exception as e:
@@ -1407,15 +1484,23 @@ async def create_maker_stage(data: MakerStageCreate, authorization: str = Header
 # 6. ステージクリア報告（金は1ゴールドも渡さない・クリア数のみ加算）
 @app.post("/api/maker/stages/{stage_id}/clear")
 async def report_maker_stage_clear(stage_id: int, data: MakerStageClear, authorization: str = Header(None)):
-    await get_user_from_token(authorization)
+    user = await get_user_from_token(authorization)
+    uid = str(user.id)
+
+    # 開いていない・開いて3秒未満・クリア済みは加算しない
+    started = maker_played.get((uid, stage_id))
+    if not started or time.time() - started < 3:
+        return {"message": "クリアを記録できませんでした。"}
+    if (uid, stage_id) in maker_cleared:
+        return {"message": "クリア済みです。"}
+
     client = await get_supabase()
-    
-    stage_res = await client.table("maker_stages").select("clears_count").eq("id", stage_id).execute()
+    stage_res = await client.table("maker_stages").select("id").eq("id", stage_id).execute()
     if not stage_res.data:
         raise HTTPException(status_code=404, detail="ステージが存在しません。")
-        
-    current_clears = stage_res.data[0].get("clears_count", 0)
-    await client.table("maker_stages").update({"clears_count": current_clears + 1}).eq("id", stage_id).execute()
+
+    maker_cleared.add((uid, stage_id))
+    await bump_maker_count(client, stage_id, "clears_count")
 
     return {"message": "ステージクリア！踏破の事実のみが記録されました。"}
 
@@ -1425,19 +1510,19 @@ async def report_maker_stage_clear(stage_id: int, data: MakerStageClear, authori
 async def delete_maker_stage(stage_id: int, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
     client = await get_supabase()
-    
+
     res = await client.table("maker_stages").select("creator_id").eq("id", stage_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="ステージが見つかりません。")
-        
+
     is_owner = (res.data[0]["creator_id"] == str(user.id))
     user_is_king = await is_king(user.id)
 
     if not is_owner and not user_is_king:
         raise HTTPException(status_code=403, detail="不敬罪：他人の迷宮を破壊する権限はありません。")
-        
+
     await client.table("maker_stages").delete().eq("id", stage_id).execute()
-    
+
     msg = "【勅命執行】不届きな迷宮を跡形もなく爆破しました。" if user_is_king and not is_owner else "ステージを削除しました。"
     return {"message": msg}
 
@@ -1473,16 +1558,17 @@ async def admin_confiscate_stage(stage_id: int, authorization: str = Header(None
         raise HTTPException(status_code=403, detail="貴様には国王の権限がない。")
 
     client = await get_supabase()
-    stage = await client.table("maker_stages").select("*").eq("id", stage_id).execute()
+    stage = await client.table("maker_stages").select("id").eq("id", stage_id).execute()
     if not stage.data:
         raise HTTPException(status_code=404, detail="ステージが見つかりません。")
 
     # 所有者を国王に変更し、接収フラグを立てる
+    # 【修正】.eq("id", stage_id) が無く、全ステージが接収されていた
     await client.table("maker_stages").update({
         "creator_id": str(user.id),
         "creator_name": "村岡国王（※接収済）",
         "is_confiscated": True
-    }).execute()
+    }).eq("id", stage_id).execute()
 
     return {"message": "この迷宮の著作権および所有権を国庫へ強制接収しました。"}
 
@@ -1490,136 +1576,188 @@ async def admin_confiscate_stage(stage_id: int, authorization: str = Header(None
 # ==================================================
 # 🌐 日替わりリアルタイム並走ロビー（WebSocket）
 # ==================================================
-import datetime
-import hashlib
-from fastapi import WebSocket, WebSocketDisconnect
+
+# 補助: 数値の安全化（NaN・無限大・極端な値を弾く）
+def safe_num(v, lo=-1e5, hi=1e5) -> float:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if (math.isnan(f) or math.isinf(f)) else max(lo, min(hi, f))
 
 # 1. 接続中クライアントのコネクション管理
 class DailyLobbyManager:
     def __init__(self):
-        # user_id -> WebSocket
-        self.active_connections: dict[str, WebSocket] = {}
+        # user_id -> {"ws", "name", "king", "t0", "last_pos", "last_chat"}
+        self.active_connections: dict = {}
 
-    async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-
-    def disconnect(self, user_id: str):
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
+    async def _send(self, uid: str, conn: dict, message: dict):
+        try:
+            await asyncio.wait_for(conn["ws"].send_json(message), timeout=2)
+        except Exception:
+            await self.disconnect(uid, conn)
 
     async def broadcast(self, sender_id: str, message: dict):
-        # 送信者以外の全プレイヤーにデータを中継
-        disconnected = []
-        for uid, ws in list(self.active_connections.items()):
-            if uid != sender_id:
-                try:
-                    await ws.send_json(message)
-                except Exception:
-                    disconnected.append(uid)
-        for uid in disconnected:
-            self.disconnect(uid)
+        # 送信者以外の全プレイヤーに【並列で】中継（遅い1人が全員を止めない）
+        await asyncio.gather(*[
+            self._send(uid, c, message)
+            for uid, c in list(self.active_connections.items()) if uid != sender_id
+        ])
 
     async def broadcast_all(self, message: dict):
         # 全員に一斉送信（参加・退出通知など）
-        disconnected = []
-        for uid, ws in list(self.active_connections.items()):
-            try:
-                await ws.send_json(message)
-            except Exception:
-                disconnected.append(uid)
-        for uid in disconnected:
-            self.disconnect(uid)
+        await asyncio.gather(*[
+            self._send(uid, c, message) for uid, c in list(self.active_connections.items())
+        ])
+
+    async def disconnect(self, user_id: str, conn: dict):
+        # 自分の接続のときだけ削除（多重接続・再接続で新しい方を消さない）
+        if self.active_connections.get(user_id) is not conn:
+            return
+        del self.active_connections[user_id]
+        # 送信失敗で落ちた人も含め、必ず退出通知を出す（ゴースト残り防止）
+        await self.broadcast_all({
+            "type": "player_leave",
+            "id": user_id,
+            "name": conn["name"],
+            "total_players": len(self.active_connections)
+        })
 
 lobby_manager = DailyLobbyManager()
 
 
 # 2. 本日の日替わりステージ取得 API
+maker_daily_cache: dict = {}
+
 @app.get("/api/maker/daily")
 async def get_daily_stage(authorization: str = Header(None)):
     await get_user_from_token(authorization)
     client = await get_supabase()
 
-    # 公開済みステージを全件取得（接収されていても可、ID順）
-    res = await client.table("maker_stages").select(
-        "id, title, description, creator_name, map_data"
-    ).order("id", desc=False).execute()
+    # 日本時間の0時で切り替え
+    today_str = datetime.now(JST).date().isoformat()
+    cols = "id, title, description, creator_name, map_data"
 
-    stages = res.data or []
-    if not stages:
+    # 当日中は同じステージに固定（投稿・削除で途中から変わらない）
+    if maker_daily_cache.get("date") == today_str:
+        r = await client.table("maker_stages").select(cols).eq("id", maker_daily_cache["id"]).execute()
+        if r.data:
+            return {"date": today_str, "stage": r.data[0]}
+
+    # まずIDだけ取得（全ステージのマップデータを毎回読まない）
+    ids_res = await client.table("maker_stages").select("id").order("id", desc=False).execute()
+    ids = ids_res.data or []
+    if not ids:
         raise HTTPException(status_code=404, detail="日替わりロビー用のステージがまだ1つもありません。")
 
     # 今日の日付（YYYY-MM-DD）からハッシュ値を生成し、毎日決まった1ステージを選出
-    today_str = datetime.date.today().isoformat()
     hash_val = int(hashlib.md5(today_str.encode()).hexdigest(), 16)
-    selected_stage = stages[hash_val % len(stages)]
+    selected_id = ids[hash_val % len(ids)]["id"]
 
-    return {
-        "date": today_str,
-        "stage": selected_stage
-    }
+    r = await client.table("maker_stages").select(cols).eq("id", selected_id).execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="ステージ取得に失敗しました。")
+
+    maker_daily_cache.update(date=today_str, id=selected_id)
+    return {"date": today_str, "stage": r.data[0]}
 
 
 # 3. 日替わりロビー WebSocket エンドポイント（脱落なし・フリー並走）
 @app.websocket("/ws/maker/daily")
 async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = None):
+    # 先に accept する（認証失敗を close コード 4401 でクライアントに伝えるため）
+    await websocket.accept()
+
     # クエリパラメータ ?token=... から認証
     try:
         user = await get_user_from_token(f"Bearer {token}" if token else None)
     except Exception:
-        await websocket.close(code=1008)
+        await websocket.close(code=4401)
         return
 
-    client = await get_supabase()
-    user_is_king = await is_king(user.id)
-    prof = await client.table("profiles").select("nickname").eq("id", user.id).execute()
-    nickname = "村岡国王" if user_is_king else (prof.data[0]["nickname"] if prof.data else "名無しの労働者")
-
     user_id = str(user.id)
-    await lobby_manager.connect(user_id, websocket)
+    user_is_king = await is_king(user.id)
+    nickname = await get_maker_nickname(user_id, user_is_king)
 
-    # 全員に参加通知と現在人数を共有
-    await lobby_manager.broadcast_all({
-        "type": "player_join",
-        "id": user_id,
-        "name": nickname,
-        "is_king": user_is_king,
-        "total_players": len(lobby_manager.active_connections)
-    })
+    conn = {"ws": websocket, "name": nickname, "king": user_is_king,
+            "t0": time.time(), "last_pos": 0.0, "last_chat": 0.0}
+
+    # 同じユーザーの旧接続があれば閉じる
+    old = lobby_manager.active_connections.get(user_id)
+    lobby_manager.active_connections[user_id] = conn
+    if old:
+        try:
+            await old["ws"].close(code=4000)
+        except Exception:
+            pass
 
     try:
-        while True:
-            data = await websocket.receive_json()
-            msg_type = data.get("type")
+        # 参加者本人に「いま誰がいるか」を送る（名前表示に必要）
+        await websocket.send_json({
+            "type": "welcome",
+            "self": user_id,
+            "players": [
+                {"id": uid, "name": c["name"], "is_king": c["king"]}
+                for uid, c in lobby_manager.active_connections.items() if uid != user_id
+            ]
+        })
 
-            # 座標・向き・クモ糸同期（そのまま他プレイヤーに転送）
+        # 全員に参加通知と現在人数を共有
+        await lobby_manager.broadcast_all({
+            "type": "player_join",
+            "id": user_id,
+            "name": nickname,
+            "is_king": user_is_king,
+            "total_players": len(lobby_manager.active_connections)
+        })
+
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(data, dict):
+                continue
+
+            msg_type = data.get("type")
+            now = time.time()
+
+            # 座標・向き・クモ糸同期（値を検証してから他プレイヤーに転送）
             if msg_type == "pos":
+                if now - conn["last_pos"] < 0.03:  # 送信頻度の上限
+                    continue
+                conn["last_pos"] = now
+                hook = data.get("hook")
+                hook = {"x": safe_num(hook.get("x")), "y": safe_num(hook.get("y"))} if isinstance(hook, dict) else None
                 await lobby_manager.broadcast(user_id, {
                     "type": "pos",
                     "id": user_id,
-                    "x": data.get("x"),
-                    "y": data.get("y"),
-                    "vx": data.get("vx"),
-                    "vy": data.get("vy"),
-                    "faceDir": data.get("faceDir"),
-                    "gravityDir": data.get("gravityDir", 1),
-                    "hook": data.get("hook"),
-                    "isSpider": data.get("isSpider", False)
+                    "x": safe_num(data.get("x")),
+                    "y": safe_num(data.get("y")),
+                    "vx": safe_num(data.get("vx"), -100, 100),
+                    "vy": safe_num(data.get("vy"), -100, 100),
+                    "faceDir": 1 if safe_num(data.get("faceDir")) >= 0 else -1,
+                    "gravityDir": -1 if safe_num(data.get("gravityDir")) < 0 else 1,
+                    "hook": hook,
+                    "isSpider": bool(data.get("isSpider", False))
                 })
 
             # リスポーン・死亡エフェクト（脱落なし：その場所で花火/煙を散らすだけ）
             elif msg_type == "respawn":
+                conn["t0"] = now  # タイム計測をリセット
                 await lobby_manager.broadcast(user_id, {
                     "type": "respawn",
                     "id": user_id,
-                    "x": data.get("x"),
-                    "y": data.get("y")
+                    "x": safe_num(data.get("x")),
+                    "y": safe_num(data.get("y"))
                 })
 
-            # チャットメッセージの中継
+            # チャットメッセージの中継（1秒1回まで）
             elif msg_type == "chat":
                 chat_text = str(data.get("text", "")).strip()[:60]  # 最大60文字制限
-                if chat_text:
+                if chat_text and now - conn["last_chat"] >= 1.0:
+                    conn["last_chat"] = now
                     await lobby_manager.broadcast_all({
                         "type": "chat",
                         "id": user_id,
@@ -1628,21 +1766,20 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
                         "text": chat_text
                     })
 
-            # ゴール報告
+            # ゴール報告（タイムはクライアント申告ではなくサーバーで計測）
             elif msg_type == "clear":
-                await lobby_manager.broadcast_all({
-                    "type": "clear",
-                    "id": user_id,
-                    "name": nickname,
-                    "time": data.get("time")
-                })
+                elapsed = now - conn["t0"]
+                if elapsed >= 3:
+                    conn["t0"] = now
+                    await lobby_manager.broadcast_all({
+                        "type": "clear",
+                        "id": user_id,
+                        "name": nickname,
+                        "time": round(elapsed, 1)
+                    })
 
-    except WebSocketDisconnect:
-        lobby_manager.disconnect(user_id)
-        # 退出通知
-        await lobby_manager.broadcast_all({
-            "type": "player_leave",
-            "id": user_id,
-            "name": nickname,
-            "total_players": len(lobby_manager.active_connections)
-        })
+    except Exception:
+        # 切断・不正データのどちらでも、下の finally で必ず後始末する
+        pass
+    finally:
+        await lobby_manager.disconnect(user_id, conn)
