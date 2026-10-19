@@ -80,6 +80,7 @@
             <button id="btn-play" onclick="setMode('play')"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" stroke="none"></polygon></svg><span class="hide-sm">遊ぶ</span></button>
         </div>
         <div id="undo-group" style="display:flex; gap:6px;">
+            <button class="btn-retro" onclick="cycleTheme()" title="背景テーマ">🎨</button>
             <button id="btn-undo" class="btn-retro" onclick="undo()" title="元に戻す (Ctrl+Z)" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
             <button id="btn-redo" class="btn-retro" onclick="redo()" title="やり直す (Ctrl+Y)" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
         </div>
@@ -223,7 +224,7 @@ const T = {
     HIDDEN_BLOCK: 31, LEVER: 32, ENEMY_H: 33, ENEMY_V: 34, BOOST_U: 35, LIFT_H: 36, LIFT_V: 37,
     STAR: 38, SPIDER: 39, ENEMY_SNIPER: 40, ENEMY_GOLGO: 41,
     SPIDER_NEW: 42, SPIKE_TOGGLE: 43, CONVEYOR_R: 44, CONVEYOR_L: 45, ICE_BLOCK: 46, CRUMBLE_BLOCK: 47,
-    TOGGLE_DOOR: 48, GRAVITY_PANEL: 49, BEAM_HOMING: 50, DOUBLE_JUMP: 51, DASH_SHOES: 52, ENEMY_SHELL: 53, ENEMY_GHOST: 54, CHECKPOINT: 55
+    TOGGLE_DOOR: 48, GRAVITY_PANEL: 49, BEAM_HOMING: 50, DOUBLE_JUMP: 51, DASH_SHOES: 52, ENEMY_SHELL: 53, ENEMY_GHOST: 54, CHECKPOINT: 55, WATER: 56, WIND_R: 57, WIND_U: 58, LAVA: 59, SHRINK: 60
 };
 
 const paletteItems = [
@@ -282,6 +283,11 @@ const paletteItems = [
     { id: T.DOOR, cat: 'entity', color: '#8e44ad', label: 'ドア', icon: '<rect x="5" y="11" width="14" height="10" rx="3"/><circle cx="12" cy="16" r="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' },
     { id: T.GOAL, cat: 'entity', color: '#fff', label: 'ゴール', icon: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>' },
     { id: T.CHECKPOINT, cat: 'entity', color: '#2ecc71', label: '中間点', icon: '<line x1="6" y1="22" x2="6" y2="3"/><path d="M6 4h12l-3 4 3 4H6"/>' },
+    { id: T.WATER, cat: 'gimmick', color: '#3498db', label: '水中', icon: '<path d=\"M2 9c3-3 5 3 10 0s7 3 10 0M2 15c3-3 5 3 10 0s7 3 10 0\"/>' },
+    { id: T.WIND_R, cat: 'gimmick', color: '#bdc3c7', label: '風→', icon: '<path d=\"M3 8h12a3 3 0 1 0-3-3M3 14h16a3 3 0 1 1-3 3\"/>' },
+    { id: T.WIND_U, cat: 'gimmick', color: '#bdc3c7', label: '風↑', icon: '<path d=\"M8 21V9a3 3 0 1 1 3 3M14 21V5a3 3 0 1 1 3-3\"/>' },
+    { id: T.LAVA, cat: 'danger', color: '#e67e22', label: '溶岩', icon: '<path d=\"M2 12c3-3 5 3 10 0s7 3 10 0v8H2z\"/>' },
+    { id: T.SHRINK, cat: 'gimmick', color: '#9b59b6', label: '縮小', icon: '<path d=\"M5 13a7 7 0 0 1 14 0z\"/><path d=\"M9 13v6h6v-6\"/>' },
     { id: T.START, cat: 'entity', color: '#10b981', label: 'スタート', icon: '<polygon points="5 3 19 12 5 21 5 3"/>' }
 ];
 
@@ -315,6 +321,11 @@ let totalCoinsInStage = 0;
 let screenShake = 0; 
 let currentBrush = T.BLOCK;
 let checkpointState = null;
+const THEMES = [{ bg: '#0f121a' }, { bg: '#1b3a2a' }, { bg: '#2b1d3a' }, { bg: '#1c3550' }, { bg: '#3a2a1a' }];
+let themeIdx = +(localStorage.getItem('maker_theme') || 0) % THEMES.length;
+let runStart = 0, clipboard = null, selRect = null, selDrag = null, hoverRC = { r: 0, c: 0 };
+const stageKey = () => String(currentStageInfo.id || 'local');
+const loadJ = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
 let undoStack = [], redoStack = [], strokeSnap = null;
 
 let enemies = []; let particles = []; let trails = []; let beamEmitters = []; let projectiles = []; let crosses = []; let lifts = []; 
@@ -485,6 +496,21 @@ window.addEventListener('keydown', e => {
     else if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) { e.preventDefault(); redo(); }
 });
 
+// ===== 範囲選択 =====
+const rcOf = e => ({ r: Math.max(0, Math.min(MAP_ROWS - 1, Math.floor((e.clientY / zoomScale + camera.y) / 40))), c: Math.max(0, Math.min(MAP_COLS - 1, Math.floor((e.clientX / zoomScale + camera.x) / 40))) });
+const normSel = (a, b) => ({ r1: Math.min(a.r, b.r), c1: Math.min(a.c, b.c), r2: Math.max(a.r, b.r), c2: Math.max(a.c, b.c) });
+canvas.addEventListener('mousedown', e => { if (mode === 'edit' && e.shiftKey && e.button === 0) { e.stopImmediatePropagation(); const p = rcOf(e); selDrag = { ...normSel(p, p), a: p }; selRect = null; } }, true);
+window.addEventListener('mousemove', e => { hoverRC = rcOf(e); if (selDrag) Object.assign(selDrag, normSel(selDrag.a, hoverRC)); });
+window.addEventListener('mouseup', () => { if (selDrag) { selRect = { r1: selDrag.r1, c1: selDrag.c1, r2: selDrag.r2, c2: selDrag.c2 }; selDrag = null; } });
+window.addEventListener('keydown', e => {
+    if (mode !== 'edit') return; const tg = e.target && e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+    if (e.code === 'Escape') selRect = null;
+    if (selRect && (e.code === 'Delete' || e.code === 'Backspace')) { beginStroke(); for (let r = selRect.r1; r <= selRect.r2; r++) for (let c = selRect.c1; c <= selRect.c2; c++) if (mapData[r][c] !== T.START && mapData[r][c] !== T.WARP) mapData[r][c] = 0; endStroke(); }
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.code === 'KeyC' && selRect) { clipboard = []; for (let r = selRect.r1; r <= selRect.r2; r++) clipboard.push(mapData[r].slice(selRect.c1, selRect.c2 + 1)); showToast('コピーしました'); }
+    if (e.code === 'KeyV' && clipboard) { e.preventDefault(); beginStroke(); clipboard.forEach((row, i) => row.forEach((t, j) => { const r = hoverRC.r + i, c = hoverRC.c + j; if (r < MAP_ROWS && c < MAP_COLS && t !== T.START && t !== T.WARP) mapData[r][c] = t; })); endStroke(); }
+});
+
 // ===== チェックポイント =====
 const CP_CONSUMABLES = [T.COIN, T.KEY, T.DOOR, T.SPIDER, T.SPIDER_NEW, T.DOUBLE_JUMP, T.DASH_SHOES];
 function activateCheckpoint(r, c) {
@@ -511,6 +537,20 @@ function applyCheckpoint() {
     player.x = cp.x; player.y = cp.y; player.vx = 0; player.vy = 0;
 }
 
+function cycleTheme() { themeIdx = (themeIdx + 1) % THEMES.length; try { localStorage.setItem('maker_theme', themeIdx); } catch (e) {} }
+function envForces() {
+    const p = player; if (p.state === 'dead' || p.state === 'clear') return;
+    const t = tileAt(Math.floor((p.y + p.h / 2) / 40), Math.floor((p.x + p.w / 2) / 40));
+    if (t === T.WATER) { p.vy *= 0.85; p.vx *= 0.92; if (keys.jump) p.vy -= 1.0 * p.gravityDir; p.vy = Math.max(-5, Math.min(5, p.vy)); p.doubleJumpUsed = false; }
+    else if (t === T.WIND_R) p.vx += 0.9;
+    else if (t === T.WIND_U) p.vy -= 1.3 * p.gravityDir;
+}
+function recordTime() {
+    const t = (performance.now() - runStart) / 1000, k = 'maker_best_' + stageKey(), b = parseFloat(localStorage.getItem(k));
+    let s = 'TIME ' + t.toFixed(2) + 's';
+    if (!b || t < b) { try { localStorage.setItem(k, t.toFixed(2)); } catch (e) {} s += ' NEW BEST!'; } else s += ' (BEST ' + b.toFixed(2) + 's)';
+    return s;
+}
 function initMap() {
     mapData = Array.from({ length: MAP_ROWS }, () => new Array(MAP_COLS).fill(0));
     for (let c = 0; c < MAP_COLS; c++) { 
@@ -589,7 +629,7 @@ function setMode(newMode) {
     document.getElementById('hud-star-status').style.display = 'none';
 
     if (mode === 'play') {
-        savedMapDataStr = JSON.stringify(mapData); checkpointState = null; startPlay();
+        savedMapDataStr = JSON.stringify(mapData); checkpointState = null; runStart = performance.now(); startPlay();
     } else {
         leaveLobby(true);
         document.getElementById('hud-mp-status').style.display = 'none'; chatWrapper.classList.remove('show');
@@ -677,6 +717,7 @@ function die() {
         document.getElementById('screen-flash').style.opacity = '1'; setTimeout(() => document.getElementById('screen-flash').style.opacity = '0', 50);
         return;
     }
+    try { const k = 'maker_deaths_' + stageKey(), d = loadJ(k, []); d.push([Math.round(player.x), Math.round(player.y)]); localStorage.setItem(k, JSON.stringify(d.slice(-200))); } catch (e) {}
     player.state = 'dead'; screenShake = 20; player.vy = -12 * player.gravityDir; player.vx = 0;
     document.getElementById('screen-flash').style.opacity = '1'; setTimeout(() => document.getElementById('screen-flash').style.opacity = '0', 100);
     createParticles(player.x + player.w/2, player.y + player.h/2, '#ff2a5f', 50);
@@ -687,7 +728,7 @@ function win() {
     if (player.state === 'clear' || player.state === 'dead') return;
     if (player.coins < totalCoinsInStage) { if (Date.now() - lastCoinToast > 1500) { lastCoinToast = Date.now(); showToast(`コイン残り: ${totalCoinsInStage - player.coins}枚`); } return; }
     player.state = 'clear'; player.vx = 0; player.vy = 0; 
-    const centerMsg = document.getElementById('center-msg'); centerMsg.innerText = "STAGE CLEAR!"; centerMsg.classList.add('show');
+    const centerMsg = document.getElementById('center-msg'); centerMsg.innerText = "STAGE CLEAR! " + recordTime(); centerMsg.classList.add('show');
     
     if (isMultiplayer && socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: 'clear' }));
@@ -947,6 +988,7 @@ function updatePhysics() {
     enemies = enemies.filter(e => !e.dead && e.y < MAP_ROWS * 40 + 300 && e.y > -300);
     crosses = crosses.filter(cr => cr.y < MAP_ROWS * 40 + 300);
 
+    envForces();
     beamEmitters.forEach(b => {
         b.tmr++; if (b.tmr >= 90) {
             b.tmr = 0; let px = b.c * 40 + 20, py = b.r * 40 + 20, vx = 0, vy = 0, hm = false;
@@ -997,6 +1039,8 @@ function checkColl(isX) {
             if (tl === T.WARP && p.warpCooldown > 0) p.warpCooldown = Math.max(p.warpCooldown, 2);
             if (tl === T.WARP && p.warpCooldown === 0) { let pr = warpPairs.find(w => (w.r1 === row && w.c1 === col) || (w.r2 === row && w.c2 === col)); if (pr && pr.r2 !== undefined) { let dr = (pr.r1 === row && pr.c1 === col) ? pr.r2 : pr.r1, dc = (pr.r1 === row && pr.c1 === col) ? pr.c2 : pr.c1; p.x = dc * 40 + 7; p.y = dr * 40 + 14; p.warpCooldown = 60; screenShake = 12; p.scaleX = 0.2; p.scaleY = 2.0; return; } }
             if (tl === T.CHECKPOINT) activateCheckpoint(row, col);
+            if (tl === T.LAVA && p.invincibleTimer === 0 && p.boostTimer === 0 && rectIntersect(p, { x: col * 40, y: row * 40 + 12, w: 40, h: 28 })) die();
+            if (tl === T.SHRINK) { activeMapData[row][col] = 0; if (p.h > 16) { if (p.gravityDir > 0) p.y += p.h - 16; p.h = 16; p.w = 18; showToast('縮小!'); } }
             if (tl === T.GOAL) { win(); return; }
             if (tl === T.HIDDEN_BLOCK && !isX && p.vy < 0 && (p.y - p.vy) >= row * 40 + 32) { activeMapData[row][col] = T.BLOCK; p.vy = 2; p.y = row * 40 + 40; screenShake = 10; createParticles(col * 40 + 20, row * 40 + 20, '#f1c40f', 25); return; }
             
@@ -1045,6 +1089,10 @@ function drawTileGraphics(ctx, t, r, c, x, y, ts, hc) {
     else if (t === T.DASH_SHOES) { ctx.fillStyle = '#ff7675'; ctx.fillRect(x + 8, y + 24, 24, 6); ctx.fillRect(x + 8, y + 18, 8, 6); ctx.fillRect(x + 24, y + 12, 8, 12); }
     else if ([T.ENEMY, T.ENEMY2, T.ENEMY_H, T.ENEMY_V, T.ENEMY_SNIPER, T.ENEMY_GOLGO, T.ENEMY_SHELL, T.ENEMY_GHOST].includes(t)) { if (mode === 'edit') { ctx.fillStyle = t === T.ENEMY2 ? '#ff2a5f' : t === T.ENEMY_H ? '#e67e22' : t === T.ENEMY_V ? '#34495e' : t === T.ENEMY_SNIPER ? '#ff4757' : t === T.ENEMY_GOLGO ? '#2c3e50' : t === T.ENEMY_SHELL ? '#27ae60' : t === T.ENEMY_GHOST ? '#ecf0f1' : '#a855f7'; roundRect(ctx, x + 4, y + ts - 28, 28, 28, 6); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + 12, y + ts - 18, 4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x + 24, y + ts - 18, 4, 0, Math.PI * 2); ctx.fill(); } }
     else if (t === T.CHECKPOINT) { const on = mode === 'play' && checkpointState && checkpointState.r === r && checkpointState.c === c; ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x + 10, y + 4, 4, ts - 4); ctx.strokeRect(x + 10, y + 4, 4, ts - 4); ctx.fillStyle = on ? '#2ecc71' : '#7f8c8d'; const fy = on ? y + 4 : y + 16; ctx.beginPath(); ctx.moveTo(x + 14, fy); ctx.lineTo(x + 32, fy + 8); ctx.lineTo(x + 14, fy + 16); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    else if (t === T.WATER) { ctx.fillStyle = 'rgba(52,152,219,0.45)'; ctx.fillRect(x, y, ts, ts); }
+    else if (t === T.WIND_R || t === T.WIND_U) { ctx.strokeStyle = '#dfe6e9'; ctx.lineWidth = 2; const o = (globalFrame * 2) % ts; for (let i = 0; i < 3; i++) { const q = (o + i * 13) % ts; ctx.beginPath(); if (t === T.WIND_R) { ctx.moveTo(x + q, y + 8 + i * 12); ctx.lineTo(x + q + 10, y + 8 + i * 12); } else { ctx.moveTo(x + 8 + i * 12, y + ts - q); ctx.lineTo(x + 8 + i * 12, y + ts - q - 10); } ctx.stroke(); } }
+    else if (t === T.LAVA) { ctx.fillStyle = '#e67e22'; ctx.fillRect(x, y + 8, ts, ts - 8); ctx.fillStyle = '#f1c40f'; for (let i = 0; i < 4; i++) ctx.fillRect(x + i * 10, y + 8 + Math.sin((globalFrame + i * 8) / 8) * 3, 6, 4); }
+    else if (t === T.SHRINK) { ctx.fillStyle = '#9b59b6'; ctx.beginPath(); ctx.arc(x + hc, y + 20, 11, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x + 14, y + 20, 12, 10); }
     else if (t === T.GOAL) { ctx.fillStyle = '#fff'; ctx.fillRect(x + ts / 4, y, 4, ts); ctx.strokeRect(x + ts / 4, y, 4, ts); ctx.fillStyle = '#ff2a5f'; ctx.beginPath(); ctx.moveTo(x + ts / 4 + 4, y + 2); ctx.lineTo(x + ts - 2, y + ts / 4); ctx.lineTo(x + ts / 4 + 4, y + ts / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); }
     else if (t === T.START) { ctx.fillStyle = 'rgba(16,185,129,0.4)'; roundRect(ctx, x, y, ts, ts, 4); ctx.fillStyle = '#fff'; ctx.font = "900 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText("START", x + hc, y + hc + 4); }
 }
@@ -1082,7 +1130,7 @@ function drawPlayer(ctx, p, isSelf) {
 }
 
 function draw() {
-    ctx.fillStyle = '#0f121a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = THEMES[themeIdx].bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
     const dpr = window.devicePixelRatio || 1, vW = Math.max(1, window.innerWidth) / zoomScale, vH = Math.max(1, window.innerHeight) / zoomScale;
     
     if (mode === 'play') { 
@@ -1137,6 +1185,10 @@ function draw() {
         drawPlayer(ctx, player, true);
     }
     particles.forEach(pt => { ctx.globalAlpha = Math.max(0, pt.life); ctx.fillStyle = pt.color; ctx.fillRect(pt.x, pt.y, 5, 5); ctx.globalAlpha = 1.0; });
+    if (mode === 'edit') {
+        loadJ('maker_deaths_' + stageKey(), []).forEach(([dx, dy]) => { ctx.strokeStyle = 'rgba(255,42,95,0.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx + 20, dy + 20); ctx.moveTo(dx + 20, dy); ctx.lineTo(dx, dy + 20); ctx.stroke(); });
+        const s = selDrag || selRect; if (s) { ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(s.c1 * 40, s.r1 * 40, (s.c2 - s.c1 + 1) * 40, (s.r2 - s.r1 + 1) * 40); ctx.setLineDash([]); }
+    }
     ctx.restore();
 }
 
