@@ -464,7 +464,7 @@
     </div>
 </div>
 
-<!-- パスワード忘れ・再設定モーダル -->
+<!-- パスワード忘れ・再設定申請モーダル -->
 <div id="forgot-modal" class="modal-overlay" onclick="if(event.target === this) closeForgotModal();">
     <div class="modal-box" onclick="event.stopPropagation();">
         <div class="modal-title">🔑 暗証番号の再設定</div>
@@ -478,6 +478,28 @@
         <div style="display: flex; gap: 8px; margin-top: 18px;">
             <button type="button" class="btn-action btn-close" style="flex: 1;" onclick="closeForgotModal()">戻る</button>
             <button type="button" id="btn-forgot-submit" class="btn-action btn-gold" style="flex: 1;" onclick="sendPasswordReset()">再設定メール送信</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新暗証番号入力モーダル（メールリンクから戻ってきた時に表示） -->
+<div id="update-password-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title">🔐 新しい暗証番号の設定</div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
+            本人確認が完了しました。<br>新しい暗証番号を入力してください。
+        </p>
+        <div class="form-group">
+            <label for="new-password">新しい暗証番号 (Password)</label>
+            <div class="input-wrap">
+                <input type="password" id="new-password" placeholder="••••••••" autocomplete="new-password">
+                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('new-password', this)" title="表示切替">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+            </div>
+        </div>
+        <div style="margin-top: 18px;">
+            <button type="button" id="btn-update-password" class="btn-action btn-gold" onclick="updatePassword()">暗証番号を更新</button>
         </div>
     </div>
 </div>
@@ -534,10 +556,31 @@
         document.getElementById("signup-realname").addEventListener("keydown", (e) => {
             if (e.key === "Enter") signup();
         });
+        document.getElementById("new-password").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") updatePassword();
+        });
+
+        // パスワード再設定メール経由のアクセス監視
+        if (supabaseClient) {
+            // URLハッシュにエラーが含まれている場合のハンドリング
+            if (window.location.hash.includes("error=")) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const errorDescription = params.get("error_description") || "リンクが無効か期限切れです";
+                alert("認証エラー: " + decodeURIComponent(errorDescription.replace(/\+/g, " ")));
+                window.location.hash = "";
+            }
+
+            // PASSWORD_RECOVERY イベントを受信したら更新モーダルを表示
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (event === "PASSWORD_RECOVERY") {
+                    document.getElementById("update-password-modal").style.display = "flex";
+                }
+            });
+        }
     });
 
-    // ログイン済みの場合は自動でダッシュボードへ遷移
-    if (localStorage.getItem("access_token")) {
+    // ログイン済みの場合は自動でダッシュボードへ遷移（パスワード再設定URL踏み時を除く）
+    if (localStorage.getItem("access_token") && !window.location.hash.includes("type=recovery")) {
         window.location.href = "/dashboard";
     }
 
@@ -560,7 +603,7 @@
         }
     }
 
-    // パスワードリセット処理
+    // パスワードリセット申請モーダル制御
     function openForgotModal() {
         document.getElementById("forgot-email").value = document.getElementById("login-email").value || "";
         document.getElementById("forgot-modal").style.display = "flex";
@@ -568,6 +611,8 @@
     function closeForgotModal() {
         document.getElementById("forgot-modal").style.display = "none";
     }
+
+    // パスワードリセットメール送信
     async function sendPasswordReset() {
         const email = document.getElementById("forgot-email").value.trim();
         if (!email) return alert("国民ID（メールアドレス）を入力してください");
@@ -581,8 +626,10 @@
         btn.innerText = "送信中...";
 
         try {
+            // このページ自身（現在のURLのオリジン + パス）をリダイレクト先に指定
+            const redirectUrl = window.location.origin + window.location.pathname;
             const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + '/dashboard'
+                redirectTo: redirectUrl
             });
             if (error) throw error;
             alert("再設定用の案内メールを送信しました。\nメール内のリンクから再設定を完了してください。");
@@ -592,6 +639,37 @@
         } finally {
             btn.disabled = false;
             btn.innerText = "再設定メール送信";
+        }
+    }
+
+    // 新暗証番号の確定・更新処理
+    async function updatePassword() {
+        const newPassword = document.getElementById("new-password").value;
+        if (!newPassword) {
+            alert("新しい暗証番号を入力してください");
+            return;
+        }
+
+        const btn = document.getElementById("btn-update-password");
+        btn.disabled = true;
+        btn.innerText = "更新中...";
+
+        try {
+            const { data, error } = await supabaseClient.auth.updateUser({
+                password: newPassword
+            });
+            if (error) throw error;
+
+            alert("暗証番号を更新しました。新しい暗証番号で入国してください。");
+            document.getElementById("update-password-modal").style.display = "none";
+            // 状態リセット
+            await supabaseClient.auth.signOut();
+            window.location.href = window.location.pathname;
+        } catch (e) {
+            alert("更新失敗: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "暗証番号を更新";
         }
     }
 
