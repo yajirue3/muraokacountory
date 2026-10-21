@@ -14,7 +14,6 @@ from db import get_supabase
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-# 2026年最新の主力高速モデル
 MODEL_NAME = "gemini-3.5-flash"
 
 ai_client = None
@@ -49,7 +48,7 @@ class ChatResponse(BaseModel):
 
 async def save_messages_to_db(user_id: str, user_text: str, reply_text: str):
     """
-    レスポンス返却をブロックしないようバックグラウンドで履歴をDB保存
+    メッセージ履歴をDB保存
     """
     try:
         client = await get_supabase()
@@ -77,33 +76,44 @@ async def build_conversation_contents(client, user_id: str, new_message: str) ->
     raw_history = history_res.data or []
     raw_history.reverse()
 
+    # 有効なメッセージのみ抽出し、DB上のロール表記を検証
+    valid_history = []
+    for item in raw_history:
+        role = item.get("role")
+        content = item.get("content", "").strip()
+        if role in ["user", "model"] and content:
+            valid_history.append({"role": role, "content": content})
+
     # Geminiの制約: 会話は必ず user から開始する
-    while raw_history and raw_history[0].get("role") != "user":
-        raw_history.pop(0)
+    while valid_history and valid_history[0]["role"] != "user":
+        valid_history.pop(0)
 
     contents: List[types.Content] = []
-    last_role = None
 
-    for item in raw_history:
-        current_role = item.get("role")
-        text_content = item.get("content", "")
-        # 同一ロールの連続を防止
-        if current_role and text_content and current_role != last_role:
+    for item in valid_history:
+        current_role = item["role"]
+        # 同一ロールが連続した場合は改行で結合してターン構造を維持
+        if contents and contents[-1].role == current_role:
+            contents[-1].parts[0].text += f"\n{item['content']}"
+        else:
             contents.append(
                 types.Content(
                     role=current_role,
-                    parts=[types.Part.from_text(text=text_content)]
+                    parts=[types.Part.from_text(text=item['content'])]
                 )
             )
-            last_role = current_role
 
-    # 今回の入力を追加
-    contents.append(
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=new_message)]
+    # 今回のメッセージを追加
+    if contents and contents[-1].role == "user":
+        contents[-1].parts[0].text += f"\n{new_message}"
+    else:
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=new_message)]
+            )
         )
-    )
+
     return contents
 
 
@@ -115,7 +125,6 @@ async def chat_with_gemini(
 ):
     """
     一括返却用チャットエンドポイント
-    DB保存をバックグラウンドに回すことで待機時間を短縮
     """
     user = await get_user_from_token(authorization)
 
@@ -129,7 +138,6 @@ async def chat_with_gemini(
     client = await get_supabase()
     contents = await build_conversation_contents(client, user.id, clean_message)
 
-    # 思考レベルをMINIMALにして思考待機時間を抑えつつ上限トークンを適正化
     config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             thinking_level=types.ThinkingLevel.MINIMAL
@@ -149,7 +157,6 @@ async def chat_with_gemini(
         print(f"[AI Generate Error]: {e}")
         raise HTTPException(status_code=500, detail=f"AI応答エラー: {str(e)}")
 
-    # DBへの書き込み完了を待たずに即時レスポンスを返し、保存はバックグラウンドで実行
     background_tasks.add_task(save_messages_to_db, user.id, clean_message, reply_text)
 
     return ChatResponse(reply=reply_text)
@@ -183,9 +190,10 @@ async def stream_generator(contents: List[types.Content], user_id: str, clean_me
 
         yield "data: [DONE]\n\n"
 
-        # 生成完了後に履歴をSupabaseへ保存
+        # 生成完了後に確実にSupabaseへ保存（awaitでGC破棄を回避）
         full_reply = "".join(full_reply_chunks)
-        asyncio.create_task(save_messages_to_db(user_id, clean_message, full_reply))
+        if full_reply:
+            await save_messages_to_db(user_id, clean_message, full_reply)
 
     except Exception as e:
         print(f"[AI Stream Error]: {e}")
@@ -199,7 +207,7 @@ async def chat_with_gemini_stream(
     authorization: str = Header(None)
 ):
     """
-    超低レイテンシで最初の1文字目から順次返答を返すSSEストリーミングエンドポイント
+    SSEストリーミングエンドポイント
     """
     user = await get_user_from_token(authorization)
 
