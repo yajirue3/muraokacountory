@@ -48,7 +48,7 @@ class ChatResponse(BaseModel):
 
 async def save_messages_to_db(user_id: str, user_text: str, reply_text: str):
     """
-    メッセージ履歴をDB保存
+    メッセージ履歴をDBへ保存
     """
     try:
         client = await get_supabase()
@@ -63,8 +63,9 @@ async def save_messages_to_db(user_id: str, user_text: str, reply_text: str):
 
 async def build_conversation_contents(client, user_id: str, new_message: str) -> List[types.Content]:
     """
-    Supabaseから履歴を取得し、Geminiの会話ターン要件に適合したContentsリストを生成
+    Supabaseから履歴を取得し、Geminiの会話ターン要件（user ↔ model の交互構造）に完全に適合したContentsリストを生成
     """
+    # 履歴を取得（直近10件）
     history_res = await (
         client.table("ai_chat_messages")
         .select("role, content")
@@ -76,41 +77,41 @@ async def build_conversation_contents(client, user_id: str, new_message: str) ->
     raw_history = history_res.data or []
     raw_history.reverse()
 
-    # 有効なメッセージのみ抽出し、DB上のロール表記を検証
-    valid_history = []
+    # 1. 有効なデータのみ抽出
+    cleaned_history = []
     for item in raw_history:
         role = item.get("role")
-        content = item.get("content", "").strip()
+        content = (item.get("content") or "").strip()
         if role in ["user", "model"] and content:
-            valid_history.append({"role": role, "content": content})
+            cleaned_history.append({"role": role, "content": content})
 
-    # Geminiの制約: 会話は必ず user から開始する
-    while valid_history and valid_history[0]["role"] != "user":
-        valid_history.pop(0)
+    # 2. Geminiの必須制約: 会話は必ず user から開始する
+    while cleaned_history and cleaned_history[0]["role"] != "user":
+        cleaned_history.pop(0)
 
-    contents: List[types.Content] = []
-
-    for item in valid_history:
-        current_role = item["role"]
-        # 同一ロールが連続した場合は改行で結合してターン構造を維持
-        if contents and contents[-1].role == current_role:
-            contents[-1].parts[0].text += f"\n{item['content']}"
+    # 3. 隣り合う同一ロールの結合処理（user -> user や model -> model の連続を防止）
+    normalized_history = []
+    for item in cleaned_history:
+        if normalized_history and normalized_history[-1]["role"] == item["role"]:
+            normalized_history[-1]["content"] += f"\n{item['content']}"
         else:
-            contents.append(
-                types.Content(
-                    role=current_role,
-                    parts=[types.Part.from_text(text=item['content'])]
-                )
-            )
+            normalized_history.append(item)
 
-    # 今回のメッセージを追加
-    if contents and contents[-1].role == "user":
-        contents[-1].parts[0].text += f"\n{new_message}"
+    # 4. 今回の新しいメッセージの統合処理
+    if normalized_history and normalized_history[-1]["role"] == "user":
+        # 過去ログ最後が user で終わっていた場合（例外時）は改行結合
+        normalized_history[-1]["content"] += f"\n{new_message}"
     else:
+        # 通常時: 直前が model なので今回の user メッセージを新規追加
+        normalized_history.append({"role": "user", "content": new_message})
+
+    # 5. Gemini SDK の types.Content リストへ変換
+    contents: List[types.Content] = []
+    for item in normalized_history:
         contents.append(
             types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=new_message)]
+                role=item["role"],
+                parts=[types.Part.from_text(text=item["content"])]
             )
         )
 
@@ -143,7 +144,7 @@ async def chat_with_gemini(
             thinking_level=types.ThinkingLevel.MINIMAL
         ),
         max_output_tokens=600,
-        system_instruction="前後の文脈を汲み取り、簡潔で分かりやすい日本語でテンポよく回答してください。"
+        system_instruction="あなたは親しみやすいAIアシスタントです。過去の会話履歴を踏まえて、自然で分かりやすい日本語で回答してください。"
     )
 
     try:
@@ -171,7 +172,7 @@ async def stream_generator(contents: List[types.Content], user_id: str, clean_me
             thinking_level=types.ThinkingLevel.MINIMAL
         ),
         max_output_tokens=800,
-        system_instruction="前後の文脈を汲み取り、自然で親切な日本語で回答してください。"
+        system_instruction="あなたは親しみやすいAIアシスタントです。過去の会話履歴を踏まえて、自然で分かりやすい日本語で回答してください。"
     )
 
     full_reply_chunks = []
