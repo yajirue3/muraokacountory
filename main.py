@@ -1783,3 +1783,31 @@ async def websocket_daily_lobby(websocket: WebSocket, token: Optional[str] = Non
         pass
     finally:
         await lobby_manager.disconnect(user_id, conn)
+
+# --------------------------------------------------
+# マイクラプラグイン専用 ログインAPI
+# --------------------------------------------------
+@app.post("/login/minecraft")
+async def login_minecraft(user: UserAuth):
+    try:
+        client = await get_supabase()
+        res = await client.auth.sign_in_with_password({
+            "email": user.email, 
+            "password": user.password
+        })
+        
+        if not res or not res.session:
+            raise HTTPException(
+                status_code=400, 
+                detail="メール認証が未完了か、アカウントが無効です。"
+            )
+
+        return {
+            "message": "入国許可",
+            "access_token": res.session.access_token,
+            "email": user.email
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"ログイン失敗: {str(e)}")
