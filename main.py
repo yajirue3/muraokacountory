@@ -441,29 +441,27 @@ async def pay_tax(data: PayTaxRequest, authorization: str = Header(None)):
             raise HTTPException(status_code=400, detail="指定された受取口座が存在しないか、所有権がありません。")
         raise HTTPException(status_code=400, detail=f"納税処理エラー: {err_msg}")
 
-@app.get("/api/wallets")  
-async def get_wallet(authorization: str = Header(None)):
+@app.get("/api/wallets")
+async def get_wallets(authorization: str = Header(None)):
     try:
-        if not authorization:
-            raise HTTPException(status_code=401, detail="No Authorization header")
+        # トークンからユーザー情報を取得
+        user = await get_user_from_token(authorization)
         
-        token = authorization.replace("Bearer ", "").strip()
+        # デフォルト口座の自動生成
+        await ensure_default_wallet(user.id)
         
-        # Supabase クライアントにトークンをセットして DB 取得
+        # Supabase からユーザーの口座一覧を取得
         client = await get_supabase()
-        # client.postgrest.auth(token) などの処理...
-
-        # (例: ウォレットデータ取得)
-        # res = await client.table('wallets').select('*').execute()
+        res = await client.table("wallets").select("*").eq("user_id", user.id).order("created_at").execute()
         
-        return {"status": "ok", "balance": 1000} # テスト用
+        return res.data
 
     except HTTPException as he:
         raise he
     except Exception as e:
-        # 500にせず、発生した具体的な例外メッセージを返す
         print(f"[WALLET DB ERROR] {str(e)}")
         raise HTTPException(status_code=400, detail=f"DBエラー: {str(e)}")
+
 @app.post("/api/wallets")
 async def create_wallet(data: WalletCreate, authorization: str = Header(None)):
     user = await get_user_from_token(authorization)
